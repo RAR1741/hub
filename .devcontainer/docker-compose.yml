@@ -1,3 +1,5 @@
+name: team-hub
+
 services:
   app:
     build:

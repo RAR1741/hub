@@ -5,17 +5,30 @@
 #   ./dev npm test
 #   ./dev bash -lc "npx supabase start"
 #   ./dev            # interactive shell
+#
+# Windows/Git Bash note: arguments containing absolute Linux paths (e.g.
+# /var/run/docker.sock, /etc/hosts) can get rewritten by MSYS path translation
+# before Docker ever sees them. If a command mysteriously can't find a path
+# that clearly exists in the container, prefix the invocation with
+# MSYS_NO_PATHCONV=1, e.g.: MSYS_NO_PATHCONV=1 ./dev cat /etc/hosts
 set -euo pipefail
 
 COMPOSE_FILE="$(cd "$(dirname "$0")" && pwd)/.devcontainer/docker-compose.yml"
 export LOCAL_WORKSPACE_FOLDER="${LOCAL_WORKSPACE_FOLDER:-$(cd "$(dirname "$0")" && pwd)}"
 
+# Pin the compose project name so this script always joins the same stack
+# VS Code's Dev Containers extension starts (it reads the `name:` in
+# docker-compose.yml). Without this, a project name derived from the
+# invoking directory could drift from VS Code's, starting a second stack
+# that fights the first one for port 3000.
+PROJECT_NAME="team-hub"
+
 # Start the service if it isn't already running.
-if [ -z "$(docker compose -f "$COMPOSE_FILE" ps -q app 2>/dev/null)" ]; then
-  docker compose -f "$COMPOSE_FILE" up -d app
+if [ -z "$(docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" ps -q app 2>/dev/null)" ]; then
+  docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" up -d app
 fi
 
 if [ "$#" -eq 0 ]; then
-  exec docker compose -f "$COMPOSE_FILE" exec app bash
+  exec docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" exec app bash
 fi
-exec docker compose -f "$COMPOSE_FILE" exec -T app "$@"
+exec docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" exec -T app "$@"
