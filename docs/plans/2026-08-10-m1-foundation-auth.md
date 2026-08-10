@@ -6,11 +6,12 @@
 
 **Architecture:** Next.js App Router (TypeScript) with all data access through server code using the Supabase service-role client; RLS enabled default-deny with zero policies. Two session types — Supabase Auth cookies (mentor OAuth) and an app-signed JWT cookie (students) — normalized by one `getViewer()` helper. Pure logic (tokens, role ranks, bootstrap decision) lives in `src/lib/` with Vitest unit tests; route handlers stay thin.
 
-**Tech Stack:** Next.js 15 (App Router, TS strict), Supabase (Postgres 15+, Auth, CLI migrations), `@supabase/supabase-js` + `@supabase/ssr`, `jose` (student JWT), Vitest, GitHub Actions.
+**Tech Stack:** Next.js 15 (App Router, TS strict), Supabase (Postgres 15+, Auth, CLI migrations), `@supabase/supabase-js` + `@supabase/ssr`, `jose` (student JWT), Vitest, GitHub Actions. **All local development runs in a VS Code Dev Container** — the only host requirements are Docker Desktop, VS Code, and a browser.
 
 ## Global Constraints (from the spec)
 
-- TypeScript strict; Node 22.
+- **Nothing is installed on the host.** No Node, no npm, no Supabase CLI, no psql on the host machine. Every command in this plan runs inside the dev container (VS Code terminal after "Reopen in Container"). The Supabase CLI is an npm devDependency invoked as `npx supabase`, never a host binary.
+- TypeScript strict; Node 22 (provided by the container image).
 - All timestamps `timestamptz` (UTC); UUID PKs (`gen_random_uuid()`).
 - Roles enum exactly: `admin`, `mentor`, `captain`, `student` (guest = unauthenticated, never stored).
 - `person.student_id_number` is an **arbitrary unique string** (phone, school ID, anything).
@@ -19,6 +20,116 @@
 - Team timezone lives in `app_setting` key `team_timezone`, default `"America/Indiana/Indianapolis"`.
 - Every commit is pushed to `origin master` immediately (standing team process).
 - Secrets only in `.env.local` (gitignored) / Vercel env vars — never committed.
+- **Two Supabase URLs, always.** Inside the container, the Supabase stack is a *sibling* container set reachable at `host.docker.internal`, not `localhost`. So: server-side code uses `SUPABASE_INTERNAL_URL` (`http://host.docker.internal:54321`); browser code uses `NEXT_PUBLIC_SUPABASE_URL` (`http://127.0.0.1:54321`, which is what the host browser can reach). Every server-side Supabase client goes through `serverSupabaseUrl()` (Task 3) — never read `NEXT_PUBLIC_SUPABASE_URL` in server code.
+
+---
+
+### Task 0: Containerized dev environment (Dev Container)
+
+**Files:**
+- Create: `.devcontainer/devcontainer.json`
+- Create: `.devcontainer/Dockerfile`
+- Modify: `.gitignore` (add `.env*` with `!.env.example`, `node_modules`, `.next`, `supabase/.temp`)
+
+**Interfaces:**
+- Consumes: nothing (first task).
+- Produces: a dev container with Node 22, git, and a working `docker` CLI wired to the host daemon; `node`, `npm`, `npx`, and `docker ps` all functional inside it. Every later task runs in this container.
+
+Design (validated against the known devcontainer + Supabase pitfalls):
+- **docker-outside-of-docker**, not docker-in-docker: the container gets the host Docker socket, so `npx supabase start` launches sibling containers on the host daemon. Their ports (54321 API, 54322 Postgres, 54323 Studio) are published on the host, so the host browser reaches them at `127.0.0.1`, and the dev container reaches them at `host.docker.internal`.
+- `containerEnv` passes `LOCAL_WORKSPACE_FOLDER=${localWorkspaceFolder}` — the *host* path of the repo. Sibling containers can only mount host paths, so any Supabase CLI feature that bind-mounts (Edge Functions, `db test`) needs this. M1 doesn't use those, but omitting it produces confusing path errors later.
+
+- [ ] **Step 1: Write the container image**
+
+Create `.devcontainer/Dockerfile`:
+
+```dockerfile
+FROM mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm
+
+# psql client, for inspecting the local Supabase database from inside the container.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+```
+
+- [ ] **Step 2: Write the dev container config**
+
+Create `.devcontainer/devcontainer.json`:
+
+```jsonc
+{
+  "name": "team-hub",
+  "build": { "dockerfile": "Dockerfile" },
+  "features": {
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
+      "moby": false
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "containerEnv": {
+    // Host path of the repo. Sibling containers started by the Supabase CLI can
+    // only bind-mount host paths, so tooling needs to know this.
+    "LOCAL_WORKSPACE_FOLDER": "${localWorkspaceFolder}"
+  },
+  "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": { "label": "Next.js dev server", "onAutoForward": "notify" }
+  },
+  "postCreateCommand": "npm install --no-audit --no-fund || true",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "ms-playwright.playwright"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  },
+  "remoteUser": "node"
+}
+```
+
+(`postCreateCommand` tolerates failure with `|| true` because on the very first open there is no `package.json` yet — Task 1 creates it.)
+
+- [ ] **Step 3: Ensure .gitignore covers the basics**
+
+`.gitignore` must contain at least:
+
+```gitignore
+node_modules
+.next
+.env*
+!.env.example
+supabase/.temp
+```
+
+- [ ] **Step 4: Open in the container and verify the environment**
+
+In VS Code: **Dev Containers: Reopen in Container** (Command Palette). Wait for the build. Then in the container terminal:
+
+```bash
+node --version    # expect v22.x
+npm --version
+docker ps         # expect a table (host daemon reachable), not a permission error
+getent hosts host.docker.internal   # expect an IP — the route to sibling containers
+psql --version    # expect 15.x or newer
+```
+
+Expected: all five succeed. If `docker ps` fails with a socket permission error, rebuild the container (the docker-outside-of-docker feature adjusts group membership at build time).
+
+**From here on, every command in this plan runs in this container's terminal.**
+
+- [ ] **Step 5: Commit and push**
+
+```bash
+git add .devcontainer .gitignore
+git commit -m "feat: add dev container (Docker Desktop is the only host requirement)"
+git push
+```
 
 ---
 
@@ -31,13 +142,13 @@
 - Create: `.github/workflows/ci.yml`
 
 **Interfaces:**
-- Consumes: nothing (first task).
+- Consumes: the dev container from Task 0 (all commands run inside it).
 - Produces: `npm run dev|build|lint|typecheck|test` all working; CI running lint + typecheck + test on push/PR.
 
-- [ ] **Step 1: Scaffold the app**
+- [ ] **Step 1: Scaffold the app (inside the dev container)**
 
 ```bash
-cd /c/Users/Jordan/Documents/Git/hub
+cd /workspaces/hub
 npx create-next-app@latest . --typescript --eslint --app --src-dir --no-tailwind --import-alias "@/*" --use-npm --yes
 ```
 
@@ -61,9 +172,10 @@ export default defineConfig({
 });
 ```
 
-Add to `package.json` scripts:
+Add to `package.json` scripts (note `dev` binds `0.0.0.0` so the forwarded port works from the host browser):
 
 ```json
+"dev": "next dev -H 0.0.0.0",
 "test": "vitest run",
 "typecheck": "tsc --noEmit"
 ```
@@ -125,29 +237,41 @@ Then check: `gh run watch --exit-status` (CI green).
 ### Task 2: Supabase local setup and core schema migration
 
 **Files:**
-- Create: `supabase/config.toml` (via `supabase init`)
+- Create: `supabase/config.toml` (via `npx supabase init`)
 - Create: `supabase/migrations/<timestamp>_core_schema.sql`
 - Create: `supabase/seed.sql`
-- Modify: `.gitignore` (ensure `.env.local`, `supabase/.temp` ignored)
 - Create: `.env.example`
+- Modify: `package.json` (add `supabase` devDependency + db scripts)
 
 **Interfaces:**
-- Consumes: nothing.
-- Produces: tables `person`, `account_request`, `kiosk_device`, `app_setting`; enum `person_role`; local stack via `supabase start`; seed data (one student with `student_id_number = '1741'`).
+- Consumes: dev container (Task 0), npm project (Task 1).
+- Produces: tables `person`, `account_request`, `kiosk_device`, `app_setting`; enum `person_role`; local stack via `npm run db:start`; seed data (one student with `student_id_number = '1741'`).
 
-- [ ] **Step 1: Initialize Supabase**
+- [ ] **Step 1: Install the Supabase CLI as a devDependency and initialize**
+
+The CLI is a project dependency, never a host install — this is Supabase's recommended path and keeps the host clean per the global constraints.
 
 ```bash
-supabase init
-supabase start
+npm install -D supabase
+npx supabase init
+npx supabase start
 ```
 
-(Requires Docker running. `supabase start` prints local URLs and keys — copy `API URL`, `service_role key` for `.env.local` in Task 3.)
+`npx supabase start` talks to the host Docker daemon through the mounted socket and prints the local URLs and keys. Copy `service_role key` and `anon key` into `.env.local` (Step 5). First run pulls several images and takes a few minutes.
+
+Add convenience scripts to `package.json`:
+
+```json
+"db:start": "supabase start",
+"db:stop": "supabase stop",
+"db:reset": "supabase db reset",
+"db:psql": "psql postgresql://postgres:postgres@host.docker.internal:54322/postgres"
+```
 
 - [ ] **Step 2: Write the core schema migration**
 
 ```bash
-supabase migration new core_schema
+npx supabase migration new core_schema
 ```
 
 Fill the generated `supabase/migrations/<timestamp>_core_schema.sql`:
@@ -223,37 +347,47 @@ values ('Test', 'Student', 'student', '1741', 2028);
 
 - [ ] **Step 4: Apply and verify**
 
-Run: `supabase db reset`
+Run: `npm run db:reset`
 Expected: migration + seed apply cleanly.
 
-Verify:
+Verify (from inside the container, so Postgres is at `host.docker.internal`):
 
 ```bash
-supabase db psql -c "select first_name, role, student_id_number from person;"
-supabase db psql -c "select key, value from app_setting;"
+npm run db:psql -- -c "select first_name, role, student_id_number from person;"
+npm run db:psql -- -c "select key, value from app_setting;"
 ```
 
 Expected: the Test Student row and the `team_timezone` setting.
-(If `supabase db psql` is unavailable in the installed CLI version, use `psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -c ...`.)
 
-- [ ] **Step 5: Env example + gitignore**
+- [ ] **Step 5: Env example**
 
-Create `.env.example`:
+Create `.env.example` — note the deliberate two-URL split from the global constraints:
 
 ```bash
+# Browser-facing (host can reach this). Used only for Supabase Auth flows.
 NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<from supabase start>
-SUPABASE_SERVICE_ROLE_KEY=<from supabase start>
-STUDENT_SESSION_SECRET=<openssl rand -hex 32>
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key from `npm run db:start`>
+
+# Server-side (dev container reaches sibling containers via host.docker.internal).
+# Leave unset in production — Vercel talks to hosted Supabase over the public URL.
+SUPABASE_INTERNAL_URL=http://host.docker.internal:54321
+SUPABASE_SERVICE_ROLE_KEY=<service_role key from `npm run db:start`>
+
+# Student session signing secret: generate with `openssl rand -hex 32`
+STUDENT_SESSION_SECRET=
+
+# Mentor Google OAuth (Task 7; optional until credentials exist)
+GOOGLE_OAUTH_CLIENT_ID=
+GOOGLE_OAUTH_CLIENT_SECRET=
 ```
 
-Confirm `.gitignore` covers `.env*` (allow `.env.example` via `!.env.example`) and `supabase/.temp/`.
+Then `cp .env.example .env.local` and fill in the real values from the `db:start` output.
 
 - [ ] **Step 6: Commit and push**
 
 ```bash
-git add supabase .env.example .gitignore
-git commit -m "feat: add Supabase core schema (person, account_request, kiosk_device, app_setting)"
+git add supabase .env.example package.json package-lock.json
+git commit -m "feat: add Supabase core schema and containerized db scripts"
 git push
 ```
 
@@ -263,6 +397,8 @@ git push
 
 **Files:**
 - Create: `src/lib/types.ts`
+- Create: `src/lib/supabase-url.ts`
+- Test: `src/lib/supabase-url.test.ts`
 - Create: `src/lib/db.ts`
 - Create: `src/lib/settings.ts`
 - Test: `src/lib/settings.test.ts`
@@ -273,6 +409,7 @@ git push
   - `type Role = "admin" | "mentor" | "captain" | "student" | "guest"`
   - `type Person = { id: string; firstName: string; lastName: string; displayName: string | null; role: Exclude<Role, "guest">; gradYear: number | null; email: string | null; isActive: boolean; studentIdNumber: string | null; authUserId: string | null }`
   - `personFromRow(row: PersonRow): Person`
+  - `resolveServerSupabaseUrl(env: { SUPABASE_INTERNAL_URL?: string; NEXT_PUBLIC_SUPABASE_URL?: string }): string` and `serverSupabaseUrl(): string` — **every server-side Supabase client must use this**
   - `getDb(): SupabaseClient` (service-role, server-only)
   - `getSetting<T>(key: string, fallback: T, db?): Promise<T>`
 
@@ -326,10 +463,76 @@ export function personFromRow(row: PersonRow): Person {
 }
 ```
 
-- [ ] **Step 2: Write the service-role client**
+- [ ] **Step 2a: Write the failing test for the server URL seam**
+
+Create `src/lib/supabase-url.test.ts`:
+
+```ts
+import { describe, expect, test } from "vitest";
+import { resolveServerSupabaseUrl } from "./supabase-url";
+
+describe("resolveServerSupabaseUrl", () => {
+  test("prefers the internal URL when set (dev container → sibling containers)", () => {
+    expect(
+      resolveServerSupabaseUrl({
+        SUPABASE_INTERNAL_URL: "http://host.docker.internal:54321",
+        NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
+      }),
+    ).toBe("http://host.docker.internal:54321");
+  });
+
+  test("falls back to the public URL in production", () => {
+    expect(
+      resolveServerSupabaseUrl({
+        NEXT_PUBLIC_SUPABASE_URL: "https://abc.supabase.co",
+      }),
+    ).toBe("https://abc.supabase.co");
+  });
+
+  test("throws when neither is configured", () => {
+    expect(() => resolveServerSupabaseUrl({})).toThrow();
+  });
+});
+```
+
+Run: `npm run test` → FAIL (module not found).
+
+- [ ] **Step 2b: Implement the URL seam and the service-role client**
 
 ```bash
-npm install @supabase/supabase-js @supabase/ssr
+npm install @supabase/supabase-js @supabase/ssr server-only
+```
+
+Create `src/lib/supabase-url.ts`:
+
+```ts
+/**
+ * Server-side Supabase base URL.
+ *
+ * In the dev container the Supabase stack runs as sibling containers on the host
+ * daemon, so server code must reach it at host.docker.internal — `localhost`
+ * would resolve to the app container itself. In production SUPABASE_INTERNAL_URL
+ * is unset and the public URL is correct.
+ */
+export function resolveServerSupabaseUrl(env: {
+  SUPABASE_INTERNAL_URL?: string;
+  NEXT_PUBLIC_SUPABASE_URL?: string;
+}): string {
+  const url = env.SUPABASE_INTERNAL_URL || env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!url) {
+    throw new Error(
+      "Set SUPABASE_INTERNAL_URL (dev container) or NEXT_PUBLIC_SUPABASE_URL",
+    );
+  }
+  return url;
+}
+
+export function serverSupabaseUrl(): string {
+  return resolveServerSupabaseUrl({
+    SUPABASE_INTERNAL_URL: process.env.SUPABASE_INTERNAL_URL,
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+  });
+}
 ```
 
 Create `src/lib/db.ts`:
@@ -337,6 +540,7 @@ Create `src/lib/db.ts`:
 ```ts
 import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { serverSupabaseUrl } from "./supabase-url";
 
 let db: SupabaseClient | undefined;
 
@@ -344,7 +548,7 @@ let db: SupabaseClient | undefined;
 export function getDb(): SupabaseClient {
   if (!db) {
     db = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      serverSupabaseUrl(),
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
       { auth: { persistSession: false, autoRefreshToken: false } },
     );
@@ -353,9 +557,7 @@ export function getDb(): SupabaseClient {
 }
 ```
 
-```bash
-npm install server-only
-```
+Run: `npm run test` → PASS (URL seam tests).
 
 - [ ] **Step 3: Write the failing settings test**
 
@@ -428,7 +630,7 @@ Expected: PASS (settings tests + canary).
 
 ```bash
 git add src/lib package.json package-lock.json
-git commit -m "feat: add person types, service-role db client, settings accessor"
+git commit -m "feat: add person types, server URL seam, db client, settings accessor"
 git push
 ```
 
@@ -789,9 +991,11 @@ export async function getViewer(): Promise<Viewer> {
     "./student-session"
   );
 
+  const { serverSupabaseUrl } = await import("./supabase-url");
+
   const cookieStore = await cookies();
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    serverSupabaseUrl(),
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
@@ -898,7 +1102,7 @@ export async function POST(request: Request) {
 
 - [ ] **Step 6: Manual verification against the local stack**
 
-With `supabase start` running and `.env.local` filled from Task 2:
+In the dev container, with `npm run db:start` already run and `.env.local` filled from Task 2:
 
 ```bash
 npm run dev &
@@ -1049,6 +1253,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { getDb } from "@/lib/db";
+import { serverSupabaseUrl } from "@/lib/supabase-url";
 import { decideOAuthLink } from "@/lib/oauth-link";
 
 export async function GET(request: Request) {
@@ -1059,7 +1264,7 @@ export async function GET(request: Request) {
 
   const cookieStore = await cookies();
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    serverSupabaseUrl(),
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
@@ -1133,7 +1338,7 @@ secret = "env(GOOGLE_OAUTH_CLIENT_SECRET)"
 redirect_uri = "http://127.0.0.1:54321/auth/v1/callback"
 ```
 
-Add both vars to `.env.example` (values come from a Google Cloud OAuth client — set up once in the Google Cloud console; the production Supabase project gets the same pair in its dashboard). Then `supabase stop && supabase start`.
+The vars are already in `.env.example` from Task 2; fill real values in `.env.local` (from a Google Cloud OAuth client — created once in the Google Cloud console; the production Supabase project gets the same pair in its dashboard). Then restart the stack: `npm run db:stop && npm run db:start`.
 
 **Note:** if no Google OAuth client exists yet, this step can't be completed locally — commit the config, verify the decision-function tests pass, and flag OAuth end-to-end verification as pending credentials in the task report. Everything else in M1 works without it.
 
@@ -1145,7 +1350,7 @@ Expected: all pass.
 - [ ] **Step 8: Commit and push**
 
 ```bash
-git add src/lib/oauth-link.ts src/lib/oauth-link.test.ts src/app/auth supabase/config.toml .env.example
+git add src/lib/oauth-link.ts src/lib/oauth-link.test.ts src/app/auth supabase/config.toml
 git commit -m "feat: add mentor OAuth callback with allowlist and first-admin bootstrap"
 git push
 ```
@@ -1397,12 +1602,12 @@ export default async function HomePage() {
 
 - [ ] **Step 5: Manual verification of the full loop**
 
-With `supabase start` + `npm run dev`:
+With `npm run db:start` + `npm run dev` in the container, use the **host browser** at `http://localhost:3000` (VS Code forwards port 3000):
 
 1. Open `http://localhost:3000/` → "Browsing as guest".
 2. `/login` → student form → enter `1741` → home shows "Signed in as Test (student)".
 3. Sign out → guest again.
-4. Submit an account request → `supabase db psql -c "select first_name, status from account_request;"` shows the pending row.
+4. Submit an account request → in the container, `npm run db:psql -- -c "select first_name, status from account_request;"` shows the pending row.
 
 Expected: all four behave as described.
 
@@ -1564,15 +1769,29 @@ Attendance + roster web app for FRC Team 1741 (Red Alert Robotics).
 
 ## Development
 
-Prereqs: Node 22, Docker, the Supabase CLI.
+**Host requirements: Docker Desktop, VS Code (Dev Containers extension), a browser. Nothing else** —
+Node, npm, the Supabase CLI, and psql all live inside the dev container.
 
-    cp .env.example .env.local   # fill values from `supabase start` output
-    supabase start
-    npm install
-    npm run dev
+1. Clone the repo and open it in VS Code.
+2. Command Palette → **Dev Containers: Reopen in Container**.
+3. In the container terminal:
+
+       npm install
+       npm run db:start            # starts local Supabase (sibling containers)
+       cp .env.example .env.local  # fill in keys printed by db:start
+       npm run dev
+
+4. Open http://localhost:3000 in your host browser. Supabase Studio is at http://localhost:54323.
 
 Tests & checks: `npm run test`, `npm run lint`, `npm run typecheck`.
-Reset the local DB (migrations + seed): `supabase db reset`.
+Database: `npm run db:reset` (re-apply migrations + seed), `npm run db:psql` (SQL shell), `npm run db:stop`.
+
+### Why two Supabase URLs
+
+`NEXT_PUBLIC_SUPABASE_URL` (`127.0.0.1:54321`) is what your **browser** reaches.
+`SUPABASE_INTERNAL_URL` (`host.docker.internal:54321`) is what **server code inside the container**
+reaches, because the Supabase stack runs as sibling containers. Server code must always go through
+`serverSupabaseUrl()` in `src/lib/supabase-url.ts`. In production only the public URL is set.
 ```
 
 - [ ] **Step 7: Full check; commit and push**
