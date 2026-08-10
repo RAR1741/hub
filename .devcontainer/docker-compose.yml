@@ -1,0 +1,24 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ../:/workspaces/hub:cached
+      # Host Docker socket: lets the Supabase CLI start sibling containers.
+      - /var/run/docker.sock:/var/run/docker.sock
+    working_dir: /workspaces/hub
+    # Docker Desktop mounts /var/run/docker.sock as root:root (no distinct "docker"
+    # group GID to join), so the non-root "node" user can't reach it. Run as root
+    # to keep docker-outside-of-docker working for both VS Code and `./dev`.
+    user: root
+    environment:
+      # Host path of the repo, for tooling that bind-mounts into sibling containers.
+      LOCAL_WORKSPACE_FOLDER: ${LOCAL_WORKSPACE_FOLDER:-}
+    extra_hosts:
+      # Provided automatically by Docker Desktop; declared for Linux hosts too.
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "3000:3000"
+    # Keep the container alive so VS Code (and `docker compose exec`) can attach.
+    command: sleep infinity

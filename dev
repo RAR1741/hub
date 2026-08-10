@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Run a command inside the dev container. Nothing but Docker is needed on the host.
+#
+#   ./dev npm install
+#   ./dev npm test
+#   ./dev bash -lc "npx supabase start"
+#   ./dev            # interactive shell
+set -euo pipefail
+
+COMPOSE_FILE="$(cd "$(dirname "$0")" && pwd)/.devcontainer/docker-compose.yml"
+export LOCAL_WORKSPACE_FOLDER="${LOCAL_WORKSPACE_FOLDER:-$(cd "$(dirname "$0")" && pwd)}"
+
+# Start the service if it isn't already running.
+if [ -z "$(docker compose -f "$COMPOSE_FILE" ps -q app 2>/dev/null)" ]; then
+  docker compose -f "$COMPOSE_FILE" up -d app
+fi
+
+if [ "$#" -eq 0 ]; then
+  exec docker compose -f "$COMPOSE_FILE" exec app bash
+fi
+exec docker compose -f "$COMPOSE_FILE" exec -T app "$@"
