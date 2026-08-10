@@ -17,7 +17,7 @@
 - Roles enum exactly: `admin`, `mentor`, `captain`, `student` (guest = unauthenticated, never stored).
 - `person.student_id_number` is an **arbitrary unique string** (phone, school ID, anything).
 - RLS enabled on every table, **zero policies** — service-key-only access. Never use the anon key for data.
-- No email anywhere. No passwords anywhere.
+- No email *sending or receiving* anywhere, and no passwords anywhere (spec §1). Note this is about email as a communication channel/feature — storing an email *address* is fine and required: `person.email` backs the mentor OAuth allowlist (spec §3.2) and `account_request.email` is the optional contact field on the request form (spec §3.4). Both appear in the approved spec data model (§4).
 - Team timezone lives in `app_setting` key `team_timezone`, default `"America/Indiana/Indianapolis"`.
 - Every commit is pushed to `origin master` immediately (standing team process).
 - Secrets only in `.env.local` (gitignored) / Vercel env vars — never committed.
