@@ -29,7 +29,7 @@ Members sign in at a shared device at the shop door.
 - **CH** — type/scan a student ID into an autofocused field, barcode-scanner friendly (`hours_server.rb` `post /signin`, `views/index.erb`). IP-whitelisted so only the lab kiosk can sign in.
 - **GP** — scan an RFID token at a full-screen kiosk; shows your per-period hours, punch in/out buttons (`app/controllers/time_kiosk_controller.rb`, `app/views/layouts/kiosk.html.erb`). Kiosk sits behind a logged-in session.
 - Variants differ on **identity mechanism**: name-tap (zero hardware, spoofable) vs student-ID/barcode (cheap scanner) vs RFID card (needs cards + reader).
-- **Decision:** ___ · Preferred variant: ___
+- **Decision:** Need · Preferred variant: Let's start with no auth, name-tap kiosk (AT) for v1, and add student-ID/barcode (CH) or RFID (GP) later if needed.
 
 ### 1.2 Sign-out flows & forgotten-sign-out cleanup
 - **AT** — self sign-out by tapping your name in "Who's Here"; auto-timeout closes forgotten manual sessions after N hours with a backdated end time (`monitor.py`).
@@ -37,48 +37,48 @@ Members sign in at a shared device at the shop door.
 - **GP** — self punch-out at kiosk (clamped to period end); managers can punch out a whole period at once; a "flagged punches" screen lists over-long, still-open, and overlapping punches for bulk cleanup (`app/controllers/time_clock_punches_controller.rb` `flagged`).
 - **Den** — self clock-out from your own device (single open session enforced); at midnight on a meeting day, open sessions auto-close **backdated to the meeting's end time** — arguably the cleanest forgotten-sign-out policy surveyed.
 - Design questions: who may sign a member out, and how are forgotten sessions healed (auto-sweep with backdating vs manual review queue vs both).
-- **Decision:** ___ · Preferred variant: ___
+- **Decision:** Need · Preferred variant: GP to start, with Den's auto-close at meeting end time as a nice-to-have.
 
 ### 1.3 Automatic presence detection (Wi-Fi)
 - **AT only** — background thread flood-pings the shop IP range, resolves MACs via `arp`, matches registered devices, auto-opens/closes visits (`monitor.py`, `arp.py`). Includes device registration pairing flow with QR code (`web_server.py` `/add`), randomized-MAC detection with per-OS fix instructions, grace periods, and backdated auto-sign-out. Requires an always-on box on the shop LAN — fundamentally incompatible with pure cloud hosting (a small on-site agent posting to a cloud API could replicate it).
-- **Decision:** ___
+- **Decision:** Nice (later) — we can start with manual sign-in/out and add Wi-Fi presence detection later if desired
 
 ### 1.4 Live "who's here" board
 - **AT** — real-time via WebSocket push, distinguishes manual vs auto-detected attendees (`www/static/modules/hereNow.mjs`).
 - **CH** — 120-second jQuery poll; anonymous viewers see only IDs, logged-in viewers see names (`get /lab_sessions/open`, `views/signed_in_list.erb`).
 - **Den** — "In the shop" live list of currently clocked-in members.
-- **Decision:** ___ · Preferred variant: ___
+- **Decision:** Need · Preferred variant: Den, with WebSocket push if we can get it working on Vercel/Supabase; otherwise a 30–60s poll is fine.
 
 ### 1.5 Hours totals & leaderboard
 - **CH** — leaderboard of all students by total project hours with session counts (`get /leader_board`); per-student detail page listing every session.
 - **GP** — hours shown per time-clock period on person profiles and at the kiosk; period summary report with daily breakdown, distinct-people counts, calendar rendering (`time_clock_periods_controller.rb` `summary`).
 - **Den** — totals per subteam plus a team leaderboard; only mentor-confirmed hours count.
 - **AT** — no in-app totals; analysis lives in Google Sheets formulas.
-- **Decision:** ___ · Preferred variant: ___
+- **Decision:** Need · Preferred variant: GP, as well as a per-student detail page like CH.
 
 ### 1.6 Attendance calendar & required/optional days
 - **CH only (rich)** — build-day calendar grid: students × build days, color-coded present/absent/excused/optional, attendance rate per student, excused-absence workflow, scheduled build days with required/optional precedence rules, semester windows (`views/calendar.erb`, `queries.rb`, `models/scheduled_build_day.rb`, `models/excused_session.rb`). "My Attendance" self-service page per student.
 - **Den (different angle)** — meeting-anchored attendance: meetings come from the team **Google Calendar**, clocking in during a meeting auto-attaches the session to it, and each meeting has an attendance view. No required/excused concept observed, but the calendar-as-source-of-truth idea composes well with CH's policy layer.
 - **GP** — general FullCalendar view (events + birthdays + notes + punches) but no required-day/excusal concept.
-- **Decision:** ___ · Preferred variant: ___
+- **Decision:** Need · Preferred variant: CH's rich required/optional build-day calendar, but with Den's Google-Calendar-anchored attendance as the source of truth for meeting times.
 
 ### 1.7 Manual / offsite hours with mentor verification
 - **Den only** — "Log Hours" for offsite work is recorded as *pending* until a mentor verifies; clock-ins outside any scheduled meeting are likewise flagged for review. In-meeting hours are trusted by default. A nice trust model: verification burden only where abuse is possible.
-- **Decision:** ___
+- **Decision:** Nice (later) — we can start with all hours trusted, and add mentor verification for offsite hours later if needed.
 
 ### 1.8 Time-clock periods (seasons)
 - **GP only** — named date ranges (e.g. "2026 Build Season") that scope punches, with per-period permissions; keeps history separated by season. `app/models/time_clock_period.rb`.
 - CH instead has a hard-coded `/reset_hours` cutoff date — a lesson in what *not* to do.
-- **Decision:** ___
+- **Decision:** Need · Preferred variant: GP
 
 ### 1.9 Manual session editing / audit corrections
 - **CH** — editors add/edit/delete sessions with arbitrary times and notes; "suspect sessions" report lists sessions > 18h (`get /suspect_lab_sessions`); date-range search.
 - **GP** — same via punch CRUD + flagged-punch review; PaperTrail audit log records every change with revert.
-- **Decision:** ___ · Preferred variant: ___
+- **Decision:** Need · Preferred variant: CH + GP
 
 ### 1.10 SMS interactions
 - **CH only** — Twilio webhook: mentors text student IDs to sign them out (batch supported), `gtfo` closes all open sessions, `here` logs a mentor check-in (`post /sms`). README pegs cost ~$1/mo + $0.01/msg.
-- **Decision:** ___
+- **Decision:** Skip — we can start with kiosk sign-in/out and add SMS later if needed.
 
 ## 2. Roster / Membership
 
@@ -86,11 +86,11 @@ Members sign in at a shared device at the shop door.
 - **GP** — richest: Person entity with names, gender/shirt-size (configurable option lists), phone, address, birthday, dietary restrictions, bio, avatar (with webcam capture), tabbed profile pages (`app/models/person.rb`, `app/views/people/`).
 - **CH** — minimal Student (ID + name), synced from SSO.
 - **AT** — roster rows in a Google Sheet (name, student flag, active flag, grad year).
-- **Decision:** ___ · Preferred variant: ___
+- **Decision:** Need · Preferred variant: GP
 
 ### 2.2 Teams / subteams hierarchy
 - **GP only** — self-referential team tree with team types (icon, custom "manager" title), membership with manager flag, join permissions (admin-added → open-join → requires-approval), membership application/approval queue (`app/models/team.rb`, `membership_application.rb`).
-- **Decision:** ___
+- **Decision:** Need · Preferred variant: GP
 
 ### 2.3 Roles & permissions (app-wide)
 - **RAR** — full RBAC: roles (ADMIN/MENTOR/STUDENT_ADMIN/STUDENT/PARENT/GUEST) × 21 granular permissions, role-permission and direct user-permission joins, admin UI for assignment, permission-gated nav (`database/schema.ts`, `app/lib/user-permissions.ts`).
@@ -98,7 +98,7 @@ Members sign in at a shared device at the shop door.
 - **CP** — three-level enum (readonly/editor/admin) + enabled flag; simplest that works.
 - **Den** — five roles (`admin`/`mentor`/`lead`/`student`/`guest`) plus server-configured superadmins; **guest read-only mode is server-enforced per endpoint**, not just hidden UI. Members carry role, subteam, grad year.
 - **CH/CM** — permission strings from an external SSO.
-- **Decision:** ___ · Preferred variant: ___
+- **Decision:** Need · Preferred variant: Den's five roles with server-enforced guest read-only mode. In the future, we can add RAR's RBAC schema for future extensibility.
 
 ### 2.4 Authentication
 - **RAR** — Better Auth, email/password, cookie sessions (Node-native; closest to our stack).
@@ -107,102 +107,103 @@ Members sign in at a shared device at the shop door.
 - **Den** — split by audience: students sign in with a team ID number (low-friction, no passwords for minors), mentors with Google OAuth (allowlisted emails) or ID + PIN; self-service account request queue.
 - **CH/CM** — external SSO only.
 - Notable sub-features to consider: first-user-admin bootstrap (GP) vs DB-manual bootstrap (RAR's gap); registration-approval queue (CP, Den); admin impersonation with true-user audit (GP); per-audience auth methods (Den).
-- **Decision:** ___ · Preferred variant: ___
+- **Decision:** Need · Preferred variant: Den's split-audience auth (student ID + mentor OAuth) with a self-service account request queue. Add first-user-admin bootstrap for initial setup.  Student's ID auth should also be compatible with OAUTH for future-proofing.
 
 ### 2.5 Parent/child & mentor relationships
 - **GP only** — typed directional relationships between people (parent/child, mentor/mentee) with per-type creation permissions (`app/models/relationship.rb`). RAR's permission list hints at the same intent (`child:progress_view`) but nothing is built.
-- **Decision:** ___
+- **Decision:** Nice (later) — we can start with a flat roster and add typed relationships later if needed.
 
 ### 2.6 Badges / training & credentials
 - **GP** — badges with types, colors, team scoping, permission-controlled awarding including self-award (`app/models/badge.rb`).
 - **RAR** — "learnings management" (areas trained, pending training, coordinating mentor) is the stated goal in `docs/Home.md` but unimplemented.
-- **Decision:** ___
+- **Decision:** Nice (later) — we can start without badges and add them later
 
 ### 2.7 RFID / access tokens
 - **GP only** — token entities attached to a person (or a hook), duplicate detection, reader-format normalization; used by the kiosk (`app/models/token.rb`).
-- **Decision:** ___
+- **Decision:** Nice (later) — we can start with no RFID tokens and add them later if needed.
 
 ## 3. Parts & Purchasing (all CP unless noted)
 
 ### 3.1 Structured part numbering
 Canonical numbers like `PREFIX-A-0100`/`PREFIX-P-0101` (project prefix + assembly/part letter + zero-padded number) intended as CAD filenames; auto-allocation: assemblies get +100 blocks, parts increment within their parent's block (`models/part.rb` `generate_number_and_create`).
-- **Decision:** ___
+- **Decision:** Nice (later)
 
 ### 3.2 Assembly hierarchy
 Parts nest under assemblies (self-referential tree), breadcrumb chain, sortable listings (`views/part_tree.erb`).
-- **Decision:** ___
+- **Decision:** Nice (later)
 
 ### 3.3 Manufacturing status pipeline
 20 color-coded statuses (designing → material → ordered → drawing → ready → cnc/laser/lathe/mill/… → done), inline AJAX status change from any list (`models/part.rb` `STATUS_MAP`).
-- **Decision:** ___
+- **Decision:** Nice (later)
 
 ### 3.4 Shop dashboard (kanban)
 Live board grouping parts by status, priority-ordered and priority-colored tiles, status filter, 10-second auto-refresh; per-project enable flag (`views/dashboard.erb`).
-- **Decision:** ___
+- **Decision:** Nice (later)
 
 ### 3.5 Purchasing: order items → vendor orders
 Line items auto-group into per-vendor open orders (typing a vendor finds-or-creates the order; blank vendor = "unclassified" bucket), vendor autocomplete, inline editing, Open → Ordered → Received lifecycle with tax/shipping/notes (`post /projects/:id/order_items`, `models/order.rb`).
-- **Decision:** ___
+- **Decision:** Nice (later)
 
 ### 3.6 Spend & reimbursement reporting
 Per-vendor spend stats with drill-down; per-purchaser reimbursed vs outstanding report driven by a `reimbursed` flag + "paid for by" field (`views/order_stats.erb`).
 - **GP alternative** — full double-entry-ish ledgers: per-team ledgers with cached balances, entry splitting, inter-ledger transfers, receipts attached to entries, colored tags, budgets matched by tag within budget periods, and Stripe hosted-checkout payments into a ledger. Much heavier; aimed at team finance, not just purchasing.
-- **Decision:** ___ · Preferred variant: ___
+- **Decision:** Nice (later) · Preferred variant: TBD
 
 ### 3.7 Purchase-request approval workflow (Den)
 - **Den only** — students submit requests (item, qty, unit price, supplier, purchase URL, notes, SKU); status flows `pending` → `approved`/`rejected` → `completed` with decision notes and signed-off-by; **auto-fill from a pasted URL** via a server-side part scraper; reorder/restock prefill from an existing item; approved purchases import into inventory. Complements CP's vendor-order model: Den covers "may we buy this?", CP covers "what did we order and who gets reimbursed?".
-- **Decision:** ___
+- **Decision:** Nice (later)
 
 ### 3.8 Shop inventory & storage boxes (Den)
 - **Den only** — parts catalog with supplier, stock quantity vs low-stock warning point, unit price, SKU, inventory-value rollup; low-stock badge; a registry of physical **storage boxes** each with a label, color tag, and shop coordinate (e.g. `B13`), so every part answers "which box, where"; Google Sheets bootstrap import with column mapping.
-- **Decision:** ___
+- **Decision:** Nice (later)
 
 ### 3.9 3D print queue (Den)
 - **Den only** — job submission with model file upload, quantity, urgency-sorted queue, filament type/color, estimated time; named printer fleet with job assignment; Queued/Printing/Done/Failed/Cancelled lifecycle; per-job activity trail and completed archive.
-- **Decision:** ___
+- **Decision:** Nice (later)
 
 ## 4. Communications
 
 ### 4.1 Mailing lists (email distribution)
 - **CM** — receives mail at `parents@`/`students@` addresses, checks sender permission, fans out one SES email per recipient with branded template, per-recipient signed unsubscribe links, reply-forwarding via base32-encoded return addresses, attachment re-hosting, dedup, throttling, Slack cross-post, blog cross-post. A full custom SMTP daemon — high ops burden to recreate as-is; the *feature* (permission-gated announcement email to parent/student lists) can be had with a simple compose-UI + email API instead.
 - **GP** — announcement email blast (checkbox on an announcement fans out HTML email) + weekly personalized digest of announcements per user (`announcement_notification_router.rb`, `infodump.rb`).
-- **Decision:** ___ · Preferred variant: ___
+- **Decision:** Nice · Preferred variant: TBD
 
 ### 4.2 Announcements (in-app)
 - **GP only** — Markdown announcements with visibility windows, team-scoped or global, surfaced on dashboard and team pages.
-- **Decision:** ___
+- **Decision:** Nice · Preferred variant: GP
 
 ### 4.3 Slack/chat notifications
 - **CM** — posts student-list mail to a Slack webhook with `<!channel>` ping. Trivial to recreate (one webhook POST).
-- **Decision:** ___
+- **Decision:** Nice · Preferred variant: CM (this should be one of the first things we implement post v1, since it's easy and useful).
 
 ### 4.4 Q&A board
 - **GP only** — team-scoped questions, threaded replies, one-vote-per-person promoting best answers, close/reopen/move moderation.
-- **Decision:** ___
+- **Decision:** Nice · Preferred variant: GP
 
 ### 4.5 Inbound mailboxes (shared inbox archive)
 - **GP only** — registered addresses whose inbound mail (via Postmark) is stored, searchable, with attachments.
-- **Decision:** ___
+- **Decision:** Nice · Preferred variant: GP
 
 ### 4.6 Suggestion box & in-app notifications
 - **Den** — public "suggest an idea / report a bug" dialog categorized by app module, reviewed by mentors; per-user notifications for events like new purchase request or new suggestion (`/api/me/notifications`).
-- **Decision:** ___
+- **Decision:** Nice · Preferred variant: Den
 
 ## 5. Events & Calendar
 
 ### 5.1 Events with check-ins
 - **GP only** — events with types, team scoping, location, times, optional attendance cap, check-ins carrying custom per-event-type fields, drag-and-drop "arrange" board grouping attendees by a field, printable grouped rosters (`app/controllers/events_controller.rb`, `checkins_controller.rb`).
-- **Decision:** ___
+- **Decision:** Nice · Preferred variant: GP
+
 
 ### 5.2 Team calendar
 - **GP** — FullCalendar month/week/list merging events, birthdays, notes, punches; localStorage view toggles.
 - **CH** — the attendance-specific build-day calendar (see 1.6).
 - **Den** — no in-app calendar UI; meetings are read from the team's Google Calendar and used as the attendance backbone (see 1.6).
-- **Decision:** ___ · Preferred variant: ___
+- **Decision:** Need · Preferred variant: CH's rich build-day calendar for required/optional days, but with Den's Google-Calendar-anchored attendance as the source of truth for meeting times.
 
 ### 5.3 Task boards & Gantt (project planning)
 - **Den only** — multiple named kanban boards (To Do / In Progress / Done, drag-and-drop) with cards carrying assignee and date ranges; **dependency-aware auto-scheduling** ("blocked by" → card starts the day after its blockers finish); per-board Gantt timeline with unscheduled bucket and today marker.
-- **Decision:** ___
+- **Decision:** Nice (later) — we already have some tools to do this; we can look into adding/integrating them at a later date.
 
 ## 6. Reporting & Exports
 
@@ -210,7 +211,7 @@ Per-vendor spend stats with drill-down; per-purchaser reimbursed vs outstanding 
 - **Ad-hoc admin reports** — GP: named Ruby snippets run on demand (powerful but `eval`-based — recreate as saved SQL/typed queries, not code eval).
 - **Spreadsheet-native reporting** — AT: all analysis in Google Sheets formulas; the app only writes rows. A lesson worth noting: mentors like spreadsheets — a "sync/export to Sheet" feature may beat in-app charts.
 - **Audit log** — GP: PaperTrail on a second database, filterable admin browser, per-change diff and revert. Den: role-gated "Workspace Audit Trail" (`/api/audit`).
-- **Decision:** ___ · Preferred variant: ___
+- **Decision:** Nice · Preferred variant: We don't need full audit logging, or CSV export, but some nice overall dashboards for admins and mentors would be good.
 
 ## 7. Platform / Admin plumbing (patterns worth copying, not user features)
 
@@ -222,7 +223,7 @@ Per-vendor spend stats with drill-down; per-purchaser reimbursed vs outstanding 
 - **Admin impersonation** — GP (`pretender`) with true-user audit trail.
 - **Guest read-only mode** — Den: unauthenticated visitors get a server-side downgraded session that can browse everything except role-gated endpoints — great for parents/sponsors, and forces clean server-side authorization from day one.
 - **Health endpoint, background-jobs dashboard** — GP (`/up`, Mission Control).
-- **Decision (which patterns to adopt):** ___
+- **Decision (which patterns to adopt):** Guest read-only mode (Den) is the only one I want to be included with v1; the others should be backlogged for later consideration.
 
 ---
 
@@ -256,6 +257,13 @@ Per-vendor spend stats with drill-down; per-purchaser reimbursed vs outstanding 
 Total expected cost: **$0/mo to start**, worst case ~$20–45/mo if the team outgrows free tiers. Custom domain ~$12/yr.
 
 > Free-tier limits and prices above are as-remembered, not freshly verified — confirm current Vercel/Supabase/Resend tiers before committing in the design spec.
+
+A few notes on the stack choice:
+- **Next.js** is a great choice for a modern web app, especially with its built-in API routes and server-side rendering.
+- **Vercel** is a solid hosting platform that integrates well with Next.js and provides a good developer experience.
+- **Supabase** is a powerful backend-as-a-service that provides a modern SQL database, authentication, and storage solutions.
+- Instead of Drizzle, let's try and use supabase's built-in ORM and migration tools, unless we find a compelling reason to use Drizzle.
+- For both outbound and inbound email, let's hold off on those until later; I'm not sure we'll need them, and they're much more complicated to implement than they first appear.
 
 ### Alternatives (one sentence each)
 - **Self-host on a $5–10/mo VPS (Coolify/Dokku) with Docker Postgres** — wins if you want zero vendor coupling and don't mind being the sysadmin; loses on bus-factor (you're the only operator) for a student org.
