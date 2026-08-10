@@ -62,21 +62,21 @@ Members sign in at a shared device at the shop door.
 - **GP** — general FullCalendar view (events + birthdays + notes + punches) but no required-day/excusal concept.
 - **Decision:** ___ · Preferred variant: ___
 
-### 1.6b Manual / offsite hours with mentor verification
+### 1.7 Manual / offsite hours with mentor verification
 - **Den only** — "Log Hours" for offsite work is recorded as *pending* until a mentor verifies; clock-ins outside any scheduled meeting are likewise flagged for review. In-meeting hours are trusted by default. A nice trust model: verification burden only where abuse is possible.
 - **Decision:** ___
 
-### 1.7 Time-clock periods (seasons)
+### 1.8 Time-clock periods (seasons)
 - **GP only** — named date ranges (e.g. "2026 Build Season") that scope punches, with per-period permissions; keeps history separated by season. `app/models/time_clock_period.rb`.
 - CH instead has a hard-coded `/reset_hours` cutoff date — a lesson in what *not* to do.
 - **Decision:** ___
 
-### 1.8 Manual session editing / audit corrections
+### 1.9 Manual session editing / audit corrections
 - **CH** — editors add/edit/delete sessions with arbitrary times and notes; "suspect sessions" report lists sessions > 18h (`get /suspect_lab_sessions`); date-range search.
 - **GP** — same via punch CRUD + flagged-punch review; PaperTrail audit log records every change with revert.
 - **Decision:** ___ · Preferred variant: ___
 
-### 1.9 SMS interactions
+### 1.10 SMS interactions
 - **CH only** — Twilio webhook: mentors text student IDs to sign them out (batch supported), `gtfo` closes all open sessions, `here` logs a mentor check-in (`post /sms`). README pegs cost ~$1/mo + $0.01/msg.
 - **Decision:** ___
 
@@ -254,6 +254,8 @@ Per-vendor spend stats with drill-down; per-purchaser reimbursed vs outstanding 
 | Realtime "who's here" board | **Supabase Realtime** (Postgres changes → WebSocket) instead of hand-rolled sockets | included |
 
 Total expected cost: **$0/mo to start**, worst case ~$20–45/mo if the team outgrows free tiers. Custom domain ~$12/yr.
+
+> Free-tier limits and prices above are as-remembered, not freshly verified — confirm current Vercel/Supabase/Resend tiers before committing in the design spec.
 
 ### Alternatives (one sentence each)
 - **Self-host on a $5–10/mo VPS (Coolify/Dokku) with Docker Postgres** — wins if you want zero vendor coupling and don't mind being the sysadmin; loses on bus-factor (you're the only operator) for a student org.
