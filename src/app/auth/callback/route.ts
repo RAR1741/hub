@@ -41,15 +41,36 @@ export async function GET(request: Request) {
   const email = data.user.email?.toLowerCase();
   const db = getDb();
 
-  const [{ data: matched }, { count }] = await Promise.all([
-    email
-      ? db.from("person").select("*").eq("email", email).maybeSingle()
-      : Promise.resolve({ data: null }),
-    db
-      .from("person")
-      .select("id", { count: "exact", head: true })
-      .eq("role", "admin"),
-  ]);
+  const [{ data: matched, error: matchedError }, { count, error: countError }] =
+    await Promise.all([
+      email
+        ? db.from("person").select("*").eq("email", email).maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+      db
+        .from("person")
+        .select("id", { count: "exact", head: true })
+        .eq("role", "admin"),
+    ]);
+
+  if (matchedError) {
+    console.error("oauth callback: failed to look up matched person", {
+      email,
+      authUserId: data.user.id,
+      error: matchedError,
+    });
+    return toErrorRedirect();
+  }
+
+  // If we can't determine the current admin count, we must not risk
+  // bootstrapping a new admin on a false "zero admins" reading — fail
+  // closed (deny) rather than fail open (escalate).
+  if (countError) {
+    console.error("oauth callback: failed to determine admin count", {
+      authUserId: data.user.id,
+      error: countError,
+    });
+    return toErrorRedirect();
+  }
 
   const decision = decideOAuthLink({
     matchedPerson: matched ?? null,
