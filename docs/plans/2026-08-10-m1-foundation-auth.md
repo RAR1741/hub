@@ -10,7 +10,8 @@
 
 ## Global Constraints (from the spec)
 
-- **Nothing is installed on the host.** No Node, no npm, no Supabase CLI, no psql on the host machine. Every command in this plan runs inside the dev container (VS Code terminal after "Reopen in Container"). The Supabase CLI is an npm devDependency invoked as `npx supabase`, never a host binary.
+- **Nothing is installed on the host.** No Node, no npm, no Supabase CLI, no psql on the host machine. The Supabase CLI is an npm devDependency invoked as `npx supabase`, never a host binary.
+- **Every command below runs inside the dev container.** Task 0 builds it and provides `./dev`. From the host, prefix commands with `./dev` (`./dev npm test`); inside a VS Code container terminal, run them bare (`npm test`). Where later tasks write `npm run …`, `npx …`, or `psql …`, that means *inside the container* — via `./dev` when driving from the host. **Git commands are the exception: run `git` on the host** (it owns the credentials and remote access).
 - TypeScript strict; Node 22 (provided by the container image).
 - All timestamps `timestamptz` (UTC); UUID PKs (`gen_random_uuid()`).
 - Roles enum exactly: `admin`, `mentor`, `captain`, `student` (guest = unauthenticated, never stored).
@@ -27,17 +28,20 @@
 ### Task 0: Containerized dev environment (Dev Container)
 
 **Files:**
-- Create: `.devcontainer/devcontainer.json`
 - Create: `.devcontainer/Dockerfile`
-- Modify: `.gitignore` (add `.env*` with `!.env.example`, `node_modules`, `.next`, `supabase/.temp`)
+- Create: `.devcontainer/docker-compose.yml`
+- Create: `.devcontainer/devcontainer.json`
+- Create: `dev` (executable helper script at repo root)
+- Modify: `.gitignore`
 
 **Interfaces:**
 - Consumes: nothing (first task).
-- Produces: a dev container with Node 22, git, and a working `docker` CLI wired to the host daemon; `node`, `npm`, `npx`, and `docker ps` all functional inside it. Every later task runs in this container.
+- Produces: one container definition usable two ways — VS Code "Reopen in Container", and headless `./dev <command>` from the host. Both give Node 22, `npx`, `psql`, and a `docker` CLI wired to the host daemon. Every later task runs its commands through one of these two paths.
 
 Design (validated against the known devcontainer + Supabase pitfalls):
-- **docker-outside-of-docker**, not docker-in-docker: the container gets the host Docker socket, so `npx supabase start` launches sibling containers on the host daemon. Their ports (54321 API, 54322 Postgres, 54323 Studio) are published on the host, so the host browser reaches them at `127.0.0.1`, and the dev container reaches them at `host.docker.internal`.
-- `containerEnv` passes `LOCAL_WORKSPACE_FOLDER=${localWorkspaceFolder}` — the *host* path of the repo. Sibling containers can only mount host paths, so any Supabase CLI feature that bind-mounts (Edge Functions, `db test`) needs this. M1 doesn't use those, but omitting it produces confusing path errors later.
+- **Compose-based devcontainer** (`dockerComposeFile` + `service` + `workspaceFolder`) rather than an image/Dockerfile-only devcontainer. This matters because it gives *one* environment definition that both VS Code and plain `docker compose` can start — no drift between "what the human opens" and "what automation runs".
+- **docker-outside-of-docker**: the container mounts the host Docker socket, so `npx supabase start` launches *sibling* containers on the host daemon. Their ports (54321 API, 54322 Postgres, 54323 Studio) publish on the host, so the host browser reaches them at `127.0.0.1` while the dev container reaches them at `host.docker.internal`.
+- `LOCAL_WORKSPACE_FOLDER` carries the *host* path of the repo. Sibling containers can only bind-mount host paths; M1 doesn't need it, but omitting it produces cryptic path errors once Edge Functions or `db test` appear.
 
 - [ ] **Step 1: Write the container image**
 
@@ -46,42 +50,59 @@ Create `.devcontainer/Dockerfile`:
 ```dockerfile
 FROM mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm
 
-# psql client, for inspecting the local Supabase database from inside the container.
+# postgresql-client: inspect the local Supabase database from inside the container.
+# docker.io: CLI only — it talks to the host daemon via the mounted socket.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends postgresql-client \
+    && apt-get install -y --no-install-recommends postgresql-client docker.io \
     && rm -rf /var/lib/apt/lists/*
 ```
 
-- [ ] **Step 2: Write the dev container config**
+- [ ] **Step 2: Write the compose file**
+
+Create `.devcontainer/docker-compose.yml`:
+
+```yaml
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ../:/workspaces/hub:cached
+      # Host Docker socket: lets the Supabase CLI start sibling containers.
+      - /var/run/docker.sock:/var/run/docker.sock
+    working_dir: /workspaces/hub
+    environment:
+      # Host path of the repo, for tooling that bind-mounts into sibling containers.
+      LOCAL_WORKSPACE_FOLDER: ${LOCAL_WORKSPACE_FOLDER:-}
+    extra_hosts:
+      # Provided automatically by Docker Desktop; declared for Linux hosts too.
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "3000:3000"
+    # Keep the container alive so VS Code (and `docker compose exec`) can attach.
+    command: sleep infinity
+```
+
+- [ ] **Step 3: Write the dev container config**
 
 Create `.devcontainer/devcontainer.json`:
 
 ```jsonc
 {
   "name": "team-hub",
-  "build": { "dockerfile": "Dockerfile" },
-  "features": {
-    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
-      "moby": false
-    },
-    "ghcr.io/devcontainers/features/github-cli:1": {}
-  },
-  "containerEnv": {
-    // Host path of the repo. Sibling containers started by the Supabase CLI can
-    // only bind-mount host paths, so tooling needs to know this.
-    "LOCAL_WORKSPACE_FOLDER": "${localWorkspaceFolder}"
-  },
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspaces/hub",
   "forwardPorts": [3000],
   "portsAttributes": {
     "3000": { "label": "Next.js dev server", "onAutoForward": "notify" }
   },
-  "postCreateCommand": "npm install --no-audit --no-fund || true",
   "customizations": {
     "vscode": {
       "extensions": [
         "dbaeumer.vscode-eslint",
-        "esbenp.prettier-vscode",
-        "ms-playwright.playwright"
+        "esbenp.prettier-vscode"
       ],
       "settings": {
         "editor.formatOnSave": true,
@@ -93,9 +114,35 @@ Create `.devcontainer/devcontainer.json`:
 }
 ```
 
-(`postCreateCommand` tolerates failure with `|| true` because on the very first open there is no `package.json` yet — Task 1 creates it.)
+- [ ] **Step 4: Write the headless helper**
 
-- [ ] **Step 3: Ensure .gitignore covers the basics**
+Create `dev` at the repo root (make it executable: `git update-index --chmod=+x dev` after adding, or `chmod +x dev` if the filesystem supports it):
+
+```bash
+#!/usr/bin/env bash
+# Run a command inside the dev container. Nothing but Docker is needed on the host.
+#
+#   ./dev npm install
+#   ./dev npm test
+#   ./dev bash -lc "npx supabase start"
+#   ./dev            # interactive shell
+set -euo pipefail
+
+COMPOSE_FILE="$(cd "$(dirname "$0")" && pwd)/.devcontainer/docker-compose.yml"
+export LOCAL_WORKSPACE_FOLDER="${LOCAL_WORKSPACE_FOLDER:-$(cd "$(dirname "$0")" && pwd)}"
+
+# Start the service if it isn't already running.
+if [ -z "$(docker compose -f "$COMPOSE_FILE" ps -q app 2>/dev/null)" ]; then
+  docker compose -f "$COMPOSE_FILE" up -d app
+fi
+
+if [ "$#" -eq 0 ]; then
+  exec docker compose -f "$COMPOSE_FILE" exec app bash
+fi
+exec docker compose -f "$COMPOSE_FILE" exec -T app "$@"
+```
+
+- [ ] **Step 5: Ensure .gitignore covers the basics**
 
 `.gitignore` must contain at least:
 
@@ -105,28 +152,30 @@ node_modules
 .env*
 !.env.example
 supabase/.temp
+.superpowers
 ```
 
-- [ ] **Step 4: Open in the container and verify the environment**
+- [ ] **Step 6: Build and verify the environment**
 
-In VS Code: **Dev Containers: Reopen in Container** (Command Palette). Wait for the build. Then in the container terminal:
+From the host (only Docker required):
 
 ```bash
-node --version    # expect v22.x
-npm --version
-docker ps         # expect a table (host daemon reachable), not a permission error
-getent hosts host.docker.internal   # expect an IP — the route to sibling containers
-psql --version    # expect 15.x or newer
+./dev node --version                          # expect v22.x
+./dev npm --version
+./dev docker ps                               # expect a table, not a permission error
+./dev getent hosts host.docker.internal       # expect an IP
+./dev psql --version                          # expect 15.x or newer
+./dev pwd                                     # expect /workspaces/hub
 ```
 
-Expected: all five succeed. If `docker ps` fails with a socket permission error, rebuild the container (the docker-outside-of-docker feature adjusts group membership at build time).
+Expected: all six succeed. If `docker ps` prints a socket permission error, the container user lacks access to the mounted socket — re-run as root to confirm the socket works (`docker compose -f .devcontainer/docker-compose.yml exec -u root app docker ps`) and, if so, add `group_add: ["999"]` (the host's docker group GID) to the `app` service, or run the service as root by setting `"remoteUser": "root"`. Record whichever fix was needed in the task report.
 
-**From here on, every command in this plan runs in this container's terminal.**
+**From here on, every command in this plan runs either through `./dev …` or in the VS Code container terminal — never on the host.**
 
-- [ ] **Step 5: Commit and push**
+- [ ] **Step 7: Commit and push**
 
 ```bash
-git add .devcontainer .gitignore
+git add .devcontainer dev .gitignore
 git commit -m "feat: add dev container (Docker Desktop is the only host requirement)"
 git push
 ```
