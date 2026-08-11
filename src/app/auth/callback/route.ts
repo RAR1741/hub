@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { getDb } from "@/lib/db";
 import { serverSupabaseUrl } from "@/lib/supabase-url";
+import { AUTH_COOKIE_NAME } from "@/lib/supabase-cookie";
 import { decideOAuthLink } from "@/lib/oauth-link";
 
 export async function GET(request: Request) {
@@ -25,6 +26,9 @@ export async function GET(request: Request) {
     serverSupabaseUrl(),
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      // Must match the browser client's cookie name (supabase-cookie.ts) or the
+      // PKCE code verifier written by the browser is unreadable here.
+      cookieOptions: { name: AUTH_COOKIE_NAME },
       cookies: {
         getAll: () => cookieStore.getAll(),
         setAll: (cookiesToSet) =>
@@ -36,7 +40,13 @@ export async function GET(request: Request) {
   );
 
   const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-  if (error || !data.user) return redirect;
+  if (error || !data.user) {
+    console.error("oauth callback: code exchange failed", {
+      hasCode: Boolean(code),
+      error: error?.message ?? "no user returned",
+    });
+    return redirect;
+  }
 
   const email = data.user.email?.toLowerCase();
   const db = getDb();

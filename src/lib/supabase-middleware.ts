@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { resolveServerSupabaseUrl } from "./supabase-url";
+import { AUTH_COOKIE_NAME } from "./supabase-cookie";
 
 /**
  * Refresh the Supabase auth session (if any) and write refreshed cookies
@@ -24,6 +25,7 @@ export async function updateSession(request: NextRequest) {
     }),
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      cookieOptions: { name: AUTH_COOKIE_NAME },
       cookies: {
         getAll: () => request.cookies.getAll(),
         setAll: (cookiesToSet) => {

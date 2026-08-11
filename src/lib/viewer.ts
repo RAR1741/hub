@@ -38,12 +38,16 @@ export async function getViewer(): Promise<Viewer> {
   );
 
   const { serverSupabaseUrl } = await import("./supabase-url");
+  const { AUTH_COOKIE_NAME } = await import("./supabase-cookie");
 
   const cookieStore = await cookies();
   const supabase = createServerClient(
     serverSupabaseUrl(),
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      // Must match the name used when the session cookie was written
+      // (supabase-cookie.ts) or getUser() won't find the mentor's session.
+      cookieOptions: { name: AUTH_COOKIE_NAME },
       cookies: {
         getAll: () => cookieStore.getAll(),
         setAll: () => {}, // read-only here; auth callback handles writes
