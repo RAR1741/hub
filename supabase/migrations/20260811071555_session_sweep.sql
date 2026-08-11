@@ -6,6 +6,7 @@ create or replace function close_stale_sessions()
 returns integer
 language plpgsql
 security definer
+set search_path = ''
 as $$
 declare
   tz text;
@@ -14,17 +15,17 @@ declare
   closed_count integer;
 begin
   select coalesce(value #>> '{}', 'America/Indiana/Indianapolis') into tz
-    from app_setting where key = 'team_timezone';
+    from public.app_setting where key = 'team_timezone';
   if tz is null then tz := 'America/Indiana/Indianapolis'; end if;
 
   select coalesce((value #>> '{}')::numeric, 4) into close_hours
-    from app_setting where key = 'auto_close_hours';
+    from public.app_setting where key = 'auto_close_hours';
   if close_hours is null then close_hours := 4; end if;
 
   -- Start of the current day in the team timezone, as a UTC instant.
   today_start := date_trunc('day', now() at time zone tz) at time zone tz;
 
-  update session
+  update public.session
      set time_out = time_in + (close_hours * interval '1 hour'),
          edited_at = now()          -- edited_by stays NULL: this is a system close
    where time_out is null

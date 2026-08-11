@@ -77,7 +77,10 @@ export async function updateSession(
     .eq("id", id)
     .select("id")
     .maybeSingle();
-  if (error) return { ok: false, status: 500 };
+  if (error) {
+    if (error.code === "23505") return { ok: false, status: 409 };
+    return { ok: false, status: 500 };
+  }
   if (!data) return { ok: false, status: 404 };
   return { ok: true, status: 200 };
 }

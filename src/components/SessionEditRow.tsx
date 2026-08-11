@@ -26,6 +26,7 @@ export function SessionEditRow({
 
   async function save() {
     setStatus(null);
+    if (!tin) { setStatus("Time in is required."); return; }
     const res = await fetch(`/api/admin/sessions/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
