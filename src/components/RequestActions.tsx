@@ -22,24 +22,26 @@ export function AccountRequestActions({ requestId }: { requestId: string }) {
   }
 
   return (
-    <span>
+    <span className="inline-flex flex-wrap items-center gap-2">
       <input
+        className="input w-36"
         placeholder="Assign student ID"
         value={studentId}
         onChange={(e) => setStudentId(e.target.value)}
       />
-      <select value={role} onChange={(e) => setRole(e.target.value)}>
+      <select className="input w-auto" value={role} onChange={(e) => setRole(e.target.value)}>
         <option value="student">student</option>
         <option value="captain">captain</option>
       </select>
       <button
         disabled={!studentId.trim()}
         onClick={() => act({ action: "approve", studentIdNumber: studentId, role })}
+        className="btn btn-primary px-3 py-1"
       >
         Approve
       </button>
-      <button onClick={() => act({ action: "deny" })}>Deny</button>
-      {status && <span role="status"> {status}</span>}
+      <button onClick={() => act({ action: "deny" })} className="btn btn-secondary px-3 py-1">Deny</button>
+      {status && <span role="status" className="text-sm text-[var(--color-muted-fg)]"> {status}</span>}
     </span>
   );
 }
@@ -60,10 +62,10 @@ export function ApplicationActions({ applicationId }: { applicationId: string })
   }
 
   return (
-    <span>
-      <button onClick={() => act("approve")}>Approve</button>
-      <button onClick={() => act("deny")}>Deny</button>
-      {status && <span role="status"> {status}</span>}
+    <span className="inline-flex flex-wrap items-center gap-2">
+      <button onClick={() => act("approve")} className="btn btn-primary px-3 py-1">Approve</button>
+      <button onClick={() => act("deny")} className="btn btn-secondary px-3 py-1">Deny</button>
+      {status && <span role="status" className="text-sm text-[var(--color-muted-fg)]"> {status}</span>}
     </span>
   );
 }

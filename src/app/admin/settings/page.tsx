@@ -17,10 +17,16 @@ export default async function AdminSettingsPage() {
   ]);
 
   return (
-    <main>
-      <h1>Admin — Settings</h1>
-      <SettingsForm initial={{ teamTimezone, gcalCalendarId, autoCloseHours, maxShiftHours }} />
-      <p><Link href="/admin/kiosk-devices">Manage kiosk devices →</Link></p>
+    <main className="flex flex-col gap-6">
+      <h1 className="text-3xl font-bold tracking-tight">Admin — Settings</h1>
+      <section className="card flex flex-col gap-4">
+        <SettingsForm initial={{ teamTimezone, gcalCalendarId, autoCloseHours, maxShiftHours }} />
+      </section>
+      <p>
+        <Link href="/admin/kiosk-devices" className="font-medium text-[var(--color-brand)]">
+          Manage kiosk devices →
+        </Link>
+      </p>
     </main>
   );
 }

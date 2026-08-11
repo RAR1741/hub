@@ -68,28 +68,28 @@ export function PersonForm({
   }
 
   return (
-    <form onSubmit={submit}>
-      <label>First name <input value={values.firstName} onChange={(e) => set("firstName", e.target.value)} required /></label>
-      <label>Last name <input value={values.lastName} onChange={(e) => set("lastName", e.target.value)} required /></label>
-      <label>Display name <input value={values.displayName} onChange={(e) => set("displayName", e.target.value)} /></label>
-      <label>Role{" "}
-        <select value={values.role} onChange={(e) => set("role", e.target.value)}>
+    <form onSubmit={submit} className="flex flex-col gap-3">
+      <label className="label">First name <input className="input" value={values.firstName} onChange={(e) => set("firstName", e.target.value)} required /></label>
+      <label className="label">Last name <input className="input" value={values.lastName} onChange={(e) => set("lastName", e.target.value)} required /></label>
+      <label className="label">Display name <input className="input" value={values.displayName} onChange={(e) => set("displayName", e.target.value)} /></label>
+      <label className="label">Role{" "}
+        <select className="input" value={values.role} onChange={(e) => set("role", e.target.value)}>
           <option value="student">student</option>
           <option value="captain">captain</option>
           <option value="mentor">mentor</option>
           <option value="admin">admin</option>
         </select>
       </label>
-      <label>Grad year <input inputMode="numeric" value={values.gradYear} onChange={(e) => set("gradYear", e.target.value)} /></label>
-      <label>Email <input type="email" value={values.email} onChange={(e) => set("email", e.target.value)} /></label>
-      <label>Phone <input value={values.phone} onChange={(e) => set("phone", e.target.value)} /></label>
-      <label>Shirt size <input value={values.shirtSize} onChange={(e) => set("shirtSize", e.target.value)} /></label>
-      <label>Dietary restrictions <input value={values.dietaryRestrictions} onChange={(e) => set("dietaryRestrictions", e.target.value)} /></label>
-      <label>Bio <textarea value={values.bio} onChange={(e) => set("bio", e.target.value)} /></label>
-      <label>Student ID <input value={values.studentIdNumber} onChange={(e) => set("studentIdNumber", e.target.value)} /></label>
-      <label>Active <input type="checkbox" checked={values.isActive} onChange={(e) => set("isActive", e.target.checked)} /></label>
-      <button type="submit">{personId ? "Save changes" : "Create person"}</button>
-      {status && <p role="status">{status}</p>}
+      <label className="label">Grad year <input className="input" inputMode="numeric" value={values.gradYear} onChange={(e) => set("gradYear", e.target.value)} /></label>
+      <label className="label">Email <input className="input" type="email" value={values.email} onChange={(e) => set("email", e.target.value)} /></label>
+      <label className="label">Phone <input className="input" value={values.phone} onChange={(e) => set("phone", e.target.value)} /></label>
+      <label className="label">Shirt size <input className="input" value={values.shirtSize} onChange={(e) => set("shirtSize", e.target.value)} /></label>
+      <label className="label">Dietary restrictions <input className="input" value={values.dietaryRestrictions} onChange={(e) => set("dietaryRestrictions", e.target.value)} /></label>
+      <label className="label">Bio <textarea className="input" value={values.bio} onChange={(e) => set("bio", e.target.value)} /></label>
+      <label className="label">Student ID <input className="input" value={values.studentIdNumber} onChange={(e) => set("studentIdNumber", e.target.value)} /></label>
+      <label className="flex items-center gap-2 text-sm font-medium text-[var(--color-muted-fg)]">Active <input type="checkbox" checked={values.isActive} onChange={(e) => set("isActive", e.target.checked)} /></label>
+      <button type="submit" className="btn btn-primary">{personId ? "Save changes" : "Create person"}</button>
+      {status && <p role="status" className="text-sm text-[var(--color-muted-fg)]">{status}</p>}
     </form>
   );
 }

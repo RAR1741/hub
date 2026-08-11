@@ -29,25 +29,25 @@ export function SettingsForm({ initial }: { initial: SettingsValues }) {
   }
 
   return (
-    <form onSubmit={submit}>
-      <label>Team timezone{" "}
-        <input value={values.teamTimezone}
+    <form onSubmit={submit} className="flex flex-col gap-3">
+      <label className="label">Team timezone{" "}
+        <input className="input" value={values.teamTimezone}
           onChange={(e) => setValues({ ...values, teamTimezone: e.target.value })} required />
       </label>
-      <label>Google Calendar id{" "}
-        <input value={values.gcalCalendarId}
+      <label className="label">Google Calendar id{" "}
+        <input className="input" value={values.gcalCalendarId}
           onChange={(e) => setValues({ ...values, gcalCalendarId: e.target.value })} />
       </label>
-      <label>Auto-close hours{" "}
-        <input type="number" min={1} max={24} value={values.autoCloseHours}
+      <label className="label">Auto-close hours{" "}
+        <input className="input" type="number" min={1} max={24} value={values.autoCloseHours}
           onChange={(e) => setValues({ ...values, autoCloseHours: Number(e.target.value) })} required />
       </label>
-      <label>Max shift hours{" "}
-        <input type="number" min={1} max={48} value={values.maxShiftHours}
+      <label className="label">Max shift hours{" "}
+        <input className="input" type="number" min={1} max={48} value={values.maxShiftHours}
           onChange={(e) => setValues({ ...values, maxShiftHours: Number(e.target.value) })} required />
       </label>
-      <button type="submit">Save settings</button>
-      {status && <p role="status">{status}</p>}
+      <button type="submit" className="btn btn-primary">Save settings</button>
+      {status && <p role="status" className="text-sm text-[var(--color-muted-fg)]">{status}</p>}
     </form>
   );
 }

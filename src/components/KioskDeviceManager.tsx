@@ -42,23 +42,27 @@ export function KioskDeviceManager({
   }
 
   return (
-    <div>
-      <label>New device name <input value={name} onChange={(e) => setName(e.target.value)} /></label>
-      <button disabled={creating || !name.trim()} onClick={create}>
-        {creating ? "Creating…" : "Create"}
-      </button>
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="label">New device name <input className="input" value={name} onChange={(e) => setName(e.target.value)} /></label>
+        <button disabled={creating || !name.trim()} onClick={create} className="btn btn-primary">
+          {creating ? "Creating…" : "Create"}
+        </button>
+      </div>
       {newToken && (
-        <p role="status">
+        <p role="status" className="text-sm text-[var(--color-muted-fg)]">
           Token (shown once — enter it on the tablet at <code>/kiosk/setup</code>):{" "}
           <code>{newToken}</code>
         </p>
       )}
-      {status && <p role="alert">{status}</p>}
-      <ul>
+      {status && <p role="alert" className="text-sm text-[var(--color-absent)]">{status}</p>}
+      <ul className="flex flex-col divide-y divide-[var(--color-border)]">
         {devices.map((d) => (
-          <li key={d.id}>
-            {d.name} — last seen {d.lastSeenAt ? new Date(d.lastSeenAt).toLocaleString() : "never"}{" "}
-            <button onClick={() => remove(d.id)}>Delete</button>
+          <li key={d.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+            <span>
+              {d.name} — last seen {d.lastSeenAt ? new Date(d.lastSeenAt).toLocaleString() : "never"}
+            </span>
+            <button onClick={() => remove(d.id)} className="btn btn-danger">Delete</button>
           </li>
         ))}
       </ul>

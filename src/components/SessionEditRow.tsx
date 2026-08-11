@@ -50,14 +50,14 @@ export function SessionEditRow({
   return (
     <tr>
       <td>{label}</td>
-      <td><input type="datetime-local" value={tin} onChange={(e) => setTin(e.target.value)} /></td>
-      <td><input type="datetime-local" value={tout} onChange={(e) => setTout(e.target.value)} /></td>
-      <td><input value={n} onChange={(e) => setN(e.target.value)} placeholder="note" /></td>
+      <td><input className="input w-48" type="datetime-local" value={tin} onChange={(e) => setTin(e.target.value)} /></td>
+      <td><input className="input w-48" type="datetime-local" value={tout} onChange={(e) => setTout(e.target.value)} /></td>
+      <td><input className="input w-36" value={n} onChange={(e) => setN(e.target.value)} placeholder="note" /></td>
       <td><input type="checkbox" checked={exc} onChange={(e) => setExc(e.target.checked)} /></td>
-      <td>
-        <button onClick={save}>Save</button>{" "}
-        <button onClick={remove}>Delete</button>
-        {status && <span role="status"> {status}</span>}
+      <td className="flex items-center gap-2">
+        <button onClick={save} className="btn btn-primary px-3 py-1">Save</button>
+        <button onClick={remove} className="btn btn-danger px-3 py-1">Delete</button>
+        {status && <span role="status" className="text-sm text-[var(--color-muted-fg)]"> {status}</span>}
       </td>
     </tr>
   );

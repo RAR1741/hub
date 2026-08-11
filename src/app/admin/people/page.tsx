@@ -11,28 +11,34 @@ export default async function AdminPeoplePage() {
 
   const rows = await listPeople();
   return (
-    <main>
-      <h1>Admin — People</h1>
-      <h2>Create person</h2>
-      <PersonForm />
-      <h2>All people ({rows.length})</h2>
-      <table>
-        <thead>
-          <tr><th>Name</th><th>Role</th><th>Student ID</th><th>Email</th><th>Active</th><th></th></tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.id}>
-              <td>{r.display_name ?? `${r.first_name} ${r.last_name}`}</td>
-              <td>{r.role}</td>
-              <td>{r.student_id_number ?? ""}</td>
-              <td>{r.email ?? ""}</td>
-              <td>{r.is_active ? "yes" : "no"}</td>
-              <td><Link href={`/admin/people/${r.id}`}>Edit</Link></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <main className="flex flex-col gap-6">
+      <h1 className="text-3xl font-bold tracking-tight">Admin — People</h1>
+      <section className="card flex flex-col gap-4">
+        <h2 className="text-xl font-semibold">Create person</h2>
+        <PersonForm />
+      </section>
+      <section className="flex flex-col gap-3">
+        <h2 className="text-xl font-semibold">All people ({rows.length})</h2>
+        <div className="card overflow-x-auto">
+          <table className="table">
+            <thead>
+              <tr><th>Name</th><th>Role</th><th>Student ID</th><th>Email</th><th>Active</th><th></th></tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id}>
+                  <td>{r.display_name ?? `${r.first_name} ${r.last_name}`}</td>
+                  <td><span className="badge">{r.role}</span></td>
+                  <td>{r.student_id_number ?? ""}</td>
+                  <td>{r.email ?? ""}</td>
+                  <td>{r.is_active ? "yes" : "no"}</td>
+                  <td><Link href={`/admin/people/${r.id}`} className="font-medium text-[var(--color-brand)]">Edit</Link></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </main>
   );
 }

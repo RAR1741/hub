@@ -29,19 +29,23 @@ export default async function AdminTeamPage({
     .map((p) => ({ id: p.id, name: displayName(p) }));
 
   return (
-    <main>
-      <h1>Team — {team.name}</h1>
-      <TeamForm
-        teamId={team.id}
-        teams={teams.map((t) => ({ id: t.id, name: t.name }))}
-        initial={{
-          name: team.name,
-          parentTeamId: team.parentTeamId ?? "",
-          description: team.description ?? "",
-          joinMode: team.joinMode,
-        }}
-      />
-      <MemberManager teamId={team.id} members={members} candidates={candidates} />
+    <main className="flex flex-col gap-6">
+      <h1 className="text-3xl font-bold tracking-tight">Team — {team.name}</h1>
+      <section className="card flex flex-col gap-4">
+        <TeamForm
+          teamId={team.id}
+          teams={teams.map((t) => ({ id: t.id, name: t.name }))}
+          initial={{
+            name: team.name,
+            parentTeamId: team.parentTeamId ?? "",
+            description: team.description ?? "",
+            joinMode: team.joinMode,
+          }}
+        />
+      </section>
+      <section className="card flex flex-col gap-4">
+        <MemberManager teamId={team.id} members={members} candidates={candidates} />
+      </section>
       <DeleteTeamButton teamId={team.id} />
     </main>
   );

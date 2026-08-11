@@ -12,5 +12,5 @@ export function ActivatePeriodButton({ periodId }: { periodId: string }) {
     });
     if (res.ok) router.refresh();
   }
-  return <button onClick={activate}>Make active</button>;
+  return <button onClick={activate} className="btn btn-primary">Make active</button>;
 }

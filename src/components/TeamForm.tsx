@@ -49,26 +49,26 @@ export function TeamForm({
   }
 
   return (
-    <form onSubmit={submit}>
-      <label>Name <input value={values.name} onChange={(e) => setValues({ ...values, name: e.target.value })} required /></label>
-      <label>Parent{" "}
-        <select value={values.parentTeamId} onChange={(e) => setValues({ ...values, parentTeamId: e.target.value })}>
+    <form onSubmit={submit} className="flex flex-col gap-3">
+      <label className="label">Name <input className="input" value={values.name} onChange={(e) => setValues({ ...values, name: e.target.value })} required /></label>
+      <label className="label">Parent{" "}
+        <select className="input" value={values.parentTeamId} onChange={(e) => setValues({ ...values, parentTeamId: e.target.value })}>
           <option value="">(none — top level)</option>
           {teams.filter((t) => t.id !== teamId).map((t) => (
             <option key={t.id} value={t.id}>{t.name}</option>
           ))}
         </select>
       </label>
-      <label>Description <input value={values.description} onChange={(e) => setValues({ ...values, description: e.target.value })} /></label>
-      <label>Join mode{" "}
-        <select value={values.joinMode} onChange={(e) => setValues({ ...values, joinMode: e.target.value })}>
+      <label className="label">Description <input className="input" value={values.description} onChange={(e) => setValues({ ...values, description: e.target.value })} /></label>
+      <label className="label">Join mode{" "}
+        <select className="input" value={values.joinMode} onChange={(e) => setValues({ ...values, joinMode: e.target.value })}>
           <option value="admin_only">admin only</option>
           <option value="open">open</option>
           <option value="requires_approval">requires approval</option>
         </select>
       </label>
-      <button type="submit">{teamId ? "Save changes" : "Create team"}</button>
-      {status && <p role="status">{status}</p>}
+      <button type="submit" className="btn btn-primary">{teamId ? "Save changes" : "Create team"}</button>
+      {status && <p role="status" className="text-sm text-[var(--color-muted-fg)]">{status}</p>}
     </form>
   );
 }

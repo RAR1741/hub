@@ -32,32 +32,43 @@ export function MemberManager({
   }
 
   return (
-    <section>
-      <h2>Members ({members.length})</h2>
-      <ul>
+    <section className="flex flex-col gap-4">
+      <h2 className="text-xl font-semibold">Members ({members.length})</h2>
+      <ul className="flex flex-col divide-y divide-[var(--color-border)]">
         {members.map((m) => (
-          <li key={m.personId}>
-            {m.name} {m.isManager ? "(manager)" : ""}{" "}
-            <button onClick={() => call("POST", { personId: m.personId, isManager: !m.isManager })}>
-              {m.isManager ? "Remove manager" : "Make manager"}
-            </button>{" "}
-            <button onClick={() => call("DELETE", { personId: m.personId })}>Remove</button>
+          <li key={m.personId} className="flex items-center justify-between gap-3 py-2 text-sm">
+            <span>
+              {m.name} {m.isManager ? "(manager)" : ""}
+            </span>
+            <span className="flex items-center gap-2">
+              <button
+                onClick={() => call("POST", { personId: m.personId, isManager: !m.isManager })}
+                className="btn btn-secondary px-3 py-1"
+              >
+                {m.isManager ? "Remove manager" : "Make manager"}
+              </button>
+              <button onClick={() => call("DELETE", { personId: m.personId })} className="btn btn-danger px-3 py-1">
+                Remove
+              </button>
+            </span>
           </li>
         ))}
       </ul>
-      <label>
-        Add member{" "}
-        <select value={personId} onChange={(e) => setPersonId(e.target.value)}>
-          <option value="">Choose…</option>
-          {candidates.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </select>
-      </label>
-      <button disabled={!personId} onClick={() => call("POST", { personId, isManager: false })}>
-        Add
-      </button>
-      {status && <p role="status">{status}</p>}
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="label">
+          Add member{" "}
+          <select className="input" value={personId} onChange={(e) => setPersonId(e.target.value)}>
+            <option value="">Choose…</option>
+            {candidates.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        </label>
+        <button disabled={!personId} onClick={() => call("POST", { personId, isManager: false })} className="btn btn-primary">
+          Add
+        </button>
+      </div>
+      {status && <p role="status" className="text-sm text-[var(--color-muted-fg)]">{status}</p>}
     </section>
   );
 }

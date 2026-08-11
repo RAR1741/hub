@@ -22,8 +22,8 @@ export function DeleteTeamButton({ teamId }: { teamId: string }) {
 
   return (
     <p>
-      <button onClick={remove}>Delete team</button>
-      {status && <span role="status"> {status}</span>}
+      <button onClick={remove} className="btn btn-danger">Delete team</button>
+      {status && <span role="status" className="text-sm text-[var(--color-muted-fg)]"> {status}</span>}
     </p>
   );
 }
