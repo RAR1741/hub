@@ -1,0 +1,85 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+
+export function KioskSetupForm() {
+  const [token, setToken] = useState("");
+  const [status, setStatus] = useState<string | null>(null);
+  const router = useRouter();
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setStatus(null);
+    const res = await fetch("/api/kiosk/setup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    });
+    if (res.ok) { router.push("/kiosk"); router.refresh(); }
+    else setStatus("Token not recognized.");
+  }
+  return (
+    <form onSubmit={submit}>
+      <label>Kiosk token <input value={token} onChange={(e) => setToken(e.target.value)} required /></label>
+      <button type="submit">Register this tablet</button>
+      {status && <p role="alert">{status}</p>}
+    </form>
+  );
+}
+
+type Member = { id: string; name: string };
+type Here = { personId: string; name: string; since: string };
+
+export function KioskBoard({ members, here }: { members: Member[]; here: Here[] }) {
+  const [busy, setBusy] = useState(false);
+  const [flash, setFlash] = useState<string | null>(null);
+  const router = useRouter();
+
+  async function call(path: string, personId: string, name: string, verb: string) {
+    if (busy) return;
+    setBusy(true);
+    setFlash(null);
+    const res = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ personId }),
+    });
+    setBusy(false);
+    if (res.ok) { setFlash(`${verb} ${name}`); router.refresh(); }
+    else if (res.status === 401) { setFlash("This tablet is not registered."); }
+    else {
+      const data = (await res.json().catch(() => ({}))) as { reason?: string };
+      setFlash(data.reason === "no_active_period" ? "No active period — ask a mentor." : "Try again.");
+    }
+  }
+
+  return (
+    <div>
+      {flash && <p role="status">{flash}</p>}
+      <section>
+        <h2>Who&apos;s here ({here.length})</h2>
+        <ul>
+          {here.map((h) => (
+            <li key={h.personId}>
+              <button onClick={() => call("/api/kiosk/clock-out", h.personId, h.name, "Signed out")}>
+                {h.name} — out
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
+      <section>
+        <h2>Sign in</h2>
+        <ul>
+          {members.map((m) => (
+            <li key={m.id}>
+              <button onClick={() => call("/api/kiosk/clock-in", m.id, m.name, "Signed in")}>
+                {m.name}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </div>
+  );
+}
