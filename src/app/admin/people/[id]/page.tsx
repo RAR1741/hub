@@ -10,7 +10,7 @@ export default async function AdminEditPersonPage({
   params: Promise<{ id: string }>;
 }) {
   const [{ id }, viewer] = await Promise.all([params, getViewer()]);
-  if (!hasRole(viewer.role, "admin")) redirect("/login");
+  if (!hasRole(viewer.role, "admin")) redirect("/");
 
   const result = await getPersonWithTeams(id);
   if (!result) notFound();

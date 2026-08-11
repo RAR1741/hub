@@ -13,7 +13,7 @@ export default async function AdminTeamPage({
   params: Promise<{ id: string }>;
 }) {
   const [{ id }, viewer] = await Promise.all([params, getViewer()]);
-  if (!hasRole(viewer.role, "admin")) redirect("/login");
+  if (!hasRole(viewer.role, "admin")) redirect("/");
 
   const [team, teams, members, everyone] = await Promise.all([
     getTeam(id),

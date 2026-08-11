@@ -64,7 +64,7 @@ export async function updatePeriod(
   return { ok: true, status: 200 };
 }
 
-/** Exactly one active period: clear all, then set this one. */
+/** Exactly one active period, enforced by the `one_active_period` partial unique index. */
 export async function setActivePeriod(
   id: string,
   db?: SupabaseClient,
@@ -72,10 +72,11 @@ export async function setActivePeriod(
   const client = db ?? (await import("./db")).getDb();
   const { data: exists } = await client.from("period").select("id").eq("id", id).maybeSingle();
   if (!exists) return { ok: false, status: 404 };
+  // Clear the current active row first, then set this one. The partial unique
+  // index rejects any state with two active periods, so concurrent callers can't
+  // both win — the loser gets a 23505 surfaced as 500 and simply retries.
   const { error: clearError } = await client
-    .from("period")
-    .update({ is_active: false })
-    .eq("is_active", true);
+    .from("period").update({ is_active: false }).eq("is_active", true);
   if (clearError) return { ok: false, status: 500 };
   const { error } = await client.from("period").update({ is_active: true }).eq("id", id);
   if (error) return { ok: false, status: 500 };

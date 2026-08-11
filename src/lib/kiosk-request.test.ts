@@ -11,4 +11,10 @@ describe("kioskTokenFromRequest", () => {
   test("undefined when absent", () => {
     expect(kioskTokenFromRequest(new Request("http://test/"))).toBeUndefined();
   });
+  test("keeps '=' inside the cookie value", () => {
+    const req = new Request("http://test/", {
+      headers: { cookie: "hub_kiosk_token=aGVsbG8=; other=1" },
+    });
+    expect(kioskTokenFromRequest(req)).toBe("aGVsbG8=");
+  });
 });

@@ -3,7 +3,7 @@ import { getViewer } from "@/lib/viewer";
 import { WhosHere } from "@/components/WhosHere";
 import { listWhosHere } from "@/lib/sessions";
 import { getActivePeriod } from "@/lib/periods";
-import { periodLeaderboard } from "@/lib/reports";
+import { personPeriodHours } from "@/lib/reports";
 import { listUpcomingMeetings } from "@/lib/meetings";
 
 export default async function HomePage() {
@@ -12,7 +12,7 @@ export default async function HomePage() {
   const activePeriod = viewer.person ? await getActivePeriod() : null;
   const myHours =
     viewer.person && activePeriod
-      ? (await periodLeaderboard(activePeriod.id)).find((e) => e.personId === viewer.person!.id)?.hours ?? 0
+      ? await personPeriodHours(viewer.person.id, activePeriod.id)
       : 0;
   const upcoming = await listUpcomingMeetings(new Date().toISOString(), 5);
   return (

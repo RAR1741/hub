@@ -41,6 +41,16 @@ export async function personSessions(
   return ((data ?? []) as SessionRow[]).map(sessionFromRow);
 }
 
+/** Total (rounded) non-excluded hours for ONE person in a period. Avoids a full leaderboard scan. */
+export async function personPeriodHours(
+  personId: string,
+  periodId: string,
+  db?: SupabaseClient,
+): Promise<number> {
+  const sessions = await personSessions(personId, periodId, db);
+  return Math.round(totalHours(sessions) * 100) / 100;
+}
+
 export async function periodLeaderboard(
   periodId: string,
   db?: SupabaseClient,

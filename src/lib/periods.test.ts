@@ -16,4 +16,9 @@ describe("parsePeriodInput", () => {
   ])("rejects %j", (body) => {
     expect(parsePeriodInput(body)).toBeNull();
   });
+  test("rejects a name longer than 80 chars", () => {
+    expect(
+      parsePeriodInput({ name: "x".repeat(81), startsOn: "2026-08-01", endsOn: "2026-12-31" }),
+    ).toBeNull();
+  });
 });

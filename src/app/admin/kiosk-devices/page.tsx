@@ -6,7 +6,7 @@ import { KioskDeviceManager } from "@/components/KioskDeviceManager";
 
 export default async function AdminKioskDevicesPage() {
   const viewer = await getViewer();
-  if (!hasRole(viewer.role, "admin")) redirect("/login");
+  if (!hasRole(viewer.role, "admin")) redirect("/");
   const devices = await listKioskDevices();
   return (
     <main>

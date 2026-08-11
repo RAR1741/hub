@@ -7,7 +7,7 @@ import { ActivatePeriodButton } from "@/components/ActivatePeriodButton";
 
 export default async function AdminPeriodsPage() {
   const viewer = await getViewer();
-  if (!hasRole(viewer.role, "admin")) redirect("/login");
+  if (!hasRole(viewer.role, "admin")) redirect("/");
 
   const periods = await listPeriods();
   return (

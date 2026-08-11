@@ -21,7 +21,7 @@ function Tree({ nodes }: { nodes: TeamNode[] }) {
 
 export default async function AdminTeamsPage() {
   const viewer = await getViewer();
-  if (!hasRole(viewer.role, "admin")) redirect("/login");
+  if (!hasRole(viewer.role, "admin")) redirect("/");
 
   const teams = await listTeams();
   return (

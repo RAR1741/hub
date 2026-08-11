@@ -12,7 +12,7 @@ import {
 
 export default async function AdminRequestsPage() {
   const viewer = await getViewer();
-  if (!hasRole(viewer.role, "admin")) redirect("/login");
+  if (!hasRole(viewer.role, "admin")) redirect("/");
 
   const [accountRequests, applications] = await Promise.all([
     listPendingAccountRequests(),

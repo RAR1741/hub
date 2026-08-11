@@ -11,21 +11,28 @@ export function KioskDeviceManager({
   const [name, setName] = useState("");
   const [newToken, setNewToken] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
   const router = useRouter();
 
   async function create() {
+    if (creating) return;
+    setCreating(true);
     setStatus(null); setNewToken(null);
-    const res = await fetch("/api/admin/kiosk-devices", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
-    });
-    if (res.ok) {
-      const { token } = (await res.json()) as { token: string };
-      setNewToken(token);
-      setName("");
-      router.refresh();
-    } else setStatus("Create failed.");
+    try {
+      const res = await fetch("/api/admin/kiosk-devices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (res.ok) {
+        const { token } = (await res.json()) as { token: string };
+        setNewToken(token);
+        setName("");
+        router.refresh();
+      } else setStatus("Create failed.");
+    } finally {
+      setCreating(false);
+    }
   }
   async function remove(id: string) {
     if (!confirm("Delete this kiosk device? Tablets using it will stop working.")) return;
@@ -37,7 +44,9 @@ export function KioskDeviceManager({
   return (
     <div>
       <label>New device name <input value={name} onChange={(e) => setName(e.target.value)} /></label>
-      <button disabled={!name.trim()} onClick={create}>Create</button>
+      <button disabled={creating || !name.trim()} onClick={create}>
+        {creating ? "Creating…" : "Create"}
+      </button>
       {newToken && (
         <p role="status">
           Token (shown once — enter it on the tablet at <code>/kiosk/setup</code>):{" "}

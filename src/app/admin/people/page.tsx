@@ -7,7 +7,7 @@ import { PersonForm } from "@/components/PersonForm";
 
 export default async function AdminPeoplePage() {
   const viewer = await getViewer();
-  if (!hasRole(viewer.role, "admin")) redirect("/login");
+  if (!hasRole(viewer.role, "admin")) redirect("/");
 
   const rows = await listPeople();
   return (

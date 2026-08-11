@@ -3,19 +3,21 @@ import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
 import { getActivePeriod } from "@/lib/periods";
 import { flaggedSessions } from "@/lib/reports";
+import { getSetting } from "@/lib/settings";
 import { SessionEditRow } from "@/components/SessionEditRow";
 
 export default async function FlaggedSessionsPage() {
   const viewer = await getViewer();
-  if (!hasRole(viewer.role, "mentor")) redirect("/login");
+  if (!hasRole(viewer.role, "mentor")) redirect("/");
 
   const period = await getActivePeriod();
+  const maxShift = await getSetting<number>("max_shift_hours", 18);
   const flagged = period ? await flaggedSessions(period.id) : [];
 
   return (
     <main>
       <h1>Flagged sessions{period ? ` — ${period.name}` : ""}</h1>
-      <p>Over {`${18}`}h, still open, auto-closed by the nightly sweep, or overlapping another session.</p>
+      <p>Over {maxShift}h, still open, auto-closed by the nightly sweep, or overlapping another session.</p>
       {flagged.length === 0 ? (
         <p>Nothing flagged. 🎉</p>
       ) : (

@@ -25,6 +25,14 @@ describe("parseSessionEdit", () => {
   ])("rejects %j", (b) => expect(parseSessionEdit(b)).toBeNull());
 });
 
+describe("parseSessionEdit — note edges", () => {
+  test("rejects a too-long note (>500)", () => {
+    expect(
+      parseSessionEdit({ timeIn: "2026-09-01T18:00:00Z", note: "x".repeat(501), excludedFromTotals: false }),
+    ).toBeNull();
+  });
+});
+
 describe("parseManualSession", () => {
   test("requires personId and timeIn", () => {
     expect(parseManualSession({ personId: "p1", timeIn: "2026-09-01T18:00:00Z" })).toEqual({
