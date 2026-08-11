@@ -23,16 +23,31 @@ export function AccountRequestForm() {
   }
 
   if (state === "sent") {
-    return <p>Request sent! A mentor will set you up at the next meeting.</p>;
+    return (
+      <p className="text-sm text-[var(--color-present)]">
+        Request sent! A mentor will set you up at the next meeting.
+      </p>
+    );
   }
   return (
-    <form onSubmit={submit}>
-      <input name="firstName" placeholder="First name" required />
-      <input name="lastName" placeholder="Last name" required />
-      <input name="gradYear" placeholder="Grad year (optional)" inputMode="numeric" />
-      <input name="email" placeholder="Email (optional)" type="email" />
-      <button type="submit">Request an account</button>
-      {state === "error" && <p role="alert">Something went wrong — try again.</p>}
+    <form onSubmit={submit} className="flex flex-col gap-2">
+      <input className="input" name="firstName" placeholder="First name" required />
+      <input className="input" name="lastName" placeholder="Last name" required />
+      <input
+        className="input"
+        name="gradYear"
+        placeholder="Grad year (optional)"
+        inputMode="numeric"
+      />
+      <input className="input" name="email" placeholder="Email (optional)" type="email" />
+      <button type="submit" className="btn btn-secondary w-full">
+        Request an account
+      </button>
+      {state === "error" && (
+        <p role="alert" className="text-sm text-[var(--color-absent)]">
+          Something went wrong — try again.
+        </p>
+      )}
     </form>
   );
 }

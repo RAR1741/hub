@@ -10,7 +10,7 @@ export function GoogleSignInButton() {
     });
   }
   return (
-    <button type="button" onClick={signIn}>
+    <button type="button" onClick={signIn} className="btn btn-secondary w-full">
       Mentor sign in with Google
     </button>
   );

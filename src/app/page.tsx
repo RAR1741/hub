@@ -16,46 +16,71 @@ export default async function HomePage() {
       : 0;
   const upcoming = await listUpcomingMeetings(new Date().toISOString(), 5);
   return (
-    <main>
-      <h1>Team Hub</h1>
+    <main className="flex flex-col gap-6">
+      <h1 className="text-3xl font-bold tracking-tight">Team Hub</h1>
       {viewer.person ? (
         <>
-          <p>
-            Signed in as {viewer.person.displayName ?? viewer.person.firstName}{" "}
-            ({viewer.role})
-          </p>
-          <form action="/api/auth/logout" method="post">
-            <button type="submit">Sign out</button>
-          </form>
-          <ul>
-            <li>
-              <Link href="/people">People</Link>
-            </li>
-            <li>
-              <Link href="/teams">Teams</Link>
-            </li>
-          </ul>
+          <div className="card flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-[var(--color-muted-fg)]">
+                Signed in as{" "}
+                <span className="font-medium text-[var(--color-fg)]">
+                  {viewer.person.displayName ?? viewer.person.firstName}
+                </span>{" "}
+                ({viewer.role})
+              </p>
+              <nav aria-label="Quick links" className="mt-3 flex flex-wrap gap-4">
+                <Link href="/people" className="text-sm font-medium text-[var(--color-brand)]">
+                  People
+                </Link>
+                <Link href="/teams" className="text-sm font-medium text-[var(--color-brand)]">
+                  Teams
+                </Link>
+              </nav>
+            </div>
+            <form action="/api/auth/logout" method="post">
+              <button type="submit" className="btn btn-secondary">
+                Sign out
+              </button>
+            </form>
+          </div>
+
           {activePeriod && (
-            <p>
-              {activePeriod.name}: you have <strong>{myHours}</strong> h.
-            </p>
+            <div className="card flex items-baseline gap-3">
+              <span className="text-sm text-[var(--color-muted-fg)]">
+                {activePeriod.name}
+              </span>
+              <span className="text-3xl font-bold text-[var(--color-brand)]">
+                {myHours}
+              </span>
+              <span className="text-sm text-[var(--color-muted-fg)]">hours</span>
+            </div>
           )}
+
           <WhosHere initial={here.map((h) => ({ name: h.name, since: h.since }))} />
         </>
       ) : (
-        <p>
-          Browsing as guest. <Link href="/login">Sign in</Link>
+        <p className="card text-[var(--color-muted-fg)]">
+          Browsing as guest.{" "}
+          <Link href="/login" className="font-medium text-[var(--color-brand)]">
+            Sign in
+          </Link>
         </p>
       )}
-      <section>
-        <h2>Upcoming meetings</h2>
+      <section className="card flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">Upcoming meetings</h2>
         {upcoming.length === 0 ? (
-          <p>No upcoming meetings scheduled.</p>
+          <p className="text-sm text-[var(--color-muted-fg)]">
+            No upcoming meetings scheduled.
+          </p>
         ) : (
-          <ul>
+          <ul className="flex flex-col divide-y divide-[var(--color-border)]">
             {upcoming.map((m) => (
-              <li key={m.id}>
-                {new Date(m.startsAt).toLocaleString()} — {m.title}
+              <li key={m.id} className="py-2 text-sm">
+                <span className="text-[var(--color-muted-fg)]">
+                  {new Date(m.startsAt).toLocaleString()}
+                </span>{" "}
+                — {m.title}
               </li>
             ))}
           </ul>

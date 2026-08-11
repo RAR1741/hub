@@ -25,18 +25,25 @@ export function StudentLoginForm() {
   }
 
   return (
-    <form onSubmit={submit}>
-      <label>
+    <form onSubmit={submit} className="flex flex-col gap-3">
+      <label className="label">
         Student ID
         <input
+          className="input mt-1"
           value={studentId}
           onChange={(e) => setStudentId(e.target.value)}
           autoFocus
           required
         />
       </label>
-      <button type="submit">Sign in</button>
-      {error && <p role="alert">{error}</p>}
+      <button type="submit" className="btn btn-primary w-full">
+        Sign in
+      </button>
+      {error && (
+        <p role="alert" className="text-sm text-[var(--color-absent)]">
+          {error}
+        </p>
+      )}
     </form>
   );
 }
