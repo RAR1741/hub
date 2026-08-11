@@ -2,14 +2,18 @@ import { ForbiddenError, requireRole } from "./authz";
 import type { Role } from "./types";
 import type { Viewer } from "./viewer";
 
-type Handler = (viewer: Viewer, request: Request) => Promise<Response>;
+type Handler<C> = (
+  viewer: Viewer,
+  request: Request,
+  context: C,
+) => Promise<Response>;
 
-export function withRole(
+export function withRole<C = unknown>(
   required: Role,
-  handler: Handler,
+  handler: Handler<C>,
   viewerSource?: () => Promise<Viewer>, // injectable for tests
-): (request: Request) => Promise<Response> {
-  return async (request: Request) => {
+): (request: Request, context?: C) => Promise<Response> {
+  return async (request: Request, context?: C) => {
     const getV = viewerSource ?? (await import("./viewer")).getViewer;
     const viewer = await getV();
     try {
@@ -20,6 +24,6 @@ export function withRole(
       }
       throw e;
     }
-    return handler(viewer, request);
+    return handler(viewer, request, context as C);
   };
 }
