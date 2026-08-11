@@ -83,3 +83,72 @@ export function teamFromRow(row: TeamRow): Team {
 }
 
 export type ApplicationStatus = "pending" | "approved" | "denied";
+
+export type SessionSource = "kiosk" | "manual" | "admin";
+
+export type PeriodRow = {
+  id: string;
+  name: string;
+  starts_on: string;
+  ends_on: string;
+  is_active: boolean;
+};
+
+export type Period = {
+  id: string;
+  name: string;
+  startsOn: string;
+  endsOn: string;
+  isActive: boolean;
+};
+
+export function periodFromRow(row: PeriodRow): Period {
+  return {
+    id: row.id,
+    name: row.name,
+    startsOn: row.starts_on,
+    endsOn: row.ends_on,
+    isActive: row.is_active,
+  };
+}
+
+export type SessionRow = {
+  id: string;
+  person_id: string;
+  period_id: string;
+  time_in: string;
+  time_out: string | null;
+  source: SessionSource;
+  note: string | null;
+  excluded_from_totals: boolean;
+  edited_by: string | null;
+  edited_at: string | null;
+};
+
+export type Session = {
+  id: string;
+  personId: string;
+  periodId: string;
+  timeIn: string;
+  timeOut: string | null;
+  source: SessionSource;
+  note: string | null;
+  excludedFromTotals: boolean;
+  editedBy: string | null;
+  editedAt: string | null;
+};
+
+export function sessionFromRow(row: SessionRow): Session {
+  return {
+    id: row.id,
+    personId: row.person_id,
+    periodId: row.period_id,
+    timeIn: row.time_in,
+    timeOut: row.time_out,
+    source: row.source,
+    note: row.note,
+    excludedFromTotals: row.excluded_from_totals,
+    editedBy: row.edited_by,
+    editedAt: row.edited_at,
+  };
+}

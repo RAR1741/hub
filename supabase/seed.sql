@@ -8,3 +8,6 @@ insert into team (name, parent_team_id, description, join_mode)
 values
   ('Programming', (select id from team where name = 'Red Alert Robotics'), 'Software subteam', 'open'),
   ('Mechanical',  (select id from team where name = 'Red Alert Robotics'), 'Mechanical subteam', 'requires_approval');
+
+insert into period (name, starts_on, ends_on, is_active)
+values ('2026–2027 Season', '2026-08-01', '2027-07-31', true);
