@@ -19,6 +19,7 @@ export async function SiteNav() {
           <Link href="/admin/requests">Admin: Requests</Link>{" "}
           <Link href="/admin/periods">Admin: Periods</Link>{" "}
           <Link href="/admin/kiosk-devices">Admin: Kiosk</Link>{" "}
+          <Link href="/admin/settings">Admin: Settings</Link>{" "}
         </>
       )}
       {viewer.person ? (
