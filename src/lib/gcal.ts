@@ -83,21 +83,35 @@ export type GcalDeps = {
 
 export type SyncResult = { meetings: number; buildDays: number };
 
+async function fetchAllEvents(deps: GcalDeps, token: string): Promise<GcalEvent[]> {
+  const timeMin = new Date(deps.now ? deps.now() : Date.now()).toISOString();
+  const items: GcalEvent[] = [];
+  let pageToken: string | undefined;
+  do {
+    const url = new URL(
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(
+        deps.credentials.calendarId,
+      )}/events`,
+    );
+    url.searchParams.set("singleEvents", "true");
+    url.searchParams.set("orderBy", "startTime");
+    url.searchParams.set("timeMin", timeMin);
+    if (pageToken) url.searchParams.set("pageToken", pageToken);
+    const res = await deps.fetch(url.toString(), {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error(`events fetch failed: ${res.status}`);
+    const json = (await res.json()) as { items?: GcalEvent[]; nextPageToken?: string };
+    items.push(...(json.items ?? []));
+    pageToken = json.nextPageToken;
+  } while (pageToken);
+  return items;
+}
+
 export async function syncCalendar(deps: GcalDeps): Promise<SyncResult> {
   const token = await fetchAccessToken(deps);
-  const url = new URL(
-    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(
-      deps.credentials.calendarId,
-    )}/events`,
-  );
-  url.searchParams.set("singleEvents", "true");
-  url.searchParams.set("orderBy", "startTime");
-  const res = await deps.fetch(url.toString(), {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) throw new Error(`events fetch failed: ${res.status}`);
-  const json = (await res.json()) as { items?: GcalEvent[] };
-  const events = (json.items ?? []).filter((e) => e.id && (e.start?.dateTime || e.start?.date));
+  const allItems = await fetchAllEvents(deps, token);
+  const events = allItems.filter((e) => e.id && (e.start?.dateTime || e.start?.date));
   if (events.length === 0) return { meetings: 0, buildDays: 0 };
 
   const syncedAt = new Date(deps.now ? deps.now() : Date.now()).toISOString();
@@ -120,8 +134,17 @@ export async function syncCalendar(deps: GcalDeps): Promise<SyncResult> {
     .upsert(meetingRows, { onConflict: "gcal_event_id" });
   if (meetingError) throw new Error(`meeting upsert failed: ${meetingError.message}`);
 
-  // One build_day per distinct local start date; never overwrite an existing row.
-  const dates = [...new Set(meetingRows.map((m) => localDateOf(m.starts_at, deps.tz)))];
+  // One build_day per distinct start date; never overwrite an existing row.
+  // All-day events carry no time component, so their date is used verbatim —
+  // running it through localDateOf would shift it a day earlier in UTC-negative
+  // timezones. Timed events still convert their instant to the team-local date.
+  const dates = [
+    ...new Set(
+      events.map((e, i) =>
+        e.start!.dateTime ? localDateOf(meetingRows[i].starts_at, deps.tz) : e.start!.date!,
+      ),
+    ),
+  ];
   const buildDayRows = dates.map((date) => ({ date, kind: "required", source: "gcal" }));
   const { error: bdError } = await deps.db
     .from("build_day")

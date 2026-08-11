@@ -54,6 +54,36 @@ function fakeFetch(events: unknown[]): GcalTransport {
   }) as unknown as GcalTransport;
 }
 
+// Like fakeFetch, but serves distinct pages keyed by the pageToken query param
+// (undefined for the first request), and records every events-endpoint URL requested.
+function fakeFetchPaged(pages: { token: string | undefined; events: unknown[]; nextPageToken?: string }[]) {
+  const requestedUrls: string[] = [];
+  const transport = (async (url: string | URL | Request) => {
+    const href = String(url);
+    if (href.includes("oauth2.googleapis.com/token")) {
+      return new Response(JSON.stringify({ access_token: "fake-token", expires_in: 3600 }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    if (href.includes("/calendar/v3/calendars/")) {
+      requestedUrls.push(href);
+      const parsed = new URL(href);
+      const pageToken = parsed.searchParams.get("pageToken") ?? undefined;
+      const page = pages.find((p) => p.token === pageToken);
+      if (!page) throw new Error(`no fake page for pageToken=${pageToken}`);
+      const body: { items: unknown[]; nextPageToken?: string } = { items: page.events };
+      if (page.nextPageToken) body.nextPageToken = page.nextPageToken;
+      return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    throw new Error(`unexpected fetch to ${href}`);
+  }) as unknown as GcalTransport;
+  return { transport, requestedUrls };
+}
+
 describe("syncCalendar", () => {
   test("upserts meetings by gcal_event_id and marks build days (gcal, ignore existing)", async () => {
     const db = fakeDb();
@@ -90,6 +120,87 @@ describe("syncCalendar", () => {
     expect(buildDayCall.rows).toEqual([
       { date: "2026-09-01", kind: "required", source: "gcal" }, // local start date
     ]);
+  });
+
+  test("an all-day event's build_day uses the date verbatim, not a tz-shifted instant (fix #1)", async () => {
+    const db = fakeDb();
+    const events = [
+      {
+        id: "evt-allday",
+        summary: "Competition Day",
+        start: { date: "2026-03-15" },
+        end: { date: "2026-03-16" },
+      },
+    ];
+    const result = await syncCalendar({
+      fetch: fakeFetch(events),
+      db: db.client,
+      credentials: {
+        clientEmail: "svc@proj.iam.gserviceaccount.com",
+        privateKey: PEM,
+        calendarId: "team@group.calendar.google.com",
+      },
+      tz: "America/Indiana/Indianapolis",
+      now: () => 1_700_000_000_000,
+    });
+
+    expect(result).toEqual({ meetings: 1, buildDays: 1 });
+
+    const buildDayCall = db.calls.find((c) => c.table === "build_day")!;
+    expect(buildDayCall.rows).toEqual([
+      { date: "2026-03-15", kind: "required", source: "gcal" }, // verbatim, no tz shift
+    ]);
+  });
+
+  test("follows nextPageToken and upserts events from every page, with a timeMin window (fix #2)", async () => {
+    const db = fakeDb();
+    const page1Events = [
+      {
+        id: "evt-page1",
+        summary: "Older Meeting",
+        start: { dateTime: "2026-09-01T18:00:00Z" },
+        end: { dateTime: "2026-09-01T20:00:00Z" },
+      },
+    ];
+    const page2Events = [
+      {
+        id: "evt-page2",
+        summary: "Newer Meeting",
+        start: { dateTime: "2026-09-08T18:00:00Z" },
+        end: { dateTime: "2026-09-08T20:00:00Z" },
+      },
+    ];
+    const { transport, requestedUrls } = fakeFetchPaged([
+      { token: undefined, events: page1Events, nextPageToken: "page-2-token" },
+      { token: "page-2-token", events: page2Events },
+    ]);
+
+    const result = await syncCalendar({
+      fetch: transport,
+      db: db.client,
+      credentials: {
+        clientEmail: "svc@proj.iam.gserviceaccount.com",
+        privateKey: PEM,
+        calendarId: "team@group.calendar.google.com",
+      },
+      tz: "America/Indiana/Indianapolis",
+      now: () => 1_700_000_000_000,
+    });
+
+    expect(result).toEqual({ meetings: 2, buildDays: 2 });
+
+    const meetingCall = db.calls.find((c) => c.table === "meeting")!;
+    expect(meetingCall.rows).toMatchObject([
+      { gcal_event_id: "evt-page1" },
+      { gcal_event_id: "evt-page2" },
+    ]);
+
+    // Both pages were fetched, and each carried a timeMin bound derived from `now`.
+    expect(requestedUrls).toHaveLength(2);
+    const expectedTimeMin = new Date(1_700_000_000_000).toISOString();
+    for (const href of requestedUrls) {
+      expect(new URL(href).searchParams.get("timeMin")).toBe(expectedTimeMin);
+    }
   });
 
   test("no events → no upserts", async () => {

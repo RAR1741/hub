@@ -17,7 +17,7 @@ export function sessionLocalDate(session: Pick<Session, "timeIn">, tz: string): 
 
 export type AttendanceStatus = "present" | "excused" | "optional" | "absent";
 
-/** True if a non-excluded session for `personId` overlaps local date `date`. */
+/** True if a non-excluded session for `personId` is attributed to local date `date`. */
 function isPresent(
   personId: string,
   date: string,
@@ -26,9 +26,7 @@ function isPresent(
 ): boolean {
   for (const s of sessions) {
     if (s.personId !== personId || s.excludedFromTotals) continue;
-    const start = localDateOf(s.timeIn, tz);
-    const end = localDateOf(s.timeOut ?? s.timeIn, tz);
-    if (start <= date && date <= end) return true; // ISO-date string comparison
+    if (sessionLocalDate(s, tz) === date) return true;
   }
   return false;
 }
@@ -68,10 +66,14 @@ export function attendanceSummary(
   let optional = 0;
   let absent = 0;
   for (const d of buildDays) {
+    // Optional days never contribute to the numerator or denominator, even if attended.
+    if (d.kind === "optional") {
+      optional += 1;
+      continue;
+    }
     const status = attendanceForDate(personId, d.date, d.kind, sessions, excusals, tz);
     if (status === "present") present += 1;
     else if (status === "excused") excused += 1;
-    else if (status === "optional") optional += 1;
     else absent += 1;
   }
   // Required days only; excused (and optional) excluded from the denominator.
