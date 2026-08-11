@@ -109,8 +109,9 @@ Set these in **Vercel → Project → Settings → Environment Variables** (Prod
 
 | Variable | Value | Notes |
 |---|---|---|
-| `AUTH_COOKIE_NAME` | `sb-teamhub-auth-token` | Must be identical across every Supabase auth client (browser, middleware, server) — see `src/lib/supabase-cookie.ts`. Using the default here is simplest; if you ever change it, change it everywhere at once. |
 | `SUPABASE_INTERNAL_URL` | **leave unset** | Only the dev container needs this (it reaches sibling Supabase containers over `host.docker.internal`). In production, `serverSupabaseUrl()` (`src/lib/supabase-url.ts`) falls back to `NEXT_PUBLIC_SUPABASE_URL` when this is unset — do not set it on Vercel. |
+
+> **`AUTH_COOKIE_NAME` is NOT an environment variable.** The auth cookie name is a hardcoded source constant, `export const AUTH_COOKIE_NAME = "sb-teamhub-auth-token"` in `src/lib/supabase-cookie.ts` — nothing reads `process.env.AUTH_COOKIE_NAME`. Setting it on Vercel has no effect. All Supabase auth clients (browser, middleware, server) import that single constant, so they already agree; if you ever need to change the cookie name, edit the constant in source and redeploy — do not add it as an env var.
 
 ### Not environment variables — `app_setting` rows
 
