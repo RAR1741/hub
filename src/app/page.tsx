@@ -4,6 +4,7 @@ import { WhosHere } from "@/components/WhosHere";
 import { listWhosHere } from "@/lib/sessions";
 import { getActivePeriod } from "@/lib/periods";
 import { periodLeaderboard } from "@/lib/reports";
+import { listUpcomingMeetings } from "@/lib/meetings";
 
 export default async function HomePage() {
   const viewer = await getViewer();
@@ -13,6 +14,7 @@ export default async function HomePage() {
     viewer.person && activePeriod
       ? (await periodLeaderboard(activePeriod.id)).find((e) => e.personId === viewer.person!.id)?.hours ?? 0
       : 0;
+  const upcoming = await listUpcomingMeetings(new Date().toISOString(), 5);
   return (
     <main>
       <h1>Team Hub</h1>
@@ -45,6 +47,20 @@ export default async function HomePage() {
           Browsing as guest. <Link href="/login">Sign in</Link>
         </p>
       )}
+      <section>
+        <h2>Upcoming meetings</h2>
+        {upcoming.length === 0 ? (
+          <p>No upcoming meetings scheduled.</p>
+        ) : (
+          <ul>
+            {upcoming.map((m) => (
+              <li key={m.id}>
+                {new Date(m.startsAt).toLocaleString()} — {m.title}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </main>
   );
 }
