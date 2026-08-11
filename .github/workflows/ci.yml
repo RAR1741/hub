@@ -16,3 +16,37 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test
+  e2e:
+    runs-on: ubuntu-latest
+    env:
+      STUDENT_SESSION_SECRET: test-e2e-secret-value
+      AUTH_COOKIE_NAME: sb-teamhub-auth-token
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      E2E_BASE_URL: http://localhost:3000
+      # supabase/config.toml references these via env(); the CLI won't start
+      # without them resolvable. Dummy values are fine — E2E uses no real OAuth.
+      GOOGLE_OAUTH_CLIENT_ID: dummy
+      GOOGLE_OAUTH_CLIENT_SECRET: dummy
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Start Supabase
+        run: npx supabase start
+      - name: Export Supabase keys into the env
+        run: |
+          # supabase status -o env emits ANON_KEY / SERVICE_ROLE_KEY; wire them to the app's names.
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$(npx supabase status -o env | grep '^ANON_KEY=' | cut -d= -f2- | tr -d '\"')" >> "$GITHUB_ENV"
+          echo "SUPABASE_SERVICE_ROLE_KEY=$(npx supabase status -o env | grep '^SERVICE_ROLE_KEY=' | cut -d= -f2- | tr -d '\"')" >> "$GITHUB_ENV"
+      - name: Reset DB (loopback URL — the npm script's host.docker.internal won't resolve here)
+        run: npx supabase db reset --db-url postgresql://postgres:postgres@127.0.0.1:54322/postgres?sslmode=disable --yes
+      - run: npm run build
+      - name: Start the app
+        run: npm run start > /tmp/next.log 2>&1 &
+      - name: Wait for the app
+        run: npx wait-on http://localhost:3000 --timeout 60000 || (cat /tmp/next.log && exit 1)
+      - run: npm run e2e
