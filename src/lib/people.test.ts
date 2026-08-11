@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { canViewProfile, displayName, rosterView } from "./people";
+import { canViewProfile, displayName, listPeople, rosterView } from "./people";
 import type { PersonRow } from "./types";
 import type { Viewer } from "./viewer";
 
@@ -78,5 +78,39 @@ describe("canViewProfile", () => {
   });
   test("guest cannot", () => {
     expect(canViewProfile(viewerWith("guest", null), "p1")).toBe(false);
+  });
+});
+
+describe("listPeople search-term sanitization", () => {
+  test("an injected term cannot restructure the .or() filter", async () => {
+    const captured: { or?: string } = {};
+    const fakeBuilder = {
+      from: () => fakeBuilder,
+      select: () => fakeBuilder,
+      order: () => fakeBuilder,
+      or: (arg: string) => {
+        captured.or = arg;
+        return fakeBuilder;
+      },
+      data: [] as PersonRow[],
+    };
+    // Attempts to close the quoted literal early, inject a fresh top-level
+    // `or` clause, and append a raw comma-separated filter of its own.
+    const injected = '") or id.eq.whatever,is_active.eq.true--';
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await listPeople(injected, fakeBuilder as any);
+
+    expect(captured.or).toBeDefined();
+    const orClause = captured.or!;
+
+    // Everything the attacker controls must land inside a quoted ilike
+    // literal. Strip every quoted segment and what remains must be exactly
+    // the fixed three-clause skeleton — no extra `or.`, no stray `)`/`,`
+    // reaching the top level of the filter string.
+    const skeleton = orClause.replace(/"[^"]*"/g, '""');
+    expect(skeleton).toBe(
+      'first_name.ilike."",last_name.ilike."",display_name.ilike.""',
+    );
   });
 });

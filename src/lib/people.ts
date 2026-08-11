@@ -42,9 +42,13 @@ export async function listPeople(
   const client = db ?? (await import("./db")).getDb();
   let query = client.from("person").select("*").order("last_name");
   if (q && q.trim()) {
-    const term = q.trim().replaceAll("%", "").replaceAll(",", "");
+    // PostgREST treats a double-quoted filter value as a literal, so wrapping
+    // the term in `"..."` prevents it from injecting `.or()` grouping syntax
+    // (parentheses, commas, operators). Strip `"` and `\` first so the term
+    // itself can't escape out of the quoting.
+    const term = q.trim().replaceAll('"', "").replaceAll("\\", "");
     query = query.or(
-      `first_name.ilike.%${term}%,last_name.ilike.%${term}%,display_name.ilike.%${term}%`,
+      `first_name.ilike."%${term}%",last_name.ilike."%${term}%",display_name.ilike."%${term}%"`,
     );
   }
   const { data } = await query;
