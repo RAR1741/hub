@@ -17,6 +17,7 @@ describe("withRole", () => {
         id: "p1", firstName: "A", lastName: "B", displayName: null,
         role: "admin", gradYear: null, email: null, isActive: true,
         studentIdNumber: null, authUserId: null,
+        phone: null, shirtSize: null, dietaryRestrictions: null, bio: null,
       },
       role: "admin",
     })(new Request("http://test/api/admin/ping"));
