@@ -103,3 +103,17 @@ export async function flaggedSessions(
   }
   return out;
 }
+
+/** All sessions in a period (raw, all people) — for the attendance grid. */
+export async function sessionsForPeriod(
+  periodId: string,
+  db?: SupabaseClient,
+): Promise<Session[]> {
+  const client = db ?? (await import("./db")).getDb();
+  const { data } = await client
+    .from("session")
+    .select("*")
+    .eq("period_id", periodId)
+    .order("time_in");
+  return ((data ?? []) as SessionRow[]).map(sessionFromRow);
+}

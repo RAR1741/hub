@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { flaggedSessions, leaderboard } from "./reports";
+import { flaggedSessions, leaderboard, sessionsForPeriod } from "./reports";
 import type { Session } from "./types";
 
 const s = (over: Partial<Session>): Session => ({
@@ -79,5 +79,27 @@ describe("flaggedSessions", () => {
   test("returns empty when nothing is flagged", async () => {
     const db = fakeDb([row({ id: "s1" })]);
     expect(await flaggedSessions("pd", db)).toEqual([]);
+  });
+});
+
+describe("sessionsForPeriod", () => {
+  test("maps rows to Session[]", async () => {
+    const rows = [
+      {
+        id: "s1", person_id: "p1", period_id: "pd1",
+        time_in: "2026-09-01T18:00:00Z", time_out: "2026-09-01T20:00:00Z",
+        source: "kiosk", note: null, excluded_from_totals: false, edited_by: null, edited_at: null,
+      },
+    ];
+    const db = {
+      from: () => ({
+        select: () => ({
+          eq: () => ({ order: async () => ({ data: rows, error: null }) }),
+        }),
+      }),
+    } as never;
+    const result = await sessionsForPeriod("pd1", db);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ id: "s1", personId: "p1", timeIn: "2026-09-01T18:00:00Z" });
   });
 });
