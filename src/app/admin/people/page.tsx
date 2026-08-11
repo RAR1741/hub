@@ -31,7 +31,7 @@ export default async function AdminPeoplePage() {
                   <td><span className="badge">{r.role}</span></td>
                   <td>{r.student_id_number ?? ""}</td>
                   <td>{r.email ?? ""}</td>
-                  <td>{r.is_active ? "yes" : "no"}</td>
+                  <td><span className="badge">{r.is_active ? "active" : "inactive"}</span></td>
                   <td><Link href={`/admin/people/${r.id}`} className="font-medium text-[var(--color-brand)]">Edit</Link></td>
                 </tr>
               ))}

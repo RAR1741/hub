@@ -66,7 +66,7 @@ export default async function PeoplePage({
                   </td>
                   <td>{p.gradYear ?? ""}</td>
                   <td>{p.email ?? ""}</td>
-                  <td>{p.isActive ? "yes" : "no"}</td>
+                  <td><span className="badge">{p.isActive ? "active" : "inactive"}</span></td>
                 </tr>
               ))}
             </tbody>
