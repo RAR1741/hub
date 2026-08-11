@@ -33,6 +33,13 @@ Database: `./dev npm run db:reset` (re-apply migrations + seed), `./dev npm run 
 
 Run `git` on the **host**, not through `./dev` — the container has no git credentials.
 
+### What's built so far
+
+- Login: student ID sign-in and mentor Google sign-in
+- Role-scoped roster (`/people`) and profiles
+- Teams with join/apply (`/teams`)
+- Admin pages: `/admin/people`, `/admin/teams`, `/admin/requests`
+
 ### Why two Supabase URLs
 
 `NEXT_PUBLIC_SUPABASE_URL` (`127.0.0.1:54321`) is what your **browser** reaches.

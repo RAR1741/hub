@@ -15,6 +15,14 @@ export default async function HomePage() {
           <form action="/api/auth/logout" method="post">
             <button type="submit">Sign out</button>
           </form>
+          <ul>
+            <li>
+              <Link href="/people">People</Link>
+            </li>
+            <li>
+              <Link href="/teams">Teams</Link>
+            </li>
+          </ul>
         </>
       ) : (
         <p>
