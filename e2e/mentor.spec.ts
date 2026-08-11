@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { mentorSessionCookie } from "./helpers/session";
+import { seededStudentPersonId } from "./helpers/db";
 
 const BASE = process.env.E2E_BASE_URL ?? "http://localhost:3000";
 
@@ -19,8 +20,7 @@ test("mentor can load the flagged-sessions screen", async ({ page }) => {
 
 test("mentor create-manual-session API accepts a valid payload", async ({ page }) => {
   // Uses the browser context's mentor cookie; needs the seeded student id.
-  const personId = process.env.E2E_STUDENT_ID;
-  test.skip(!personId, "E2E_STUDENT_ID not provided");
+  const personId = await seededStudentPersonId();
   const res = await page.request.post("/api/admin/sessions", {
     data: {
       personId,

@@ -1,4 +1,16 @@
 import { defineConfig, devices } from "@playwright/test";
+import { existsSync } from "node:fs";
+import path from "node:path";
+import dotenv from "dotenv";
+
+// Load local env for the Playwright process itself (the dev server loads its
+// own via Next.js). dotenv does NOT override already-set process.env vars, so
+// in CI (no .env.local/.env present, and env already provided by the workflow)
+// this is a harmless no-op.
+for (const file of [".env.local", ".env"]) {
+  const filePath = path.resolve(__dirname, file);
+  if (existsSync(filePath)) dotenv.config({ path: filePath });
+}
 
 export default defineConfig({
   testDir: "./e2e",
