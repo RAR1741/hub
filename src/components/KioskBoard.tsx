@@ -19,10 +19,24 @@ export function KioskSetupForm() {
     else setStatus("Token not recognized.");
   }
   return (
-    <form onSubmit={submit}>
-      <label>Kiosk token <input value={token} onChange={(e) => setToken(e.target.value)} required /></label>
-      <button type="submit">Register this tablet</button>
-      {status && <p role="alert">{status}</p>}
+    <form onSubmit={submit} className="flex flex-col gap-4">
+      <label className="label">
+        Kiosk token
+        <input
+          className="input mt-1"
+          value={token}
+          onChange={(e) => setToken(e.target.value)}
+          required
+        />
+      </label>
+      <button type="submit" className="btn btn-primary">
+        Register this tablet
+      </button>
+      {status && (
+        <p role="alert" className="text-sm font-medium text-[var(--color-absent)]">
+          {status}
+        </p>
+      )}
     </form>
   );
 }
@@ -54,32 +68,49 @@ export function KioskBoard({ members, here }: { members: Member[]; here: Here[] 
   }
 
   return (
-    <div>
-      {flash && <p role="status">{flash}</p>}
-      <section>
-        <h2>Who&apos;s here ({here.length})</h2>
-        <ul>
-          {here.map((h) => (
-            <li key={h.personId}>
-              <button onClick={() => call("/api/kiosk/clock-out", h.personId, h.name, "Signed out")}>
-                {h.name} — out
-              </button>
-            </li>
-          ))}
-        </ul>
-      </section>
-      <section>
-        <h2>Sign in</h2>
-        <ul>
-          {members.map((m) => (
-            <li key={m.id}>
-              <button onClick={() => call("/api/kiosk/clock-in", m.id, m.name, "Signed in")}>
-                {m.name}
-              </button>
-            </li>
-          ))}
-        </ul>
-      </section>
+    <div className="flex flex-1 flex-col gap-6">
+      {flash && (
+        <p
+          role="status"
+          className="rounded-xl border border-[var(--color-brand)] bg-[var(--color-brand)] px-6 py-4 text-center text-xl font-bold text-[var(--color-brand-fg)] shadow-lg"
+        >
+          {flash}
+        </p>
+      )}
+      <div className="grid flex-1 grid-cols-1 gap-6 lg:grid-cols-[1fr_2fr]">
+        <section className="card flex flex-col gap-4">
+          <h2 className="text-2xl font-bold tracking-tight">
+            Who&apos;s here ({here.length})
+          </h2>
+          <ul className="flex flex-col gap-3">
+            {here.map((h) => (
+              <li key={h.personId}>
+                <button
+                  onClick={() => call("/api/kiosk/clock-out", h.personId, h.name, "Signed out")}
+                  className="btn btn-secondary min-h-16 w-full text-lg leading-tight border-[var(--color-present)]"
+                >
+                  {h.name} — out
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+        <section className="card flex flex-col gap-4">
+          <h2 className="text-2xl font-bold tracking-tight">Sign in</h2>
+          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+            {members.map((m) => (
+              <li key={m.id}>
+                <button
+                  onClick={() => call("/api/kiosk/clock-in", m.id, m.name, "Signed in")}
+                  className="btn btn-primary min-h-16 w-full text-lg leading-tight"
+                >
+                  {m.name}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      </div>
     </div>
   );
 }
