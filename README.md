@@ -39,6 +39,10 @@ Run `git` on the **host**, not through `./dev` — the container has no git cred
 - Role-scoped roster (`/people`) and profiles
 - Teams with join/apply (`/teams`)
 - Admin pages: `/admin/people`, `/admin/teams`, `/admin/requests`
+- Kiosk sign-in/out (`/kiosk`), who's-here board, leaderboard (`/leaderboard`), per-member hours
+- Attendance periods (`/admin/periods`), flagged-session review (`/admin/sessions/flagged`),
+  kiosk device management (`/admin/kiosk-devices`)
+- Nightly auto-close sweep for sessions left open past the day boundary
 
 ### Why two Supabase URLs
 
