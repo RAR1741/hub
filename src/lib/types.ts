@@ -152,3 +152,81 @@ export function sessionFromRow(row: SessionRow): Session {
     editedAt: row.edited_at,
   };
 }
+
+export type BuildDayKind = "required" | "optional";
+export type BuildDaySource = "gcal" | "manual";
+
+export type MeetingRow = {
+  id: string;
+  gcal_event_id: string;
+  title: string;
+  starts_at: string;
+  ends_at: string;
+  synced_at: string;
+};
+
+export type Meeting = {
+  id: string;
+  gcalEventId: string;
+  title: string;
+  startsAt: string;
+  endsAt: string;
+  syncedAt: string;
+};
+
+export function meetingFromRow(row: MeetingRow): Meeting {
+  return {
+    id: row.id,
+    gcalEventId: row.gcal_event_id,
+    title: row.title,
+    startsAt: row.starts_at,
+    endsAt: row.ends_at,
+    syncedAt: row.synced_at,
+  };
+}
+
+export type BuildDayRow = {
+  date: string;
+  kind: BuildDayKind;
+  source: BuildDaySource;
+  meeting_id: string | null;
+};
+
+export type BuildDay = {
+  date: string;
+  kind: BuildDayKind;
+  source: BuildDaySource;
+  meetingId: string | null;
+};
+
+export function buildDayFromRow(row: BuildDayRow): BuildDay {
+  return {
+    date: row.date,
+    kind: row.kind,
+    source: row.source,
+    meetingId: row.meeting_id,
+  };
+}
+
+export type ExcusalRow = {
+  person_id: string;
+  date: string;
+  note: string | null;
+  created_by: string | null;
+};
+
+export type Excusal = {
+  personId: string;
+  date: string;
+  note: string | null;
+  createdBy: string | null;
+};
+
+export function excusalFromRow(row: ExcusalRow): Excusal {
+  return {
+    personId: row.person_id,
+    date: row.date,
+    note: row.note,
+    createdBy: row.created_by,
+  };
+}

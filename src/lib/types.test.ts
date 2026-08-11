@@ -1,6 +1,10 @@
 import { describe, expect, test } from "vitest";
 import { personFromRow, teamFromRow, type TeamRow } from "./types";
 import { periodFromRow, sessionFromRow, type PeriodRow, type SessionRow } from "./types";
+import {
+  buildDayFromRow, excusalFromRow, meetingFromRow,
+  type BuildDayRow, type ExcusalRow, type MeetingRow,
+} from "./types";
 
 describe("teamFromRow", () => {
   test("maps snake_case to camelCase", () => {
@@ -66,6 +70,39 @@ describe("sessionFromRow", () => {
       timeIn: "2026-09-01T22:00:00Z", timeOut: null,
       source: "kiosk", note: null, excludedFromTotals: false,
       editedBy: null, editedAt: null,
+    });
+  });
+});
+
+describe("meetingFromRow", () => {
+  test("maps snake_case to camelCase", () => {
+    const row: MeetingRow = {
+      id: "m1", gcal_event_id: "g1", title: "Build",
+      starts_at: "2026-09-01T22:00:00Z", ends_at: "2026-09-02T01:00:00Z",
+      synced_at: "2026-08-31T12:00:00Z",
+    };
+    expect(meetingFromRow(row)).toEqual({
+      id: "m1", gcalEventId: "g1", title: "Build",
+      startsAt: "2026-09-01T22:00:00Z", endsAt: "2026-09-02T01:00:00Z",
+      syncedAt: "2026-08-31T12:00:00Z",
+    });
+  });
+});
+
+describe("buildDayFromRow", () => {
+  test("maps all fields", () => {
+    const row: BuildDayRow = { date: "2026-09-01", kind: "optional", source: "gcal", meeting_id: "m1" };
+    expect(buildDayFromRow(row)).toEqual({
+      date: "2026-09-01", kind: "optional", source: "gcal", meetingId: "m1",
+    });
+  });
+});
+
+describe("excusalFromRow", () => {
+  test("maps all fields", () => {
+    const row: ExcusalRow = { person_id: "p1", date: "2026-09-01", note: "sick", created_by: "p2" };
+    expect(excusalFromRow(row)).toEqual({
+      personId: "p1", date: "2026-09-01", note: "sick", createdBy: "p2",
     });
   });
 });
