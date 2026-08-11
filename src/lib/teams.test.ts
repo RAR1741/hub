@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { buildTeamTree, parseTeamInput } from "./teams";
+import { buildTeamTree, joinAction, parseTeamInput } from "./teams";
 import type { Team } from "./types";
 
 const team = (id: string, name: string, parentTeamId: string | null): Team => ({
@@ -41,5 +41,27 @@ describe("parseTeamInput", () => {
     [null],
   ])("rejects %j", (body) => {
     expect(parseTeamInput(body)).toBeNull();
+  });
+});
+
+describe("joinAction", () => {
+  const t = (joinMode: Team["joinMode"]): Team => ({
+    id: "t1", name: "T", parentTeamId: null, description: null, joinMode,
+  });
+
+  test("existing member", () => {
+    expect(joinAction(t("open"), true, false)).toBe("member");
+  });
+  test("open team is joinable", () => {
+    expect(joinAction(t("open"), false, false)).toBe("join");
+  });
+  test("approval team without pending app is applyable", () => {
+    expect(joinAction(t("requires_approval"), false, false)).toBe("apply");
+  });
+  test("approval team with pending app shows pending", () => {
+    expect(joinAction(t("requires_approval"), false, true)).toBe("pending");
+  });
+  test("admin_only offers nothing", () => {
+    expect(joinAction(t("admin_only"), false, false)).toBe("none");
   });
 });

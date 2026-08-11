@@ -175,3 +175,88 @@ export async function removeMember(
   if (error) return { ok: false, status: 500 };
   return { ok: true, status: 200 };
 }
+
+export type JoinActionResult = "member" | "join" | "apply" | "pending" | "none";
+
+/** What the teams page offers this person for this team. PURE. */
+export function joinAction(
+  team: Team,
+  isMember: boolean,
+  hasPendingApplication: boolean,
+): JoinActionResult {
+  if (isMember) return "member";
+  if (team.joinMode === "open") return "join";
+  if (team.joinMode === "requires_approval") {
+    return hasPendingApplication ? "pending" : "apply";
+  }
+  return "none";
+}
+
+export async function memberTeamIds(
+  personId: string,
+  db?: SupabaseClient,
+): Promise<Set<string>> {
+  const client = db ?? (await import("./db")).getDb();
+  const { data } = await client
+    .from("team_membership")
+    .select("team_id")
+    .eq("person_id", personId);
+  return new Set((data ?? []).map((r) => r.team_id as string));
+}
+
+export async function pendingApplicationTeamIds(
+  personId: string,
+  db?: SupabaseClient,
+): Promise<Set<string>> {
+  const client = db ?? (await import("./db")).getDb();
+  const { data } = await client
+    .from("membership_application")
+    .select("team_id")
+    .eq("person_id", personId)
+    .eq("status", "pending");
+  return new Set((data ?? []).map((r) => r.team_id as string));
+}
+
+/** Self-service join — server-side re-check that the team really is open. */
+export async function joinTeam(
+  teamId: string,
+  personId: string,
+  db?: SupabaseClient,
+): Promise<{ ok: boolean; status: number }> {
+  const client = db ?? (await import("./db")).getDb();
+  const team = await getTeam(teamId, client);
+  if (!team) return { ok: false, status: 404 };
+  if (team.joinMode !== "open") return { ok: false, status: 403 };
+  const { error } = await client
+    .from("team_membership")
+    .upsert(
+      { team_id: teamId, person_id: personId, is_manager: false },
+      { onConflict: "person_id,team_id" },
+    );
+  if (error) return { ok: false, status: 500 };
+  return { ok: true, status: 200 };
+}
+
+const UNIQUE_VIOLATION_APPLY = "23505";
+
+/** Self-service application — one pending application per (person, team). */
+export async function applyToTeam(
+  teamId: string,
+  personId: string,
+  message: string | null,
+  db?: SupabaseClient,
+): Promise<{ ok: boolean; status: number }> {
+  const client = db ?? (await import("./db")).getDb();
+  const team = await getTeam(teamId, client);
+  if (!team) return { ok: false, status: 404 };
+  if (team.joinMode !== "requires_approval") return { ok: false, status: 403 };
+  const { error } = await client.from("membership_application").insert({
+    team_id: teamId,
+    person_id: personId,
+    message,
+  });
+  if (error) {
+    return { ok: false, status: error.code === UNIQUE_VIOLATION_APPLY ? 409 : 500 };
+  }
+  return { ok: true, status: 200 };
+}
