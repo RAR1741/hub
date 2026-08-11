@@ -21,9 +21,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
-      <body>
+      <body className="bg-[var(--color-canvas)] text-[var(--color-fg)] antialiased">
         <SiteNav />
-        {children}
+        <div className="mx-auto max-w-6xl px-4 py-6">{children}</div>
       </body>
     </html>
   );
