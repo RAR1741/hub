@@ -27,29 +27,43 @@ export function JoinButtons({
     else setStatus("Action failed.");
   }
 
-  if (action === "member") return <em>member</em>;
-  if (action === "pending") return <em>application pending</em>;
+  if (action === "member") return <em className="badge badge-present">member</em>;
+  if (action === "pending") return <em className="badge">application pending</em>;
   if (action === "join") {
     return (
-      <>
-        <button onClick={() => post(`/api/teams/${teamId}/join`)}>Join</button>
-        {status && <span role="status"> {status}</span>}
-      </>
+      <span className="flex flex-wrap items-center gap-2">
+        <button className="btn btn-primary" onClick={() => post(`/api/teams/${teamId}/join`)}>
+          Join
+        </button>
+        {status && (
+          <span role="status" className="text-sm text-[var(--color-muted-fg)]">
+            {status}
+          </span>
+        )}
+      </span>
     );
   }
   if (action === "apply") {
     return (
-      <>
+      <span className="flex flex-wrap items-center gap-2">
         <input
+          className="input w-48"
           placeholder="Message (optional)"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
         />
-        <button onClick={() => post(`/api/teams/${teamId}/apply`, { message: message || undefined })}>
+        <button
+          className="btn btn-primary"
+          onClick={() => post(`/api/teams/${teamId}/apply`, { message: message || undefined })}
+        >
           Apply
         </button>
-        {status && <span role="status"> {status}</span>}
-      </>
+        {status && (
+          <span role="status" className="text-sm text-[var(--color-muted-fg)]">
+            {status}
+          </span>
+        )}
+      </span>
     );
   }
   return null;

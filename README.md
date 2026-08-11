@@ -57,6 +57,21 @@ The Google Calendar end-to-end (real service account + shared calendar) and the 
 itself are user-driven — they need real accounts/credentials that can't be created autonomously; see
 `docs/setup/google-calendar.md` and `docs/setup/deploy.md`.
 
+## UI / design system
+
+Styling is Tailwind CSS v4, CSS-first — there's no `tailwind.config.js`; everything (theme tokens,
+dark-mode variants, and the shared component classes) lives in `src/app/globals.css` via
+`@import "tailwindcss"`, an `@theme` block, and a small `@layer components`. The tokens define the
+brand red, neutral surface/border/text scale, and attendance status colors (present/excused/
+optional/absent), each with a light and `prefers-color-scheme: dark` value.
+
+Pages are built from semantic HTML (`<main>`, `<table>`, `<form>`, `<label>`, headings) styled with
+Tailwind utility classes plus a handful of reusable component classes: `.btn`/`.btn-primary`/
+`.btn-secondary`/`.btn-danger`, `.card`, `.label`, `.input`, `.badge`/`.badge-present` etc., and
+`.table`. Wide tables sit inside an `overflow-x-auto` wrapper so they scroll on narrow viewports
+instead of breaking the layout. Reach for the existing component classes and utilities before adding
+new bespoke CSS.
+
 ### Why two Supabase URLs
 
 `NEXT_PUBLIC_SUPABASE_URL` (`127.0.0.1:54321`) is what your **browser** reaches.

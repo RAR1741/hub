@@ -23,7 +23,7 @@ export default async function FlaggedSessionsPage() {
         Over {maxShift}h, still open, auto-closed by the nightly sweep, or overlapping another session.
       </p>
       {flagged.length === 0 ? (
-        <p>Nothing flagged. 🎉</p>
+        <p className="card text-[var(--color-muted-fg)]">Nothing flagged. 🎉</p>
       ) : (
         <div className="card overflow-x-auto">
           <table className="table">
