@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { canViewProfile, displayName, listPeople, rosterView } from "./people";
+import { canViewProfile, displayName, listPeople, parsePersonInput, rosterView } from "./people";
 import type { PersonRow } from "./types";
 import type { Viewer } from "./viewer";
 
@@ -112,5 +112,35 @@ describe("listPeople search-term sanitization", () => {
     expect(skeleton).toBe(
       'first_name.ilike."",last_name.ilike."",display_name.ilike.""',
     );
+  });
+});
+
+describe("parsePersonInput", () => {
+  const valid = {
+    firstName: "Ada",
+    lastName: "Lovelace",
+    role: "student",
+    email: "ADA@Example.ORG",
+    gradYear: 2028,
+    isActive: true,
+  };
+
+  test("accepts a valid body and lowercases email", () => {
+    const input = parsePersonInput(valid);
+    expect(input).not.toBeNull();
+    expect(input!.email).toBe("ada@example.org");
+    expect(input!.role).toBe("student");
+    expect(input!.displayName).toBeNull();
+  });
+
+  test.each([
+    [{ ...valid, firstName: "" }],
+    [{ ...valid, role: "superadmin" }],
+    [{ ...valid, gradYear: 1990 }],
+    [{ ...valid, email: 42 }],
+    [{ ...valid, isActive: "yes" }],
+    [null],
+  ])("rejects %j", (body) => {
+    expect(parsePersonInput(body)).toBeNull();
   });
 });
