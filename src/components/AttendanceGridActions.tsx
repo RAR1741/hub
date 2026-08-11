@@ -56,7 +56,9 @@ export function AttendanceCell({
     <td data-status={status} title={`${date}: ${status}`}>
       <span className="dot" aria-label={status} />
       <span className="cell-actions">
-        <button type="button" disabled={busy} onClick={addSession}>+ session</button>
+        <button type="button" disabled={busy} onClick={addSession}>
+          + session
+        </button>
         <button type="button" disabled={busy} onClick={toggleExcusal}>
           {status === "excused" ? "unexcuse" : "excuse"}
         </button>
