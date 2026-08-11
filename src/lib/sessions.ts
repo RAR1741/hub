@@ -41,11 +41,12 @@ export type WhosHereEntry = { personId: string; name: string; since: string };
 
 export async function listWhosHere(db?: SupabaseClient): Promise<WhosHereEntry[]> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client
+  const { data, error } = await client
     .from("session")
-    .select("time_in, person (id, first_name, last_name, display_name)")
+    .select("time_in, person!person_id (id, first_name, last_name, display_name)")
     .is("time_out", null)
     .order("time_in");
+  if (error) console.error("listWhosHere: query failed", error);
   return (data ?? [])
     .filter((r) => r.person)
     .map((r) => {

@@ -57,13 +57,14 @@ export async function listPendingApplications(
   db?: SupabaseClient,
 ): Promise<PendingApplication[]> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client
+  const { data, error } = await client
     .from("membership_application")
     .select(
-      "id, message, created_at, person (id, first_name, last_name, display_name), team (id, name)",
+      "id, message, created_at, person!person_id (id, first_name, last_name, display_name), team (id, name)",
     )
     .eq("status", "pending")
     .order("created_at");
+  if (error) console.error("listPendingApplications: query failed", error);
   return (data ?? [])
     .filter((r) => r.person && r.team)
     .map((r) => {

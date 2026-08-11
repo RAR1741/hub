@@ -56,10 +56,11 @@ export async function periodLeaderboard(
   db?: SupabaseClient,
 ): Promise<LeaderboardEntry[]> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client
+  const { data, error } = await client
     .from("session")
-    .select("*, person (id, first_name, last_name, display_name)")
+    .select("*, person!person_id (id, first_name, last_name, display_name)")
     .eq("period_id", periodId);
+  if (error) console.error("periodLeaderboard: query failed", error);
   const byPerson = new Map<string, { name: string; sessions: Session[] }>();
   for (const row of data ?? []) {
     const p = row.person as unknown as {
@@ -88,11 +89,12 @@ export async function flaggedSessions(
 ): Promise<FlaggedSession[]> {
   const client = db ?? (await import("./db")).getDb();
   const maxShift = await getSetting<number>("max_shift_hours", 18, client);
-  const { data } = await client
+  const { data, error } = await client
     .from("session")
-    .select("*, person (id, first_name, last_name, display_name)")
+    .select("*, person!person_id (id, first_name, last_name, display_name)")
     .eq("period_id", periodId)
     .order("time_in", { ascending: false });
+  if (error) console.error("flaggedSessions: query failed", error);
 
   const sessions = (data ?? []).map((r) => sessionFromRow(r as unknown as SessionRow));
   const overlaps = overlappingSessionIds(sessions);
