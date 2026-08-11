@@ -25,3 +25,28 @@ flags are required here that would otherwise look unnecessary. Please keep them.
 
 See `.superpowers/sdd/2026-08-10-m1-foundation-auth/task-2-report.md` for the full
 investigation and verification output.
+
+## Nightly session sweep
+
+`close_stale_sessions()` (see `supabase/migrations/20260811071555_session_sweep.sql`)
+heals forgotten sign-outs: any `session` row still open (`time_out is null`) from a
+**previous local day** gets backdated to `time_in + auto_close_hours` and stamped
+with `edited_at = now()`. `edited_by` is deliberately left `NULL` — that's the signal
+the flagged-sessions screen uses to distinguish an auto-close from a human edit.
+
+The function is timezone-aware: it reads `team_timezone` (default
+`America/Indiana/Indianapolis`) and `auto_close_hours` (default `4`) from
+`app_setting`, and computes "start of today" in that timezone before comparing
+against each session's `time_in`. A session opened earlier today is left alone even
+if it's been open for hours; only sessions from a prior calendar day (in team-local
+time) are swept.
+
+It's scheduled via `pg_cron` to run once daily at **08:00 UTC** (job name
+`close-stale-sessions`) — early morning across all US timezones the team is likely
+to be in, well after the shop has closed. The UTC hour doesn't need to be exact;
+the function itself does the local-day math.
+
+For manual runs — "close everyone out now" or testing without waiting for cron —
+call `POST /api/admin/sessions/run-sweep` (mentor role or higher). It invokes the
+same function via `getDb().rpc("close_stale_sessions")` and returns
+`{ closed: <count> }`.
