@@ -1,6 +1,9 @@
 import { notFound } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { canViewProfile, getPersonWithTeams } from "@/lib/people";
+import { getActivePeriod } from "@/lib/periods";
+import { personSessions } from "@/lib/reports";
+import { sessionHours, totalHours } from "@/lib/hours";
 
 export default async function PersonPage({
   params,
@@ -13,6 +16,8 @@ export default async function PersonPage({
   const result = await getPersonWithTeams(id);
   if (!result) notFound();
   const { person, teams } = result;
+  const activePeriod = await getActivePeriod();
+  const sessions = activePeriod ? await personSessions(person.id, activePeriod.id) : [];
 
   return (
     <main>
@@ -40,6 +45,22 @@ export default async function PersonPage({
           ))}
         </ul>
       )}
+      <h2>Hours{activePeriod ? ` — ${activePeriod.name}` : ""}</h2>
+      <p>Total: <strong>{Math.round(totalHours(sessions) * 100) / 100}</strong> h across {sessions.length} sessions.</p>
+      <table>
+        <thead><tr><th>In</th><th>Out</th><th>Hours</th><th>Source</th><th>Excluded</th></tr></thead>
+        <tbody>
+          {sessions.map((s) => (
+            <tr key={s.id}>
+              <td>{new Date(s.timeIn).toLocaleString()}</td>
+              <td>{s.timeOut ? new Date(s.timeOut).toLocaleString() : "— open —"}</td>
+              <td>{s.timeOut ? Math.round(sessionHours(s) * 100) / 100 : ""}</td>
+              <td>{s.source}</td>
+              <td>{s.excludedFromTotals ? "yes" : ""}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </main>
   );
 }
