@@ -29,6 +29,11 @@ export function createRateLimiter(opts: {
 }
 
 export function clientIp(request: Request): string {
+  // On Vercel (and most platforms) x-real-ip is set by the trusted proxy to the
+  // true client IP and cannot be spoofed by the client, unlike x-forwarded-for
+  // (whose first hop a client can forge). Prefer it; fall back for local/dev.
+  const realIp = request.headers.get("x-real-ip");
+  if (realIp) return realIp.trim();
   const fwd = request.headers.get("x-forwarded-for");
   if (fwd) return fwd.split(",")[0].trim();
   return "unknown";

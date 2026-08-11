@@ -33,16 +33,29 @@ Database: `./dev npm run db:reset` (re-apply migrations + seed), `./dev npm run 
 
 Run `git` on the **host**, not through `./dev` — the container has no git credentials.
 
-### What's built so far
+### What's built so far — v1 feature-complete
 
-- Login: student ID sign-in and mentor Google sign-in
-- Role-scoped roster (`/people`) and profiles
-- Teams with join/apply (`/teams`)
-- Admin pages: `/admin/people`, `/admin/teams`, `/admin/requests`
-- Kiosk sign-in/out (`/kiosk`), who's-here board, leaderboard (`/leaderboard`), per-member hours
-- Attendance periods (`/admin/periods`), flagged-session review (`/admin/sessions/flagged`),
-  kiosk device management (`/admin/kiosk-devices`)
-- Nightly auto-close sweep for sessions left open past the day boundary
+- Roster + teams: role-scoped roster (`/people`) and profiles, teams with join/apply (`/teams`),
+  admin pages for people/teams/requests
+- Split-audience auth: student ID sign-in and mentor Google OAuth sign-in, with first-Google-sign-in
+  bootstrapping the admin account
+- Kiosk sign-in/out (`/kiosk`), who's-here board, and a device-registration flow
+  (`/admin/kiosk-devices`)
+- Attendance periods (`/admin/periods`), hours + leaderboard (`/leaderboard`), per-member hour detail
+- Flagged-session review (`/admin/sessions/flagged`) and a nightly auto-close sweep for sessions left
+  open past the day boundary
+- Google Calendar sync (hourly, via pg_cron/pg_net) with required/optional build days and excusals
+- `/calendar` — the attendance grid across build days
+- `/me/attendance` — a member's own attendance summary
+- `/admin/settings` — timezone, calendar ID, auto-close/max-shift hours, kiosk-devices link
+- A Playwright smoke suite (kiosk round trip, guest read-only, student login, mentor session edit),
+  run in CI on every push/PR alongside lint/typecheck/unit tests
+- A deploy runbook (`docs/setup/deploy.md`) covering the hosted Supabase project, Vercel, production
+  Google OAuth, and the calendar-sync cron
+
+The Google Calendar end-to-end (real service account + shared calendar) and the production deploy
+itself are user-driven — they need real accounts/credentials that can't be created autonomously; see
+`docs/setup/google-calendar.md` and `docs/setup/deploy.md`.
 
 ### Why two Supabase URLs
 

@@ -37,4 +37,19 @@ describe("clientIp", () => {
   test("falls back to 'unknown'", () => {
     expect(clientIp(new Request("http://test/"))).toBe("unknown");
   });
+  test("prefers the trusted real-IP header when present", () => {
+    const req = new Request("http://test/", {
+      headers: { "x-real-ip": "9.9.9.9", "x-forwarded-for": "1.1.1.1, 2.2.2.2" },
+    });
+    expect(clientIp(req)).toBe("9.9.9.9");
+  });
+  test("falls back to the first x-forwarded-for hop", () => {
+    const req = new Request("http://test/", {
+      headers: { "x-forwarded-for": "1.1.1.1, 2.2.2.2" },
+    });
+    expect(clientIp(req)).toBe("1.1.1.1");
+  });
+  test("unknown when no headers", () => {
+    expect(clientIp(new Request("http://test/"))).toBe("unknown");
+  });
 });
