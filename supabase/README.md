@@ -50,3 +50,20 @@ For manual runs — "close everyone out now" or testing without waiting for cron
 call `POST /api/admin/sessions/run-sweep` (mentor role or higher). It invokes the
 same function via `getDb().rpc("close_stale_sessions")` and returns
 `{ closed: <count> }`.
+
+## Hourly calendar sync
+
+`supabase/migrations/20260811084653_calendar_cron.sql` schedules a `pg_cron` job
+(`gcal-hourly-sync`) that runs once an hour (`0 * * * *`) and uses `pg_net`'s
+`net.http_post` to call `POST /api/admin/calendar/sync`. Both the target URL
+(`app_setting.sync_url`) and the shared secret (`app_setting.gcal_sync_secret`,
+sent as the `x-sync-secret` header) are read from `app_setting` **at run time** via
+sub-selects in the cron command — changing either value (e.g. to point at the
+production URL) needs no new migration.
+
+The sync endpoint itself is a no-op that returns `not_configured` until the Google
+service account is set up (see `docs/setup/google-calendar.md`). On the hosted
+project, `sync_url` must be updated to the production URL and `gcal_sync_secret`
+must be set to a non-empty value as part of the deploy runbook (see
+`docs/setup/deploy.md`) — otherwise the cron job will fire hourly against the
+local placeholder URL with an empty secret.
