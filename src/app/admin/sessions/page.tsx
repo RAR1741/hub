@@ -11,13 +11,14 @@ export default async function AdminSessionsPage({
 }: {
   searchParams: Promise<{ period?: string; person?: string }>;
 }) {
-  const [{ period, person }, viewer, periods, peopleRows] = await Promise.all([
+  const viewer = await getViewer();
+  if (!hasRole(viewer.role, "mentor")) redirect("/");
+
+  const [{ period, person }, periods, peopleRows] = await Promise.all([
     searchParams,
-    getViewer(),
     listPeriods(),
     listPeople(),
   ]);
-  if (!hasRole(viewer.role, "mentor")) redirect("/");
 
   const active = await getActivePeriod();
   const periodId = period ?? active?.id ?? periods[0]?.id;
@@ -57,7 +58,9 @@ export default async function AdminSessionsPage({
         <button type="submit" className="btn btn-primary">View</button>
       </form>
       {sessions.length === 0 ? (
-        <p className="card text-[var(--muted)]">No sessions match.</p>
+        <p className="card text-[var(--muted)]">
+          No sessions for this filter — try a different period or member.
+        </p>
       ) : (
         <div className="tablewrap">
           <div style={{ overflowX: "auto" }}>

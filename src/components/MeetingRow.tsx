@@ -28,32 +28,44 @@ export function MeetingRow({
   const [starts, setStarts] = useState(toLocalInput(startsAt));
   const [ends, setEnds] = useState(toLocalInput(endsAt));
   const [status, setStatus] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const router = useRouter();
 
   async function save() {
     setStatus(null);
-    const res = await fetch(`/api/admin/meetings/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: t,
-        startsAt: starts ? new Date(starts).toISOString() : "",
-        endsAt: ends ? new Date(ends).toISOString() : "",
-      }),
-    });
-    if (res.ok) {
-      setEditing(false);
-      router.refresh();
-    } else {
-      setStatus("Save failed — check the fields.");
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/admin/meetings/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: t,
+          startsAt: starts ? new Date(starts).toISOString() : "",
+          endsAt: ends ? new Date(ends).toISOString() : "",
+        }),
+      });
+      if (res.ok) {
+        setEditing(false);
+        router.refresh();
+      } else {
+        setStatus("Save failed — check the fields.");
+      }
+    } finally {
+      setBusy(false);
     }
   }
 
   async function remove() {
     if (!confirm(`Delete the meeting "${title}"?`)) return;
-    const res = await fetch(`/api/admin/meetings/${id}`, { method: "DELETE" });
-    if (res.ok) router.refresh();
-    else setStatus("Delete failed.");
+    setStatus(null);
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/admin/meetings/${id}`, { method: "DELETE" });
+      if (res.ok) router.refresh();
+      else setStatus("Delete failed.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (editing) {
@@ -82,10 +94,10 @@ export function MeetingRow({
                 onChange={(e) => setEnds(e.target.value)}
               />
             </label>
-            <button onClick={save} className="btn btn-primary">
-              Save
+            <button onClick={save} className="btn btn-primary" disabled={busy}>
+              {busy ? "Saving…" : "Save"}
             </button>
-            <button onClick={() => setEditing(false)} className="btn">
+            <button onClick={() => setEditing(false)} className="btn" disabled={busy}>
               Cancel
             </button>
             {status && <span role="status" className="text-sm text-[var(--muted)]">{status}</span>}
@@ -108,7 +120,7 @@ export function MeetingRow({
           <button onClick={() => setEditing(true)} className="btn icon" aria-label={`Edit ${title}`}>
             <Icon name="edit" />
           </button>
-          <button onClick={remove} className="btn icon danger" aria-label={`Delete ${title}`}>
+          <button onClick={remove} className="btn icon danger" aria-label={`Delete ${title}`} disabled={busy}>
             <Icon name="trash" />
           </button>
         </div>

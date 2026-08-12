@@ -14,46 +14,57 @@ export function MemberManager({
 }) {
   const [personId, setPersonId] = useState("");
   const [status, setStatus] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const router = useRouter();
 
   async function call(method: "POST" | "DELETE", body: Record<string, unknown>) {
     setStatus(null);
-    const res = await fetch(`/api/admin/teams/${teamId}/members`, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (res.ok) {
-      router.refresh();
-      setPersonId("");
-    } else {
-      setStatus("Action failed.");
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/admin/teams/${teamId}/members`, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        router.refresh();
+        setPersonId("");
+      } else {
+        setStatus("Action failed.");
+      }
+    } finally {
+      setBusy(false);
     }
   }
 
   return (
     <section className="flex flex-col gap-4">
       <h2 className="text-xl font-semibold">Members ({members.length})</h2>
-      <ul className="flex flex-col divide-y divide-[var(--color-border)]">
-        {members.map((m) => (
-          <li key={m.personId} className="flex items-center justify-between gap-3 py-2 text-sm">
-            <span>
-              {m.name} {m.isManager ? "(manager)" : ""}
-            </span>
-            <span className="flex items-center gap-2">
-              <button
-                onClick={() => call("POST", { personId: m.personId, isManager: !m.isManager })}
-                className="btn btn-secondary px-3 py-1"
-              >
-                {m.isManager ? "Remove manager" : "Make manager"}
-              </button>
-              <button onClick={() => call("DELETE", { personId: m.personId })} className="btn btn-danger px-3 py-1">
-                Remove
-              </button>
-            </span>
-          </li>
-        ))}
-      </ul>
+      {members.length === 0 ? (
+        <p className="text-sm text-[var(--color-muted-fg)]">No members yet — add one below.</p>
+      ) : (
+        <ul className="flex flex-col divide-y divide-[var(--color-border)]">
+          {members.map((m) => (
+            <li key={m.personId} className="flex items-center justify-between gap-3 py-2 text-sm">
+              <span>
+                {m.name} {m.isManager ? "(manager)" : ""}
+              </span>
+              <span className="flex items-center gap-2">
+                <button
+                  disabled={busy}
+                  onClick={() => call("POST", { personId: m.personId, isManager: !m.isManager })}
+                  className="btn btn-secondary px-3 py-1"
+                >
+                  {m.isManager ? "Remove manager" : "Make manager"}
+                </button>
+                <button disabled={busy} onClick={() => call("DELETE", { personId: m.personId })} className="btn btn-danger px-3 py-1">
+                  Remove
+                </button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
       <div className="flex flex-wrap items-end gap-3">
         <label className="label">
           Add member{" "}
@@ -64,8 +75,8 @@ export function MemberManager({
             ))}
           </select>
         </label>
-        <button disabled={!personId} onClick={() => call("POST", { personId, isManager: false })} className="btn btn-primary">
-          Add
+        <button disabled={busy || !personId} onClick={() => call("POST", { personId, isManager: false })} className="btn btn-primary">
+          {busy ? "Working…" : "Add"}
         </button>
       </div>
       {status && <p role="status" className="text-sm text-[var(--color-muted-fg)]">{status}</p>}

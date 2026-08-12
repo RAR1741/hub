@@ -47,6 +47,11 @@ export default async function LeaderboardPage({
           View
         </button>
       </form>
+      {entries.length === 0 ? (
+        <p className="card text-[var(--muted)]">
+          No hours logged for this period yet — clock in to start climbing the board.
+        </p>
+      ) : (
       <div className="tablewrap">
         <table className="table">
           <thead>
@@ -75,6 +80,7 @@ export default async function LeaderboardPage({
           </tbody>
         </table>
       </div>
+      )}
     </main>
   );
 }

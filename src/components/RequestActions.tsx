@@ -7,18 +7,24 @@ export function AccountRequestActions({ requestId }: { requestId: string }) {
   const [studentId, setStudentId] = useState("");
   const [role, setRole] = useState("student");
   const [status, setStatus] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const router = useRouter();
 
   async function act(body: Record<string, unknown>) {
     setStatus(null);
-    const res = await fetch(`/api/admin/requests/account/${requestId}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (res.ok) router.refresh();
-    else if (res.status === 409) setStatus("Student ID or email already in use.");
-    else setStatus("Action failed.");
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/admin/requests/account/${requestId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) router.refresh();
+      else if (res.status === 409) setStatus("Student ID or email already in use.");
+      else setStatus("Action failed.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -34,13 +40,13 @@ export function AccountRequestActions({ requestId }: { requestId: string }) {
         <option value="captain">captain</option>
       </select>
       <button
-        disabled={!studentId.trim()}
+        disabled={busy || !studentId.trim()}
         onClick={() => act({ action: "approve", studentIdNumber: studentId, role })}
         className="btn btn-primary px-3 py-1"
       >
-        Approve
+        {busy ? "Working…" : "Approve"}
       </button>
-      <button onClick={() => act({ action: "deny" })} className="btn btn-secondary px-3 py-1">Deny</button>
+      <button disabled={busy} onClick={() => act({ action: "deny" })} className="btn btn-secondary px-3 py-1">Deny</button>
       {status && <span role="status" className="text-sm text-[var(--color-muted-fg)]"> {status}</span>}
     </span>
   );
@@ -48,23 +54,29 @@ export function AccountRequestActions({ requestId }: { requestId: string }) {
 
 export function ApplicationActions({ applicationId }: { applicationId: string }) {
   const [status, setStatus] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const router = useRouter();
 
   async function act(action: "approve" | "deny") {
     setStatus(null);
-    const res = await fetch(`/api/admin/requests/application/${applicationId}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action }),
-    });
-    if (res.ok) router.refresh();
-    else setStatus("Action failed.");
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/admin/requests/application/${applicationId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      if (res.ok) router.refresh();
+      else setStatus("Action failed.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
     <span className="inline-flex flex-wrap items-center gap-2">
-      <button onClick={() => act("approve")} className="btn btn-primary px-3 py-1">Approve</button>
-      <button onClick={() => act("deny")} className="btn btn-secondary px-3 py-1">Deny</button>
+      <button disabled={busy} onClick={() => act("approve")} className="btn btn-primary px-3 py-1">{busy ? "Working…" : "Approve"}</button>
+      <button disabled={busy} onClick={() => act("deny")} className="btn btn-secondary px-3 py-1">Deny</button>
       {status && <span role="status" className="text-sm text-[var(--color-muted-fg)]"> {status}</span>}
     </span>
   );

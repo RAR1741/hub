@@ -22,29 +22,35 @@ export function TeamForm({
   const EMPTY: TeamFormValues = { name: "", parentTeamId: "", description: "", joinMode: "admin_only" };
   const [values, setValues] = useState<TeamFormValues>(initial ?? EMPTY);
   const [status, setStatus] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const router = useRouter();
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setStatus(null);
-    const res = await fetch(teamId ? `/api/admin/teams/${teamId}` : "/api/admin/teams", {
-      method: teamId ? "PATCH" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: values.name,
-        parentTeamId: values.parentTeamId || undefined,
-        description: values.description || undefined,
-        joinMode: values.joinMode,
-      }),
-    });
-    if (res.ok) {
-      setStatus("Saved.");
-      router.refresh();
-      if (!teamId) setValues(EMPTY);
-    } else if (res.status === 409) {
-      setStatus("A team with that name already exists.");
-    } else {
-      setStatus("Save failed — check the fields.");
+    setBusy(true);
+    try {
+      const res = await fetch(teamId ? `/api/admin/teams/${teamId}` : "/api/admin/teams", {
+        method: teamId ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: values.name,
+          parentTeamId: values.parentTeamId || undefined,
+          description: values.description || undefined,
+          joinMode: values.joinMode,
+        }),
+      });
+      if (res.ok) {
+        setStatus("Saved.");
+        router.refresh();
+        if (!teamId) setValues(EMPTY);
+      } else if (res.status === 409) {
+        setStatus("A team with that name already exists.");
+      } else {
+        setStatus("Save failed — check the fields.");
+      }
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -67,7 +73,7 @@ export function TeamForm({
           <option value="requires_approval">requires approval</option>
         </select>
       </label>
-      <button type="submit" className="btn btn-primary">{teamId ? "Save changes" : "Create team"}</button>
+      <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? "Saving…" : teamId ? "Save changes" : "Create team"}</button>
       {status && <p role="status" className="text-sm text-[var(--color-muted-fg)]">{status}</p>}
     </form>
   );

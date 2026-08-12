@@ -4,6 +4,7 @@ import {
 } from "../../src/lib/student-session";
 
 export const SEEDED_MENTOR_ID = "00000000-0000-0000-0000-000000000009";
+export const SEEDED_ADMIN_ID = "00000000-0000-0000-0000-00000000000a";
 export const SEEDED_STUDENT_ID_NUMBER = "1741";
 
 /**
@@ -17,5 +18,18 @@ export async function mentorSessionCookie(
   const secret = process.env.STUDENT_SESSION_SECRET;
   if (!secret) throw new Error("STUDENT_SESSION_SECRET must be set for E2E");
   const value = await createStudentSessionToken(SEEDED_MENTOR_ID, secret);
+  return { name: STUDENT_SESSION_COOKIE, value, url: baseURL };
+}
+
+/**
+ * Same as mentorSessionCookie, but for the seeded admin — needed for E2E specs
+ * that exercise admin-gated routes (meetings, periods, people, kiosk devices).
+ */
+export async function adminSessionCookie(
+  baseURL = "http://localhost:3000",
+): Promise<{ name: string; value: string; url: string }> {
+  const secret = process.env.STUDENT_SESSION_SECRET;
+  if (!secret) throw new Error("STUDENT_SESSION_SECRET must be set for E2E");
+  const value = await createStudentSessionToken(SEEDED_ADMIN_ID, secret);
   return { name: STUDENT_SESSION_COOKIE, value, url: baseURL };
 }

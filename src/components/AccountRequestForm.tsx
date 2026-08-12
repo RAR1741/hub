@@ -3,10 +3,11 @@
 import { useState } from "react";
 
 export function AccountRequestForm() {
-  const [state, setState] = useState<"idle" | "sent" | "error">("idle");
+  const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle");
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    setState("sending");
     const form = new FormData(e.currentTarget);
     const gradYearRaw = String(form.get("gradYear") ?? "").trim();
     const res = await fetch("/api/account-request", {
@@ -40,8 +41,8 @@ export function AccountRequestForm() {
         inputMode="numeric"
       />
       <input className="input" name="email" placeholder="Email (optional)" type="email" />
-      <button type="submit" className="btn btn-secondary w-full">
-        Request an account
+      <button type="submit" className="btn btn-secondary w-full" disabled={state === "sending"}>
+        {state === "sending" ? "Sending…" : "Request an account"}
       </button>
       {state === "error" && (
         <p role="alert" className="text-sm" style={{ color: "var(--absent)" }}>

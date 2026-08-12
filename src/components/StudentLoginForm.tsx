@@ -6,21 +6,27 @@ import { useRouter } from "next/navigation";
 export function StudentLoginForm() {
   const [studentId, setStudentId] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const router = useRouter();
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    const res = await fetch("/api/auth/student", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ studentId }),
-    });
-    if (res.ok) {
-      router.push("/");
-      router.refresh();
-    } else {
-      setError("ID not recognized. Check with a mentor.");
+    setBusy(true);
+    try {
+      const res = await fetch("/api/auth/student", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ studentId }),
+      });
+      if (res.ok) {
+        router.push("/");
+        router.refresh();
+      } else {
+        setError("ID not recognized. Check with a mentor.");
+      }
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -36,7 +42,7 @@ export function StudentLoginForm() {
           required
         />
       </label>
-      <button type="submit" className="btn btn-primary w-full">
+      <button type="submit" className="btn btn-primary w-full" disabled={busy}>
         Sign in
       </button>
       {error && (

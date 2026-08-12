@@ -37,6 +37,9 @@ export default async function AdminPeoplePage() {
           <PersonForm />
         </div>
       </details>
+      {rows.length === 0 ? (
+        <p className="card text-[var(--muted)]">No members yet — add your first above.</p>
+      ) : (
       <div className="tablewrap">
         <div style={{ overflowX: "auto" }}>
           <table className="table">
@@ -81,6 +84,7 @@ export default async function AdminPeoplePage() {
           </table>
         </div>
       </div>
+      )}
     </main>
   );
 }

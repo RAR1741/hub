@@ -25,6 +25,7 @@ export function PersonForm({
 }) {
   const [values, setValues] = useState<PersonFormValues>(initial ?? EMPTY);
   const [status, setStatus] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const router = useRouter();
 
   function set<K extends keyof PersonFormValues>(k: K, v: PersonFormValues[K]) {
@@ -34,36 +35,41 @@ export function PersonForm({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setStatus(null);
-    const payload = {
-      firstName: values.firstName,
-      lastName: values.lastName,
-      displayName: values.displayName || undefined,
-      role: values.role,
-      gradYear: values.gradYear ? Number(values.gradYear) : undefined,
-      email: values.email || undefined,
-      phone: values.phone || undefined,
-      shirtSize: values.shirtSize || undefined,
-      dietaryRestrictions: values.dietaryRestrictions || undefined,
-      bio: values.bio || undefined,
-      studentIdNumber: values.studentIdNumber || undefined,
-      isActive: values.isActive,
-    };
-    const res = await fetch(
-      personId ? `/api/admin/people/${personId}` : "/api/admin/people",
-      {
-        method: personId ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      },
-    );
-    if (res.ok) {
-      setStatus("Saved.");
-      router.refresh();
-      if (!personId) setValues(EMPTY);
-    } else if (res.status === 409) {
-      setStatus("Email or student ID already in use.");
-    } else {
-      setStatus("Save failed — check the fields.");
+    setBusy(true);
+    try {
+      const payload = {
+        firstName: values.firstName,
+        lastName: values.lastName,
+        displayName: values.displayName || undefined,
+        role: values.role,
+        gradYear: values.gradYear ? Number(values.gradYear) : undefined,
+        email: values.email || undefined,
+        phone: values.phone || undefined,
+        shirtSize: values.shirtSize || undefined,
+        dietaryRestrictions: values.dietaryRestrictions || undefined,
+        bio: values.bio || undefined,
+        studentIdNumber: values.studentIdNumber || undefined,
+        isActive: values.isActive,
+      };
+      const res = await fetch(
+        personId ? `/api/admin/people/${personId}` : "/api/admin/people",
+        {
+          method: personId ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+      );
+      if (res.ok) {
+        setStatus("Saved.");
+        router.refresh();
+        if (!personId) setValues(EMPTY);
+      } else if (res.status === 409) {
+        setStatus("Email or student ID already in use.");
+      } else {
+        setStatus("Save failed — check the fields.");
+      }
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -88,7 +94,7 @@ export function PersonForm({
       <label className="label">Bio <textarea className="input" value={values.bio} onChange={(e) => set("bio", e.target.value)} /></label>
       <label className="label">Student ID <input className="input" value={values.studentIdNumber} onChange={(e) => set("studentIdNumber", e.target.value)} /></label>
       <label className="flex items-center gap-2 text-sm font-medium text-[var(--color-muted-fg)]">Active <input type="checkbox" checked={values.isActive} onChange={(e) => set("isActive", e.target.checked)} /></label>
-      <button type="submit" className="btn btn-primary">{personId ? "Save changes" : "Create person"}</button>
+      <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? "Saving…" : personId ? "Save changes" : "Create person"}</button>
       {status && <p role="status" className="text-sm text-[var(--color-muted-fg)]">{status}</p>}
     </form>
   );

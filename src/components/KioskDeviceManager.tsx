@@ -13,26 +13,37 @@ function DeviceRow({
 }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(device.name);
+  const [busy, setBusy] = useState(false);
   const router = useRouter();
 
   async function rename() {
     if (!name.trim()) return;
-    const res = await fetch(`/api/admin/kiosk-devices/${device.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: name.trim() }),
-    });
-    if (res.ok) {
-      setEditing(false);
-      router.refresh();
-    } else onFailed("Rename failed.");
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/admin/kiosk-devices/${device.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim() }),
+      });
+      if (res.ok) {
+        setEditing(false);
+        router.refresh();
+      } else onFailed("Rename failed.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function remove() {
     if (!confirm("Delete this kiosk device? Tablets using it will stop working.")) return;
-    const res = await fetch(`/api/admin/kiosk-devices/${device.id}`, { method: "DELETE" });
-    if (res.ok) router.refresh();
-    else onFailed("Delete failed.");
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/admin/kiosk-devices/${device.id}`, { method: "DELETE" });
+      if (res.ok) router.refresh();
+      else onFailed("Delete failed.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -45,10 +56,10 @@ function DeviceRow({
             onChange={(e) => setName(e.target.value)}
             aria-label={`Rename ${device.name}`}
           />
-          <button onClick={rename} className="btn btn-primary px-3 py-1">
-            Save
+          <button onClick={rename} className="btn btn-primary px-3 py-1" disabled={busy}>
+            {busy ? "Saving…" : "Save"}
           </button>
-          <button onClick={() => { setEditing(false); setName(device.name); }} className="btn px-3 py-1">
+          <button onClick={() => { setEditing(false); setName(device.name); }} className="btn px-3 py-1" disabled={busy}>
             Cancel
           </button>
         </span>
@@ -60,10 +71,10 @@ function DeviceRow({
       )}
       {!editing && (
         <div className="rowacts">
-          <button onClick={() => setEditing(true)} className="btn icon" aria-label={`Rename ${device.name}`}>
+          <button onClick={() => setEditing(true)} className="btn icon" aria-label={`Rename ${device.name}`} disabled={busy}>
             <Icon name="edit" />
           </button>
-          <button onClick={remove} className="btn icon danger" aria-label={`Delete ${device.name}`}>
+          <button onClick={remove} className="btn icon danger" aria-label={`Delete ${device.name}`} disabled={busy}>
             <Icon name="trash" />
           </button>
         </div>
@@ -119,11 +130,15 @@ export function KioskDeviceManager({
         </p>
       )}
       {status && <p role="alert" className="text-sm text-[var(--absent)]">{status}</p>}
-      <ul className="flex flex-col divide-y divide-[var(--hair)]">
-        {devices.map((d) => (
-          <DeviceRow key={d.id} device={d} onFailed={setStatus} />
-        ))}
-      </ul>
+      {devices.length === 0 ? (
+        <p className="text-sm text-[var(--muted)]">No kiosk devices yet — create one above.</p>
+      ) : (
+        <ul className="flex flex-col divide-y divide-[var(--hair)]">
+          {devices.map((d) => (
+            <DeviceRow key={d.id} device={d} onFailed={setStatus} />
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

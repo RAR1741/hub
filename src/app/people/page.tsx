@@ -47,13 +47,19 @@ export default async function PeoplePage({
               Search
             </button>
           </form>
-          <ul className="flex flex-col divide-y divide-[var(--hair)]">
-            {view.names.map((n) => (
-              <li key={n} className="px-4 py-3 text-sm">
-                {n}
-              </li>
-            ))}
-          </ul>
+          {view.names.length === 0 ? (
+            <p className="p-4 text-sm text-[var(--muted)]">
+              {q ? "No members match that search — try a different name." : "No members yet."}
+            </p>
+          ) : (
+            <ul className="flex flex-col divide-y divide-[var(--hair)]">
+              {view.names.map((n) => (
+                <li key={n} className="px-4 py-3 text-sm">
+                  {n}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       ) : (
         <div className="tablewrap">
@@ -71,6 +77,11 @@ export default async function PeoplePage({
               Search
             </button>
           </form>
+          {view.people.length === 0 ? (
+            <p className="p-4 text-sm text-[var(--muted)]">
+              {q ? "No members match that search — try a different name, email, or ID." : "No members yet — add your first from Admin → People."}
+            </p>
+          ) : (
           <div style={{ overflowX: "auto" }}>
             <table className="table">
               <thead>
@@ -118,6 +129,7 @@ export default async function PeoplePage({
               </tbody>
             </table>
           </div>
+          )}
         </div>
       )}
     </main>

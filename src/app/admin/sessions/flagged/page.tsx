@@ -25,7 +25,7 @@ export default async function FlaggedSessionsPage() {
         </div>
       </div>
       {flagged.length === 0 ? (
-        <p className="card text-[var(--muted)]">Nothing flagged.</p>
+        <p className="card text-[var(--muted)]">Nothing flagged — every session looks clean.</p>
       ) : (
         <div className="tablewrap">
           <div style={{ overflowX: "auto" }}>

@@ -13,18 +13,24 @@ export function JoinButtons({
 }) {
   const [status, setStatus] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
   const router = useRouter();
 
   async function post(path: string, body?: Record<string, unknown>) {
     setStatus(null);
-    const res = await fetch(path, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body ?? {}),
-    });
-    if (res.ok) router.refresh();
-    else if (res.status === 409) setStatus("You already have a pending application.");
-    else setStatus("Action failed.");
+    setBusy(true);
+    try {
+      const res = await fetch(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body ?? {}),
+      });
+      if (res.ok) router.refresh();
+      else if (res.status === 409) setStatus("You already have a pending application.");
+      else setStatus("Action failed.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (action === "member") return <em className="pill status-present">member</em>;
@@ -32,8 +38,8 @@ export function JoinButtons({
   if (action === "join") {
     return (
       <span className="flex flex-wrap items-center gap-2">
-        <button className="btn btn-primary" onClick={() => post(`/api/teams/${teamId}/join`)}>
-          Join
+        <button className="btn btn-primary" disabled={busy} onClick={() => post(`/api/teams/${teamId}/join`)}>
+          {busy ? "Joining…" : "Join"}
         </button>
         {status && (
           <span role="status" className="text-sm" style={{ color: "var(--muted)" }}>
@@ -54,9 +60,10 @@ export function JoinButtons({
         />
         <button
           className="btn btn-primary"
+          disabled={busy}
           onClick={() => post(`/api/teams/${teamId}/apply`, { message: message || undefined })}
         >
-          Apply
+          {busy ? "Applying…" : "Apply"}
         </button>
         {status && (
           <span role="status" className="text-sm" style={{ color: "var(--muted)" }}>

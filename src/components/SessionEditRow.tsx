@@ -22,29 +22,41 @@ export function SessionEditRow({
   const [n, setN] = useState(note ?? "");
   const [exc, setExc] = useState(excluded);
   const [status, setStatus] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const router = useRouter();
 
   async function save() {
     setStatus(null);
     if (!tin) { setStatus("Time in is required."); return; }
-    const res = await fetch(`/api/admin/sessions/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        timeIn: new Date(tin).toISOString(),
-        timeOut: tout ? new Date(tout).toISOString() : null,
-        note: n || undefined,
-        excludedFromTotals: exc,
-      }),
-    });
-    if (res.ok) { setStatus("Saved."); router.refresh(); }
-    else setStatus("Save failed.");
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/admin/sessions/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          timeIn: new Date(tin).toISOString(),
+          timeOut: tout ? new Date(tout).toISOString() : null,
+          note: n || undefined,
+          excludedFromTotals: exc,
+        }),
+      });
+      if (res.ok) { setStatus("Saved."); router.refresh(); }
+      else setStatus("Save failed.");
+    } finally {
+      setBusy(false);
+    }
   }
   async function remove() {
     if (!confirm(`Delete this session for ${label}?`)) return;
-    const res = await fetch(`/api/admin/sessions/${id}`, { method: "DELETE" });
-    if (res.ok) router.refresh();
-    else setStatus("Delete failed.");
+    setStatus(null);
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/admin/sessions/${id}`, { method: "DELETE" });
+      if (res.ok) router.refresh();
+      else setStatus("Delete failed.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -55,8 +67,8 @@ export function SessionEditRow({
       <td><input className="input w-36" value={n} onChange={(e) => setN(e.target.value)} placeholder="note" /></td>
       <td><input type="checkbox" checked={exc} onChange={(e) => setExc(e.target.checked)} /></td>
       <td className="flex items-center gap-2">
-        <button onClick={save} className="btn btn-primary px-3 py-1">Save</button>
-        <button onClick={remove} className="btn btn-danger px-3 py-1">Delete</button>
+        <button onClick={save} className="btn btn-primary px-3 py-1" disabled={busy}>{busy ? "Saving…" : "Save"}</button>
+        <button onClick={remove} className="btn btn-danger px-3 py-1" disabled={busy}>{busy ? "Deleting…" : "Delete"}</button>
         {status && <span role="status" className="text-sm text-[var(--color-muted-fg)]"> {status}</span>}
       </td>
     </tr>

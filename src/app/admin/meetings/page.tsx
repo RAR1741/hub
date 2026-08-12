@@ -27,6 +27,9 @@ export default async function AdminMeetingsPage() {
         Editing a <span className="pill role">Google</span>-sourced meeting is temporary — the next
         calendar sync overwrites it. Only <span className="pill on">Manual</span> meetings persist.
       </p>
+      {meetings.length === 0 ? (
+        <p className="card text-[var(--muted)]">No meetings yet — add one above or connect Google Calendar.</p>
+      ) : (
       <div className="tablewrap">
         <div style={{ overflowX: "auto" }}>
           <table className="table">
@@ -54,6 +57,7 @@ export default async function AdminMeetingsPage() {
           </table>
         </div>
       </div>
+      )}
     </main>
   );
 }

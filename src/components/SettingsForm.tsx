@@ -13,19 +13,25 @@ export type SettingsValues = {
 export function SettingsForm({ initial }: { initial: SettingsValues }) {
   const [values, setValues] = useState<SettingsValues>(initial);
   const [status, setStatus] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const router = useRouter();
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setStatus(null);
-    const res = await fetch("/api/admin/settings", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(values),
-    });
-    if (res.ok) { setStatus("Saved."); router.refresh(); }
-    else if (res.status === 400) setStatus("Check the fields (timezone must be a valid IANA zone; hours in range).");
-    else setStatus("Save failed.");
+    setBusy(true);
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
+      if (res.ok) { setStatus("Saved."); router.refresh(); }
+      else if (res.status === 400) setStatus("Check the fields (timezone must be a valid IANA zone; hours in range).");
+      else setStatus("Save failed.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -46,7 +52,7 @@ export function SettingsForm({ initial }: { initial: SettingsValues }) {
         <input className="input" type="number" min={1} max={48} value={values.maxShiftHours}
           onChange={(e) => setValues({ ...values, maxShiftHours: Number(e.target.value) })} required />
       </label>
-      <button type="submit" className="btn btn-primary">Save settings</button>
+      <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? "Saving…" : "Save settings"}</button>
       {status && <p role="status" className="text-sm text-[var(--color-muted-fg)]">{status}</p>}
     </form>
   );

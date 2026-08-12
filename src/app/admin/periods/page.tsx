@@ -25,6 +25,9 @@ export default async function AdminPeriodsPage() {
           <PeriodForm />
         </div>
       </details>
+      {periods.length === 0 ? (
+        <p className="card text-[var(--muted)]">No periods yet — create the first season above.</p>
+      ) : (
       <div className="tablewrap">
         <div style={{ overflowX: "auto" }}>
           <table className="table">
@@ -56,6 +59,7 @@ export default async function AdminPeriodsPage() {
           </table>
         </div>
       </div>
+      )}
     </main>
   );
 }
