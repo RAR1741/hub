@@ -87,6 +87,15 @@ describe("meetingFromRow", () => {
       syncedAt: "2026-08-31T12:00:00Z",
     });
   });
+
+  test("maps a manual meeting's null gcal_event_id", () => {
+    const row: MeetingRow = {
+      id: "m2", gcal_event_id: null, title: "Off-calendar sync",
+      starts_at: "2026-09-03T22:00:00Z", ends_at: "2026-09-04T01:00:00Z",
+      synced_at: "2026-08-31T12:00:00Z",
+    };
+    expect(meetingFromRow(row).gcalEventId).toBeNull();
+  });
 });
 
 describe("buildDayFromRow", () => {

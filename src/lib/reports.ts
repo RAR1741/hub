@@ -116,6 +116,39 @@ export async function flaggedSessions(
   return out;
 }
 
+export type SessionWithName = Session & { name: string };
+
+/**
+ * Sessions in a period, optionally filtered to one person, newest first, each
+ * carrying the member's display name — for the all-sessions admin view. Uses
+ * the `person!person_id` FK-hint embed (person is also referenced by
+ * session.edited_by, so an unqualified embed is ambiguous and PostgREST
+ * rejects it with PGRST201).
+ */
+export async function listSessionsForPeriod(
+  periodId: string,
+  personId?: string,
+  db?: SupabaseClient,
+): Promise<SessionWithName[]> {
+  const client = db ?? (await import("./db")).getDb();
+  let query = client
+    .from("session")
+    .select("*, person!person_id (id, first_name, last_name, display_name)")
+    .eq("period_id", periodId);
+  if (personId) query = query.eq("person_id", personId);
+  const { data, error } = await query.order("time_in", { ascending: false });
+  if (error) console.error("listSessionsForPeriod: query failed", error);
+  return (data ?? []).map((row) => {
+    const p = row.person as unknown as {
+      id: string; first_name: string; last_name: string; display_name: string | null;
+    } | null;
+    return {
+      ...sessionFromRow(row as unknown as SessionRow),
+      name: p ? displayName(p) : "Unknown",
+    };
+  });
+}
+
 /** All sessions in a period (raw, all people) — for the attendance grid. */
 export async function sessionsForPeriod(
   periodId: string,

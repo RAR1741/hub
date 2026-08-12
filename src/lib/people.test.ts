@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { canViewProfile, displayName, listPeople, parsePersonInput, rosterView } from "./people";
+import { canViewProfile, deletePerson, displayName, listPeople, parsePersonInput, rosterView } from "./people";
 import type { PersonRow } from "./types";
 import type { Viewer } from "./viewer";
 
@@ -112,6 +112,45 @@ describe("listPeople search-term sanitization", () => {
     expect(skeleton).toBe(
       'first_name.ilike."",last_name.ilike."",display_name.ilike.""',
     );
+  });
+});
+
+describe("deletePerson", () => {
+  function fakeDb(result: { data: { id: string } | null; error: { code: string } | null }) {
+    return {
+      from: () => ({
+        delete: () => ({
+          eq: () => ({
+            select: () => ({
+              maybeSingle: async () => result,
+            }),
+          }),
+        }),
+      }),
+    } as never;
+  }
+
+  test("404 when missing", async () => {
+    const result = await deletePerson("p1", fakeDb({ data: null, error: null }));
+    expect(result).toEqual({ ok: false, status: 404 });
+  });
+
+  test("ok when deleted", async () => {
+    const result = await deletePerson("p1", fakeDb({ data: { id: "p1" }, error: null }));
+    expect(result).toEqual({ ok: true, status: 200 });
+  });
+
+  test("409 when blocked by a restrict FK (e.g. a session they edited)", async () => {
+    const result = await deletePerson(
+      "p1",
+      fakeDb({ data: null, error: { code: "23503" } }),
+    );
+    expect(result).toEqual({ ok: false, status: 409 });
+  });
+
+  test("500 on other errors", async () => {
+    const result = await deletePerson("p1", fakeDb({ data: null, error: { code: "99999" } }));
+    expect(result).toEqual({ ok: false, status: 500 });
   });
 });
 

@@ -1,5 +1,7 @@
 import { describe, expect, test } from "vitest";
-import { flaggedSessions, leaderboard, personPeriodHours, sessionsForPeriod } from "./reports";
+import {
+  flaggedSessions, leaderboard, listSessionsForPeriod, personPeriodHours, sessionsForPeriod,
+} from "./reports";
 import type { Session } from "./types";
 
 const s = (over: Partial<Session>): Session => ({
@@ -101,6 +103,47 @@ describe("sessionsForPeriod", () => {
     const result = await sessionsForPeriod("pd1", db);
     expect(result).toHaveLength(1);
     expect(result[0]).toMatchObject({ id: "s1", personId: "p1", timeIn: "2026-09-01T18:00:00Z" });
+  });
+});
+
+describe("listSessionsForPeriod", () => {
+  // Tracks .eq() calls so tests can assert whether personId narrowed the query.
+  function fakeDb(rows: Record<string, unknown>[]) {
+    const eqCalls: [string, unknown][] = [];
+    const builder = {
+      eq(col: string, val: unknown) {
+        eqCalls.push([col, val]);
+        return builder;
+      },
+      order: async () => ({ data: rows, error: null }),
+    };
+    return { db: { from: () => ({ select: () => builder }) } as never, eqCalls };
+  }
+
+  test("maps rows newest-first with the member's display name", async () => {
+    const rows = [row({ id: "s1" })];
+    const { db } = fakeDb(rows);
+    const result = await listSessionsForPeriod("pd", undefined, db);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ id: "s1", personId: "p1", name: "Ada Lovelace" });
+  });
+
+  test("without personId, filters only by period_id", async () => {
+    const { db, eqCalls } = fakeDb([row({ id: "s1" })]);
+    await listSessionsForPeriod("pd", undefined, db);
+    expect(eqCalls).toEqual([["period_id", "pd"]]);
+  });
+
+  test("with personId, also filters by person_id", async () => {
+    const { db, eqCalls } = fakeDb([row({ id: "s1" })]);
+    await listSessionsForPeriod("pd", "p1", db);
+    expect(eqCalls).toEqual([["period_id", "pd"], ["person_id", "p1"]]);
+  });
+
+  test("falls back to 'Unknown' when the person embed is missing", async () => {
+    const { db } = fakeDb([row({ id: "s1", person: null })]);
+    const result = await listSessionsForPeriod("pd", undefined, db);
+    expect(result[0].name).toBe("Unknown");
   });
 });
 

@@ -68,6 +68,10 @@ function fakeDb() {
                 filters.push({ op: "gte", col, val });
                 return chain;
               },
+              not(col: string, op: string, val: unknown) {
+                filters.push({ op: `not.${op}`, col, val });
+                return chain;
+              },
               // Thenable: awaiting the builder records the delete and resolves.
               then(resolve: (v: { error: null }) => void) {
                 deletes.push({ table, filters });
@@ -261,6 +265,11 @@ describe("syncCalendar", () => {
     // The two meeting deletes prune rows below timeMin and at/after timeMax.
     const meetingDeletes = db.deletes.filter((d) => d.table === "meeting");
     expect(meetingDeletes.map((d) => d.filters[0].op).sort()).toEqual(["gte", "lt"]);
+    // Each prune is scoped to gcal-sourced rows only, so a manual (null
+    // gcal_event_id) meeting outside the window is never deleted by sync.
+    for (const del of meetingDeletes) {
+      expect(del.filters).toContainEqual({ op: "not.is", col: "gcal_event_id", val: null });
+    }
   });
 
   test("follows nextPageToken and upserts events from every page, with a timeMin window (fix #2)", async () => {

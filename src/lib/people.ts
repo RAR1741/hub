@@ -179,6 +179,37 @@ export async function createPerson(
   return { ok: true, id: data.id as string };
 }
 
+const FOREIGN_KEY_VIOLATION = "23503";
+
+/**
+ * Hard-delete a person. `session.person_id` and `team_membership.person_id`
+ * are `on delete cascade` (see 20260811060855_attendance.sql /
+ * 20260811032027_roster_teams.sql), so a person's own attendance history and
+ * team memberships are removed along with them. Other tables that reference a
+ * person as staff — `session.edited_by`, `excusal.created_by`,
+ * `membership_application.reviewed_by`, `account_request.reviewed_by`,
+ * `kiosk_device.created_by` — have no delete action (default RESTRICT), so
+ * deleting a mentor/admin who edited/reviewed/created those rows is blocked
+ * with a foreign-key-violation surfaced as 409.
+ */
+export async function deletePerson(
+  id: string,
+  db?: SupabaseClient,
+): Promise<{ ok: boolean; status: number }> {
+  const client = db ?? (await import("./db")).getDb();
+  const { data, error } = await client
+    .from("person")
+    .delete()
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    return { ok: false, status: error.code === FOREIGN_KEY_VIOLATION ? 409 : 500 };
+  }
+  if (!data) return { ok: false, status: 404 };
+  return { ok: true, status: 200 };
+}
+
 export async function updatePerson(
   id: string,
   input: PersonInput,

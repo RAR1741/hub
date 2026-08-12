@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { parsePeriodInput } from "./periods";
+import { deletePeriod, parsePeriodInput } from "./periods";
 
 describe("parsePeriodInput", () => {
   test("accepts a valid period", () => {
@@ -20,5 +20,57 @@ describe("parsePeriodInput", () => {
     expect(
       parsePeriodInput({ name: "x".repeat(81), startsOn: "2026-08-01", endsOn: "2026-12-31" }),
     ).toBeNull();
+  });
+});
+
+describe("deletePeriod", () => {
+  function fakeDb(opts: { periodExists: boolean; sessionCount: number }) {
+    return {
+      from(table: string) {
+        if (table === "period") {
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: opts.periodExists ? { id: "pd1" } : null,
+                  error: null,
+                }),
+              }),
+            }),
+            delete: () => ({
+              eq: async () => ({ error: null }),
+            }),
+          };
+        }
+        if (table === "session") {
+          return {
+            select: () => ({
+              eq: () => ({
+                limit: async () => ({
+                  data: opts.sessionCount > 0 ? [{ id: "s1" }] : [],
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        throw new Error(`unexpected table ${table}`);
+      },
+    } as never;
+  }
+
+  test("404 when the period is missing", async () => {
+    const result = await deletePeriod("pd1", fakeDb({ periodExists: false, sessionCount: 0 }));
+    expect(result).toEqual({ ok: false, status: 404 });
+  });
+
+  test("409 when the period has sessions (don't silently delete history)", async () => {
+    const result = await deletePeriod("pd1", fakeDb({ periodExists: true, sessionCount: 1 }));
+    expect(result).toEqual({ ok: false, status: 409 });
+  });
+
+  test("ok when the period has no sessions", async () => {
+    const result = await deletePeriod("pd1", fakeDb({ periodExists: true, sessionCount: 0 }));
+    expect(result).toEqual({ ok: true, status: 200 });
   });
 });

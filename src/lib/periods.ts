@@ -64,6 +64,28 @@ export async function updatePeriod(
   return { ok: true, status: 200 };
 }
 
+const FOREIGN_KEY_VIOLATION = "23503";
+
+/**
+ * Hard-delete a period. `session.period_id references period on delete
+ * restrict` (20260811060855_attendance.sql), so a period with attendance
+ * history is protected at the DB level too — but a clean 409 with a clear
+ * message beats a raw 23503, so this checks explicitly first.
+ */
+export async function deletePeriod(
+  id: string,
+  db?: SupabaseClient,
+): Promise<{ ok: boolean; status: number }> {
+  const client = db ?? (await import("./db")).getDb();
+  const { data: exists } = await client.from("period").select("id").eq("id", id).maybeSingle();
+  if (!exists) return { ok: false, status: 404 };
+  const { data: sessions } = await client.from("session").select("id").eq("period_id", id).limit(1);
+  if (sessions && sessions.length > 0) return { ok: false, status: 409 };
+  const { error } = await client.from("period").delete().eq("id", id);
+  if (error) return { ok: false, status: error.code === FOREIGN_KEY_VIOLATION ? 409 : 500 };
+  return { ok: true, status: 200 };
+}
+
 /** Exactly one active period, enforced by the `one_active_period` partial unique index. */
 export async function setActivePeriod(
   id: string,

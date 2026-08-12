@@ -158,7 +158,7 @@ export type BuildDaySource = "gcal" | "manual";
 
 export type MeetingRow = {
   id: string;
-  gcal_event_id: string;
+  gcal_event_id: string | null;
   title: string;
   starts_at: string;
   ends_at: string;
@@ -167,7 +167,7 @@ export type MeetingRow = {
 
 export type Meeting = {
   id: string;
-  gcalEventId: string;
+  gcalEventId: string | null;
   title: string;
   startsAt: string;
   endsAt: string;

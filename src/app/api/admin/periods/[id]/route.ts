@@ -1,5 +1,5 @@
 import { withRole } from "@/lib/api";
-import { parsePeriodInput, setActivePeriod, updatePeriod } from "@/lib/periods";
+import { deletePeriod, parsePeriodInput, setActivePeriod, updatePeriod } from "@/lib/periods";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -19,4 +19,15 @@ export const PATCH = withRole<Ctx>("admin", async (_viewer, request, context) =>
   return result.ok
     ? Response.json({ ok: true })
     : Response.json({ error: "failed" }, { status: result.status });
+});
+
+export const DELETE = withRole<Ctx>("admin", async (_viewer, _request, context) => {
+  const { id } = await context.params;
+  const result = await deletePeriod(id);
+  return result.ok
+    ? Response.json({ ok: true })
+    : Response.json(
+        { error: result.status === 409 ? "period has sessions" : "failed" },
+        { status: result.status },
+      );
 });

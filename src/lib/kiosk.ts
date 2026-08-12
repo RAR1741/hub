@@ -42,6 +42,23 @@ export async function listKioskDevices(
   }));
 }
 
+export async function renameKioskDevice(
+  id: string,
+  name: string,
+  db?: SupabaseClient,
+): Promise<{ ok: boolean; status: number }> {
+  const client = db ?? (await import("./db")).getDb();
+  const { data, error } = await client
+    .from("kiosk_device")
+    .update({ name })
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
+  if (error) return { ok: false, status: 500 };
+  if (!data) return { ok: false, status: 404 };
+  return { ok: true, status: 200 };
+}
+
 export async function deleteKioskDevice(
   id: string,
   db?: SupabaseClient,

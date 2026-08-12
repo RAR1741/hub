@@ -189,10 +189,12 @@ export async function syncCalendar(deps: GcalDeps): Promise<SyncResult> {
     .upsert(meetingRows, { onConflict: "gcal_event_id" });
   if (meetingError) throw new Error(`meeting upsert failed: ${meetingError.message}`);
 
-  // Prune meetings outside the synced window so a prior wider sync's stale
-  // far-past/far-future rows don't linger.
-  await deps.db.from("meeting").delete().lt("starts_at", timeMin);
-  await deps.db.from("meeting").delete().gte("starts_at", timeMax);
+  // Prune gcal-sourced meetings outside the synced window so a prior wider
+  // sync's stale far-past/far-future rows don't linger. Scoped to
+  // gcal_event_id IS NOT NULL so a manual (admin-created) meeting outside the
+  // ±12-month window is never swept up by this cleanup.
+  await deps.db.from("meeting").delete().lt("starts_at", timeMin).not("gcal_event_id", "is", null);
+  await deps.db.from("meeting").delete().gte("starts_at", timeMax).not("gcal_event_id", "is", null);
 
   // One build_day per distinct local start date. Its kind is REQUIRED if ANY
   // event on that date is required (mandatory title or Thursday night), else
