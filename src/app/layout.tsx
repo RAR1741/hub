@@ -1,16 +1,24 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Archivo, Inter, JetBrains_Mono } from "next/font/google";
 import { SiteNav } from "@/components/SiteNav";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const archivo = Archivo({
+  variable: "--font-display",
   subsets: ["latin"],
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const inter = Inter({
+  variable: "--font-body",
   subsets: ["latin"],
+  display: "swap",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-mono",
+  subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -18,10 +26,30 @@ export const metadata: Metadata = {
   description: "Attendance and roster for FRC Team 1741.",
 };
 
+// Applies a persisted theme choice (light/dark) before first paint so there's
+// no flash of the wrong theme. "system" (the default) removes the attribute
+// and lets the prefers-color-scheme media query in globals.css take over.
+const noFlashThemeScript = `
+(function () {
+  try {
+    var theme = localStorage.getItem("hub-theme");
+    if (theme === "light" || theme === "dark") {
+      document.documentElement.setAttribute("data-theme", theme);
+    }
+  } catch (e) {}
+})();
+`;
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
-      <body className="bg-[var(--color-canvas)] text-[var(--color-fg)] antialiased">
+    <html
+      lang="en"
+      className={`${archivo.variable} ${inter.variable} ${jetbrainsMono.variable}`}
+    >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: noFlashThemeScript }} />
+      </head>
+      <body className="antialiased">
         <SiteNav />
         <div className="mx-auto max-w-6xl px-4 py-6">{children}</div>
       </body>

@@ -1,77 +1,107 @@
 import Link from "next/link";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const navLinkClass =
-  "rounded-md px-2 py-1 text-sm font-medium text-[var(--color-muted-fg)] transition-colors hover:bg-[var(--color-canvas)] hover:text-[var(--color-fg)] hover:no-underline";
+  "rounded-lg px-2.5 py-1.5 text-[13.5px] font-semibold text-[var(--muted)] transition-colors hover:bg-[var(--steel-soft)] hover:text-[var(--ink)] hover:no-underline";
 
 export async function SiteNav() {
   const viewer = await getViewer();
+  const initials = viewer.person
+    ? (viewer.person.displayName ?? viewer.person.firstName ?? "")
+        .trim()
+        .split(/\s+/)
+        .map((part) => part[0])
+        .filter(Boolean)
+        .slice(0, 2)
+        .join("")
+        .toUpperCase()
+    : "";
+
   return (
-    <nav className="sticky top-0 z-10 border-b border-[var(--color-border)] bg-[var(--color-surface)]/95 backdrop-blur supports-[backdrop-filter]:bg-[var(--color-surface)]/80">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-1 gap-y-2 px-4 py-3">
-        <Link
-          href="/"
-          className="mr-2 text-base font-bold tracking-tight text-[var(--color-fg)] hover:no-underline"
-        >
-          Team Hub
-        </Link>
-        <div className="flex flex-wrap items-center gap-x-1">
-          <Link href="/" className={navLinkClass}>
-            Home
-          </Link>{" "}
-          <Link href="/people" className={navLinkClass}>
-            People
-          </Link>{" "}
-          <Link href="/teams" className={navLinkClass}>
-            Teams
-          </Link>{" "}
-          <Link href="/kiosk" className={navLinkClass}>
-            Kiosk
-          </Link>{" "}
-          <Link href="/leaderboard" className={navLinkClass}>
-            Leaderboard
-          </Link>{" "}
-          {hasRole(viewer.role, "mentor") && (
-            <Link href="/admin/sessions/flagged" className={navLinkClass}>
-              Flagged sessions
-            </Link>
-          )}{" "}
-          {hasRole(viewer.role, "admin") && (
-            <>
-              <Link href="/admin/people" className={navLinkClass}>
-                Admin: People
-              </Link>{" "}
-              <Link href="/admin/teams" className={navLinkClass}>
-                Admin: Teams
-              </Link>{" "}
-              <Link href="/admin/requests" className={navLinkClass}>
-                Admin: Requests
-              </Link>{" "}
-              <Link href="/admin/periods" className={navLinkClass}>
-                Admin: Periods
-              </Link>{" "}
-              <Link href="/admin/kiosk-devices" className={navLinkClass}>
-                Admin: Kiosk
-              </Link>{" "}
-              <Link href="/admin/settings" className={navLinkClass}>
-                Admin: Settings
-              </Link>{" "}
-            </>
-          )}
-        </div>
-        <div className="ml-auto flex items-center gap-3">
-          {viewer.person ? (
-            <span className="text-sm text-[var(--color-muted-fg)]">
-              {viewer.person.displayName ?? viewer.person.firstName} ({viewer.role})
+    <div className="sticky top-0 z-10">
+      <div className="hazard" />
+      <nav className="border-b border-[var(--hair)] bg-[var(--surface)]/95 backdrop-blur supports-[backdrop-filter]:bg-[var(--surface)]/85">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-1 gap-y-2 px-4 py-2.5">
+          <Link
+            href="/"
+            className="mr-2 flex items-center gap-2.5 font-[family-name:var(--font-display)] text-base font-extrabold tracking-tight text-[var(--ink)] hover:no-underline"
+          >
+            <span
+              className="rounded-md px-[7px] py-[3px] font-[family-name:var(--font-mono)] text-[13px] font-bold tracking-[0.02em]"
+              style={{ background: "var(--red)", color: "var(--red-fg)" }}
+            >
+              1741
             </span>
-          ) : (
-            <Link href="/login" className="btn btn-primary">
-              Sign in
-            </Link>
-          )}
+            Team Hub
+          </Link>
+          <div className="flex flex-1 flex-wrap items-center gap-x-1">
+            <Link href="/" className={navLinkClass}>
+              Home
+            </Link>{" "}
+            <Link href="/people" className={navLinkClass}>
+              People
+            </Link>{" "}
+            <Link href="/teams" className={navLinkClass}>
+              Teams
+            </Link>{" "}
+            <Link href="/kiosk" className={navLinkClass}>
+              Kiosk
+            </Link>{" "}
+            <Link href="/leaderboard" className={navLinkClass}>
+              Leaderboard
+            </Link>{" "}
+            {hasRole(viewer.role, "mentor") && (
+              <Link href="/admin/sessions/flagged" className={navLinkClass}>
+                Flagged sessions
+              </Link>
+            )}{" "}
+            {hasRole(viewer.role, "admin") && (
+              <>
+                <Link href="/admin/people" className={navLinkClass}>
+                  Admin: People
+                </Link>{" "}
+                <Link href="/admin/teams" className={navLinkClass}>
+                  Admin: Teams
+                </Link>{" "}
+                <Link href="/admin/requests" className={navLinkClass}>
+                  Admin: Requests
+                </Link>{" "}
+                <Link href="/admin/periods" className={navLinkClass}>
+                  Admin: Periods
+                </Link>{" "}
+                <Link href="/admin/kiosk-devices" className={navLinkClass}>
+                  Admin: Kiosk
+                </Link>{" "}
+                <Link href="/admin/settings" className={navLinkClass}>
+                  Admin: Settings
+                </Link>{" "}
+              </>
+            )}
+          </div>
+          <div className="ml-auto flex items-center gap-3">
+            <ThemeToggle />
+            {viewer.person ? (
+              <span className="flex items-center gap-2 text-[13px] text-[var(--muted)]">
+                <span
+                  className="grid h-[27px] w-[27px] place-items-center rounded-full text-[12px] font-bold text-white"
+                  style={{ background: "var(--steel)" }}
+                  aria-hidden="true"
+                >
+                  {initials}
+                </span>
+                {viewer.person.displayName ?? viewer.person.firstName} (
+                {viewer.role})
+              </span>
+            ) : (
+              <Link href="/login" className="btn btn-primary">
+                Sign in
+              </Link>
+            )}
+          </div>
         </div>
-      </div>
-    </nav>
+      </nav>
+    </div>
   );
 }
