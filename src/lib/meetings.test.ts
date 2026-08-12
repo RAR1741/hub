@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
-  createManualMeeting, deleteMeeting, listUpcomingMeetings, parseMeetingInput, updateMeeting,
+  createManualMeeting, deleteMeeting, listAllMeetings, listUpcomingMeetings, parseMeetingInput,
+  updateMeeting,
 } from "./meetings";
 
 describe("listUpcomingMeetings", () => {
@@ -34,6 +35,34 @@ describe("listUpcomingMeetings", () => {
     expect(captured.gte).toBe("2026-09-01T00:00:00Z");
     expect(captured.limit).toBe(5);
     expect(result[0]).toMatchObject({ id: "m1", gcalEventId: "g1", title: "Build" });
+  });
+});
+
+describe("listAllMeetings", () => {
+  test("orders by starts_at desc and maps rows", async () => {
+    const rows = [
+      {
+        id: "m1", gcal_event_id: null, title: "Manual meeting",
+        starts_at: "2026-09-02T22:00:00Z", ends_at: "2026-09-03T01:00:00Z",
+        synced_at: "2026-08-31T00:00:00Z",
+      },
+    ];
+    const captured: Record<string, unknown> = {};
+    const db = {
+      from: () => ({
+        select: () => ({
+          order: (col: string, opts: unknown) => {
+            captured.order = col;
+            captured.opts = opts;
+            return { limit: () => Promise.resolve({ data: rows, error: null }) };
+          },
+        }),
+      }),
+    } as never;
+    const result = await listAllMeetings(db);
+    expect(captured.order).toBe("starts_at");
+    expect(captured.opts).toEqual({ ascending: false });
+    expect(result[0]).toMatchObject({ id: "m1", gcalEventId: null, title: "Manual meeting" });
   });
 });
 

@@ -58,27 +58,10 @@ export async function SiteNav() {
               </Link>
             )}{" "}
             {hasRole(viewer.role, "admin") && (
-              <>
-                <Link href="/admin/people" className={navLinkClass}>
-                  Admin: People
-                </Link>{" "}
-                <Link href="/admin/teams" className={navLinkClass}>
-                  Admin: Teams
-                </Link>{" "}
-                <Link href="/admin/requests" className={navLinkClass}>
-                  Admin: Requests
-                </Link>{" "}
-                <Link href="/admin/periods" className={navLinkClass}>
-                  Admin: Periods
-                </Link>{" "}
-                <Link href="/admin/kiosk-devices" className={navLinkClass}>
-                  Admin: Kiosk
-                </Link>{" "}
-                <Link href="/admin/settings" className={navLinkClass}>
-                  Admin: Settings
-                </Link>{" "}
-              </>
-            )}
+              <Link href="/admin" className={navLinkClass}>
+                Admin
+              </Link>
+            )}{" "}
           </div>
           <div className="ml-auto flex items-center gap-3">
             <ThemeToggle />

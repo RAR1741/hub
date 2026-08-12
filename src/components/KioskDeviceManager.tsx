@@ -2,6 +2,75 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Icon } from "@/components/Icon";
+
+function DeviceRow({
+  device,
+  onFailed,
+}: {
+  device: { id: string; name: string; lastSeenAt: string | null };
+  onFailed: (msg: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(device.name);
+  const router = useRouter();
+
+  async function rename() {
+    if (!name.trim()) return;
+    const res = await fetch(`/api/admin/kiosk-devices/${device.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: name.trim() }),
+    });
+    if (res.ok) {
+      setEditing(false);
+      router.refresh();
+    } else onFailed("Rename failed.");
+  }
+
+  async function remove() {
+    if (!confirm("Delete this kiosk device? Tablets using it will stop working.")) return;
+    const res = await fetch(`/api/admin/kiosk-devices/${device.id}`, { method: "DELETE" });
+    if (res.ok) router.refresh();
+    else onFailed("Delete failed.");
+  }
+
+  return (
+    <li className="flex items-center justify-between gap-3 py-2 text-sm">
+      {editing ? (
+        <span className="flex flex-1 items-center gap-2">
+          <input
+            className="input"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            aria-label={`Rename ${device.name}`}
+          />
+          <button onClick={rename} className="btn btn-primary px-3 py-1">
+            Save
+          </button>
+          <button onClick={() => { setEditing(false); setName(device.name); }} className="btn px-3 py-1">
+            Cancel
+          </button>
+        </span>
+      ) : (
+        <span>
+          {device.name} — last seen{" "}
+          {device.lastSeenAt ? new Date(device.lastSeenAt).toLocaleString() : "never"}
+        </span>
+      )}
+      {!editing && (
+        <div className="rowacts">
+          <button onClick={() => setEditing(true)} className="btn icon" aria-label={`Rename ${device.name}`}>
+            <Icon name="edit" />
+          </button>
+          <button onClick={remove} className="btn icon danger" aria-label={`Delete ${device.name}`}>
+            <Icon name="trash" />
+          </button>
+        </div>
+      )}
+    </li>
+  );
+}
 
 export function KioskDeviceManager({
   devices,
@@ -34,12 +103,6 @@ export function KioskDeviceManager({
       setCreating(false);
     }
   }
-  async function remove(id: string) {
-    if (!confirm("Delete this kiosk device? Tablets using it will stop working.")) return;
-    const res = await fetch(`/api/admin/kiosk-devices/${id}`, { method: "DELETE" });
-    if (res.ok) router.refresh();
-    else setStatus("Delete failed.");
-  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -50,20 +113,15 @@ export function KioskDeviceManager({
         </button>
       </div>
       {newToken && (
-        <p role="status" className="text-sm text-[var(--color-muted-fg)]">
+        <p role="status" className="text-sm text-[var(--muted)]">
           Token (shown once — enter it on the tablet at <code>/kiosk/setup</code>):{" "}
           <code>{newToken}</code>
         </p>
       )}
-      {status && <p role="alert" className="text-sm text-[var(--color-absent)]">{status}</p>}
-      <ul className="flex flex-col divide-y divide-[var(--color-border)]">
+      {status && <p role="alert" className="text-sm text-[var(--absent)]">{status}</p>}
+      <ul className="flex flex-col divide-y divide-[var(--hair)]">
         {devices.map((d) => (
-          <li key={d.id} className="flex items-center justify-between gap-3 py-2 text-sm">
-            <span>
-              {d.name} — last seen {d.lastSeenAt ? new Date(d.lastSeenAt).toLocaleString() : "never"}
-            </span>
-            <button onClick={() => remove(d.id)} className="btn btn-danger">Delete</button>
-          </li>
+          <DeviceRow key={d.id} device={d} onFailed={setStatus} />
         ))}
       </ul>
     </div>

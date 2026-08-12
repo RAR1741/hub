@@ -3,6 +3,7 @@ import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
 import { getPersonWithTeams } from "@/lib/people";
 import { PersonForm } from "@/components/PersonForm";
+import { DeletePersonButton } from "@/components/DeletePersonButton";
 
 export default async function AdminEditPersonPage({
   params,
@@ -15,12 +16,17 @@ export default async function AdminEditPersonPage({
   const result = await getPersonWithTeams(id);
   if (!result) notFound();
   const p = result.person;
+  const name = p.displayName ?? `${p.firstName} ${p.lastName}`;
 
   return (
     <main className="flex flex-col gap-6">
-      <h1 className="text-3xl font-bold tracking-tight">
-        Edit — {p.displayName ?? `${p.firstName} ${p.lastName}`}
-      </h1>
+      <div className="page-head">
+        <div>
+          <h1>Edit — {name}</h1>
+          <div className="sub">Person details</div>
+        </div>
+        <DeletePersonButton personId={p.id} name={name} labeled />
+      </div>
       <section className="card flex flex-col gap-4">
         <PersonForm
           personId={p.id}

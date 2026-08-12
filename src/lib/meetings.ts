@@ -18,6 +18,17 @@ export async function listUpcomingMeetings(
   return ((data ?? []) as MeetingRow[]).map(meetingFromRow);
 }
 
+/** All meetings, most recent first — for the admin Meetings page. */
+export async function listAllMeetings(db?: SupabaseClient): Promise<Meeting[]> {
+  const client = db ?? (await import("./db")).getDb();
+  const { data } = await client
+    .from("meeting")
+    .select("*")
+    .order("starts_at", { ascending: false })
+    .limit(500);
+  return ((data ?? []) as MeetingRow[]).map(meetingFromRow);
+}
+
 export type ManualMeetingInput = { title: string; startsAt: string; endsAt: string };
 
 /** Normalize a required ISO datetime string; null when missing/unparseable. */

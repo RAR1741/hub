@@ -2,8 +2,21 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
-import { listPeople } from "@/lib/people";
+import { listPeople, displayName } from "@/lib/people";
 import { PersonForm } from "@/components/PersonForm";
+import { DeletePersonButton } from "@/components/DeletePersonButton";
+import { Icon } from "@/components/Icon";
+
+function initials(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .map((part) => part[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
 
 export default async function AdminPeoplePage() {
   const viewer = await getViewer();
@@ -12,33 +25,62 @@ export default async function AdminPeoplePage() {
   const rows = await listPeople();
   return (
     <main className="flex flex-col gap-6">
-      <h1 className="text-3xl font-bold tracking-tight">Admin — People</h1>
-      <section className="card flex flex-col gap-4">
-        <h2 className="text-xl font-semibold">Create person</h2>
-        <PersonForm />
-      </section>
-      <section className="flex flex-col gap-3">
-        <h2 className="text-xl font-semibold">All people ({rows.length})</h2>
-        <div className="card overflow-x-auto">
+      <div className="page-head">
+        <div>
+          <h1>People</h1>
+          <div className="sub">Roster, roles, and student IDs · {rows.length} member{rows.length === 1 ? "" : "s"}</div>
+        </div>
+      </div>
+      <details className="card">
+        <summary className="cursor-pointer text-base font-semibold">Add person</summary>
+        <div className="mt-4">
+          <PersonForm />
+        </div>
+      </details>
+      <div className="tablewrap">
+        <div style={{ overflowX: "auto" }}>
           <table className="table">
             <thead>
-              <tr><th>Name</th><th>Role</th><th>Student ID</th><th>Email</th><th>Active</th><th></th></tr>
+              <tr>
+                <th>Member</th>
+                <th>Student ID</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th style={{ textAlign: "right" }}>Actions</th>
+              </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
-                <tr key={r.id}>
-                  <td>{r.display_name ?? `${r.first_name} ${r.last_name}`}</td>
-                  <td><span className="badge">{r.role}</span></td>
-                  <td>{r.student_id_number ?? ""}</td>
-                  <td>{r.email ?? ""}</td>
-                  <td><span className="badge">{r.is_active ? "active" : "inactive"}</span></td>
-                  <td><Link href={`/admin/people/${r.id}`} className="font-medium text-[var(--color-brand)]">Edit</Link></td>
-                </tr>
-              ))}
+              {rows.map((r) => {
+                const name = displayName(r);
+                return (
+                  <tr key={r.id}>
+                    <td>
+                      <Link href={`/admin/people/${r.id}`} className="name-cell hover:no-underline">
+                        <span className="avatar" aria-hidden="true">{initials(name)}</span>
+                        <span>
+                          <div className="nm" style={{ color: "var(--ink)" }}>{name}</div>
+                          {r.email && <div className="em">{r.email}</div>}
+                        </span>
+                      </Link>
+                    </td>
+                    <td><span className="sid">{r.student_id_number ?? "—"}</span></td>
+                    <td><span className={`pill ${r.role === "admin" ? "admin" : "role"}`}>{r.role}</span></td>
+                    <td><span className={`pill ${r.is_active ? "on" : "off"}`}>{r.is_active ? "Active" : "Inactive"}</span></td>
+                    <td>
+                      <div className="rowacts">
+                        <Link href={`/admin/people/${r.id}`} className="btn icon" aria-label={`Edit ${name}`}>
+                          <Icon name="edit" />
+                        </Link>
+                        <DeletePersonButton personId={r.id} name={name} />
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
-      </section>
+      </div>
     </main>
   );
 }

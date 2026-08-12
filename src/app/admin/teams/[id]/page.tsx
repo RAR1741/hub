@@ -30,7 +30,13 @@ export default async function AdminTeamPage({
 
   return (
     <main className="flex flex-col gap-6">
-      <h1 className="text-3xl font-bold tracking-tight">Team — {team.name}</h1>
+      <div className="page-head">
+        <div>
+          <h1>Team — {team.name}</h1>
+          <div className="sub">{members.length} member{members.length === 1 ? "" : "s"}</div>
+        </div>
+        <DeleteTeamButton teamId={team.id} />
+      </div>
       <section className="card flex flex-col gap-4">
         <TeamForm
           teamId={team.id}
@@ -46,7 +52,6 @@ export default async function AdminTeamPage({
       <section className="card flex flex-col gap-4">
         <MemberManager teamId={team.id} members={members} candidates={candidates} />
       </section>
-      <DeleteTeamButton teamId={team.id} />
     </main>
   );
 }

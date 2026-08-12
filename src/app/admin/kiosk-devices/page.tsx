@@ -10,8 +10,13 @@ export default async function AdminKioskDevicesPage() {
   const devices = await listKioskDevices();
   return (
     <main className="flex flex-col gap-6">
-      <h1 className="text-3xl font-bold tracking-tight">Admin — Kiosk devices</h1>
-      <p className="text-sm text-[var(--color-muted-fg)]">
+      <div className="page-head">
+        <div>
+          <h1>Kiosk devices</h1>
+          <div className="sub">{devices.length} device{devices.length === 1 ? "" : "s"} registered</div>
+        </div>
+      </div>
+      <p className="text-sm text-[var(--muted)]">
         Create a token, then enter it once on the shop tablet at <code>/kiosk/setup</code>.
       </p>
       <section className="card flex flex-col gap-4">

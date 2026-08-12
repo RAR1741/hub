@@ -4,6 +4,7 @@ import { hasRole } from "@/lib/authz";
 import { listPeriods } from "@/lib/periods";
 import { PeriodForm } from "@/components/PeriodForm";
 import { ActivatePeriodButton } from "@/components/ActivatePeriodButton";
+import { DeletePeriodButton } from "@/components/DeletePeriodButton";
 
 export default async function AdminPeriodsPage() {
   const viewer = await getViewer();
@@ -12,28 +13,49 @@ export default async function AdminPeriodsPage() {
   const periods = await listPeriods();
   return (
     <main className="flex flex-col gap-6">
-      <h1 className="text-3xl font-bold tracking-tight">Admin — Periods</h1>
-      <section className="card flex flex-col gap-4">
-        <h2 className="text-xl font-semibold">Create period</h2>
-        <PeriodForm />
-      </section>
-      <section className="flex flex-col gap-3">
-        <h2 className="text-xl font-semibold">All periods</h2>
-        <div className="card overflow-x-auto">
+      <div className="page-head">
+        <div>
+          <h1>Periods</h1>
+          <div className="sub">Seasons and the active period · {periods.length} total</div>
+        </div>
+      </div>
+      <details className="card">
+        <summary className="cursor-pointer text-base font-semibold">Create period</summary>
+        <div className="mt-4">
+          <PeriodForm />
+        </div>
+      </details>
+      <div className="tablewrap">
+        <div style={{ overflowX: "auto" }}>
           <table className="table">
-            <thead><tr><th>Name</th><th>Starts</th><th>Ends</th><th>Active</th><th></th></tr></thead>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Starts</th>
+                <th>Ends</th>
+                <th>Status</th>
+                <th style={{ textAlign: "right" }}>Actions</th>
+              </tr>
+            </thead>
             <tbody>
               {periods.map((p) => (
                 <tr key={p.id}>
-                  <td>{p.name}</td><td>{p.startsOn}</td><td>{p.endsOn}</td>
-                  <td>{p.isActive ? <span className="badge badge-present">active</span> : ""}</td>
-                  <td>{p.isActive ? null : <ActivatePeriodButton periodId={p.id} />}</td>
+                  <td>{p.name}</td>
+                  <td className="mono">{p.startsOn}</td>
+                  <td className="mono">{p.endsOn}</td>
+                  <td>{p.isActive ? <span className="pill on">Active</span> : <span className="pill off">Inactive</span>}</td>
+                  <td>
+                    <div className="rowacts">
+                      {!p.isActive && <ActivatePeriodButton periodId={p.id} />}
+                      <DeletePeriodButton periodId={p.id} name={p.name} />
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      </section>
+      </div>
     </main>
   );
 }
