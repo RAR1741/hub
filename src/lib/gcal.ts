@@ -13,6 +13,16 @@ export type GcalCredentials = {
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
 
+// Sync pulls a window of ±12 months around "now" so a recently-edited past
+// event still updates and the far future doesn't accumulate forever.
+const WINDOW_MS = 365 * 24 * 60 * 60 * 1000;
+
+// Attendance days default to OPTIONAL. A build day is REQUIRED only when an
+// event on it either says "mandatory" in the title, or is a Thursday-night
+// meeting (Thursday, starting at/after this hour, team-local).
+const MANDATORY_RE = /mandatory/i;
+const THURSDAY_NIGHT_HOUR = 17; // 5:00 PM local
+
 function base64url(input: Buffer | string): string {
   return Buffer.from(input).toString("base64url");
 }
@@ -95,8 +105,36 @@ export type GcalDeps = {
 
 export type SyncResult = { meetings: number; buildDays: number };
 
-async function fetchAllEvents(deps: GcalDeps, token: string): Promise<GcalEvent[]> {
-  const timeMin = new Date(deps.now ? deps.now() : Date.now()).toISOString();
+/**
+ * Is a calendar event a REQUIRED attendance day? True when the title contains
+ * "mandatory", or the event starts on a Thursday at/after 5 PM team-local (the
+ * regular Thursday-night meeting). All-day events (no time) qualify only via
+ * the title. Everything else is optional. PURE.
+ */
+export function isRequiredEvent(
+  e: Pick<GcalEvent, "summary" | "start">,
+  tz: string,
+): boolean {
+  if (MANDATORY_RE.test(e.summary ?? "")) return true;
+  const dt = e.start?.dateTime;
+  if (!dt) return false; // all-day event: no "night" time to check
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    weekday: "short",
+    hour: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(dt));
+  const weekday = parts.find((p) => p.type === "weekday")?.value;
+  const hour = Number(parts.find((p) => p.type === "hour")?.value);
+  return weekday === "Thu" && hour >= THURSDAY_NIGHT_HOUR;
+}
+
+async function fetchAllEvents(
+  deps: GcalDeps,
+  token: string,
+  timeMin: string,
+  timeMax: string,
+): Promise<GcalEvent[]> {
   const items: GcalEvent[] = [];
   let pageToken: string | undefined;
   do {
@@ -108,6 +146,7 @@ async function fetchAllEvents(deps: GcalDeps, token: string): Promise<GcalEvent[
     url.searchParams.set("singleEvents", "true");
     url.searchParams.set("orderBy", "startTime");
     url.searchParams.set("timeMin", timeMin);
+    url.searchParams.set("timeMax", timeMax);
     if (pageToken) url.searchParams.set("pageToken", pageToken);
     const res = await deps.fetch(url.toString(), {
       headers: { Authorization: `Bearer ${token}` },
@@ -121,12 +160,16 @@ async function fetchAllEvents(deps: GcalDeps, token: string): Promise<GcalEvent[
 }
 
 export async function syncCalendar(deps: GcalDeps): Promise<SyncResult> {
+  const nowMs = deps.now ? deps.now() : Date.now();
+  const timeMin = new Date(nowMs - WINDOW_MS).toISOString();
+  const timeMax = new Date(nowMs + WINDOW_MS).toISOString();
+
   const token = await fetchAccessToken(deps);
-  const allItems = await fetchAllEvents(deps, token);
+  const allItems = await fetchAllEvents(deps, token, timeMin, timeMax);
   const events = allItems.filter((e) => e.id && (e.start?.dateTime || e.start?.date));
   if (events.length === 0) return { meetings: 0, buildDays: 0 };
 
-  const syncedAt = new Date(deps.now ? deps.now() : Date.now()).toISOString();
+  const syncedAt = new Date(nowMs).toISOString();
   const meetingRows = events.map((e) => {
     const startsAt = e.start!.dateTime ?? `${e.start!.date}T00:00:00Z`;
     let endsAt: string;
@@ -146,18 +189,38 @@ export async function syncCalendar(deps: GcalDeps): Promise<SyncResult> {
     .upsert(meetingRows, { onConflict: "gcal_event_id" });
   if (meetingError) throw new Error(`meeting upsert failed: ${meetingError.message}`);
 
-  // One build_day per distinct start date; never overwrite an existing row.
-  // All-day events carry no time component, so their date is used verbatim —
-  // running it through localDateOf would shift it a day earlier in UTC-negative
-  // timezones. Timed events still convert their instant to the team-local date.
-  const dates = [
-    ...new Set(
-      events.map((e, i) =>
-        e.start!.dateTime ? localDateOf(meetingRows[i].starts_at, deps.tz) : e.start!.date!,
-      ),
-    ),
-  ];
-  const buildDayRows = dates.map((date) => ({ date, kind: "required", source: "gcal" }));
+  // Prune meetings outside the synced window so a prior wider sync's stale
+  // far-past/far-future rows don't linger.
+  await deps.db.from("meeting").delete().lt("starts_at", timeMin);
+  await deps.db.from("meeting").delete().gte("starts_at", timeMax);
+
+  // One build_day per distinct local start date. Its kind is REQUIRED if ANY
+  // event on that date is required (mandatory title or Thursday night), else
+  // OPTIONAL. All-day events carry no time component, so their date is used
+  // verbatim — running it through localDateOf would shift it a day earlier in
+  // UTC-negative timezones. Timed events convert their instant to team-local.
+  const dateKinds = new Map<string, "required" | "optional">();
+  events.forEach((e, i) => {
+    const date = e.start!.dateTime
+      ? localDateOf(meetingRows[i].starts_at, deps.tz)
+      : e.start!.date!;
+    if (!dateKinds.has(date)) dateKinds.set(date, "optional");
+    if (isRequiredEvent(e, deps.tz)) dateKinds.set(date, "required");
+  });
+  const buildDayRows = [...dateKinds].map(([date, kind]) => ({
+    date,
+    kind,
+    source: "gcal",
+  }));
+
+  // The sync owns gcal-sourced build days: clear them so a re-sync reclassifies
+  // (e.g. after the calendar changes), then re-insert. `ignoreDuplicates` leaves
+  // any manual admin override (source = 'manual') on a date untouched.
+  const { error: bdDeleteError } = await deps.db
+    .from("build_day")
+    .delete()
+    .eq("source", "gcal");
+  if (bdDeleteError) throw new Error(`build_day cleanup failed: ${bdDeleteError.message}`);
   const { error: bdError } = await deps.db
     .from("build_day")
     .upsert(buildDayRows, { onConflict: "date", ignoreDuplicates: true });
