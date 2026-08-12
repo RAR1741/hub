@@ -1,0 +1,359 @@
+<title>Team Hub — UI Direction</title>
+<style>
+  /* ---------- tokens: light (bare :root) ---------- */
+  :root {
+    --red: #E01926; --red-press: #B4131D; --red-fg: #ffffff;
+    --canvas: #F5F2EE;      /* warm shop paper */
+    --surface: #FFFFFF;
+    --surface-2: #FBF9F6;
+    --ink: #1B1719;         /* warm near-black */
+    --muted: #6E6863;
+    --hair: #E5E0D9;        /* warm hairline */
+    --steel: #55636E;       /* cool mechanical secondary */
+    --steel-soft: #EAEDEF;
+    --present: #1F9D57; --excused: #2C6BE6; --optional: #6B7079; --absent: #D67A22;
+    --shadow: 0 1px 2px rgba(20,16,14,.04), 0 6px 20px -10px rgba(20,16,14,.14);
+    --font-display: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-body: var(--font-display);
+    --font-mono: ui-monospace, "Cascadia Code", "SF Mono", "Segoe UI Mono", Menlo, Consolas, monospace;
+  }
+  /* ---------- tokens: dark ---------- */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --red: #FF3B45; --red-press: #E0222C; --red-fg: #17110f;
+      --canvas: #131417; --surface: #1B1D21; --surface-2: #212429;
+      --ink: #ECE9E4; --muted: #9C958D; --hair: #2C2F35; --steel: #8EA0AD; --steel-soft: #262A30;
+      --present: #35C878; --excused: #5A93FF; --optional: #8B93A0; --absent: #F0973E;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 26px -12px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="dark"] {
+    --red: #FF3B45; --red-press: #E0222C; --red-fg: #17110f;
+    --canvas: #131417; --surface: #1B1D21; --surface-2: #212429;
+    --ink: #ECE9E4; --muted: #9C958D; --hair: #2C2F35; --steel: #8EA0AD; --steel-soft: #262A30;
+    --present: #35C878; --excused: #5A93FF; --optional: #8B93A0; --absent: #F0973E;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 26px -12px rgba(0,0,0,.6);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--canvas); color: var(--ink);
+    font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 28px 20px 80px; }
+  .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  .eyebrow { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; font-weight: 700; color: var(--muted); }
+
+  /* pitch chrome */
+  .pitch-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
+  .pitch-head h1 { font-family: var(--font-display); font-weight: 850; font-size: clamp(26px, 4vw, 40px); letter-spacing: -.02em; margin: 6px 0 2px; text-wrap: balance; }
+  .pitch-head p { color: var(--muted); margin: 0; max-width: 52ch; }
+  .toggle { display: inline-flex; gap: 2px; background: var(--steel-soft); border: 1px solid var(--hair); border-radius: 999px; padding: 3px; }
+  .toggle button { font: inherit; font-size: 12px; font-weight: 650; border: 0; background: transparent; color: var(--muted); padding: 6px 13px; border-radius: 999px; cursor: pointer; }
+  .toggle button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+  .toggle button:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+
+  .screen { margin-top: 34px; }
+  .screen-label { display: flex; align-items: center; gap: 10px; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; font-weight: 700; color: var(--muted); margin-bottom: 10px; }
+  .screen-label::before { content: ""; width: 22px; height: 3px; background: var(--red); border-radius: 2px; }
+
+  /* app frame */
+  .app { background: var(--canvas); border: 1px solid var(--hair); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow); }
+  .hazard { height: 4px; background: repeating-linear-gradient(-45deg, var(--red) 0 11px, var(--ink) 11px 22px); opacity: .9; }
+
+  .topbar { display: flex; align-items: center; gap: 20px; padding: 12px 18px; background: var(--surface); border-bottom: 1px solid var(--hair); }
+  .brand { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 800; letter-spacing: -.01em; }
+  .badge-num { font-family: var(--font-mono); font-weight: 700; font-size: 13px; color: var(--red-fg); background: var(--red); padding: 3px 7px; border-radius: 6px; letter-spacing: .02em; }
+  .nav { display: flex; gap: 4px; margin-left: 6px; flex: 1; flex-wrap: wrap; }
+  .nav a { font-size: 13.5px; font-weight: 600; color: var(--muted); text-decoration: none; padding: 7px 11px; border-radius: 8px; }
+  .nav a.active { color: var(--ink); background: var(--steel-soft); }
+  .nav a:hover { color: var(--ink); }
+  .who { display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--muted); }
+  .avatar { width: 27px; height: 27px; border-radius: 50%; background: var(--steel); color: #fff; display: grid; place-items: center; font-size: 12px; font-weight: 700; }
+
+  main { padding: 20px; }
+  .status-strip { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 12px 16px; background: var(--ink); color: var(--canvas); border-radius: 11px; margin-bottom: 18px; }
+  .status-strip .live { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); box-shadow: 0 0 0 0 var(--red); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(224,25,38,.5);} 70%{box-shadow:0 0 0 7px rgba(224,25,38,0);} 100%{box-shadow:0 0 0 0 rgba(224,25,38,0);} }
+  .status-strip .sep { width: 1px; height: 16px; background: rgba(255,255,255,.18); }
+  .status-strip .grow { flex: 1; }
+  .status-strip .date { font-family: var(--font-mono); font-size: 12.5px; opacity: .8; }
+
+  .dash-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 16px; }
+  .card { background: var(--surface); border: 1px solid var(--hair); border-radius: 12px; box-shadow: var(--shadow); }
+  .card-head { display: flex; align-items: center; justify-content: space-between; padding: 13px 16px; border-bottom: 1px solid var(--hair); }
+  .card-head h3 { font-family: var(--font-display); font-weight: 750; font-size: 14px; letter-spacing: .01em; margin: 0; }
+  .count { font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: var(--muted); background: var(--steel-soft); padding: 2px 8px; border-radius: 999px; }
+
+  /* signature: pit board */
+  .pit { display: flex; flex-direction: column; }
+  .pit-row { display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--hair); }
+  .pit-row:last-child { border-bottom: 0; }
+  .pit-row .idx { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+  .pit-row .nm { font-weight: 650; font-size: 15.5px; }
+  .pit-row .sub { font-size: 12px; color: var(--muted); }
+  .clock { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 14px; font-weight: 700; color: var(--ink); }
+  .clock .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--present); }
+
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .stat { padding: 16px; }
+  .stat .num { font-family: var(--font-mono); font-weight: 750; font-size: 44px; line-height: 1; letter-spacing: -.02em; }
+  .stat .num small { font-size: 18px; color: var(--muted); font-weight: 650; }
+  .stat .bar { height: 7px; border-radius: 4px; background: var(--steel-soft); margin-top: 12px; overflow: hidden; }
+  .stat .bar i { display: block; height: 100%; background: var(--red); border-radius: 4px; }
+  .meet { display: flex; gap: 12px; padding: 11px 16px; border-bottom: 1px solid var(--hair); align-items: baseline; }
+  .meet:last-child { border-bottom: 0; }
+  .meet .d { font-family: var(--font-mono); font-size: 12px; color: var(--muted); min-width: 52px; }
+  .meet .t { font-weight: 600; font-size: 14px; }
+  .req { font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--red); border: 1px solid var(--red); border-radius: 5px; padding: 1px 5px; margin-left: auto; }
+
+  /* admin table */
+  .page-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+  .page-head h2 { font-family: var(--font-display); font-weight: 800; font-size: 22px; letter-spacing: -.01em; margin: 0; }
+  .page-head .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .btn { font: inherit; font-weight: 650; font-size: 13.5px; border-radius: 9px; padding: 8px 14px; border: 1px solid var(--hair); background: var(--surface); color: var(--ink); cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
+  .btn:hover { border-color: var(--steel); }
+  .btn-primary { background: var(--red); border-color: var(--red); color: var(--red-fg); }
+  .btn-primary:hover { background: var(--red-press); border-color: var(--red-press); }
+  .btn svg { width: 15px; height: 15px; }
+  .btn.icon { padding: 7px; }
+  .btn.danger:hover { border-color: var(--absent); color: var(--absent); }
+  .tablewrap { background: var(--surface); border: 1px solid var(--hair); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; }
+  .toolbar { display: flex; gap: 10px; padding: 12px; border-bottom: 1px solid var(--hair); }
+  .search { flex: 1; display: flex; align-items: center; gap: 8px; background: var(--surface-2); border: 1px solid var(--hair); border-radius: 9px; padding: 7px 11px; color: var(--muted); font-size: 13.5px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  thead th { text-align: left; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 700; padding: 11px 16px; border-bottom: 1px solid var(--hair); }
+  tbody td { padding: 12px 16px; border-bottom: 1px solid var(--hair); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: 0; }
+  tbody tr:hover { background: var(--surface-2); }
+  .name-cell { display: flex; align-items: center; gap: 11px; }
+  .name-cell .avatar { background: var(--steel); }
+  .name-cell .em { font-size: 12px; color: var(--muted); }
+  .sid { font-family: var(--font-mono); font-size: 13px; color: var(--muted); }
+  .pill { font-size: 11.5px; font-weight: 700; padding: 3px 9px; border-radius: 999px; display: inline-block; letter-spacing: .01em; }
+  .pill.role { background: var(--steel-soft); color: var(--steel); }
+  .pill.admin { background: color-mix(in srgb, var(--red) 15%, transparent); color: var(--red); }
+  .pill.on { background: color-mix(in srgb, var(--present) 16%, transparent); color: var(--present); }
+  .pill.off { background: var(--steel-soft); color: var(--muted); }
+  .rowacts { display: flex; gap: 6px; justify-content: flex-end; }
+
+  /* kiosk (committed dark) */
+  .kiosk { background: #101114; color: #F3F1EC; border-radius: 14px; border: 1px solid #23262c; overflow: hidden; box-shadow: var(--shadow); }
+  .kiosk .hazard { opacity: 1; }
+  .kiosk-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #23262c; }
+  .kiosk-head .k-brand { font-family: var(--font-display); font-weight: 850; font-size: 20px; letter-spacing: -.01em; display: flex; align-items: center; gap: 10px; }
+  .kiosk-head .k-now { font-family: var(--font-mono); font-size: 13px; color: #9aa0a8; }
+  .kiosk-body { display: grid; grid-template-columns: 1.4fr 1fr; gap: 0; }
+  .k-signin { padding: 18px 20px; }
+  .k-here { padding: 18px 20px; background: #0b0c0e; border-left: 1px solid #23262c; }
+  .k-title { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; font-weight: 800; color: #8b919a; margin: 0 0 14px; }
+  .k-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 11px; }
+  .k-name { background: #1b1e23; border: 1px solid #2a2e35; color: #F3F1EC; border-radius: 11px; padding: 16px 10px; font-weight: 700; font-size: 15px; text-align: center; cursor: pointer; min-height: 58px; display: grid; place-items: center; }
+  .k-name:hover { border-color: var(--red); }
+  .k-out { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #16181c; border: 1px solid #2a2e35; border-radius: 11px; padding: 13px 15px; margin-bottom: 10px; cursor: pointer; }
+  .k-out .knm { font-weight: 700; }
+  .k-out .kt { font-family: var(--font-mono); font-size: 14px; color: #35C878; font-weight: 700; }
+  .k-out:hover { border-color: var(--red); }
+
+  .note { margin-top: 34px; padding: 16px 18px; border: 1px dashed var(--hair); border-radius: 12px; color: var(--muted); font-size: 13px; background: var(--surface-2); }
+  .note b { color: var(--ink); }
+  .note code { font-family: var(--font-mono); font-size: 12px; background: var(--steel-soft); padding: 1px 5px; border-radius: 4px; color: var(--ink); }
+
+  @media (max-width: 720px) {
+    .dash-grid { grid-template-columns: 1fr; }
+    .kiosk-body { grid-template-columns: 1fr; }
+    .k-here { border-left: 0; border-top: 1px solid #23262c; }
+    .nav { display: none; }
+    .col-hide { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { .dot { animation: none; } }
+</style>
+
+<div class="wrap">
+  <div class="pitch-head">
+    <div>
+      <div class="eyebrow">Team Hub · UI direction</div>
+      <h1>Shop-floor control panel</h1>
+      <p>A proposed look for Red Alert Robotics — decisive red, mono data readouts, and a live pit board. Flip the theme and resize to see it hold up.</p>
+    </div>
+    <div class="toggle" role="group" aria-label="Theme">
+      <button id="t-light" aria-pressed="false">Light</button>
+      <button id="t-dark" aria-pressed="false">Dark</button>
+      <button id="t-system" aria-pressed="true">System</button>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <section class="screen">
+    <div class="screen-label">Dashboard · member view</div>
+    <div class="app">
+      <div class="hazard"></div>
+      <nav class="topbar">
+        <div class="brand"><span class="badge-num">1741</span> Team Hub</div>
+        <div class="nav">
+          <a href="#" class="active">Dashboard</a><a href="#">Kiosk</a><a href="#">Leaderboard</a>
+          <a href="#">People</a><a href="#">Calendar</a><a href="#">Admin</a>
+        </div>
+        <div class="who"><span class="avatar">JM</span> J. Miller · admin</div>
+      </nav>
+      <main>
+        <div class="status-strip">
+          <span class="live"><span class="dot"></span> 7 on the clock</span>
+          <span class="sep"></span>
+          <span>2026–2027 Build Season · Week 3</span>
+          <span class="grow"></span>
+          <span class="date" id="clock">Thu · 18:42</span>
+        </div>
+        <div class="dash-grid">
+          <div class="card pit">
+            <div class="card-head"><h3>In the shop</h3><span class="count">7 here</span></div>
+            <div class="pit-list">
+              <div class="pit-row"><span class="idx">01</span><div><div class="nm">Ada Okafor</div><div class="sub">Programming</div></div><span class="clock"><span class="live-dot"></span><span class="dur" data-since="132">2:12</span></span></div>
+              <div class="pit-row"><span class="idx">02</span><div><div class="nm">Bo Tran</div><div class="sub">Mechanical · lead</div></div><span class="clock"><span class="live-dot"></span><span class="dur" data-since="118">1:58</span></span></div>
+              <div class="pit-row"><span class="idx">03</span><div><div class="nm">Cruz Delgado</div><div class="sub">Electrical</div></div><span class="clock"><span class="live-dot"></span><span class="dur" data-since="97">1:37</span></span></div>
+              <div class="pit-row"><span class="idx">04</span><div><div class="nm">Priya Nair</div><div class="sub">CAD / Design</div></div><span class="clock"><span class="live-dot"></span><span class="dur" data-since="64">1:04</span></span></div>
+              <div class="pit-row"><span class="idx">05</span><div><div class="nm">Sam Whitfield</div><div class="sub">Drive team</div></div><span class="clock"><span class="live-dot"></span><span class="dur" data-since="41">0:41</span></span></div>
+            </div>
+          </div>
+          <div class="side">
+            <div class="card stat">
+              <div class="eyebrow">Your hours · this season</div>
+              <div class="num" style="margin-top:6px;">47.5<small> h</small></div>
+              <div class="bar"><i style="width:68%"></i></div>
+              <div class="sub" style="font-size:12px;color:var(--muted);margin-top:8px;">68% of the 70 h build-season goal</div>
+            </div>
+            <div class="card">
+              <div class="card-head"><h3>Upcoming meetings</h3><span class="count">next 3</span></div>
+              <div class="meet"><span class="d">THU 8/13</span><span class="t">FRC Team Meeting</span><span class="req">Required</span></div>
+              <div class="meet"><span class="d">SAT 8/15</span><span class="t">Machine Shop Training</span></div>
+              <div class="meet"><span class="d">THU 8/20</span><span class="t">FRC Team Meeting</span><span class="req">Required</span></div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </section>
+
+  <!-- ADMIN PEOPLE CRUD -->
+  <section class="screen">
+    <div class="screen-label">Admin · People — full CRUD</div>
+    <div class="app">
+      <main>
+        <div class="page-head">
+          <div>
+            <h2>People</h2>
+            <div class="sub">Roster, roles, and student IDs · 34 members</div>
+          </div>
+          <div style="display:flex;gap:9px;">
+            <button class="btn">Import CSV</button>
+            <button class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> Add person</button>
+          </div>
+        </div>
+        <div class="tablewrap">
+          <div class="toolbar">
+            <div class="search"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg> Search name, email, or ID…</div>
+            <button class="btn">Role: All ▾</button>
+            <button class="btn">Active only</button>
+          </div>
+          <div style="overflow-x:auto;">
+          <table>
+            <thead><tr><th>Member</th><th class="col-hide">Student ID</th><th>Role</th><th>Status</th><th style="text-align:right;">Actions</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><div class="name-cell"><span class="avatar">AO</span><div><div style="font-weight:650;">Ada Okafor</div><div class="em">ada.okafor@school.edu</div></div></div></td>
+                <td class="col-hide"><span class="sid">1741-0142</span></td>
+                <td><span class="pill role">Student</span></td>
+                <td><span class="pill on">Active</span></td>
+                <td><div class="rowacts"><button class="btn icon" aria-label="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3z"/></svg></button><button class="btn icon danger" aria-label="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg></button></div></td>
+              </tr>
+              <tr>
+                <td><div class="name-cell"><span class="avatar">BT</span><div><div style="font-weight:650;">Bo Tran</div><div class="em">bo.tran@school.edu</div></div></div></td>
+                <td class="col-hide"><span class="sid">1741-0088</span></td>
+                <td><span class="pill role">Captain</span></td>
+                <td><span class="pill on">Active</span></td>
+                <td><div class="rowacts"><button class="btn icon" aria-label="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3z"/></svg></button><button class="btn icon danger" aria-label="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg></button></div></td>
+              </tr>
+              <tr>
+                <td><div class="name-cell"><span class="avatar" style="background:var(--red);">JM</span><div><div style="font-weight:650;">Jordan Miller</div><div class="em">jmiller@redalert1741.org</div></div></div></td>
+                <td class="col-hide"><span class="sid">—</span></td>
+                <td><span class="pill admin">Admin</span></td>
+                <td><span class="pill on">Active</span></td>
+                <td><div class="rowacts"><button class="btn icon" aria-label="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3z"/></svg></button><button class="btn icon danger" aria-label="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg></button></div></td>
+              </tr>
+              <tr>
+                <td><div class="name-cell"><span class="avatar">PN</span><div><div style="font-weight:650;">Priya Nair</div><div class="em">priya.nair@school.edu</div></div></div></td>
+                <td class="col-hide"><span class="sid">1741-0203</span></td>
+                <td><span class="pill role">Mentor</span></td>
+                <td><span class="pill off">Inactive</span></td>
+                <td><div class="rowacts"><button class="btn icon" aria-label="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3z"/></svg></button><button class="btn icon danger" aria-label="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg></button></div></td>
+              </tr>
+            </tbody>
+          </table>
+          </div>
+        </div>
+        <div class="note" style="margin-top:14px;">Every model gets this same table + <b>Add / Edit / Delete</b> treatment — People, Teams, Periods, Meetings, Build days, Sessions, Kiosk devices — with an <b>Admin hub</b> that links them all.</div>
+      </main>
+    </div>
+  </section>
+
+  <!-- KIOSK -->
+  <section class="screen">
+    <div class="screen-label">Kiosk · shop tablet (bold, always dark)</div>
+    <div class="kiosk">
+      <div class="hazard"></div>
+      <div class="kiosk-head">
+        <div class="k-brand"><span class="badge-num">1741</span> Sign in / out</div>
+        <div class="k-now" id="kclock">THU · 18:42 · 7 here</div>
+      </div>
+      <div class="kiosk-body">
+        <div class="k-signin">
+          <p class="k-title">Tap your name to sign in</p>
+          <div class="k-grid">
+            <button class="k-name">Devon Lee</button><button class="k-name">Mia Sørensen</button><button class="k-name">Owen Park</button>
+            <button class="k-name">Reese Cole</button><button class="k-name">Tariq Bello</button><button class="k-name">Yuki Sato</button>
+          </div>
+        </div>
+        <div class="k-here">
+          <p class="k-title">On the clock · 7</p>
+          <div class="k-out"><span class="knm">Ada Okafor</span><span class="kt">2:12</span></div>
+          <div class="k-out"><span class="knm">Bo Tran</span><span class="kt">1:58</span></div>
+          <div class="k-out"><span class="knm">Cruz Delgado</span><span class="kt">1:37</span></div>
+          <div class="k-out"><span class="knm">Priya Nair</span><span class="kt">1:04</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="note">
+    <b>Mockup notes.</b> Fonts here use system stacks; the real app self-hosts <b>Archivo</b> (display) + <b>Inter</b> (body) + <b>JetBrains Mono</b> (data readouts) via <code>next/font</code> — no runtime CDN. Everything above is theme-token-driven and works in light + dark + system. This is direction, not final pixels — I'll build it across the app in phases and you'll check each one live.
+  </div>
+</div>
+
+<script>
+  const root = document.documentElement;
+  const btns = { light: t_light, dark: t_dark, system: t_system };
+  function setTheme(mode) {
+    if (mode === "system") root.removeAttribute("data-theme");
+    else root.setAttribute("data-theme", mode);
+    for (const k in btns) btns[k].setAttribute("aria-pressed", String(k === mode));
+  }
+  t_light.onclick = () => setTheme("light");
+  t_dark.onclick = () => setTheme("dark");
+  t_system.onclick = () => setTheme("system");
+
+  // live ticking durations for the pit board (reduced-motion: leave static)
+  if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    setInterval(() => {
+      document.querySelectorAll(".dur").forEach(el => {
+        let m = +el.dataset.since + Math.floor((Date.now() / 1000 % 60) / 59);
+        // gentle: just re-render mm:ss from a base minute count
+        let base = +el.dataset.since;
+        const now = new Date();
+        const secs = now.getSeconds();
+        el.textContent = base + ":" + String(secs).padStart(2, "0");
+      });
+    }, 1000);
+  }
+</script>
