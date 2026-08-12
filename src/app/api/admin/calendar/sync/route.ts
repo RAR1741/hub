@@ -26,7 +26,21 @@ export async function POST(request: Request) {
     await getSetting<string>("gcal_calendar_id", "", db),
   );
   const credentials = gcalCredentialsFromEnv(calendarId);
-  if (!credentials) return Response.json({ error: "not_configured" }, { status: 400 });
+  if (!credentials) {
+    // Report which piece is missing (presence booleans only — never the values)
+    // so a misconfigured env is diagnosable without leaking secrets.
+    return Response.json(
+      {
+        error: "not_configured",
+        have: {
+          clientEmail: Boolean(process.env.GOOGLE_SA_CLIENT_EMAIL),
+          privateKey: Boolean(process.env.GOOGLE_SA_PRIVATE_KEY),
+          calendarId: Boolean(calendarId),
+        },
+      },
+      { status: 400 },
+    );
+  }
 
   const tz = await getSetting<string>("team_timezone", "America/Indiana/Indianapolis", db);
   try {
