@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { formatClockDuration } from "@/lib/format";
 
 export function KioskSetupForm() {
   const [token, setToken] = useState("");
@@ -44,15 +45,6 @@ export function KioskSetupForm() {
 type Member = { id: string; name: string };
 type Here = { personId: string; name: string; since: string };
 
-/** mm:ss for the first minute, then h:mm — matches the dashboard pit board. */
-function formatDuration(sinceIso: string, nowMs: number): string {
-  const elapsedMs = Math.max(0, nowMs - new Date(sinceIso).getTime());
-  const totalMinutes = Math.floor(elapsedMs / 60000);
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  return `${hours}:${String(minutes).padStart(2, "0")}`;
-}
-
 export function KioskBoard({ members, here }: { members: Member[]; here: Here[] }) {
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
@@ -92,7 +84,7 @@ export function KioskBoard({ members, here }: { members: Member[]; here: Here[] 
         <div className="k-brand">
           <span
             className="rounded-md px-[7px] py-[3px] font-[family-name:var(--font-mono)] text-[13px] font-bold tracking-[0.02em]"
-            style={{ background: "var(--red)", color: "var(--red-fg)" }}
+            style={{ background: "#E01926", color: "#ffffff" }}
           >
             1741
           </span>
@@ -109,7 +101,7 @@ export function KioskBoard({ members, here }: { members: Member[]; here: Here[] 
         <p
           role="status"
           className="mx-5 mt-4 rounded-xl border px-6 py-4 text-center text-xl font-bold shadow-lg"
-          style={{ background: "var(--red)", borderColor: "var(--red)", color: "var(--red-fg)" }}
+          style={{ background: "#E01926", borderColor: "#E01926", color: "#ffffff" }}
         >
           {flash}
         </p>
@@ -154,7 +146,7 @@ export function KioskBoard({ members, here }: { members: Member[]; here: Here[] 
                 className="k-out"
               >
                 <span className="knm">{h.name}</span>
-                <span className="kt mono">{formatDuration(h.since, now)}</span>
+                <span className="kt mono">{formatClockDuration(h.since, now)}</span>
               </button>
             ))
           )}

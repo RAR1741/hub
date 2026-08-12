@@ -1,17 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatClockDuration } from "@/lib/format";
 
 type Entry = { name: string; since: string };
-
-/** mm:ss for the first minute, then h:mm — matches the kiosk's mono duration format. */
-function formatDuration(sinceIso: string, nowMs: number): string {
-  const elapsedMs = Math.max(0, nowMs - new Date(sinceIso).getTime());
-  const totalMinutes = Math.floor(elapsedMs / 60000);
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  return `${hours}:${String(minutes).padStart(2, "0")}`;
-}
 
 export function WhosHere({ initial }: { initial: Entry[] }) {
   const [here, setHere] = useState<Entry[]>(initial);
@@ -51,7 +43,7 @@ export function WhosHere({ initial }: { initial: Entry[] }) {
               <div className="nm">{h.name}</div>
               <span className="clock">
                 <span className="live-dot" aria-hidden="true" />
-                <span className="mono">{formatDuration(h.since, now)}</span>
+                <span className="mono">{formatClockDuration(h.since, now)}</span>
               </span>
             </div>
           ))
