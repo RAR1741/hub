@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 export function KioskSetupForm() {
@@ -44,10 +44,26 @@ export function KioskSetupForm() {
 type Member = { id: string; name: string };
 type Here = { personId: string; name: string; since: string };
 
+/** mm:ss for the first minute, then h:mm — matches the dashboard pit board. */
+function formatDuration(sinceIso: string, nowMs: number): string {
+  const elapsedMs = Math.max(0, nowMs - new Date(sinceIso).getTime());
+  const totalMinutes = Math.floor(elapsedMs / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${hours}:${String(minutes).padStart(2, "0")}`;
+}
+
 export function KioskBoard({ members, here }: { members: Member[]; here: Here[] }) {
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const router = useRouter();
+
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   async function call(path: string, personId: string, name: string, verb: string) {
     if (busy) return;
@@ -67,48 +83,81 @@ export function KioskBoard({ members, here }: { members: Member[]; here: Here[] 
     }
   }
 
+  const nowDate = new Date(now);
+
   return (
-    <div className="flex flex-1 flex-col gap-6">
+    <div className="kiosk flex flex-1 flex-col">
+      <div className="hazard" />
+      <div className="kiosk-head">
+        <div className="k-brand">
+          <span
+            className="rounded-md px-[7px] py-[3px] font-[family-name:var(--font-mono)] text-[13px] font-bold tracking-[0.02em]"
+            style={{ background: "var(--red)", color: "var(--red-fg)" }}
+          >
+            1741
+          </span>
+          Sign in / out
+        </div>
+        <div className="k-now mono">
+          {nowDate.toLocaleDateString(undefined, { weekday: "short" }).toUpperCase()} ·{" "}
+          {nowDate.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })} ·{" "}
+          {here.length} here
+        </div>
+      </div>
+
       {flash && (
         <p
           role="status"
-          className="rounded-xl border border-[var(--color-brand)] bg-[var(--color-brand)] px-6 py-4 text-center text-xl font-bold text-[var(--color-brand-fg)] shadow-lg"
+          className="mx-5 mt-4 rounded-xl border px-6 py-4 text-center text-xl font-bold shadow-lg"
+          style={{ background: "var(--red)", borderColor: "var(--red)", color: "var(--red-fg)" }}
         >
           {flash}
         </p>
       )}
-      <div className="grid flex-1 grid-cols-1 gap-6 lg:grid-cols-[1fr_2fr]">
-        <section className="card flex flex-col gap-4">
-          <h2 className="text-2xl font-bold tracking-tight">
-            Who&apos;s here ({here.length})
-          </h2>
-          <ul className="flex flex-col gap-3">
-            {here.map((h) => (
-              <li key={h.personId}>
+
+      <div className="kiosk-body flex-1">
+        <section className="k-signin">
+          <p className="k-title">Tap your name to sign in</p>
+          {members.length === 0 ? (
+            <p className="text-sm" style={{ color: "#8b919a" }}>
+              Everyone active is already signed in.
+            </p>
+          ) : (
+            <div className="k-grid">
+              {members.map((m) => (
                 <button
-                  onClick={() => call("/api/kiosk/clock-out", h.personId, h.name, "Signed out")}
-                  className="btn btn-secondary min-h-16 w-full text-lg leading-tight border-[var(--color-present)]"
-                >
-                  {h.name} — out
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-        <section className="card flex flex-col gap-4">
-          <h2 className="text-2xl font-bold tracking-tight">Sign in</h2>
-          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-            {members.map((m) => (
-              <li key={m.id}>
-                <button
+                  key={m.id}
+                  type="button"
+                  disabled={busy}
                   onClick={() => call("/api/kiosk/clock-in", m.id, m.name, "Signed in")}
-                  className="btn btn-primary min-h-16 w-full text-lg leading-tight"
+                  className="k-name"
                 >
                   {m.name}
                 </button>
-              </li>
-            ))}
-          </ul>
+              ))}
+            </div>
+          )}
+        </section>
+        <section className="k-here">
+          <p className="k-title">On the clock · {here.length}</p>
+          {here.length === 0 ? (
+            <p className="text-sm" style={{ color: "#8b919a" }}>
+              Nobody is signed in yet.
+            </p>
+          ) : (
+            here.map((h) => (
+              <button
+                key={h.personId}
+                type="button"
+                disabled={busy}
+                onClick={() => call("/api/kiosk/clock-out", h.personId, h.name, "Signed out")}
+                className="k-out"
+              >
+                <span className="knm">{h.name}</span>
+                <span className="kt mono">{formatDuration(h.since, now)}</span>
+              </button>
+            ))
+          )}
         </section>
       </div>
     </div>

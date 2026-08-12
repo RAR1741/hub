@@ -5,6 +5,7 @@ import { listWhosHere } from "@/lib/sessions";
 import { getActivePeriod } from "@/lib/periods";
 import { personPeriodHours } from "@/lib/reports";
 import { listUpcomingMeetings } from "@/lib/meetings";
+import { listBuildDays } from "@/lib/build-days";
 
 export default async function HomePage() {
   const viewer = await getViewer();
@@ -15,9 +16,39 @@ export default async function HomePage() {
       ? await personPeriodHours(viewer.person.id, activePeriod.id)
       : 0;
   const upcoming = await listUpcomingMeetings(new Date().toISOString(), 5);
+  const requiredDates = new Set(
+    upcoming.length
+      ? (
+          await listBuildDays({
+            from: upcoming[0].startsAt.slice(0, 10),
+            to: upcoming[upcoming.length - 1].startsAt.slice(0, 10),
+          })
+        )
+          .filter((d) => d.kind === "required")
+          .map((d) => d.date)
+      : [],
+  );
+  const now = new Date();
+
   return (
     <main className="flex flex-col gap-6">
       <h1 className="text-3xl font-bold tracking-tight">Team Hub</h1>
+
+      {viewer.person && (
+        <div className="status-strip">
+          <span className="live">
+            <span className="dot" aria-hidden="true" /> {here.length} on the clock
+          </span>
+          <span className="sep" aria-hidden="true" />
+          {activePeriod && <span>{activePeriod.name}</span>}
+          <span className="grow" />
+          <span className="date mono">
+            {now.toLocaleDateString(undefined, { weekday: "short" })} ·{" "}
+            {now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+          </span>
+        </div>
+      )}
+
       {viewer.person ? (
         <>
           <div className="card flex flex-wrap items-center justify-between gap-4">
@@ -45,19 +76,19 @@ export default async function HomePage() {
             </form>
           </div>
 
-          {activePeriod && (
-            <div className="card flex items-baseline gap-3">
-              <span className="text-sm text-[var(--color-muted-fg)]">
-                {activePeriod.name}
-              </span>
-              <span className="text-3xl font-bold text-[var(--color-brand)]">
-                {myHours}
-              </span>
-              <span className="text-sm text-[var(--color-muted-fg)]">hours</span>
-            </div>
-          )}
+          <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
+            <WhosHere initial={here.map((h) => ({ name: h.name, since: h.since }))} />
 
-          <WhosHere initial={here.map((h) => ({ name: h.name, since: h.since }))} />
+            {activePeriod && (
+              <div className="card stat">
+                <p className="eyebrow">{activePeriod.name} · your hours</p>
+                <div className="num" style={{ marginTop: 6 }}>
+                  {myHours}
+                  <small> h</small>
+                </div>
+              </div>
+            )}
+          </div>
         </>
       ) : (
         <p className="card text-[var(--color-muted-fg)]">
@@ -67,23 +98,32 @@ export default async function HomePage() {
           </Link>
         </p>
       )}
-      <section className="card flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">Upcoming meetings</h2>
+
+      <section className="card meets">
+        <div className="card-head">
+          <h3>Upcoming meetings</h3>
+          <span className="count">{upcoming.length}</span>
+        </div>
         {upcoming.length === 0 ? (
-          <p className="text-sm text-[var(--color-muted-fg)]">
+          <p className="p-4 text-sm text-[var(--color-muted-fg)]">
             No upcoming meetings scheduled.
           </p>
         ) : (
-          <ul className="flex flex-col divide-y divide-[var(--color-border)]">
-            {upcoming.map((m) => (
-              <li key={m.id} className="py-2 text-sm">
-                <span className="text-[var(--color-muted-fg)]">
-                  {new Date(m.startsAt).toLocaleString()}
-                </span>{" "}
-                — {m.title}
-              </li>
-            ))}
-          </ul>
+          upcoming.map((m) => {
+            const start = new Date(m.startsAt);
+            const dateKey = m.startsAt.slice(0, 10);
+            return (
+              <div key={m.id} className="meet">
+                <span className="d mono">
+                  {start
+                    .toLocaleDateString(undefined, { weekday: "short", month: "numeric", day: "numeric" })
+                    .toUpperCase()}
+                </span>
+                <span className="t">{m.title}</span>
+                {requiredDates.has(dateKey) && <span className="req">Required</span>}
+              </div>
+            );
+          })
         )}
       </section>
     </main>

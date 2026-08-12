@@ -4,8 +4,18 @@ import { useEffect, useState } from "react";
 
 type Entry = { name: string; since: string };
 
+/** mm:ss for the first minute, then h:mm — matches the kiosk's mono duration format. */
+function formatDuration(sinceIso: string, nowMs: number): string {
+  const elapsedMs = Math.max(0, nowMs - new Date(sinceIso).getTime());
+  const totalMinutes = Math.floor(elapsedMs / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${hours}:${String(minutes).padStart(2, "0")}`;
+}
+
 export function WhosHere({ initial }: { initial: Entry[] }) {
   const [here, setHere] = useState<Entry[]>(initial);
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     const id = setInterval(async () => {
@@ -19,30 +29,32 @@ export function WhosHere({ initial }: { initial: Entry[] }) {
     return () => clearInterval(id);
   }, []);
 
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
   return (
-    <section className="card flex flex-col gap-3">
-      <h2 className="text-lg font-semibold">In the shop ({here.length})</h2>
+    <section className="card pit">
+      <div className="card-head">
+        <h3>In the shop</h3>
+        <span className="count">{here.length} here</span>
+      </div>
       <div role="status">
         {here.length === 0 ? (
-          <p className="text-sm text-[var(--color-muted-fg)]">Nobody is signed in.</p>
+          <p className="p-4 text-sm text-[var(--color-muted-fg)]">Nobody is signed in.</p>
         ) : (
-          <ul className="flex flex-col divide-y divide-[var(--color-border)]">
-            {here.map((h) => (
-              <li
-                key={`${h.name}-${h.since}`}
-                className="flex items-center gap-2 py-2 text-sm"
-              >
-                <span
-                  aria-hidden="true"
-                  className="h-2 w-2 shrink-0 rounded-full bg-[var(--color-present)]"
-                />
-                <span className="font-medium">{h.name}</span>
-                <span className="text-[var(--color-muted-fg)]">
-                  — since {new Date(h.since).toLocaleTimeString()}
-                </span>
-              </li>
-            ))}
-          </ul>
+          here.map((h, i) => (
+            <div key={`${h.name}-${h.since}`} className="pit-row">
+              <span className="idx">{String(i + 1).padStart(2, "0")}</span>
+              <div className="nm">{h.name}</div>
+              <span className="clock">
+                <span className="live-dot" aria-hidden="true" />
+                <span className="mono">{formatDuration(h.since, now)}</span>
+              </span>
+            </div>
+          ))
         )}
       </div>
     </section>
