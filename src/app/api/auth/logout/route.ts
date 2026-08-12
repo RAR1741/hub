@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { STUDENT_SESSION_COOKIE } from "@/lib/student-session";
+import { clientUrl } from "@/lib/request-origin";
 
 export async function POST(request: Request) {
-  const response = NextResponse.redirect(new URL("/", request.url), 303);
+  const response = NextResponse.redirect(clientUrl(request, "/"), 303);
   response.cookies.delete(STUDENT_SESSION_COOKIE);
   // Supabase auth cookies are cleared client-side via supabase.auth.signOut()
   // on the login page; belt-and-suspenders: expire any sb-* cookies present.

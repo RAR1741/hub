@@ -4,19 +4,20 @@ import { createServerClient } from "@supabase/ssr";
 import { getDb } from "@/lib/db";
 import { serverSupabaseUrl } from "@/lib/supabase-url";
 import { AUTH_COOKIE_NAME } from "@/lib/supabase-cookie";
+import { clientUrl } from "@/lib/request-origin";
 import { decideOAuthLink } from "@/lib/oauth-link";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
-  const redirect = NextResponse.redirect(new URL("/", request.url));
+  const redirect = NextResponse.redirect(clientUrl(request, "/"));
   if (!code) return redirect;
 
   // Preserves the auth cookies already attached to `redirect` (set below via
   // the Supabase client's setAll callback) when we need to redirect somewhere
   // else instead — e.g. on a failed person-link write.
   const toErrorRedirect = () => {
-    const err = NextResponse.redirect(new URL("/login?error=oauth", request.url));
+    const err = NextResponse.redirect(clientUrl(request, "/login?error=oauth"));
     redirect.cookies.getAll().forEach((c) => err.cookies.set(c));
     return err;
   };
