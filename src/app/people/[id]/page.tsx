@@ -19,15 +19,31 @@ export default async function PersonPage({
   const activePeriod = await getActivePeriod();
   const sessions = activePeriod ? await personSessions(person.id, activePeriod.id) : [];
 
+  const name = person.displayName ?? `${person.firstName} ${person.lastName}`;
+  const totalH = Math.round(totalHours(sessions) * 100) / 100;
+
   return (
     <main className="flex flex-col gap-6">
       <div className="card flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-3xl font-bold tracking-tight">
-            {person.displayName ?? `${person.firstName} ${person.lastName}`}
-          </h1>
-          <span className="badge">{person.role}</span>
-          <span className="badge">{person.isActive ? "active" : "inactive"}</span>
+          <span className="avatar" style={{ width: 40, height: 40, minWidth: 40, fontSize: 15 }} aria-hidden="true">
+            {name
+              .trim()
+              .split(/\s+/)
+              .map((p) => p[0])
+              .filter(Boolean)
+              .slice(0, 2)
+              .join("")
+              .toUpperCase()}
+          </span>
+          <h1 className="text-2xl font-bold tracking-tight">{name}</h1>
+          <span className={`pill ${person.role === "admin" ? "admin" : "role"}`}>
+            {person.role}
+          </span>
+          <span className={`pill ${person.isActive ? "on" : "off"}`}>
+            {person.isActive ? "Active" : "Inactive"}
+          </span>
+          {person.studentIdNumber && <span className="sid">{person.studentIdNumber}</span>}
         </div>
         <dl className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
           <div>
@@ -60,11 +76,11 @@ export default async function PersonPage({
       <section className="card flex flex-col gap-3">
         <h2 className="text-lg font-semibold">Teams</h2>
         {teams.length === 0 ? (
-          <p className="text-sm text-[var(--color-muted-fg)]">No team memberships.</p>
+          <p className="text-sm text-[var(--muted)]">No team memberships.</p>
         ) : (
           <ul className="flex flex-wrap gap-2">
             {teams.map(({ team, isManager }) => (
-              <li key={team.id} className="badge">
+              <li key={team.id} className="pill role">
                 {team.name}
                 {isManager ? " (manager)" : ""}
               </li>
@@ -77,13 +93,21 @@ export default async function PersonPage({
         <h2 className="text-lg font-semibold">
           Hours{activePeriod ? ` — ${activePeriod.name}` : ""}
         </h2>
-        <p className="text-sm text-[var(--color-muted-fg)]">
-          Total:{" "}
-          <strong className="text-[var(--color-fg)]">
-            {Math.round(totalHours(sessions) * 100) / 100}
-          </strong>{" "}
-          h across {sessions.length} sessions.
-        </p>
+        <div className="flex flex-wrap items-end gap-6">
+          <div className="stat" style={{ padding: 0 }}>
+            <div className="eyebrow">Total hours</div>
+            <div className="num mono" style={{ marginTop: 4 }}>
+              {totalH}
+              <small> h</small>
+            </div>
+          </div>
+          <div className="stat" style={{ padding: 0 }}>
+            <div className="eyebrow">Sessions</div>
+            <div className="num mono" style={{ marginTop: 4 }}>
+              {sessions.length}
+            </div>
+          </div>
+        </div>
         <div className="overflow-x-auto">
           <table className="table">
             <thead>
@@ -100,7 +124,7 @@ export default async function PersonPage({
                 <tr key={s.id}>
                   <td>{new Date(s.timeIn).toLocaleString()}</td>
                   <td>{s.timeOut ? new Date(s.timeOut).toLocaleString() : "— open —"}</td>
-                  <td>{s.timeOut ? Math.round(sessionHours(s) * 100) / 100 : ""}</td>
+                  <td className="mono">{s.timeOut ? Math.round(sessionHours(s) * 100) / 100 : ""}</td>
                   <td>{s.source}</td>
                   <td>{s.excludedFromTotals ? "yes" : ""}</td>
                 </tr>

@@ -40,7 +40,7 @@ export function StudentLoginForm() {
         Sign in
       </button>
       {error && (
-        <p role="alert" className="text-sm text-[var(--color-absent)]">
+        <p role="alert" className="text-sm" style={{ color: "var(--absent)" }}>
           {error}
         </p>
       )}

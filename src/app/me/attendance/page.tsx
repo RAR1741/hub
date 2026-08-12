@@ -18,7 +18,7 @@ export default async function MyAttendancePage() {
     return (
       <main className="flex flex-col gap-6">
         <h1 className="text-3xl font-bold tracking-tight">My Attendance</h1>
-        <p className="card text-[var(--color-muted-fg)]">No active period yet.</p>
+        <p className="card text-[var(--muted)]">No active period yet.</p>
       </main>
     );
   }
@@ -39,17 +39,20 @@ export default async function MyAttendancePage() {
       <h1 className="text-3xl font-bold tracking-tight">
         My Attendance — {period.name}
       </h1>
-      <div className="card flex flex-wrap items-baseline gap-3">
-        <span className="text-sm text-[var(--color-muted-fg)]">Attendance</span>
-        <span className="text-3xl font-bold text-[var(--color-brand)]">
-          {summary.percentage === null ? "—" : `${summary.percentage}%`}
-        </span>
-        <span className="text-sm text-[var(--color-muted-fg)]">
-          ({summary.present} present, {summary.excused} excused, {summary.absent} absent,{" "}
-          {summary.optional} optional)
+      <div className="card stat flex flex-wrap items-end gap-4">
+        <div>
+          <div className="eyebrow">Attendance</div>
+          <div className="num mono">
+            {summary.percentage === null ? "—" : summary.percentage}
+            {summary.percentage !== null && <small>%</small>}
+          </div>
+        </div>
+        <span className="text-sm" style={{ color: "var(--muted)" }}>
+          {summary.present} present, {summary.excused} excused, {summary.absent} absent,{" "}
+          {summary.optional} optional
         </span>
       </div>
-      <div className="card overflow-x-auto">
+      <div className="tablewrap">
         <table className="table">
           <thead>
             <tr>
@@ -63,10 +66,10 @@ export default async function MyAttendancePage() {
               const status = attendanceForDate(personId, d.date, d.kind, sessions, excusals, tz);
               return (
                 <tr key={d.date}>
-                  <td>{d.date}</td>
+                  <td className="mono">{d.date}</td>
                   <td>{d.kind}</td>
                   <td>
-                    <span className={`badge badge-${status}`}>{status}</span>
+                    <span className={`pill status-${status}`}>{status}</span>
                   </td>
                 </tr>
               );

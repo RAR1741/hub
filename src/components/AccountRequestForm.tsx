@@ -24,7 +24,7 @@ export function AccountRequestForm() {
 
   if (state === "sent") {
     return (
-      <p className="text-sm text-[var(--color-present)]">
+      <p className="text-sm" style={{ color: "var(--present)" }}>
         Request sent! A mentor will set you up at the next meeting.
       </p>
     );
@@ -44,7 +44,7 @@ export function AccountRequestForm() {
         Request an account
       </button>
       {state === "error" && (
-        <p role="alert" className="text-sm text-[var(--color-absent)]">
+        <p role="alert" className="text-sm" style={{ color: "var(--absent)" }}>
           Something went wrong — try again.
         </p>
       )}

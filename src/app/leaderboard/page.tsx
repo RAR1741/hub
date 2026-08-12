@@ -18,7 +18,12 @@ export default async function LeaderboardPage({
 
   return (
     <main className="flex flex-col gap-6">
-      <h1 className="text-3xl font-bold tracking-tight">Leaderboard</h1>
+      <div className="page-head">
+        <div>
+          <h1>Leaderboard</h1>
+          <div className="sub">Hours logged this period, ranked</div>
+        </div>
+      </div>
       <form method="get" className="card flex flex-wrap items-end gap-3">
         <div>
           <label className="label" htmlFor="leaderboard-period">
@@ -42,7 +47,7 @@ export default async function LeaderboardPage({
           View
         </button>
       </form>
-      <div className="card overflow-x-auto">
+      <div className="tablewrap">
         <table className="table">
           <thead>
             <tr>
@@ -55,17 +60,16 @@ export default async function LeaderboardPage({
           <tbody>
             {entries.map((e, i) => (
               <tr key={e.personId}>
-                <td className="font-medium text-[var(--color-muted-fg)]">{i + 1}</td>
+                <td className="mono" style={{ color: "var(--muted)" }}>
+                  {i + 1}
+                </td>
                 <td>
-                  <Link
-                    href={`/people/${e.personId}`}
-                    className="font-medium text-[var(--color-brand)]"
-                  >
+                  <Link href={`/people/${e.personId}`} className="font-medium">
                     {e.name}
                   </Link>
                 </td>
-                <td>{e.hours}</td>
-                <td>{e.sessionCount}</td>
+                <td className="mono">{e.hours}</td>
+                <td className="mono">{e.sessionCount}</td>
               </tr>
             ))}
           </tbody>

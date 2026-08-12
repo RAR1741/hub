@@ -28,7 +28,7 @@ export default async function TeamsPage() {
             <div className="flex flex-wrap items-center gap-2">
               <strong className="font-medium">{n.name}</strong>
               {n.description ? (
-                <span className="text-sm text-[var(--color-muted-fg)]">
+                <span className="text-sm" style={{ color: "var(--muted)" }}>
                   — {n.description}
                 </span>
               ) : null}
@@ -48,9 +48,15 @@ export default async function TeamsPage() {
 
   return (
     <main className="flex flex-col gap-6">
-      <h1 className="text-3xl font-bold tracking-tight">Teams</h1>
+      <div className="page-head">
+        <div>
+          <h1>Teams</h1>
+        </div>
+      </div>
       {!viewer.person && (
-        <p className="text-sm text-[var(--color-muted-fg)]">Sign in to join a team.</p>
+        <p className="text-sm" style={{ color: "var(--muted)" }}>
+          Sign in to join a team.
+        </p>
       )}
       <div className="card">
         <Tree nodes={buildTeamTree(teams)} />

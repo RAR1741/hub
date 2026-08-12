@@ -27,8 +27,8 @@ export function JoinButtons({
     else setStatus("Action failed.");
   }
 
-  if (action === "member") return <em className="badge badge-present">member</em>;
-  if (action === "pending") return <em className="badge">application pending</em>;
+  if (action === "member") return <em className="pill status-present">member</em>;
+  if (action === "pending") return <em className="pill role">application pending</em>;
   if (action === "join") {
     return (
       <span className="flex flex-wrap items-center gap-2">
@@ -36,7 +36,7 @@ export function JoinButtons({
           Join
         </button>
         {status && (
-          <span role="status" className="text-sm text-[var(--color-muted-fg)]">
+          <span role="status" className="text-sm" style={{ color: "var(--muted)" }}>
             {status}
           </span>
         )}
@@ -59,7 +59,7 @@ export function JoinButtons({
           Apply
         </button>
         {status && (
-          <span role="status" className="text-sm text-[var(--color-muted-fg)]">
+          <span role="status" className="text-sm" style={{ color: "var(--muted)" }}>
             {status}
           </span>
         )}
