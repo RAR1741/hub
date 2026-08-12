@@ -32,7 +32,10 @@ export async function POST(request: Request) {
   try {
     const result = await syncCalendar({ fetch: globalThis.fetch, db, credentials, tz });
     return Response.json(result);
-  } catch {
+  } catch (e) {
+    // Surface the real cause server-side (bad calendar id, unshared calendar,
+    // token/network failure) while keeping the client response generic.
+    console.error("calendar sync failed:", e);
     return Response.json({ error: "sync_failed" }, { status: 502 });
   }
 }
