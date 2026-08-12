@@ -104,6 +104,7 @@ Set these in **Vercel → Project → Settings → Environment Variables** (Prod
 | `GOOGLE_OAUTH_CLIENT_SECRET` | `GOCSPX-...` | Production OAuth client secret — same note. |
 | `GOOGLE_SA_CLIENT_EMAIL` | `team-hub-calendar-sync@....iam.gserviceaccount.com` | Calendar service account, per `docs/setup/google-calendar.md`. |
 | `GOOGLE_SA_PRIVATE_KEY` | `"-----BEGIN PRIVATE KEY-----\nMIIE...\n-----END PRIVATE KEY-----\n"` | Same service account. Paste with literal `\n` escapes on one line, exactly as `docs/setup/google-calendar.md` describes — `gcalCredentialsFromEnv` restores real newlines before parsing the PEM. |
+| `GOOGLE_CALENDAR_ID` | `your-calendar-id@group.calendar.google.com` | Optional — the calendar to sync. When set it **overrides** the `gcal_calendar_id` app setting, so you can configure the whole calendar integration from env alone. Leave unset to manage it from Admin → Settings instead. |
 
 ### Config (not secret, but must be exact)
 
@@ -117,7 +118,7 @@ Set these in **Vercel → Project → Settings → Environment Variables** (Prod
 
 | Key | Where set | Notes |
 |---|---|---|
-| `gcal_calendar_id` | Admin → Settings (in-app) | The Google Calendar ID to sync from. |
+| `gcal_calendar_id` | Admin → Settings (in-app) | The Google Calendar ID to sync from. Optional if you set the `GOOGLE_CALENDAR_ID` env var instead (env wins when both are present). |
 | `gcal_sync_secret` | SQL (§2 above) | Shared secret pg_cron sends as `x-sync-secret`. |
 | `sync_url` | SQL (§2 above) | The production sync endpoint URL, read by the cron job at run time. |
 

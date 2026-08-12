@@ -2,7 +2,7 @@ import { getDb } from "@/lib/db";
 import { getSetting } from "@/lib/settings";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
-import { gcalCredentialsFromEnv, syncCalendar } from "@/lib/gcal";
+import { gcalCredentialsFromEnv, pickCalendarId, syncCalendar } from "@/lib/gcal";
 
 export async function POST(request: Request) {
   const db = getDb();
@@ -20,7 +20,11 @@ export async function POST(request: Request) {
     }
   }
 
-  const calendarId = await getSetting<string>("gcal_calendar_id", "", db);
+  // GOOGLE_CALENDAR_ID env var wins; otherwise the gcal_calendar_id app setting.
+  const calendarId = pickCalendarId(
+    process.env.GOOGLE_CALENDAR_ID,
+    await getSetting<string>("gcal_calendar_id", "", db),
+  );
   const credentials = gcalCredentialsFromEnv(calendarId);
   if (!credentials) return Response.json({ error: "not_configured" }, { status: 400 });
 

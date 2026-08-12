@@ -1,10 +1,32 @@
 import { describe, expect, test } from "vitest";
-import { buildServiceAccountJwt, syncCalendar, type GcalTransport } from "./gcal";
+import {
+  buildServiceAccountJwt,
+  pickCalendarId,
+  syncCalendar,
+  type GcalTransport,
+} from "./gcal";
 import { generateKeyPairSync } from "node:crypto";
 
 // A throwaway RSA key so buildServiceAccountJwt can actually sign in the test.
 const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const PEM = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
+
+describe("pickCalendarId", () => {
+  test("the env var wins when set", () => {
+    expect(pickCalendarId("env-cal@group.calendar.google.com", "db-cal@x")).toBe(
+      "env-cal@group.calendar.google.com",
+    );
+  });
+  test("falls back to the db setting when the env var is unset or empty", () => {
+    expect(pickCalendarId(undefined, "db-cal@x")).toBe("db-cal@x");
+    expect(pickCalendarId("", "db-cal@x")).toBe("db-cal@x");
+    expect(pickCalendarId("   ", "db-cal@x")).toBe("db-cal@x");
+  });
+  test("trims, and returns empty string when neither is set", () => {
+    expect(pickCalendarId("  env-cal  ", "")).toBe("env-cal");
+    expect(pickCalendarId(undefined, undefined)).toBe("");
+  });
+});
 
 describe("buildServiceAccountJwt", () => {
   test("produces a three-segment JWT", () => {

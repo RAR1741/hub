@@ -48,13 +48,15 @@ sign-in setup (`docs/setup/google-oauth.md`).
 |---|---|---|
 | `GOOGLE_SA_CLIENT_EMAIL` | `.env.local` | the Next.js app (sync route) |
 | `GOOGLE_SA_PRIVATE_KEY` | `.env.local` | the Next.js app (RS256 assertion) |
-| `gcal_calendar_id` | `app_setting` (Admin → Settings) | the sync route |
+| `GOOGLE_CALENDAR_ID` | `.env.local` (optional) | the sync route — **overrides** the `gcal_calendar_id` app setting when set |
+| `gcal_calendar_id` | `app_setting` (Admin → Settings) | the sync route — used when `GOOGLE_CALENDAR_ID` is unset |
 | `gcal_sync_secret` | `app_setting` (set via SQL / deploy runbook) | the sync route's shared-secret gate + pg_cron |
 
 ```bash
 # .env.local
 GOOGLE_SA_CLIENT_EMAIL=team-hub-calendar-sync@your-project.iam.gserviceaccount.com
 GOOGLE_SA_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIEvQ...\n-----END PRIVATE KEY-----\n"
+GOOGLE_CALENDAR_ID=your-calendar-id@group.calendar.google.com   # optional; else set gcal_calendar_id in Admin → Settings
 ```
 
 The private key from the downloaded JSON spans multiple lines. Two ways to store it:
@@ -64,9 +66,11 @@ The private key from the downloaded JSON spans multiple lines. Two ways to store
 - Or keep the real newlines, with the whole value quoted — works too, as long as your `.env`
   loader preserves them.
 
-`gcal_calendar_id` and `gcal_sync_secret` are rows in `app_setting`, not env vars — `gcal_calendar_id`
-can be set from **Admin → Settings** in the app; `gcal_sync_secret` is set directly via SQL (see
-below) since it's only consumed by the sync route and pg_cron, never shown in the UI.
+The calendar id can be provided **either** as the `GOOGLE_CALENDAR_ID` env var in `.env.local`
+(simplest — keeps all Google config in one place) **or** as the `gcal_calendar_id` row in
+`app_setting`, set from **Admin → Settings** in the app. When both are present the env var wins.
+`gcal_sync_secret` is set directly via SQL (see below) since it's only consumed by the sync route
+and pg_cron, never shown in the UI.
 
 ## 4. Set the shared secret (for pg_cron)
 

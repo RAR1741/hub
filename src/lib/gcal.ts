@@ -17,6 +17,18 @@ function base64url(input: Buffer | string): string {
   return Buffer.from(input).toString("base64url");
 }
 
+/**
+ * Resolve the calendar id: the `GOOGLE_CALENDAR_ID` env var wins when set,
+ * otherwise fall back to the `gcal_calendar_id` app setting (editable in
+ * /admin/settings). PURE — the caller reads both values and passes them in.
+ */
+export function pickCalendarId(
+  envValue: string | undefined,
+  dbValue: string | undefined,
+): string {
+  return (envValue ?? "").trim() || (dbValue ?? "").trim();
+}
+
 /** Read service-account creds from env; null if not fully configured. */
 export function gcalCredentialsFromEnv(calendarId: string): GcalCredentials | null {
   const clientEmail = process.env.GOOGLE_SA_CLIENT_EMAIL;
