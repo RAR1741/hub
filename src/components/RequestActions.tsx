@@ -31,6 +31,7 @@ export function AccountRequestActions({ requestId }: { requestId: string }) {
       <input
         className="input w-36"
         placeholder="Assign student ID"
+        aria-label="Assign student ID"
         value={studentId}
         onChange={(e) => setStudentId(e.target.value)}
       />

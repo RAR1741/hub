@@ -55,6 +55,7 @@ export function JoinButtons({
         <input
           className="input w-48"
           placeholder="Message (optional)"
+          aria-label="Message (optional)"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
         />

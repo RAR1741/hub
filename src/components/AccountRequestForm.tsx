@@ -32,15 +32,16 @@ export function AccountRequestForm() {
   }
   return (
     <form onSubmit={submit} className="flex flex-col gap-2">
-      <input className="input" name="firstName" placeholder="First name" required />
-      <input className="input" name="lastName" placeholder="Last name" required />
+      <input className="input" name="firstName" placeholder="First name" aria-label="First name" required />
+      <input className="input" name="lastName" placeholder="Last name" aria-label="Last name" required />
       <input
         className="input"
         name="gradYear"
         placeholder="Grad year (optional)"
+        aria-label="Grad year (optional)"
         inputMode="numeric"
       />
-      <input className="input" name="email" placeholder="Email (optional)" type="email" />
+      <input className="input" name="email" placeholder="Email (optional)" aria-label="Email (optional)" type="email" />
       <button type="submit" className="btn btn-secondary w-full" disabled={state === "sending"}>
         {state === "sending" ? "Sending…" : "Request an account"}
       </button>

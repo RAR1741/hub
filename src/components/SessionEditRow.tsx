@@ -62,10 +62,10 @@ export function SessionEditRow({
   return (
     <tr>
       <td>{label}</td>
-      <td><input className="input w-48" type="datetime-local" value={tin} onChange={(e) => setTin(e.target.value)} /></td>
-      <td><input className="input w-48" type="datetime-local" value={tout} onChange={(e) => setTout(e.target.value)} /></td>
-      <td><input className="input w-36" value={n} onChange={(e) => setN(e.target.value)} placeholder="note" /></td>
-      <td><input type="checkbox" checked={exc} onChange={(e) => setExc(e.target.checked)} /></td>
+      <td><input className="input w-48" type="datetime-local" aria-label={`Time in for ${label}`} value={tin} onChange={(e) => setTin(e.target.value)} /></td>
+      <td><input className="input w-48" type="datetime-local" aria-label={`Time out for ${label}`} value={tout} onChange={(e) => setTout(e.target.value)} /></td>
+      <td><input className="input w-36" aria-label={`Note for ${label}`} value={n} onChange={(e) => setN(e.target.value)} placeholder="note" /></td>
+      <td><input type="checkbox" aria-label={`Exclude ${label} from totals`} checked={exc} onChange={(e) => setExc(e.target.checked)} /></td>
       <td className="flex items-center gap-2">
         <button onClick={save} className="btn btn-primary px-3 py-1" disabled={busy}>{busy ? "Saving…" : "Save"}</button>
         <button onClick={remove} className="btn btn-danger px-3 py-1" disabled={busy}>{busy ? "Deleting…" : "Delete"}</button>

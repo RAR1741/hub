@@ -54,8 +54,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <script dangerouslySetInnerHTML={{ __html: noFlashThemeScript }} />
       </head>
       <body className="antialiased">
+        <a href="#main" className="skip-link">
+          Skip to main content
+        </a>
         <SiteNav />
-        <div className="mx-auto max-w-6xl px-4 py-6">{children}</div>
+        <div id="main" className="mx-auto max-w-6xl px-4 py-6">
+          {children}
+        </div>
       </body>
     </html>
   );
