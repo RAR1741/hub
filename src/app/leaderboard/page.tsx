@@ -3,7 +3,7 @@ import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
 import { getActivePeriod, listPeriods } from "@/lib/periods";
 import { periodLeaderboard, type LeaderboardEntry } from "@/lib/reports";
-import { publicName } from "@/lib/people";
+import { canViewProfile, publicName } from "@/lib/people";
 
 // Guests may only ever see a first name + last initial (except on the Kiosk).
 function entryLabel(e: LeaderboardEntry, masked: boolean): string {
@@ -14,10 +14,14 @@ function LeaderColumn({
   title,
   rows,
   masked,
+  canLink,
 }: {
   title: string;
   rows: LeaderboardEntry[];
   masked: boolean;
+  // Only link a name to its profile when the viewer can actually open it
+  // (self, or mentor+). Otherwise render plain text — no dead link.
+  canLink: (personId: string) => boolean;
 }) {
   return (
     <div className="card flex flex-col gap-3">
@@ -44,13 +48,12 @@ function LeaderColumn({
                     {i + 1}
                   </td>
                   <td>
-                    {masked ? (
-                      // Guests get no profile link (profiles are gated) and a masked name.
-                      <span className="font-medium">{entryLabel(e, true)}</span>
-                    ) : (
+                    {canLink(e.personId) ? (
                       <Link href={`/people/${e.personId}`} className="font-medium">
-                        {entryLabel(e, false)}
+                        {entryLabel(e, masked)}
                       </Link>
+                    ) : (
+                      <span className="font-medium">{entryLabel(e, masked)}</span>
                     )}
                   </td>
                   <td className="mono">{e.hours}</td>
@@ -78,6 +81,9 @@ export default async function LeaderboardPage({
   // only show that button to mentors+.
   const canExport = hasRole(viewer.role, "mentor");
   const masked = viewer.role === "guest";
+  // A profile link is only rendered when the viewer can open it: their own
+  // row always, plus everyone if they're a mentor+ (see canViewProfile).
+  const canLink = (personId: string) => canViewProfile(viewer, personId);
   const active = await getActivePeriod();
   const periodId = period ?? active?.id ?? periods[0]?.id;
   const entries = periodId ? await periodLeaderboard(periodId) : [];
@@ -126,8 +132,8 @@ export default async function LeaderboardPage({
         </p>
       ) : (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <LeaderColumn title="Students" rows={students} masked={masked} />
-          <LeaderColumn title="Mentors" rows={mentors} masked={masked} />
+          <LeaderColumn title="Students" rows={students} masked={masked} canLink={canLink} />
+          <LeaderColumn title="Mentors" rows={mentors} masked={masked} canLink={canLink} />
         </div>
       )}
     </main>
