@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getViewer } from "@/lib/viewer";
+import { hasRole } from "@/lib/authz";
 import { listPeople, rosterView } from "@/lib/people";
 import { Icon } from "@/components/Icon";
 
@@ -22,6 +23,8 @@ export default async function PeoplePage({
   const [{ q }, viewer] = await Promise.all([searchParams, getViewer()]);
   const view = rosterView(viewer.role, await listPeople(q));
   const count = view.kind === "names" ? view.names.length : view.people.length;
+  // People are edited from /admin/people, which is admin-gated.
+  const canEdit = hasRole(viewer.role, "admin");
 
   return (
     <main className="flex flex-col gap-6">
@@ -90,6 +93,7 @@ export default async function PeoplePage({
                   <th>Student ID</th>
                   <th>Role</th>
                   <th>Status</th>
+                  {canEdit && <th aria-label="Edit" />}
                 </tr>
               </thead>
               <tbody>
@@ -123,6 +127,17 @@ export default async function PeoplePage({
                           {p.isActive ? "Active" : "Inactive"}
                         </span>
                       </td>
+                      {canEdit && (
+                        <td>
+                          <Link
+                            href={`/admin/people/${p.id}`}
+                            className="btn icon"
+                            aria-label={`Edit ${name}`}
+                          >
+                            <Icon name="edit" />
+                          </Link>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
