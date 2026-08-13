@@ -5,6 +5,7 @@ import {
   buildDayFromRow, excusalFromRow, meetingFromRow,
   type BuildDayRow, type ExcusalRow, type MeetingRow,
 } from "./types";
+import { excusalRequestFromRow, type ExcusalRequestRow } from "./types";
 
 describe("teamFromRow", () => {
   test("maps snake_case to camelCase", () => {
@@ -112,6 +113,34 @@ describe("excusalFromRow", () => {
     const row: ExcusalRow = { person_id: "p1", date: "2026-09-01", note: "sick", created_by: "p2" };
     expect(excusalFromRow(row)).toEqual({
       personId: "p1", date: "2026-09-01", note: "sick", createdBy: "p2",
+    });
+  });
+});
+
+describe("excusalRequestFromRow", () => {
+  test("maps snake_case to camelCase for all fields", () => {
+    const row: ExcusalRequestRow = {
+      id: "er1", person_id: "p1", date: "2026-09-01", reason: "sick",
+      status: "pending", reviewed_by: null, reviewed_at: null,
+      created_at: "2026-08-31T12:00:00Z",
+    };
+    expect(excusalRequestFromRow(row)).toEqual({
+      id: "er1", personId: "p1", date: "2026-09-01", reason: "sick",
+      status: "pending", reviewedBy: null, reviewedAt: null,
+      createdAt: "2026-08-31T12:00:00Z",
+    });
+  });
+
+  test("maps a reviewed (approved) request", () => {
+    const row: ExcusalRequestRow = {
+      id: "er2", person_id: "p1", date: "2026-09-02", reason: null,
+      status: "approved", reviewed_by: "p9", reviewed_at: "2026-09-02T10:00:00Z",
+      created_at: "2026-08-31T12:00:00Z",
+    };
+    expect(excusalRequestFromRow(row)).toEqual({
+      id: "er2", personId: "p1", date: "2026-09-02", reason: null,
+      status: "approved", reviewedBy: "p9", reviewedAt: "2026-09-02T10:00:00Z",
+      createdAt: "2026-08-31T12:00:00Z",
     });
   });
 });

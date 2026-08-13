@@ -230,3 +230,40 @@ export function excusalFromRow(row: ExcusalRow): Excusal {
     createdBy: row.created_by,
   };
 }
+
+export type ExcusalRequestStatus = "pending" | "approved" | "denied";
+
+export type ExcusalRequestRow = {
+  id: string;
+  person_id: string;
+  date: string;
+  reason: string | null;
+  status: ExcusalRequestStatus;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+};
+
+export type ExcusalRequest = {
+  id: string;
+  personId: string;
+  date: string;
+  reason: string | null;
+  status: ExcusalRequestStatus;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+};
+
+export function excusalRequestFromRow(row: ExcusalRequestRow): ExcusalRequest {
+  return {
+    id: row.id,
+    personId: row.person_id,
+    date: row.date,
+    reason: row.reason,
+    status: row.status,
+    reviewedBy: row.reviewed_by,
+    reviewedAt: row.reviewed_at,
+    createdAt: row.created_at,
+  };
+}
