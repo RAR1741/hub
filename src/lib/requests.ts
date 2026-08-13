@@ -126,14 +126,21 @@ export async function approveAccountRequest(
   );
   if (!created.ok) return { ok: false, status: created.status };
 
-  const { error } = await client
+  const { error, data } = await client
     .from("account_request")
     .update({ status: "approved", reviewed_by: reviewerId, reviewed_at: new Date().toISOString() })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("status", "pending") // atomic guard against a concurrent re-decision
+    .select("id")
+    .maybeSingle();
   if (error) {
     console.error("account_request approved but status update failed", { id, error });
     return { ok: false, status: 500 };
   }
+  // The person was already created above; a missing row here means someone
+  // else decided this request in the race window between our fetch and this
+  // write, so report the conflict rather than a false success.
+  if (!data) return { ok: false, status: 409 };
   return { ok: true, status: 200 };
 }
 
@@ -178,14 +185,21 @@ export async function approveApplication(
   );
   if (!membership.ok) return { ok: false, status: membership.status };
 
-  const { error } = await client
+  const { error, data } = await client
     .from("membership_application")
     .update({ status: "approved", reviewed_by: reviewerId, reviewed_at: new Date().toISOString() })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("status", "pending") // atomic guard against a concurrent re-decision
+    .select("id")
+    .maybeSingle();
   if (error) {
     console.error("application approved but status update failed", { id, error });
     return { ok: false, status: 500 };
   }
+  // The membership was already upserted above; a missing row here means
+  // someone else decided this application in the race window between our
+  // fetch and this write, so report the conflict rather than a false success.
+  if (!data) return { ok: false, status: 409 };
   return { ok: true, status: 200 };
 }
 
