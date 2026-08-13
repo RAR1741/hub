@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from "vitest";
+import { describe, expect, test } from "vitest";
 import { runTimeImport } from "./time-import-run";
 
 // Minimal fake db capturing inserts/deletes. person select returns the injected roster (default: Ada).
@@ -7,8 +7,13 @@ function fakeDb(
     { id: "ada", first_name: "Ada", last_name: "Lovelace", display_name: null },
   ],
 ) {
-  const calls = { sessionInsert: [] as any[], excusalUpsert: [] as any[], personInsert: [] as any[], deletes: [] as string[] };
-  const db: any = {
+  const calls = {
+    sessionInsert: [] as Record<string, unknown>[],
+    excusalUpsert: [] as Record<string, unknown>[],
+    personInsert: [] as Record<string, unknown>[],
+    deletes: [] as string[],
+  };
+  const db = {
     from(table: string) {
       if (table === "period") {
         return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: "pd1", name: "S", starts_on: "2026-01-01", ends_on: "2026-03-01", is_active: true } }) }) }) };
@@ -19,25 +24,25 @@ function fakeDb(
       if (table === "person") {
         return {
           select: () => ({ data: people, error: null }),
-          insert: (rows: any) => { calls.personInsert.push(rows); return { select: () => ({ single: async () => ({ data: { id: "new-1" }, error: null }) }) }; },
+          insert: (rows: Record<string, unknown>) => { calls.personInsert.push(rows); return { select: () => ({ single: async () => ({ data: { id: "new-1" }, error: null }) }) }; },
           delete: () => ({ eq: () => ({ eq: async () => { calls.deletes.push("session"); return { error: null }; } }) }),
         };
       }
       if (table === "session") {
         return {
           delete: () => ({ eq: () => ({ eq: async () => { calls.deletes.push("session"); return { error: null }; } }) }),
-          insert: async (rows: any[]) => { calls.sessionInsert.push(...rows); return { error: null }; },
+          insert: async (rows: Record<string, unknown>[]) => { calls.sessionInsert.push(...rows); return { error: null }; },
         };
       }
       if (table === "excusal") {
         return {
           delete: () => ({ eq: () => ({ gte: () => ({ lte: async () => { calls.deletes.push("excusal"); return { error: null }; } }) }) }),
-          upsert: async (rows: any[]) => { calls.excusalUpsert.push(...rows); return { error: null }; },
+          upsert: async (rows: Record<string, unknown>[]) => { calls.excusalUpsert.push(...rows); return { error: null }; },
         };
       }
       throw new Error(`unexpected table ${table}`);
     },
-  };
+  } as never;
   return { db, calls };
 }
 
