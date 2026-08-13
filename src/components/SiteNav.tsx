@@ -57,6 +57,11 @@ export async function SiteNav() {
                 Flagged sessions
               </Link>
             )}{" "}
+            {hasRole(viewer.role, "mentor") && (
+              <Link href="/admin/requests" className={navLinkClass}>
+                Requests
+              </Link>
+            )}{" "}
             {hasRole(viewer.role, "admin") && (
               <Link href="/admin" className={navLinkClass}>
                 Admin

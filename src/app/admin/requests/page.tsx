@@ -29,7 +29,7 @@ export default async function AdminRequestsPage() {
       <div className="page-head">
         <div>
           <h1>Requests</h1>
-          <div className="sub">Pending account + team-join approvals</div>
+          <div className="sub">Pending approvals</div>
         </div>
       </div>
 
