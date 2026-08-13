@@ -66,7 +66,10 @@ function Section({ label, children }: { label: string; children: ReactNode }) {
 
 export default async function AdminHubPage() {
   const viewer = await getViewer();
-  if (!hasRole(viewer.role, "admin")) redirect("/");
+  // Mentors+ reach the hub, but each section/card below is gated to the role
+  // that its target page actually requires — mentors see only their subset.
+  if (!hasRole(viewer.role, "mentor")) redirect("/");
+  const isAdmin = hasRole(viewer.role, "admin");
 
   const activePeriod = await getActivePeriod();
   const [
@@ -82,22 +85,25 @@ export default async function AdminHubPage() {
     applications,
     excusalRequests,
   ] = await Promise.all([
-    listPeople(),
-    listTeams(),
-    listPeriods(),
-    listAllMeetings(),
+    // Admin-only data isn't fetched for mentors — they can't see those cards.
+    isAdmin ? listPeople() : Promise.resolve([]),
+    isAdmin ? listTeams() : Promise.resolve([]),
+    isAdmin ? listPeriods() : Promise.resolve([]),
+    isAdmin ? listAllMeetings() : Promise.resolve([]),
     activePeriod ? listBuildDays({ from: activePeriod.startsOn, to: activePeriod.endsOn }) : Promise.resolve([]),
     activePeriod ? listSessionsForPeriod(activePeriod.id) : Promise.resolve([]),
     activePeriod ? flaggedSessions(activePeriod.id) : Promise.resolve([]),
-    listKioskDevices(),
-    listPendingAccountRequests(),
-    listPendingApplications(),
+    isAdmin ? listKioskDevices() : Promise.resolve([]),
+    isAdmin ? listPendingAccountRequests() : Promise.resolve([]),
+    isAdmin ? listPendingApplications() : Promise.resolve([]),
     listPendingExcusalRequests(),
   ]);
 
-  // Everything an admin reviews on /admin/requests: account + team-join + excusal.
-  const requestsCount =
-    accountRequests.length + applications.length + excusalRequests.length;
+  // Requests queue, scoped to what the viewer can actually act on:
+  // admins review account + team-join + excusal; mentors only excusals.
+  const requestsCount = isAdmin
+    ? accountRequests.length + applications.length + excusalRequests.length
+    : excusalRequests.length;
 
   return (
     <main className="flex flex-col gap-8">
@@ -117,7 +123,7 @@ export default async function AdminHubPage() {
           title="Requests"
           count={requestsCount}
           alert={requestsCount > 0}
-          hint="Pending account, team-join, and excusal approvals."
+          hint={isAdmin ? "Pending account, team-join, and excusal approvals." : "Pending excusal approvals."}
         />
         <Card
           href="/admin/sessions/flagged"
@@ -129,22 +135,30 @@ export default async function AdminHubPage() {
         />
       </Section>
 
-      <Section label="Roster">
-        <Card href="/admin/people" icon="users" title="People" count={people.length} hint="Roster, roles, and student IDs." />
-        <Card href="/admin/teams" icon="users" title="Teams" count={teams.length} hint="Sub-teams, join modes, membership." />
-      </Section>
+      {isAdmin && (
+        <Section label="Roster">
+          <Card href="/admin/people" icon="users" title="People" count={people.length} hint="Roster, roles, and student IDs." />
+          <Card href="/admin/teams" icon="users" title="Teams" count={teams.length} hint="Sub-teams, join modes, membership." />
+        </Section>
+      )}
 
       <Section label="Time">
-        <Card href="/admin/meetings" icon="calendar" title="Meetings" count={meetings.length} hint="Google Calendar sync + manual meetings." />
+        {isAdmin && (
+          <Card href="/admin/meetings" icon="calendar" title="Meetings" count={meetings.length} hint="Google Calendar sync + manual meetings." />
+        )}
         <Card href="/admin/build-days" icon="calendar" title="Build days" count={buildDays.length} hint="Required/optional days for the active period." />
         <Card href="/admin/sessions" icon="clock" title="Sessions" count={sessions.length} hint="All attendance sessions, browse and edit." />
-        <Card href="/admin/periods" icon="calendar" title="Periods" count={periods.length} hint="Seasons and the active period." />
+        {isAdmin && (
+          <Card href="/admin/periods" icon="calendar" title="Periods" count={periods.length} hint="Seasons and the active period." />
+        )}
       </Section>
 
-      <Section label="Config">
-        <Card href="/admin/kiosk-devices" icon="chevron" title="Kiosk devices" count={kioskDevices.length} hint="Shop-tablet sign-in tokens." />
-        <Card href="/admin/settings" icon="x" title="Settings" hint="Timezone, calendar sync, shift limits." />
-      </Section>
+      {isAdmin && (
+        <Section label="Config">
+          <Card href="/admin/kiosk-devices" icon="chevron" title="Kiosk devices" count={kioskDevices.length} hint="Shop-tablet sign-in tokens." />
+          <Card href="/admin/settings" icon="x" title="Settings" hint="Timezone, calendar sync, shift limits." />
+        </Section>
+      )}
     </main>
   );
 }
