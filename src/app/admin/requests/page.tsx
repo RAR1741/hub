@@ -17,9 +17,10 @@ export default async function AdminRequestsPage() {
   // Mentors+ can review requests (matches the review routes' withRole("mentor") gates).
   if (!hasRole(viewer.role, "mentor")) redirect("/");
 
+  const isAdmin = hasRole(viewer.role, "admin");
   const [accountRequests, applications, excusalRequests] = await Promise.all([
-    listPendingAccountRequests(),
-    listPendingApplications(),
+    isAdmin ? listPendingAccountRequests() : Promise.resolve([]),
+    isAdmin ? listPendingApplications() : Promise.resolve([]),
     listPendingExcusalRequests(),
   ]);
 
@@ -32,61 +33,65 @@ export default async function AdminRequestsPage() {
         </div>
       </div>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-base font-semibold">Account requests ({accountRequests.length})</h2>
-        {accountRequests.length === 0 ? (
-          <p className="card text-sm text-[var(--muted)]">None pending.</p>
-        ) : (
-          <div className="tablewrap">
-            <div style={{ overflowX: "auto" }}>
-              <table className="table">
-                <thead>
-                  <tr><th>Name</th><th>Grad year</th><th>Email</th><th>Requested</th><th>Actions</th></tr>
-                </thead>
-                <tbody>
-                  {accountRequests.map((r) => (
-                    <tr key={r.id}>
-                      <td>{r.first_name} {r.last_name}</td>
-                      <td className="mono">{r.grad_year ?? ""}</td>
-                      <td>{r.email ?? ""}</td>
-                      <td className="mono">{new Date(r.created_at).toLocaleDateString()}</td>
-                      <td><AccountRequestActions requestId={r.id} /></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+      {isAdmin && (
+        <section className="flex flex-col gap-3">
+          <h2 className="text-base font-semibold">Account requests ({accountRequests.length})</h2>
+          {accountRequests.length === 0 ? (
+            <p className="card text-sm text-[var(--muted)]">None pending.</p>
+          ) : (
+            <div className="tablewrap">
+              <div style={{ overflowX: "auto" }}>
+                <table className="table">
+                  <thead>
+                    <tr><th>Name</th><th>Grad year</th><th>Email</th><th>Requested</th><th>Actions</th></tr>
+                  </thead>
+                  <tbody>
+                    {accountRequests.map((r) => (
+                      <tr key={r.id}>
+                        <td>{r.first_name} {r.last_name}</td>
+                        <td className="mono">{r.grad_year ?? ""}</td>
+                        <td>{r.email ?? ""}</td>
+                        <td className="mono">{new Date(r.created_at).toLocaleDateString()}</td>
+                        <td><AccountRequestActions requestId={r.id} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
-        )}
-      </section>
+          )}
+        </section>
+      )}
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-base font-semibold">Membership applications ({applications.length})</h2>
-        {applications.length === 0 ? (
-          <p className="card text-sm text-[var(--muted)]">None pending.</p>
-        ) : (
-          <div className="tablewrap">
-            <div style={{ overflowX: "auto" }}>
-              <table className="table">
-                <thead>
-                  <tr><th>Person</th><th>Team</th><th>Message</th><th>Applied</th><th>Actions</th></tr>
-                </thead>
-                <tbody>
-                  {applications.map((a) => (
-                    <tr key={a.id}>
-                      <td>{a.personName}</td>
-                      <td>{a.teamName}</td>
-                      <td>{a.message ?? ""}</td>
-                      <td className="mono">{new Date(a.createdAt).toLocaleDateString()}</td>
-                      <td><ApplicationActions applicationId={a.id} /></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+      {isAdmin && (
+        <section className="flex flex-col gap-3">
+          <h2 className="text-base font-semibold">Membership applications ({applications.length})</h2>
+          {applications.length === 0 ? (
+            <p className="card text-sm text-[var(--muted)]">None pending.</p>
+          ) : (
+            <div className="tablewrap">
+              <div style={{ overflowX: "auto" }}>
+                <table className="table">
+                  <thead>
+                    <tr><th>Person</th><th>Team</th><th>Message</th><th>Applied</th><th>Actions</th></tr>
+                  </thead>
+                  <tbody>
+                    {applications.map((a) => (
+                      <tr key={a.id}>
+                        <td>{a.personName}</td>
+                        <td>{a.teamName}</td>
+                        <td>{a.message ?? ""}</td>
+                        <td className="mono">{new Date(a.createdAt).toLocaleDateString()}</td>
+                        <td><ApplicationActions applicationId={a.id} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
-        )}
-      </section>
+          )}
+        </section>
+      )}
 
       <section className="flex flex-col gap-3">
         <h2 className="text-base font-semibold">Excusal requests ({excusalRequests.length})</h2>
