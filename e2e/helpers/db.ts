@@ -57,3 +57,34 @@ export async function seededStudentPersonId(): Promise<string> {
   }
   return rows[0].id;
 }
+
+/** The id of a pending excusal_request row for a person+date, or null if none exists. */
+export async function findPendingExcusalRequestId(
+  personId: string,
+  date: string,
+): Promise<string | null> {
+  const res = await fetch(
+    `${restBaseUrl()}/excusal_request?person_id=eq.${personId}&date=eq.${date}&status=eq.pending&select=id&order=created_at.desc&limit=1`,
+    { headers: authHeaders() },
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`findPendingExcusalRequestId lookup failed: ${res.status} ${body}`);
+  }
+  const rows = (await res.json()) as { id: string }[];
+  return rows[0]?.id ?? null;
+}
+
+/** True if an excusal row exists for the given person+date. */
+export async function excusalExists(personId: string, date: string): Promise<boolean> {
+  const res = await fetch(
+    `${restBaseUrl()}/excusal?person_id=eq.${personId}&date=eq.${date}&select=person_id`,
+    { headers: authHeaders() },
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`excusalExists lookup failed: ${res.status} ${body}`);
+  }
+  const rows = (await res.json()) as unknown[];
+  return rows.length > 0;
+}

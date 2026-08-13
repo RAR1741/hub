@@ -46,8 +46,13 @@ Run `git` on the **host**, not through `./dev` — the container has no git cred
   open past the day boundary
 - Google Calendar sync (hourly, via pg_cron/pg_net) with required/optional build days and excusals
 - `/calendar` — the attendance grid across build days
-- `/me/attendance` — a member's own attendance summary
-- `/admin/settings` — timezone, calendar ID, auto-close/max-shift hours, kiosk-devices link
+- `/me/attendance` — a member's own attendance summary, hours-vs-season-goal progress, a
+  missed-required-day nudge with one-click "Request excusal" links, and self-service excusal requests
+  (see below)
+- `/admin/requests` — mentor+ review queue for account requests, membership applications, and
+  student excusal requests
+- `/admin/settings` — timezone, calendar ID, auto-close/max-shift hours, season hours goal,
+  kiosk-devices link
 - A Playwright smoke suite (kiosk round trip, guest read-only, student login, mentor session edit),
   run in CI on every push/PR alongside lint/typecheck/unit tests
 - A deploy runbook (`docs/setup/deploy.md`) covering the hosted Supabase project, Vercel, production
@@ -56,6 +61,32 @@ Run `git` on the **host**, not through `./dev` — the container has no git cred
 The Google Calendar end-to-end (real service account + shared calendar) and the production deploy
 itself are user-driven — they need real accounts/credentials that can't be created autonomously; see
 `docs/setup/google-calendar.md` and `docs/setup/deploy.md`.
+
+### Self-service excusal requests
+
+A student can ask for an excused absence themselves instead of waiting on a mentor to enter one:
+
+- On `/me/attendance`, the **Request excusal** card lets a signed-in member submit a date (past or
+  future) and an optional reason, which `POST`s `/api/excusal-requests`. The request is always
+  scoped to the signed-in viewer — there's no way to request on someone else's behalf. A member can
+  have at most one *pending* request per date (a `pending`-partial unique index enforces this
+  server-side); re-requesting after a decision is allowed. The **My excusal requests** card below it
+  lists the member's own requests with a status pill (pending/approved/denied).
+- Each row in the **missed required days** nudge (also on `/me/attendance`) links to
+  `/me/attendance?date=YYYY-MM-DD`, which prefills the request form with that date — one click from
+  "I missed this" to "I've asked for an excusal."
+- Mentors and admins review pending requests on `/admin/requests` (`withRole("mentor")`-gated).
+  Approving a request creates a real `excusal` row (so attendance math treats it exactly like a
+  mentor-entered excusal, with no separate code path); denying just records the decision. Both
+  actions go through `POST /api/admin/requests/excusal/[id]` with `{ "action": "approve" | "deny" }`.
+
+### Season hours goal
+
+`/admin/settings` has a **Season hours goal** field (hours; `0` = no goal set). When it's set above
+zero, both the dashboard and `/me/attendance` show a progress bar under the member's hours readout —
+"*X* of *Y* h · *Z* to go" — using the shared `hoursGoalProgress()` helper
+(`src/lib/hours-goal.ts`). With no goal set, those readouts fall back to showing just the raw hours
+number, as before.
 
 ## UI / design system
 

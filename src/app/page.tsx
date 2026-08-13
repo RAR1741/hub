@@ -6,6 +6,8 @@ import { getActivePeriod } from "@/lib/periods";
 import { personPeriodHours } from "@/lib/reports";
 import { listUpcomingMeetings } from "@/lib/meetings";
 import { listBuildDays } from "@/lib/build-days";
+import { getSetting } from "@/lib/settings";
+import { hoursGoalProgress } from "@/lib/hours-goal";
 
 export default async function HomePage() {
   const viewer = await getViewer();
@@ -15,6 +17,11 @@ export default async function HomePage() {
     viewer.person && activePeriod
       ? await personPeriodHours(viewer.person.id, activePeriod.id)
       : 0;
+  const hoursGoal =
+    viewer.person && activePeriod
+      ? await getSetting<number>("season_hours_goal", 0)
+      : 0;
+  const goalProgress = hoursGoalProgress(myHours, hoursGoal);
   const upcoming = await listUpcomingMeetings(new Date().toISOString(), 5);
   const requiredDates = new Set(
     upcoming.length
@@ -86,6 +93,16 @@ export default async function HomePage() {
                   {myHours}
                   <small> h</small>
                 </div>
+                {goalProgress && (
+                  <>
+                    <div className="bar">
+                      <i style={{ width: `${goalProgress.pct}%` }} />
+                    </div>
+                    <p className="text-sm" style={{ color: "var(--muted)", marginTop: 8 }}>
+                      {myHours} of {goalProgress.goal} h · {goalProgress.remaining} to go
+                    </p>
+                  </>
+                )}
               </div>
             )}
           </div>
