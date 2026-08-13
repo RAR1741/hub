@@ -93,8 +93,22 @@ export default async function CalendarPage() {
         .attendance-grid td[data-status="excused"] .dot { background: var(--excused); }
         .attendance-grid td[data-status="optional"] .dot { background: var(--optional); }
         .attendance-grid td[data-status="absent"] .dot { background: var(--absent); }
-        .attendance-grid .cell-actions { display: none; margin-left: 0.25rem; }
-        .attendance-grid td:hover .cell-actions { display: inline-flex; gap: 0.25rem; }
+        /* Reveal on hover, but keep the buttons focusable (opacity, not
+           display:none) so keyboard users reach them; always show where hover
+           isn't available (touch/tablet — the mentor's likely device). */
+        .attendance-grid .cell-actions {
+          display: inline-flex;
+          gap: 0.25rem;
+          margin-left: 0.25rem;
+          opacity: 0;
+          transition: opacity 0.12s ease;
+        }
+        .attendance-grid td:hover .cell-actions,
+        .attendance-grid td:focus-within .cell-actions { opacity: 1; }
+        @media (hover: none) { .attendance-grid .cell-actions { opacity: 1; } }
+        @media (prefers-reduced-motion: reduce) {
+          .attendance-grid .cell-actions { transition: none; }
+        }
         .attendance-grid .cell-actions button {
           font-size: 0.6875rem;
           font-weight: 650;
