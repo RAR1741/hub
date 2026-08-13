@@ -2,7 +2,11 @@ import { describe, expect, test, vi } from "vitest";
 import { runTimeImport } from "./time-import-run";
 
 // Minimal fake db capturing inserts/deletes. person select returns the injected roster (default: Ada).
-function fakeDb(people = [{ id: "ada", first_name: "Ada", last_name: "Lovelace", display_name: null }]) {
+function fakeDb(
+  people: { id: string; first_name: string; last_name: string; display_name: string | null }[] = [
+    { id: "ada", first_name: "Ada", last_name: "Lovelace", display_name: null },
+  ],
+) {
   const calls = { sessionInsert: [] as any[], excusalUpsert: [] as any[], personInsert: [] as any[], deletes: [] as string[] };
   const db: any = {
     from(table: string) {
