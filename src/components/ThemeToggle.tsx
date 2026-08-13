@@ -2,37 +2,47 @@
 
 import { useSyncExternalStore } from "react";
 
-type ThemeMode = "light" | "dark" | "system";
+type Theme = "light" | "dark";
 
 const STORAGE_KEY = "hub-theme";
 const listeners = new Set<() => void>();
 
-function subscribe(listener: () => void) {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
+function systemTheme(): Theme {
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
-function getSnapshot(): ThemeMode {
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  // While no explicit choice is stored we follow the OS, so re-render when it flips.
+  const mq = window.matchMedia("(prefers-color-scheme: dark)");
+  mq.addEventListener("change", listener);
+  return () => {
+    listeners.delete(listener);
+    mq.removeEventListener("change", listener);
+  };
+}
+
+// No stored choice → reflect the current system theme; once the user picks, use that.
+function getSnapshot(): Theme {
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY);
-    return stored === "light" || stored === "dark" ? stored : "system";
+    if (stored === "light" || stored === "dark") return stored;
+    return systemTheme();
   } catch {
-    return "system";
+    return "light";
   }
 }
 
-function getServerSnapshot(): ThemeMode {
-  return "system";
+function getServerSnapshot(): Theme {
+  return "light";
 }
 
-function applyTheme(mode: ThemeMode) {
-  const root = document.documentElement;
-  if (mode === "system") {
-    root.removeAttribute("data-theme");
-    localStorage.removeItem(STORAGE_KEY);
-  } else {
-    root.setAttribute("data-theme", mode);
+function setTheme(mode: Theme) {
+  document.documentElement.setAttribute("data-theme", mode);
+  try {
     localStorage.setItem(STORAGE_KEY, mode);
+  } catch {
+    // ignore storage failures — the attribute still applies for this session
   }
   for (const listener of listeners) listener();
 }
@@ -40,14 +50,9 @@ function applyTheme(mode: ThemeMode) {
 export function ThemeToggle() {
   const mode = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
-  function choose(next: ThemeMode) {
-    applyTheme(next);
-  }
-
-  const options: { key: ThemeMode; label: string }[] = [
+  const options: { key: Theme; label: string }[] = [
     { key: "light", label: "Light" },
     { key: "dark", label: "Dark" },
-    { key: "system", label: "System" },
   ];
 
   return (
@@ -62,7 +67,7 @@ export function ThemeToggle() {
           key={opt.key}
           type="button"
           aria-pressed={mode === opt.key}
-          onClick={() => choose(opt.key)}
+          onClick={() => setTheme(opt.key)}
           className="rounded-full px-3 py-1.5 text-xs font-semibold"
           style={
             mode === opt.key

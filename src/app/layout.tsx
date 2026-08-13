@@ -27,8 +27,8 @@ export const metadata: Metadata = {
 };
 
 // Applies a persisted theme choice (light/dark) before first paint so there's
-// no flash of the wrong theme. "system" (the default) removes the attribute
-// and lets the prefers-color-scheme media query in globals.css take over.
+// no flash of the wrong theme. With no stored choice we leave the attribute
+// off and let the prefers-color-scheme media query in globals.css follow the OS.
 const noFlashThemeScript = `
 (function () {
   try {
