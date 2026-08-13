@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getViewer } from "@/lib/viewer";
+import { hasRole } from "@/lib/authz";
 import { getActivePeriod, listPeriods } from "@/lib/periods";
 import { periodLeaderboard } from "@/lib/reports";
 
@@ -11,7 +12,9 @@ export default async function LeaderboardPage({
   const [{ period }, viewer, periods] = await Promise.all([
     searchParams, getViewer(), listPeriods(),
   ]);
-  void viewer; // open to guests: hours + names only, no contact detail
+  // Open to guests: hours + names only, no contact detail. The CSV export
+  // hits a mentor-gated route, so only show that button to mentors+.
+  const canExport = hasRole(viewer.role, "mentor");
   const active = await getActivePeriod();
   const periodId = period ?? active?.id ?? periods[0]?.id;
   const entries = periodId ? await periodLeaderboard(periodId) : [];
@@ -23,6 +26,11 @@ export default async function LeaderboardPage({
           <h1>Leaderboard</h1>
           <div className="sub">Hours logged this period, ranked</div>
         </div>
+        {canExport && periodId && (
+          <a className="btn" href={`/api/admin/reports/hours?period=${periodId}`}>
+            Export CSV
+          </a>
+        )}
       </div>
       <form method="get" className="card flex flex-wrap items-end gap-3">
         <div>

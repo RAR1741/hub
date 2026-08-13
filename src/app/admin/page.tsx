@@ -133,6 +133,12 @@ export default async function AdminHubPage() {
           alert={flagged.length > 0}
           hint="Over-limit, open, or overlapping sessions."
         />
+        <Card
+          href="/admin/reports"
+          icon="calendar"
+          title="Reports"
+          hint="Hours and attendance summaries, exportable as CSV."
+        />
       </Section>
 
       {isAdmin && (

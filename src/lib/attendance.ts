@@ -1,4 +1,11 @@
-import type { BuildDay, BuildDayKind, Excusal, Session } from "./types";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { BuildDay, BuildDayKind, Excusal, PeriodRow, Session } from "./types";
+import { periodFromRow } from "./types";
+import { listBuildDays } from "./build-days";
+import { listExcusals } from "./excusals";
+import { sessionsForPeriod } from "./reports";
+import { getSetting } from "./settings";
+import { displayName, listPeople } from "./people";
 
 /** The team-local YYYY-MM-DD for a UTC instant. en-CA formats as YYYY-MM-DD. */
 export function localDateOf(iso: string, tz: string): string {
@@ -81,4 +88,63 @@ export function attendanceSummary(
   const percentage =
     denominator === 0 ? null : Math.round((present / denominator) * 10000) / 100;
   return { present, excused, optional, absent, denominator, percentage };
+}
+
+export type PeriodAttendanceSummary = {
+  personId: string;
+  name: string;
+  present: number;
+  excused: number;
+  absent: number;
+  /** Required build days in the period (present + excused + absent; optional days never count). */
+  requiredDays: number;
+  percentage: number | null;
+};
+
+/**
+ * Per-active-person attendance summary over a whole period's required build
+ * days. Composes the existing `attendanceSummary`/`attendanceForDate` math —
+ * this function only fetches and fans the data out per person, it doesn't
+ * change how a day is scored. Returns `[]` if the period doesn't exist.
+ */
+export async function attendanceSummaryForPeriod(
+  periodId: string,
+  db?: SupabaseClient,
+): Promise<PeriodAttendanceSummary[]> {
+  const client = db ?? (await import("./db")).getDb();
+  const { data: periodRow } = await client
+    .from("period")
+    .select("*")
+    .eq("id", periodId)
+    .maybeSingle();
+  if (!periodRow) return [];
+  const period = periodFromRow(periodRow as PeriodRow);
+  const range = { from: period.startsOn, to: period.endsOn };
+
+  const [buildDays, excusals, sessions, tz, peopleRows] = await Promise.all([
+    listBuildDays(range, client),
+    listExcusals(range, client),
+    sessionsForPeriod(periodId, client),
+    getSetting<string>("team_timezone", "America/Indiana/Indianapolis", client),
+    listPeople(undefined, client),
+  ]);
+
+  return peopleRows
+    .filter((p) => p.is_active)
+    .map((p) => {
+      const personId = p.id;
+      const personSessions = sessions.filter((s) => s.personId === personId);
+      const personExcusals = excusals.filter((e) => e.personId === personId);
+      const summary = attendanceSummary(personId, buildDays, personSessions, personExcusals, tz);
+      return {
+        personId,
+        name: displayName(p),
+        present: summary.present,
+        excused: summary.excused,
+        absent: summary.absent,
+        requiredDays: summary.present + summary.excused + summary.absent,
+        percentage: summary.percentage,
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
 }

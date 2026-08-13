@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   attendanceForDate,
   attendanceSummary,
+  attendanceSummaryForPeriod,
   localDateOf,
   sessionLocalDate,
 } from "./attendance";
@@ -117,5 +118,76 @@ describe("attendanceSummary", () => {
       denominator: 1,
       percentage: 100,
     });
+  });
+});
+
+describe("attendanceSummaryForPeriod", () => {
+  // Generic chained-query stub: select/eq/gte/lte all return the same chain
+  // object; order() and maybeSingle() are the terminal calls and resolve to
+  // whatever result was registered for that table.
+  function fakeDb(tables: Record<string, { data: unknown; error: unknown }>) {
+    return {
+      from(table: string) {
+        const result = tables[table] ?? { data: null, error: null };
+        const chain: Record<string, unknown> = {};
+        for (const m of ["select", "eq", "gte", "lte"]) {
+          chain[m] = () => chain;
+        }
+        chain.order = async () => result;
+        chain.maybeSingle = async () => result;
+        return chain;
+      },
+    } as never;
+  }
+
+  const periodRow = { id: "pd1", name: "Fall", starts_on: "2026-09-01", ends_on: "2026-09-05", is_active: true };
+
+  test("per active person, over required build days, using existing attendance math", async () => {
+    const db = fakeDb({
+      period: { data: periodRow, error: null },
+      build_day: {
+        data: [
+          { date: "2026-09-01", kind: "required", source: "gcal", meeting_id: null }, // p1 present
+          { date: "2026-09-02", kind: "required", source: "gcal", meeting_id: null }, // p1 absent
+          { date: "2026-09-03", kind: "optional", source: "gcal", meeting_id: null }, // never counts
+        ],
+        error: null,
+      },
+      excusal: { data: [], error: null },
+      session: {
+        data: [
+          { id: "s1", person_id: "p1", period_id: "pd1", time_in: "2026-09-01T18:00:00Z", time_out: "2026-09-01T20:00:00Z", source: "kiosk", note: null, excluded_from_totals: false, edited_by: null, edited_at: null },
+        ],
+        error: null,
+      },
+      app_setting: { data: { value: "America/Indiana/Indianapolis" }, error: null },
+      person: {
+        data: [
+          { id: "p1", first_name: "Ada", last_name: "Lovelace", display_name: null, role: "student", grad_year: null, email: null, is_active: true, student_id_number: "1001", auth_user_id: null },
+          { id: "p2", first_name: "Bo", last_name: "Jones", display_name: null, role: "student", grad_year: null, email: null, is_active: false, student_id_number: "1002", auth_user_id: null },
+        ],
+        error: null,
+      },
+    });
+
+    const result = await attendanceSummaryForPeriod("pd1", db);
+
+    // p2 is inactive and must be excluded entirely.
+    expect(result).toEqual([
+      {
+        personId: "p1",
+        name: "Ada Lovelace",
+        present: 1,
+        excused: 0,
+        absent: 1,
+        requiredDays: 2,
+        percentage: 50,
+      },
+    ]);
+  });
+
+  test("returns [] when the period doesn't exist", async () => {
+    const db = fakeDb({ period: { data: null, error: null } });
+    expect(await attendanceSummaryForPeriod("missing", db)).toEqual([]);
   });
 });

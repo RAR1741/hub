@@ -106,6 +106,27 @@ duplicate-student-ID unique-violations into a per-row error instead of a 500. Th
 (`parseRosterCsv` in `src/lib/roster-import.ts`) also flags in-file duplicate emails/student IDs as
 per-row errors before anything reaches the database.
 
+### Hours & attendance reports (CSV export)
+
+`/admin/reports` (mentor+, also linked from `/admin` and as an **Export CSV** button on
+`/leaderboard`) shows, for a selected period: an **hours** table (member, student ID, total hours —
+every active person, including those with zero logged sessions) and an **attendance summary**
+table (present/excused/absent/required days/percentage, over the period's *required* build days
+only). Each table has an **Export CSV** button.
+
+- `GET /api/admin/reports/hours?period=<id>` and `GET /api/admin/reports/attendance?period=<id>`
+  are mentor-gated (`withRole("mentor")`) CSV downloads (`Content-Disposition: attachment`);
+  `period` defaults to the active period when omitted.
+- The pure CSV encoder (`toCsv` — RFC-4180-ish: quotes commas/quotes/newlines, `""`-escapes
+  embedded quotes, CRLF lines) and the two report-row builders (`hoursReportCsv`,
+  `attendanceSummaryCsv`) live in `src/lib/reports-export.ts`.
+- `attendanceSummaryForPeriod` (`src/lib/attendance.ts`) composes the existing
+  `attendanceSummary`/`attendanceForDate` math per active person over a period's build days — it
+  doesn't change how a day is scored, just fans the same math out roster-wide.
+- `hoursReportForPeriod` (`src/lib/reports.ts`) is the hours-table equivalent of
+  `periodLeaderboard`, except it includes every active person (zero-hour members included), not
+  just people with at least one session row.
+
 ## UI / design system
 
 Team Hub's look is a "shop-floor control panel" — warm-neutral surfaces, Red Alert red, a cool

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
-  flaggedSessions, leaderboard, listSessionsForPeriod, personPeriodHours, sessionsForPeriod,
+  flaggedSessions, hoursReportForPeriod, leaderboard, listSessionsForPeriod, personPeriodHours,
+  sessionsForPeriod,
 } from "./reports";
 import type { Session } from "./types";
 
@@ -162,5 +163,36 @@ describe("personPeriodHours", () => {
       }),
     } as never;
     expect(await personPeriodHours("p1", "pd1", db)).toBe(2);
+  });
+});
+
+describe("hoursReportForPeriod", () => {
+  function fakeDb(sessionRows: Record<string, unknown>[], personRows: Record<string, unknown>[]) {
+    return {
+      from(table: string) {
+        if (table === "session") {
+          return { select: () => ({ eq: async () => ({ data: sessionRows, error: null }) }) };
+        }
+        // person
+        return { select: () => ({ order: async () => ({ data: personRows, error: null }) }) };
+      },
+    } as never;
+  }
+
+  test("includes active people with zero sessions, alongside people with logged hours", async () => {
+    const sessionRows = [row({ id: "s1", person_id: "p1" })]; // 2h
+    const personRows = [
+      { id: "p1", first_name: "Ada", last_name: "Lovelace", display_name: null, role: "student", grad_year: null, email: null, is_active: true, student_id_number: "1001", auth_user_id: null },
+      { id: "p2", first_name: "Bo", last_name: "Jones", display_name: null, role: "student", grad_year: null, email: null, is_active: true, student_id_number: "1002", auth_user_id: null },
+      { id: "p3", first_name: "Cy", last_name: "Inactive", display_name: null, role: "student", grad_year: null, email: null, is_active: false, student_id_number: "1003", auth_user_id: null },
+    ];
+    const db = fakeDb(sessionRows, personRows);
+
+    const result = await hoursReportForPeriod("pd", db);
+
+    expect(result).toEqual([
+      { personId: "p1", name: "Ada Lovelace", studentId: "1001", hours: 2 },
+      { personId: "p2", name: "Bo Jones", studentId: "1002", hours: 0 },
+    ]);
   });
 });

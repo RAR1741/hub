@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Session, SessionRow } from "./types";
 import { sessionFromRow } from "./types";
 import { totalHours, overlappingSessionIds, sessionFlags, type FlagKind } from "./hours";
-import { displayName } from "./people";
+import { displayName, listPeople } from "./people";
 import { getSetting } from "./settings";
 
 export type LeaderboardEntry = {
@@ -74,6 +74,40 @@ export async function periodLeaderboard(
   return leaderboard(
     [...byPerson.entries()].map(([personId, v]) => ({ personId, name: v.name, sessions: v.sessions })),
   );
+}
+
+export type HoursReportRow = {
+  personId: string;
+  name: string;
+  studentId: string | null;
+  hours: number;
+};
+
+/**
+ * Hours report for every active person in a period, including people with
+ * zero logged sessions (unlike `periodLeaderboard`, which only lists people
+ * who show up in the `session` rows for the period). Sorted like the
+ * leaderboard: hours desc, then name.
+ */
+export async function hoursReportForPeriod(
+  periodId: string,
+  db?: SupabaseClient,
+): Promise<HoursReportRow[]> {
+  const client = db ?? (await import("./db")).getDb();
+  const [entries, peopleRows] = await Promise.all([
+    periodLeaderboard(periodId, client),
+    listPeople(undefined, client),
+  ]);
+  const hoursByPerson = new Map(entries.map((e) => [e.personId, e.hours]));
+  return peopleRows
+    .filter((p) => p.is_active)
+    .map((p) => ({
+      personId: p.id,
+      name: displayName(p),
+      studentId: p.student_id_number,
+      hours: hoursByPerson.get(p.id) ?? 0,
+    }))
+    .sort((a, b) => b.hours - a.hours || a.name.localeCompare(b.name));
 }
 
 export type FlaggedSession = {
