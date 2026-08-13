@@ -1,5 +1,14 @@
 import { describe, expect, test } from "vitest";
-import { canViewProfile, deletePerson, displayName, listPeople, parsePersonInput, rosterView } from "./people";
+import {
+  canViewProfile,
+  deletePerson,
+  displayName,
+  findPersonForRosterRow,
+  listPeople,
+  parsePersonInput,
+  rosterView,
+  updatePersonRosterFields,
+} from "./people";
 import type { PersonRow } from "./types";
 import type { Viewer } from "./viewer";
 
@@ -150,6 +159,130 @@ describe("deletePerson", () => {
   test("500 on other errors", async () => {
     const result = await deletePerson("p1", fakeDb({ data: null, error: { code: "99999" } }));
     expect(result).toEqual({ ok: false, status: 500 });
+  });
+});
+
+describe("updatePersonRosterFields", () => {
+  function fakeDb(result: { data: { id: string } | null; error: { code: string } | null }) {
+    const captured: { update?: Record<string, unknown> } = {};
+    const db = {
+      from: () => ({
+        update: (patch: Record<string, unknown>) => {
+          captured.update = patch;
+          return {
+            eq: () => ({
+              select: () => ({
+                maybeSingle: async () => result,
+              }),
+            }),
+          };
+        },
+      }),
+    } as never;
+    return { db, captured };
+  }
+
+  const input = {
+    firstName: "Ada",
+    lastName: "Lovelace",
+    email: "ada@example.org",
+    role: "student" as const,
+    gradYear: 2028,
+    studentIdNumber: "1741",
+  };
+
+  test("updates only the roster-supplied columns", async () => {
+    const { db, captured } = fakeDb({ data: { id: "p1" }, error: null });
+    const result = await updatePersonRosterFields("p1", input, db);
+    expect(result).toEqual({ ok: true, status: 200 });
+    expect(captured.update).toEqual({
+      first_name: "Ada",
+      last_name: "Lovelace",
+      email: "ada@example.org",
+      role: "student",
+      grad_year: 2028,
+      student_id_number: "1741",
+    });
+    // Fields not in the roster CSV (display_name, phone, shirt_size,
+    // dietary_restrictions, bio, is_active) must never be touched.
+    expect(captured.update).not.toHaveProperty("display_name");
+    expect(captured.update).not.toHaveProperty("is_active");
+  });
+
+  test("null email/role/gradYear/studentIdNumber (blank CSV cells) are left out of the patch entirely — never used to clear a column", async () => {
+    const { db, captured } = fakeDb({ data: { id: "p1" }, error: null });
+    await updatePersonRosterFields(
+      "p1",
+      { firstName: "Ada", lastName: "Lovelace", email: null, role: null, gradYear: null, studentIdNumber: null },
+      db,
+    );
+    expect(captured.update).toEqual({ first_name: "Ada", last_name: "Lovelace" });
+  });
+
+  test("a role that wasn't explicitly specified in the CSV never demotes an existing mentor/admin", async () => {
+    const { db, captured } = fakeDb({ data: { id: "p1" }, error: null });
+    await updatePersonRosterFields("p1", { ...input, role: null }, db);
+    expect(captured.update).not.toHaveProperty("role");
+  });
+
+  test("404 when the person no longer exists", async () => {
+    const { db } = fakeDb({ data: null, error: null });
+    expect(await updatePersonRosterFields("p1", input, db)).toEqual({ ok: false, status: 404 });
+  });
+
+  test("409 on unique violation", async () => {
+    const { db } = fakeDb({ data: null, error: { code: "23505" } });
+    expect(await updatePersonRosterFields("p1", input, db)).toEqual({ ok: false, status: 409 });
+  });
+});
+
+describe("findPersonForRosterRow", () => {
+  test("matches by email first", async () => {
+    const calls: string[] = [];
+    const db = {
+      from: () => ({
+        select: () => ({
+          eq: (col: string) => {
+            calls.push(col);
+            return { maybeSingle: async () => ({ data: { id: "p-email" } }) };
+          },
+        }),
+      }),
+    } as never;
+    const id = await findPersonForRosterRow({ email: "ada@example.org", studentIdNumber: "1741" }, db);
+    expect(id).toBe("p-email");
+    expect(calls).toEqual(["email"]); // never even looks up student_id_number
+  });
+
+  test("falls back to student_id_number when no email match", async () => {
+    let call = 0;
+    const db = {
+      from: () => ({
+        select: () => ({
+          eq: () => {
+            call += 1;
+            const first = call === 1;
+            return {
+              maybeSingle: async () =>
+                first ? { data: null } : { data: { id: "p-sid" } },
+            };
+          },
+        }),
+      }),
+    } as never;
+    const id = await findPersonForRosterRow({ email: "ada@example.org", studentIdNumber: "1741" }, db);
+    expect(id).toBe("p-sid");
+  });
+
+  test("returns null when neither is present or matches", async () => {
+    const db = {
+      from: () => ({
+        select: () => ({
+          eq: () => ({ maybeSingle: async () => ({ data: null }) }),
+        }),
+      }),
+    } as never;
+    expect(await findPersonForRosterRow({ email: null, studentIdNumber: null }, db)).toBeNull();
   });
 });
 

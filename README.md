@@ -88,6 +88,24 @@ zero, both the dashboard and `/me/attendance` show a progress bar under the memb
 (`src/lib/hours-goal.ts`). With no goal set, those readouts fall back to showing just the raw hours
 number, as before.
 
+### CSV roster import
+
+`/admin/people/import` (linked from `/admin/people`) lets an admin bulk create/update the roster
+from a CSV. Columns (case-insensitive, any order): `first_name,last_name,email,role,grad_year,
+student_id_number`. Only `first_name` and `last_name` are required; a blank `role` defaults to
+`student`. Download a starter file from the **Download template** link (`GET
+/api/admin/people/import`).
+
+Each row is matched against the existing roster by **email** (exact — email is always stored
+lowercased) first, then by **student_id_number**: a match updates that person's name/email/role/
+grad-year/student-ID only (their phone, bio, shirt size, dietary notes, display name, and active
+flag are left alone); no match creates a new person. `POST /api/admin/people/import` re-parses and
+re-validates the raw CSV text server-side — it never trusts the browser's preview — and returns a
+per-row summary (`created`/`updated`/`skipped`/`errors`/`results`), turning duplicate-email/
+duplicate-student-ID unique-violations into a per-row error instead of a 500. The pure parser
+(`parseRosterCsv` in `src/lib/roster-import.ts`) also flags in-file duplicate emails/student IDs as
+per-row errors before anything reaches the database.
+
 ## UI / design system
 
 Team Hub's look is a "shop-floor control panel" — warm-neutral surfaces, Red Alert red, a cool

@@ -383,6 +383,22 @@
     color: var(--muted);
   }
 
+  /* CSV roster import preview badges */
+  .pill.new {
+    background: color-mix(in srgb, var(--present) 16%, transparent);
+    color: var(--present);
+  }
+
+  .pill.update {
+    background: var(--steel-soft);
+    color: var(--steel);
+  }
+
+  .pill.error {
+    background: color-mix(in srgb, var(--absent) 16%, transparent);
+    color: var(--absent);
+  }
+
   .badge-present,
   .pill.status-present {
     background: var(--present);

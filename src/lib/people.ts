@@ -83,8 +83,8 @@ export async function getPersonWithTeams(
   return { person: personFromRow(personRow as PersonRow), teams };
 }
 
-const ASSIGNABLE_ROLES = ["admin", "mentor", "student"] as const;
-type AssignableRole = (typeof ASSIGNABLE_ROLES)[number];
+export const ASSIGNABLE_ROLES = ["admin", "mentor", "student"] as const;
+export type AssignableRole = (typeof ASSIGNABLE_ROLES)[number];
 
 export type PersonInput = {
   firstName: string;
@@ -227,4 +227,95 @@ export async function updatePerson(
   }
   if (!data) return { ok: false, status: 404 };
   return { ok: true, status: 200 };
+}
+
+/**
+ * The subset of person columns a roster CSV row can supply. `firstName` /
+ * `lastName` are always applied (the CSV parser requires them on every row).
+ * `email` / `role` / `gradYear` / `studentIdNumber` are `null` when the CSV
+ * left that column blank for this row — and on UPDATE, null means "leave the
+ * existing value alone", not "clear it". (There's currently no way to
+ * deliberately blank out someone's email/grad-year/student-ID via CSV; that
+ * felt like a safer default than a blank cell silently wiping data — e.g.
+ * blanking `email` would drop someone off the OAuth allowlist.) `role: null`
+ * additionally covers "this row didn't specify a role" (the parser defaults
+ * a blank role to `student` for CREATE, but that default must never demote
+ * an existing mentor/admin back to student on re-import).
+ */
+export type RosterFieldsInput = {
+  firstName: string;
+  lastName: string;
+  email: string | null;
+  role: AssignableRole | null;
+  gradYear: number | null;
+  studentIdNumber: string | null;
+};
+
+/**
+ * Update ONLY the roster-CSV-supplied columns on a matched person, leaving
+ * every other column (display_name, phone, shirt_size, dietary_restrictions,
+ * bio, is_active) untouched. Deliberately distinct from `updatePerson`, which
+ * overwrites the full row — a CSV import only carries a subset of fields, and
+ * doing a full overwrite from that subset would null out data the roster
+ * template doesn't collect (e.g. someone's phone number or bio) on every
+ * re-import. Blank/unspecified CSV cells (see `RosterFieldsInput`) are
+ * likewise left out of the update patch rather than clearing the column.
+ */
+export async function updatePersonRosterFields(
+  id: string,
+  input: RosterFieldsInput,
+  db?: SupabaseClient,
+): Promise<{ ok: boolean; status: number }> {
+  const client = db ?? (await import("./db")).getDb();
+  const patch: Record<string, unknown> = {
+    first_name: input.firstName,
+    last_name: input.lastName,
+  };
+  if (input.email !== null) patch.email = input.email;
+  if (input.role !== null) patch.role = input.role;
+  if (input.gradYear !== null) patch.grad_year = input.gradYear;
+  if (input.studentIdNumber !== null) patch.student_id_number = input.studentIdNumber;
+
+  const { data, error } = await client
+    .from("person")
+    .update(patch)
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    return { ok: false, status: error.code === UNIQUE_VIOLATION ? 409 : 500 };
+  }
+  if (!data) return { ok: false, status: 404 };
+  return { ok: true, status: 200 };
+}
+
+/**
+ * Find an existing person by email (exact match — person.email is always
+ * stored lowercased, and CSV rows are lowercased at parse time) or, failing
+ * that, by student_id_number. Uses `.eq()` (parameterized) rather than a
+ * `.or()` filter string so free-text student IDs from an uploaded CSV can
+ * never influence PostgREST filter syntax.
+ */
+export async function findPersonForRosterRow(
+  row: { email: string | null; studentIdNumber: string | null },
+  db?: SupabaseClient,
+): Promise<string | null> {
+  const client = db ?? (await import("./db")).getDb();
+  if (row.email) {
+    const { data } = await client
+      .from("person")
+      .select("id")
+      .eq("email", row.email)
+      .maybeSingle();
+    if (data) return data.id as string;
+  }
+  if (row.studentIdNumber) {
+    const { data } = await client
+      .from("person")
+      .select("id")
+      .eq("student_id_number", row.studentIdNumber)
+      .maybeSingle();
+    if (data) return data.id as string;
+  }
+  return null;
 }
