@@ -23,7 +23,7 @@ export type PendingApplication = {
   createdAt: string;
 };
 
-const APPROVABLE_ROLES = ["student", "captain"] as const;
+const APPROVABLE_ROLES = ["student"] as const;
 
 /** Validate the approval payload. PURE. Mentors/admins are created in /admin/people, not here. */
 export function parseApproval(
@@ -93,7 +93,7 @@ export async function listPendingApplications(
  */
 export async function approveAccountRequest(
   id: string,
-  approval: { studentIdNumber: string; role: "student" | "captain" },
+  approval: { studentIdNumber: string; role: "student" },
   reviewerId: string,
   db?: SupabaseClient,
 ): Promise<{ ok: boolean; status: number }> {

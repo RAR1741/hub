@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 
 export function AccountRequestActions({ requestId }: { requestId: string }) {
   const [studentId, setStudentId] = useState("");
-  const [role, setRole] = useState("student");
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const router = useRouter();
@@ -35,13 +34,9 @@ export function AccountRequestActions({ requestId }: { requestId: string }) {
         value={studentId}
         onChange={(e) => setStudentId(e.target.value)}
       />
-      <select className="input w-auto" value={role} onChange={(e) => setRole(e.target.value)}>
-        <option value="student">student</option>
-        <option value="captain">captain</option>
-      </select>
       <button
         disabled={busy || !studentId.trim()}
-        onClick={() => act({ action: "approve", studentIdNumber: studentId, role })}
+        onClick={() => act({ action: "approve", studentIdNumber: studentId, role: "student" })}
         className="btn btn-primary px-3 py-1"
       >
         {busy ? "Working…" : "Approve"}

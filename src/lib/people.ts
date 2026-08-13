@@ -83,7 +83,7 @@ export async function getPersonWithTeams(
   return { person: personFromRow(personRow as PersonRow), teams };
 }
 
-const ASSIGNABLE_ROLES = ["admin", "mentor", "captain", "student"] as const;
+const ASSIGNABLE_ROLES = ["admin", "mentor", "student"] as const;
 type AssignableRole = (typeof ASSIGNABLE_ROLES)[number];
 
 export type PersonInput = {

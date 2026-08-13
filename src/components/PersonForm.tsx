@@ -81,7 +81,6 @@ export function PersonForm({
       <label className="label">Role{" "}
         <select className="input" value={values.role} onChange={(e) => set("role", e.target.value)}>
           <option value="student">student</option>
-          <option value="captain">captain</option>
           <option value="mentor">mentor</option>
           <option value="admin">admin</option>
         </select>

@@ -1,4 +1,4 @@
-export type Role = "admin" | "mentor" | "captain" | "student" | "guest";
+export type Role = "admin" | "mentor" | "student" | "guest";
 
 /** Row shape of the person table (snake_case, as returned by supabase-js). */
 export type PersonRow = {
@@ -6,7 +6,7 @@ export type PersonRow = {
   first_name: string;
   last_name: string;
   display_name: string | null;
-  role: "admin" | "mentor" | "captain" | "student";
+  role: "admin" | "mentor" | "student";
   grad_year: number | null;
   email: string | null;
   is_active: boolean;

@@ -8,16 +8,11 @@ describe("parseApproval", () => {
       role: "student",
     });
   });
-  test("accepts captain", () => {
-    expect(parseApproval({ studentIdNumber: "17", role: "captain" })).toEqual({
-      studentIdNumber: "17",
-      role: "captain",
-    });
-  });
   test.each([
     [{}],
     [{ studentIdNumber: "" }],
     [{ studentIdNumber: "ok", role: "admin" }],
+    [{ studentIdNumber: "ok", role: "captain" }], // captain role removed — no longer approvable
     [{ studentIdNumber: "x".repeat(65) }],
     [null],
   ])("rejects %j", (body) => {

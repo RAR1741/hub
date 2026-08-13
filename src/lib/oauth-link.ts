@@ -5,7 +5,7 @@ export type OAuthLinkDecision = {
   personId?: string;
 };
 
-const OAUTH_LINKABLE_ROLES = new Set(["admin", "mentor", "captain"]);
+const OAUTH_LINKABLE_ROLES = new Set(["admin", "mentor"]);
 
 export function decideOAuthLink(input: {
   matchedPerson: PersonRow | null;

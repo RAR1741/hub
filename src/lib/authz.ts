@@ -3,9 +3,8 @@ import type { Role } from "./types";
 const RANK: Record<Role, number> = {
   guest: 0,
   student: 1,
-  captain: 2,
-  mentor: 3,
-  admin: 4,
+  mentor: 2,
+  admin: 3,
 };
 
 export function hasRole(actual: Role, required: Role): boolean {

@@ -29,9 +29,8 @@ describe("rosterView", () => {
     expect(view).toEqual({ kind: "names", names: ["Ada Lovelace", "Z"] });
   });
 
-  test("student and captain also get names only", () => {
+  test("student also gets names only", () => {
     expect(rosterView("student", rows).kind).toBe("names");
-    expect(rosterView("captain", rows).kind).toBe("names");
   });
 
   test("mentor gets full people (active only), ordered by last name", () => {
