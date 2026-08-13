@@ -3,21 +3,15 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { parseTimeSheet } from "@/lib/time-import";
+import type { TimeImportSummary } from "@/lib/time-import-run";
 
-type PeriodOpt = { id: string; name: string; isActive: boolean };
-type Summary = {
-  createdPeople: number; matchedPeople: number; sessions: number; excusals: number;
-  skipped: { name: string; date: string; reason: string }[];
-  anomalies: { name: string; date: string; kind: string; detail: string }[];
-  errors: { name: string; message: string }[];
-  createdNames: string[];
-};
+type PeriodOpt = { id: string; name: string; isActive: boolean; startsOn: string; endsOn: string };
 
 export function TimeImportForm({ periods }: { periods: PeriodOpt[] }) {
   const [text, setText] = useState("");
   const [periodId, setPeriodId] = useState(periods.find((p) => p.isActive)?.id ?? periods[0]?.id ?? "");
   const [preview, setPreview] = useState<ReturnType<typeof parseTimeSheet> | null>(null);
-  const [summary, setSummary] = useState<Summary | null>(null);
+  const [summary, setSummary] = useState<TimeImportSummary | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -39,6 +33,9 @@ export function TimeImportForm({ periods }: { periods: PeriodOpt[] }) {
     anomalies: preview.people.reduce((n, p) => n + p.anomalies.length, 0),
   };
 
+  const selectedPeriod = periods.find((p) => p.id === periodId);
+  const outOfRange = preview && selectedPeriod ? preview.dates.filter((d) => d < selectedPeriod.startsOn || d > selectedPeriod.endsOn) : [];
+
   async function runImport() {
     setBusy(true); setStatus(null);
     try {
@@ -47,7 +44,7 @@ export function TimeImportForm({ periods }: { periods: PeriodOpt[] }) {
         body: JSON.stringify({ csv: text, periodId }),
       });
       if (res.ok) {
-        const data = (await res.json()) as Summary;
+        const data = (await res.json()) as TimeImportSummary;
         setSummary(data);
         setStatus(`Imported ${data.sessions} sessions, ${data.excusals} excusals · ${data.createdPeople} people created, ${data.matchedPeople} matched · ${data.skipped.length} skipped, ${data.anomalies.length} anomalies, ${data.errors.length} errors.`);
         router.refresh();
@@ -91,6 +88,11 @@ export function TimeImportForm({ periods }: { periods: PeriodOpt[] }) {
             <span className="pill update">{counts.skipped} skipped</span>
             <span className="pill error">{counts.anomalies} anomalies</span>
           </div>
+          {outOfRange.length > 0 && selectedPeriod && (
+            <p role="alert" className="text-sm text-[var(--absent)]">
+              {outOfRange.length} of {preview.dates.length} meeting dates fall outside {selectedPeriod.name} ({selectedPeriod.startsOn} – {selectedPeriod.endsOn}). Did you pick the right season?
+            </p>
+          )}
           {preview.fileIssues.length > 0 && <ul className="text-sm text-[var(--absent)]">{preview.fileIssues.map((f, i) => <li key={i}>{f}</li>)}</ul>}
           {counts.anomalies > 0 && (
             <ul className="flex flex-col gap-1 text-sm">
@@ -119,6 +121,23 @@ export function TimeImportForm({ periods }: { periods: PeriodOpt[] }) {
             <ul className="flex flex-col gap-1 text-sm">
               {summary.errors.map((e, i) => <li key={i} className="text-[var(--absent)]">{e.name}: {e.message}</li>)}
             </ul>
+          )}
+          {summary.anomalies.length > 0 && (
+            <ul className="flex flex-col gap-1 text-sm">
+              {summary.anomalies.map((a, i) => (
+                <li key={i} className="text-[var(--absent)]">{a.name} · {a.date}: {a.detail}</li>
+              ))}
+            </ul>
+          )}
+          {summary.skipped.length > 0 && (
+            <details className="text-sm">
+              <summary className="cursor-pointer">{summary.skipped.length} skipped entries</summary>
+              <ul className="mt-2 flex flex-col gap-1">
+                {summary.skipped.map((s, i) => (
+                  <li key={i} className="text-[var(--muted)]">{s.name} · {s.date}: {s.reason}</li>
+                ))}
+              </ul>
+            </details>
           )}
         </section>
       )}

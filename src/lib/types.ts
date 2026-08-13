@@ -84,7 +84,7 @@ export function teamFromRow(row: TeamRow): Team {
 
 export type ApplicationStatus = "pending" | "approved" | "denied";
 
-export type SessionSource = "kiosk" | "manual" | "admin";
+export type SessionSource = "kiosk" | "manual" | "admin" | "import";
 
 export type PeriodRow = {
   id: string;

@@ -17,7 +17,7 @@ export default async function AdminTimeImportPage() {
           <div className="sub">Bulk-import a season&apos;s attendance from a Google-Sheets CSV export</div>
         </div>
       </div>
-      <TimeImportForm periods={periods.map((p) => ({ id: p.id, name: p.name, isActive: p.isActive }))} />
+      <TimeImportForm periods={periods.map((p) => ({ id: p.id, name: p.name, isActive: p.isActive, startsOn: p.startsOn, endsOn: p.endsOn }))} />
     </main>
   );
 }

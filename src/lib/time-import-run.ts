@@ -35,7 +35,8 @@ export async function runTimeImport(args: {
   if (parsed.people.length === 0) return { error: parsed.fileIssues[0] ?? "no_data" };
 
   // Load roster once; build name/display-name -> id[] index.
-  const { data: peopleRows } = await db.from("person").select("id, first_name, last_name, display_name");
+  const { data: peopleRows, error: rosterError } = await db.from("person").select("id, first_name, last_name, display_name");
+  if (rosterError) return { error: `roster_load_failed: ${rosterError.message}` };
   const byName = new Map<string, string[]>();
   const byDisplay = new Map<string, string[]>();
   const pushId = (m: Map<string, string[]>, k: string, id: string) => { if (k) m.set(k, [...(m.get(k) ?? []), id]); };
