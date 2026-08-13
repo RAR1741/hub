@@ -6,6 +6,7 @@ import { serverSupabaseUrl } from "@/lib/supabase-url";
 import { AUTH_COOKIE_NAME } from "@/lib/supabase-cookie";
 import { clientUrl } from "@/lib/request-origin";
 import { decideOAuthLink } from "@/lib/oauth-link";
+import type { PersonRow } from "@/lib/types";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -52,16 +53,33 @@ export async function GET(request: Request) {
   const email = data.user.email?.toLowerCase();
   const db = getDb();
 
-  const [{ data: matched, error: matchedError }, { count, error: countError }] =
-    await Promise.all([
-      email
-        ? db.from("person").select("*").eq("email", email).maybeSingle()
-        : Promise.resolve({ data: null, error: null }),
-      db
-        .from("person")
-        .select("id", { count: "exact", head: true })
-        .eq("role", "admin"),
-    ]);
+  const [
+    { data: matched, error: matchedError },
+    { count, error: countError },
+    { count: linkedCount, error: linkedCountError },
+    { data: firstAdmin, error: firstAdminError },
+  ] = await Promise.all([
+    email
+      ? db.from("person").select("*").eq("email", email).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    db
+      .from("person")
+      .select("id", { count: "exact", head: true })
+      .eq("role", "admin"),
+    // How many people already have a Google account attached. Zero = fresh setup.
+    db
+      .from("person")
+      .select("id", { count: "exact", head: true })
+      .not("auth_user_id", "is", null),
+    // The first admin (earliest created) — the fresh-setup login adopts this one.
+    db
+      .from("person")
+      .select("*")
+      .eq("role", "admin")
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+  ]);
 
   if (matchedError) {
     console.error("oauth callback: failed to look up matched person", {
@@ -83,9 +101,30 @@ export async function GET(request: Request) {
     return toErrorRedirect();
   }
 
+  // A wrong "nobody linked yet" reading would wrongly adopt the admin account,
+  // so if we can't determine the linked-account count, fail closed (deny) too.
+  if (linkedCountError) {
+    console.error("oauth callback: failed to determine linked-account count", {
+      authUserId: data.user.id,
+      error: linkedCountError,
+    });
+    return toErrorRedirect();
+  }
+
+  // A failed first-admin lookup only disables the fresh-setup adopt path
+  // (firstAdmin stays null); normal email-match linking still proceeds.
+  if (firstAdminError) {
+    console.error("oauth callback: failed to look up the first admin", {
+      authUserId: data.user.id,
+      error: firstAdminError,
+    });
+  }
+
   const decision = decideOAuthLink({
     matchedPerson: matched ?? null,
     adminCount: count ?? 0,
+    linkedCount: linkedCount ?? 0,
+    firstAdmin: (firstAdmin as PersonRow | null) ?? null,
   });
 
   if (decision.action === "bootstrap-admin") {
@@ -125,6 +164,31 @@ export async function GET(request: Request) {
         });
         return toErrorRedirect();
       }
+    }
+  } else if (decision.action === "adopt-admin") {
+    // Fresh setup: attach this login to the first admin, but only while it's
+    // still unlinked. The `.is auth_user_id null` guard makes two simultaneous
+    // first logins safe — the loser updates nothing and simply stays a guest.
+    const { data: adopted, error: adoptError } = await db
+      .from("person")
+      .update({ auth_user_id: data.user.id, is_active: true })
+      .eq("id", decision.personId!)
+      .is("auth_user_id", null)
+      .select("id");
+    if (adoptError) {
+      console.error("oauth callback: failed to adopt the first admin", {
+        personId: decision.personId,
+        authUserId: data.user.id,
+        error: adoptError,
+      });
+      return toErrorRedirect();
+    }
+    if (!adopted || adopted.length === 0) {
+      // Another first login adopted it first — this user stays a guest.
+      console.warn(
+        "oauth callback: first admin already adopted by a concurrent login",
+        { personId: decision.personId, authUserId: data.user.id },
+      );
     }
   } else if (decision.action === "link") {
     const { error: linkError } = await db
