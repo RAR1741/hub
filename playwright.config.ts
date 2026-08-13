@@ -14,9 +14,19 @@ for (const file of [".env.local", ".env"]) {
 
 export default defineConfig({
   testDir: "./e2e",
+  globalSetup: "./e2e/global-setup.ts",
   timeout: 30_000,
   expect: { timeout: 5_000 },
   fullyParallel: false, // specs share one DB; keep them serial
+  // `fullyParallel: false` only serializes tests *within* a file — without
+  // pinning workers, Playwright still runs multiple spec *files*
+  // concurrently (one per worker), which is exactly what the comment above
+  // says not to do: specs share one DB, and concurrent workers are also
+  // what turns the local dev server's lazy per-route compile into a flake
+  // (whichever spec's first hit on a given route loses the race against
+  // the 30s test timeout). Force a single worker so runs are fully serial,
+  // both for DB safety and for determinism against the dev server.
+  workers: 1,
   retries: 0,
   reporter: [["list"]],
   use: {

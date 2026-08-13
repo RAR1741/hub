@@ -88,3 +88,33 @@ export async function excusalExists(personId: string, date: string): Promise<boo
   const rows = (await res.json()) as unknown[];
   return rows.length > 0;
 }
+
+/**
+ * Delete any excusal_request rows for a person+date, regardless of status.
+ * Used to make specs that POST /api/excusal-requests re-run-safe against the
+ * partial-unique `one_pending_excusal_request_per_person_date` constraint —
+ * without this, a 2nd run (without `db:reset`) hits a leftover pending row
+ * from the prior run and gets a 409 instead of the 201 the spec asserts.
+ */
+export async function deleteExcusalRequests(personId: string, date: string): Promise<void> {
+  const res = await fetch(
+    `${restBaseUrl()}/excusal_request?person_id=eq.${personId}&date=eq.${date}`,
+    { method: "DELETE", headers: authHeaders() },
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`deleteExcusalRequests failed: ${res.status} ${body}`);
+  }
+}
+
+/** Delete the excusal row for a person+date, if any. Idempotent. */
+export async function deleteExcusal(personId: string, date: string): Promise<void> {
+  const res = await fetch(
+    `${restBaseUrl()}/excusal?person_id=eq.${personId}&date=eq.${date}`,
+    { method: "DELETE", headers: authHeaders() },
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`deleteExcusal failed: ${res.status} ${body}`);
+  }
+}

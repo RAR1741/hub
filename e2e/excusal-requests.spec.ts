@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { mentorSessionCookie, studentSessionCookie } from "./helpers/session";
 import {
+  deleteExcusal,
+  deleteExcusalRequests,
   excusalExists,
   findPendingExcusalRequestId,
   seededStudentPersonId,
@@ -10,10 +12,18 @@ import {
 // creates a real `excusal` row (M6 issue #28's self-service request flow).
 // Self-contained from a clean `db:reset`: uses a fixed date that no other
 // spec touches for this person.
+//
+// Re-run-safe WITHOUT a db:reset between runs: a prior run leaves a pending
+// excusal_request (unique per person+date) and the excusal it approved into
+// behind, so before creating we wipe both for this person+date. That keeps
+// the `201` and `excusalExists === false` assertions below meaningful on a
+// second (or Nth) run, not just the first.
 const REQUEST_DATE = "2026-09-20";
 
 test("student excusal request -> mentor approval creates an excusal", async ({ browser }) => {
   const personId = await seededStudentPersonId();
+  await deleteExcusalRequests(personId, REQUEST_DATE);
+  await deleteExcusal(personId, REQUEST_DATE);
 
   // 1. Student POSTs their own excusal request.
   const studentContext = await browser.newContext();
@@ -50,11 +60,17 @@ test("student excusal request -> mentor approval creates an excusal", async ({ b
   expect(await excusalExists(personId, REQUEST_DATE)).toBe(true);
 });
 
-test("mentor Requests nav link is visible to mentors", async ({ browser }) => {
+test("mentor Requests card is visible in the admin hub", async ({ browser }) => {
+  // The top-nav "Requests" link was removed when the admin hub was
+  // reorganized into sections (feat(ui): reorganize admin hub into
+  // sections; declutter nav) — Requests now lives as a card on /admin,
+  // which mentors reach via the "Admin" nav link. Updated to match.
   const mentorContext = await browser.newContext();
   await mentorContext.addCookies([await mentorSessionCookie()]);
   const page = await mentorContext.newPage();
   await page.goto("/");
-  await expect(page.getByRole("link", { name: "Requests" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Admin" })).toBeVisible();
+  await page.goto("/admin");
+  await expect(page.getByRole("link", { name: /Requests/ })).toBeVisible();
   await mentorContext.close();
 });
