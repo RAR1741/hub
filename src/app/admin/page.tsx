@@ -145,6 +145,7 @@ export default async function AdminHubPage() {
         <Section label="Roster">
           <Card href="/admin/people" icon="users" title="People" count={people.length} hint="Roster, roles, and student IDs." />
           <Card href="/admin/teams" icon="users" title="Teams" count={teams.length} hint="Sub-teams, join modes, membership." />
+          <Card href="/admin/time-import" icon="clock" title="Time import" hint="Import a season's attendance from a Google-Sheets CSV." />
         </Section>
       )}
 
