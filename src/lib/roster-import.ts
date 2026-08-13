@@ -204,8 +204,13 @@ export function parseRosterCsv(text: string): ParseRosterCsvResult {
     let gradYear: number | null = null;
     if (gradYearRaw !== "") {
       const n = Number(gradYearRaw);
-      if (!Number.isInteger(n)) {
-        errors.push({ line, message: `grad_year must be an integer: "${gradYearRaw}"` });
+      // Bound to the same range the admin person form enforces (optInt 2000–2100)
+      // so a typo'd year (e.g. 20281) is caught instead of imported.
+      if (!Number.isInteger(n) || n < 2000 || n > 2100) {
+        errors.push({
+          line,
+          message: `grad_year must be an integer between 2000 and 2100: "${gradYearRaw}"`,
+        });
         return;
       }
       gradYear = n;

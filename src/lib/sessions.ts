@@ -7,6 +7,7 @@ export type ClockResult =
   | { ok: false; status: number; reason: string };
 
 const UNIQUE_VIOLATION = "23505";
+const FOREIGN_KEY_VIOLATION = "23503";
 
 export async function clockIn(personId: string, db?: SupabaseClient): Promise<ClockResult> {
   const client = db ?? (await import("./db")).getDb();
@@ -18,6 +19,8 @@ export async function clockIn(personId: string, db?: SupabaseClient): Promise<Cl
   if (error) {
     // The partial unique index rejects a second open session for the same person.
     if (error.code === UNIQUE_VIOLATION) return { ok: false, status: 409, reason: "already_in" };
+    // A bad/nonexistent person_id fails the FK — that's a bad request, not a server error.
+    if (error.code === FOREIGN_KEY_VIOLATION) return { ok: false, status: 400, reason: "invalid_person" };
     return { ok: false, status: 500, reason: "db_error" };
   }
   return { ok: true };

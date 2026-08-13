@@ -29,6 +29,10 @@ describe("clockIn", () => {
     const r = await clockIn("p1", fakeDb({ activePeriod: { id: "pd1" }, insertError: { code: "23505" } }));
     expect(r).toEqual({ ok: false, status: 409, reason: "already_in" });
   });
+  test("400 invalid_person on foreign-key violation (23503)", async () => {
+    const r = await clockIn("nope", fakeDb({ activePeriod: { id: "pd1" }, insertError: { code: "23503" } }));
+    expect(r).toEqual({ ok: false, status: 400, reason: "invalid_person" });
+  });
   test("ok when insert succeeds", async () => {
     const r = await clockIn("p1", fakeDb({ activePeriod: { id: "pd1" } }));
     expect(r).toEqual({ ok: true });

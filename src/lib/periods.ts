@@ -33,6 +33,13 @@ export async function getActivePeriod(db?: SupabaseClient): Promise<Period | nul
   return data ? periodFromRow(data as PeriodRow) : null;
 }
 
+/** Look up a period by id. Returns null if not found (or the id is malformed). */
+export async function getPeriod(id: string, db?: SupabaseClient): Promise<Period | null> {
+  const client = db ?? (await import("./db")).getDb();
+  const { data } = await client.from("period").select("*").eq("id", id).maybeSingle();
+  return data ? periodFromRow(data as PeriodRow) : null;
+}
+
 export async function createPeriod(
   input: PeriodInput,
   db?: SupabaseClient,

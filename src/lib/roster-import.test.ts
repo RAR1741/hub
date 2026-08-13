@@ -75,6 +75,16 @@ describe("parseRosterCsv", () => {
     expect(errors).toEqual([{ line: 2, message: expect.stringMatching(/grad_year/i) }]);
   });
 
+  test("out-of-range grad_year is a per-row error (matches the admin form's 2000–2100 bound)", () => {
+    const csv = "first_name,last_name,grad_year\nAda,Lovelace,20281\nBo,Peep,1899\n";
+    const { rows, errors } = parseRosterCsv(csv);
+    expect(rows).toHaveLength(0);
+    expect(errors).toEqual([
+      { line: 2, message: expect.stringMatching(/grad_year/i) },
+      { line: 3, message: expect.stringMatching(/grad_year/i) },
+    ]);
+  });
+
   test("email is lowercased", () => {
     const csv = "first_name,last_name,email\nAda,Lovelace,ADA@EXAMPLE.ORG\n";
     const { rows, errors } = parseRosterCsv(csv);

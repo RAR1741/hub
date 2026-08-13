@@ -2,6 +2,7 @@ import { getDb } from "@/lib/db";
 import { getSetting } from "@/lib/settings";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
+import { secureEqual } from "@/lib/secure-compare";
 import { gcalCredentialsFromEnv, pickCalendarId, syncCalendar } from "@/lib/gcal";
 
 export async function POST(request: Request) {
@@ -10,7 +11,7 @@ export async function POST(request: Request) {
   // Gate 1: shared secret (for pg_cron, which has no session). Empty secret never authorizes.
   const provided = request.headers.get("x-sync-secret");
   const secret = await getSetting<string>("gcal_sync_secret", "", db);
-  const secretOk = secret.length > 0 && provided === secret;
+  const secretOk = secret.length > 0 && provided != null && secureEqual(provided, secret);
 
   // Gate 2: a mentor+ session.
   if (!secretOk) {

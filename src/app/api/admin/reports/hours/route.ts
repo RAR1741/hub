@@ -1,5 +1,5 @@
 import { withRole } from "@/lib/api";
-import { getActivePeriod } from "@/lib/periods";
+import { getActivePeriod, getPeriod } from "@/lib/periods";
 import { hoursReportForPeriod } from "@/lib/reports";
 import { hoursReportCsv } from "@/lib/reports-export";
 
@@ -7,18 +7,19 @@ import { hoursReportCsv } from "@/lib/reports-export";
 export const GET = withRole("mentor", async (_viewer, request) => {
   const { searchParams } = new URL(request.url);
   const requested = searchParams.get("period");
-  const periodId = requested ?? (await getActivePeriod())?.id;
-  if (!periodId) {
-    return Response.json({ error: "no active period" }, { status: 404 });
+  // A requested-but-nonexistent period is a 404, not a silent empty CSV.
+  const period = requested ? await getPeriod(requested) : await getActivePeriod();
+  if (!period) {
+    return Response.json({ error: "period not found" }, { status: 404 });
   }
 
-  const rows = await hoursReportForPeriod(periodId);
+  const rows = await hoursReportForPeriod(period.id);
   const csv = hoursReportCsv(rows);
   return new Response(csv, {
     status: 200,
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="hours-${periodId}.csv"`,
+      "Content-Disposition": `attachment; filename="hours-${period.id}.csv"`,
     },
   });
 });
