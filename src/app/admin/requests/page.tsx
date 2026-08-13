@@ -5,18 +5,22 @@ import {
   listPendingAccountRequests,
   listPendingApplications,
 } from "@/lib/requests";
+import { listPendingExcusalRequests } from "@/lib/excusal-requests";
 import {
   AccountRequestActions,
   ApplicationActions,
+  ExcusalRequestActions,
 } from "@/components/RequestActions";
 
 export default async function AdminRequestsPage() {
   const viewer = await getViewer();
-  if (!hasRole(viewer.role, "admin")) redirect("/");
+  // Mentors+ can review requests (matches the review routes' withRole("mentor") gates).
+  if (!hasRole(viewer.role, "mentor")) redirect("/");
 
-  const [accountRequests, applications] = await Promise.all([
+  const [accountRequests, applications, excusalRequests] = await Promise.all([
     listPendingAccountRequests(),
     listPendingApplications(),
+    listPendingExcusalRequests(),
   ]);
 
   return (
@@ -75,6 +79,33 @@ export default async function AdminRequestsPage() {
                       <td>{a.message ?? ""}</td>
                       <td className="mono">{new Date(a.createdAt).toLocaleDateString()}</td>
                       <td><ApplicationActions applicationId={a.id} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-base font-semibold">Excusal requests ({excusalRequests.length})</h2>
+        {excusalRequests.length === 0 ? (
+          <p className="card text-sm text-[var(--muted)]">No pending excusal requests.</p>
+        ) : (
+          <div className="tablewrap">
+            <div style={{ overflowX: "auto" }}>
+              <table className="table">
+                <thead>
+                  <tr><th>Name</th><th>Date</th><th>Reason</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                  {excusalRequests.map((r) => (
+                    <tr key={r.id}>
+                      <td>{r.name}</td>
+                      <td className="mono">{r.date}</td>
+                      <td>{r.reason ?? ""}</td>
+                      <td><ExcusalRequestActions requestId={r.id} /></td>
                     </tr>
                   ))}
                 </tbody>

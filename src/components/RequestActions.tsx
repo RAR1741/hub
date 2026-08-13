@@ -81,3 +81,33 @@ export function ApplicationActions({ applicationId }: { applicationId: string })
     </span>
   );
 }
+
+export function ExcusalRequestActions({ requestId }: { requestId: string }) {
+  const [status, setStatus] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const router = useRouter();
+
+  async function act(action: "approve" | "deny") {
+    setStatus(null);
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/admin/requests/excusal/${requestId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      if (res.ok) router.refresh();
+      else setStatus("Action failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <span className="inline-flex flex-wrap items-center gap-2">
+      <button disabled={busy} onClick={() => act("approve")} className="btn btn-primary px-3 py-1">{busy ? "Working…" : "Approve"}</button>
+      <button disabled={busy} onClick={() => act("deny")} className="btn btn-secondary px-3 py-1">Deny</button>
+      {status && <span role="status" className="text-sm text-[var(--color-muted-fg)]"> {status}</span>}
+    </span>
+  );
+}
