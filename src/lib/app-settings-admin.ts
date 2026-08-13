@@ -5,6 +5,7 @@ export type SettingsInput = {
   gcalCalendarId: string;
   autoCloseHours: number;
   maxShiftHours: number;
+  seasonHoursGoal: number;
 };
 
 function isValidTimeZone(tz: unknown): tz is string {
@@ -31,8 +32,15 @@ export function parseSettingsInput(body: unknown): SettingsInput | null {
   if (gcalCalendarId === null || gcalCalendarId.length > 200) return null;
   const autoCloseHours = intInRange(b.autoCloseHours, 1, 24);
   const maxShiftHours = intInRange(b.maxShiftHours, 1, 48);
-  if (autoCloseHours === null || maxShiftHours === null) return null;
-  return { teamTimezone: b.teamTimezone, gcalCalendarId, autoCloseHours, maxShiftHours };
+  const seasonHoursGoal = intInRange(b.seasonHoursGoal, 0, 100_000);
+  if (autoCloseHours === null || maxShiftHours === null || seasonHoursGoal === null) return null;
+  return {
+    teamTimezone: b.teamTimezone,
+    gcalCalendarId,
+    autoCloseHours,
+    maxShiftHours,
+    seasonHoursGoal,
+  };
 }
 
 export async function setSettings(
@@ -45,6 +53,7 @@ export async function setSettings(
     { key: "gcal_calendar_id", value: input.gcalCalendarId },
     { key: "auto_close_hours", value: input.autoCloseHours },
     { key: "max_shift_hours", value: input.maxShiftHours },
+    { key: "season_hours_goal", value: input.seasonHoursGoal },
   ];
   const { error } = await client.from("app_setting").upsert(rows, { onConflict: "key" });
   if (error) return { ok: false, status: 500 };

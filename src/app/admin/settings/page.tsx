@@ -9,12 +9,14 @@ export default async function AdminSettingsPage() {
   const viewer = await getViewer();
   if (!hasRole(viewer.role, "admin")) redirect("/");
 
-  const [teamTimezone, gcalCalendarId, autoCloseHours, maxShiftHours] = await Promise.all([
-    getSetting<string>("team_timezone", "America/Indiana/Indianapolis"),
-    getSetting<string>("gcal_calendar_id", ""),
-    getSetting<number>("auto_close_hours", 4),
-    getSetting<number>("max_shift_hours", 18),
-  ]);
+  const [teamTimezone, gcalCalendarId, autoCloseHours, maxShiftHours, seasonHoursGoal] =
+    await Promise.all([
+      getSetting<string>("team_timezone", "America/Indiana/Indianapolis"),
+      getSetting<string>("gcal_calendar_id", ""),
+      getSetting<number>("auto_close_hours", 4),
+      getSetting<number>("max_shift_hours", 18),
+      getSetting<number>("season_hours_goal", 0),
+    ]);
 
   return (
     <main className="flex flex-col gap-6">
@@ -25,7 +27,9 @@ export default async function AdminSettingsPage() {
         </div>
       </div>
       <section className="card flex flex-col gap-4">
-        <SettingsForm initial={{ teamTimezone, gcalCalendarId, autoCloseHours, maxShiftHours }} />
+        <SettingsForm
+          initial={{ teamTimezone, gcalCalendarId, autoCloseHours, maxShiftHours, seasonHoursGoal }}
+        />
       </section>
       <p>
         <Link href="/admin/kiosk-devices" className="font-medium text-[var(--red)]">

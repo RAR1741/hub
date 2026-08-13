@@ -8,6 +8,7 @@ export type SettingsValues = {
   gcalCalendarId: string;
   autoCloseHours: number;
   maxShiftHours: number;
+  seasonHoursGoal: number;
 };
 
 export function SettingsForm({ initial }: { initial: SettingsValues }) {
@@ -51,6 +52,10 @@ export function SettingsForm({ initial }: { initial: SettingsValues }) {
       <label className="label">Max shift hours{" "}
         <input className="input" type="number" min={1} max={48} value={values.maxShiftHours}
           onChange={(e) => setValues({ ...values, maxShiftHours: Number(e.target.value) })} required />
+      </label>
+      <label className="label">Season hours goal (0 = no goal){" "}
+        <input className="input" type="number" min={0} max={100000} value={values.seasonHoursGoal}
+          onChange={(e) => setValues({ ...values, seasonHoursGoal: Number(e.target.value) })} required />
       </label>
       <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? "Saving…" : "Save settings"}</button>
       {status && <p role="status" className="text-sm text-[var(--color-muted-fg)]">{status}</p>}
