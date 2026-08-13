@@ -1,4 +1,6 @@
+import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
+import { hasRole } from "@/lib/authz";
 import {
   buildTeamTree,
   joinAction,
@@ -11,6 +13,8 @@ import { JoinButtons } from "@/components/JoinButtons";
 
 export default async function TeamsPage() {
   const viewer = await getViewer();
+  // Teams is signed-in only — guests (the only role below student) are sent to login.
+  if (!hasRole(viewer.role, "student")) redirect("/login");
   const teams = await listTeams();
   const [memberIds, pendingIds] = viewer.person
     ? await Promise.all([

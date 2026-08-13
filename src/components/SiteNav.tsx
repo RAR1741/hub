@@ -43,9 +43,11 @@ export async function SiteNav() {
             <Link href="/people" className={navLinkClass}>
               People
             </Link>{" "}
-            <Link href="/teams" className={navLinkClass}>
-              Teams
-            </Link>{" "}
+            {hasRole(viewer.role, "student") && (
+              <Link href="/teams" className={navLinkClass}>
+                Teams
+              </Link>
+            )}{" "}
             <Link href="/kiosk" className={navLinkClass}>
               Kiosk
             </Link>{" "}
