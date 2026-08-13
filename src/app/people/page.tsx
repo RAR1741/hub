@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
 import { listPeople, rosterView } from "@/lib/people";
@@ -21,6 +22,8 @@ export default async function PeoplePage({
   searchParams: Promise<{ q?: string }>;
 }) {
   const [{ q }, viewer] = await Promise.all([searchParams, getViewer()]);
+  // People is signed-in only — guests (the only role below student) go to login.
+  if (!hasRole(viewer.role, "student")) redirect("/login");
   const view = rosterView(viewer.role, await listPeople(q));
   const count = view.kind === "names" ? view.names.length : view.people.length;
   // People are edited from /admin/people, which is admin-gated.

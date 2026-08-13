@@ -25,6 +25,26 @@ test.describe("teams hidden from guests", () => {
   });
 });
 
+test.describe("people hidden from guests", () => {
+  test("anonymous GET /people is redirected to /login", async ({ browser }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await page.goto("/people");
+    expect(new URL(page.url()).pathname).toBe("/login");
+    await context.close();
+  });
+
+  test("a signed-in student is NOT redirected away from /people", async ({ browser }) => {
+    const context = await browser.newContext();
+    await context.addCookies([await studentSessionCookie()]);
+    const page = await context.newPage();
+    await page.goto("/people");
+    expect(new URL(page.url()).pathname).toBe("/people");
+    await expect(page.getByRole("heading", { name: "People" })).toBeVisible();
+    await context.close();
+  });
+});
+
 test.describe("People edit icon is admin-only", () => {
   test("an admin sees a per-row edit link on /people", async ({ browser }) => {
     const context = await browser.newContext();
