@@ -8,6 +8,8 @@
  * rest are optional. Unknown columns are ignored (noted, not fatal).
  */
 
+import { parseCsvRecords } from "./csv";
+
 export type RosterRole = "admin" | "mentor" | "student";
 
 export type ParsedRosterRow = {
@@ -51,79 +53,6 @@ type HeaderKey = (typeof KNOWN_HEADERS)[number];
 const ROLE_VALUES = ["admin", "mentor", "student"] as const;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-/**
- * RFC4180-ish CSV tokenizer: quoted fields, doubled-quote escaping, embedded
- * commas inside quotes, and CRLF/CR/LF line endings. Deliberately small and
- * dependency-free per the brief (no heavy CSV package needed for this shape).
- */
-function parseCsvRecords(text: string): string[][] {
-  const records: string[][] = [];
-  let row: string[] = [];
-  let field = "";
-  let inQuotes = false;
-  let sawAnyContentInRow = false;
-
-  const src = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
-  let i = 0;
-  const len = src.length;
-
-  while (i < len) {
-    const c = src[i];
-    if (inQuotes) {
-      if (c === '"') {
-        if (src[i + 1] === '"') {
-          field += '"';
-          i += 2;
-          continue;
-        }
-        inQuotes = false;
-        i++;
-        continue;
-      }
-      field += c;
-      i++;
-      continue;
-    }
-
-    if (c === '"') {
-      inQuotes = true;
-      sawAnyContentInRow = true;
-      i++;
-      continue;
-    }
-    if (c === ",") {
-      row.push(field);
-      field = "";
-      sawAnyContentInRow = true;
-      i++;
-      continue;
-    }
-    if (c === "\r") {
-      i++;
-      continue;
-    }
-    if (c === "\n") {
-      row.push(field);
-      records.push(row);
-      row = [];
-      field = "";
-      sawAnyContentInRow = false;
-      i++;
-      continue;
-    }
-    field += c;
-    sawAnyContentInRow = true;
-    i++;
-  }
-
-  if (sawAnyContentInRow || field.length > 0 || row.length > 0) {
-    row.push(field);
-    records.push(row);
-  }
-
-  return records;
-}
 
 function cellOrEmpty(record: string[], idx: number | undefined): string {
   if (idx === undefined) return "";
