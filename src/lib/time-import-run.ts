@@ -16,6 +16,7 @@ export type TimeImportSummary = {
 };
 
 const nameKey = (first: string, last: string) => `${first.trim().toLowerCase()}\x00${last.trim().toLowerCase()}`;
+const normalizeFull = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
 const toMinutes = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
 
 export async function runTimeImport(args: {
@@ -36,11 +37,11 @@ export async function runTimeImport(args: {
   // Load roster once; build name/display-name -> id[] index.
   const { data: peopleRows } = await db.from("person").select("id, first_name, last_name, display_name");
   const byName = new Map<string, string[]>();
+  const byDisplay = new Map<string, string[]>();
+  const pushId = (m: Map<string, string[]>, k: string, id: string) => { if (k) m.set(k, [...(m.get(k) ?? []), id]); };
   for (const p of (peopleRows ?? []) as { id: string; first_name: string; last_name: string; display_name: string | null }[]) {
-    for (const k of [nameKey(p.first_name, p.last_name), p.display_name ? nameKey(...splitDisplay(p.display_name)) : ""]) {
-      if (!k) continue;
-      byName.set(k, [...(byName.get(k) ?? []), p.id]);
-    }
+    pushId(byName, nameKey(p.first_name, p.last_name), p.id);
+    if (p.display_name) pushId(byDisplay, normalizeFull(p.display_name), p.id);
   }
 
   const summary: TimeImportSummary = {
@@ -52,15 +53,16 @@ export async function runTimeImport(args: {
 
   for (const person of parsed.people) {
     const name = `${person.firstName} ${person.lastName}`;
-    const key = nameKey(person.firstName, person.lastName);
-    const matches = byName.get(key) ?? [];
+    const nkey = nameKey(person.firstName, person.lastName);
+    const dkey = normalizeFull(name);
+    const candidateIds = new Set<string>([...(byName.get(nkey) ?? []), ...(byDisplay.get(dkey) ?? [])]);
 
     let personId: string;
-    if (matches.length > 1) {
+    if (candidateIds.size > 1) {
       summary.errors.push({ name, message: "Ambiguous — name matches more than one person" });
       continue;
-    } else if (matches.length === 1) {
-      personId = matches[0];
+    } else if (candidateIds.size === 1) {
+      personId = [...candidateIds][0];
       summary.matchedPeople += 1;
     } else {
       const { data, error } = await db.from("person")
@@ -68,7 +70,7 @@ export async function runTimeImport(args: {
         .select("id").single();
       if (error || !data) { summary.errors.push({ name, message: "Failed to create person" }); continue; }
       personId = data.id as string;
-      byName.set(key, [personId]);
+      pushId(byName, nkey, personId);
       summary.createdPeople += 1;
       summary.createdNames.push(name);
     }
@@ -77,8 +79,10 @@ export async function runTimeImport(args: {
   }
 
   // Idempotent replace: clear this period's prior import rows, then insert.
-  await db.from("session").delete().eq("period_id", args.periodId).eq("source", "import");
-  await db.from("excusal").delete().eq("source", "import").gte("date", period.startsOn).lte("date", period.endsOn);
+  const delSession = await db.from("session").delete().eq("period_id", args.periodId).eq("source", "import");
+  if (delSession.error) return { error: `session_delete_failed: ${delSession.error.message}` };
+  const delExcusal = await db.from("excusal").delete().eq("source", "import").gte("date", period.startsOn).lte("date", period.endsOn);
+  if (delExcusal.error) return { error: `excusal_delete_failed: ${delExcusal.error.message}` };
 
   for (let i = 0; i < sessionRows.length; i += 500) {
     const { error } = await db.from("session").insert(sessionRows.slice(i, i + 500));
@@ -90,11 +94,6 @@ export async function runTimeImport(args: {
   }
 
   return summary;
-}
-
-function splitDisplay(display: string): [string, string] {
-  const parts = display.trim().split(/\s+/);
-  return [parts[0] ?? "", parts.slice(1).join(" ")];
 }
 
 function collectRows(
