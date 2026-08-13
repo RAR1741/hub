@@ -13,6 +13,17 @@ export function displayName(p: {
   return p.display_name ?? `${p.first_name} ${p.last_name}`;
 }
 
+/**
+ * First name + last initial, e.g. "Ada L." — the only form a guest may see on
+ * any non-Kiosk page. Ignores display_name/nicknames on purpose (masking works
+ * off the real name). Falls back to just the first name when there's no last.
+ * PURE.
+ */
+export function publicName(p: { first_name: string; last_name: string }): string {
+  const initial = p.last_name.trim().charAt(0);
+  return initial ? `${p.first_name} ${initial}.` : p.first_name;
+}
+
 export type RosterView =
   | { kind: "names"; names: string[] }
   | { kind: "full"; people: Person[] };

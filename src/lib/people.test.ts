@@ -6,6 +6,7 @@ import {
   findPersonForRosterRow,
   listPeople,
   parsePersonInput,
+  publicName,
   rosterView,
   updatePersonRosterFields,
 } from "./people";
@@ -58,6 +59,20 @@ describe("displayName", () => {
   });
   test("falls back to first + last", () => {
     expect(displayName({ first_name: "A", last_name: "B", display_name: null })).toBe("A B");
+  });
+});
+
+describe("publicName", () => {
+  test("first name + last initial", () => {
+    expect(publicName({ first_name: "Ada", last_name: "Lovelace" })).toBe("Ada L.");
+  });
+  test("ignores display_name / nicknames (masks the real name)", () => {
+    // publicName takes only first/last, so a nickname can never leak a full surname.
+    expect(publicName({ first_name: "Zed", last_name: "Adams" })).toBe("Zed A.");
+  });
+  test("falls back to first name when there is no last name", () => {
+    expect(publicName({ first_name: "Cher", last_name: "" })).toBe("Cher");
+    expect(publicName({ first_name: "Cher", last_name: "   " })).toBe("Cher");
   });
 });
 

@@ -14,17 +14,17 @@ const s = (over: Partial<Session>): Session => ({
 describe("leaderboard", () => {
   test("totals per person, sorted by hours desc", () => {
     const result = leaderboard([
-      { personId: "p1", name: "Ada", sessions: [s({}), s({ timeOut: "2026-09-01T21:00:00Z" })] }, // 2 + 3 = 5
-      { personId: "p2", name: "Bo", sessions: [s({})] }, // 2
+      { personId: "p1", name: "Ada", firstName: "Ada", lastName: "Lovelace", role: "student", sessions: [s({}), s({ timeOut: "2026-09-01T21:00:00Z" })] }, // 2 + 3 = 5
+      { personId: "p2", name: "Bo", firstName: "Bo", lastName: "Peep", role: "mentor", sessions: [s({})] }, // 2
     ]);
     expect(result).toEqual([
-      { personId: "p1", name: "Ada", hours: 5, sessionCount: 2 },
-      { personId: "p2", name: "Bo", hours: 2, sessionCount: 1 },
+      { personId: "p1", name: "Ada", firstName: "Ada", lastName: "Lovelace", role: "student", hours: 5, sessionCount: 2 },
+      { personId: "p2", name: "Bo", firstName: "Bo", lastName: "Peep", role: "mentor", hours: 2, sessionCount: 1 },
     ]);
   });
   test("excluded and open sessions don't add hours but count as sessions", () => {
     const [entry] = leaderboard([
-      { personId: "p1", name: "Ada", sessions: [s({ excludedFromTotals: true }), s({ timeOut: null })] },
+      { personId: "p1", name: "Ada", firstName: "Ada", lastName: "Lovelace", role: "student", sessions: [s({ excludedFromTotals: true }), s({ timeOut: null })] },
     ]);
     expect(entry.hours).toBe(0);
     expect(entry.sessionCount).toBe(2);

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Session, SessionRow } from "./types";
+import type { Session, SessionRow, Role } from "./types";
 import { sessionFromRow } from "./types";
 import { totalHours, overlappingSessionIds, sessionFlags, type FlagKind } from "./hours";
 import { displayName, listPeople } from "./people";
@@ -8,18 +8,31 @@ import { getSetting } from "./settings";
 export type LeaderboardEntry = {
   personId: string;
   name: string;
+  firstName: string;
+  lastName: string;
+  role: Role;
   hours: number;
   sessionCount: number;
 };
 
 /** Per-person totals, sorted by hours desc then name. PURE. */
 export function leaderboard(
-  rows: { personId: string; name: string; sessions: Session[] }[],
+  rows: {
+    personId: string;
+    name: string;
+    firstName: string;
+    lastName: string;
+    role: Role;
+    sessions: Session[];
+  }[],
 ): LeaderboardEntry[] {
   return rows
     .map((r) => ({
       personId: r.personId,
       name: r.name,
+      firstName: r.firstName,
+      lastName: r.lastName,
+      role: r.role,
       hours: Math.round(totalHours(r.sessions) * 100) / 100,
       sessionCount: r.sessions.length,
     }))
@@ -58,21 +71,38 @@ export async function periodLeaderboard(
   const client = db ?? (await import("./db")).getDb();
   const { data, error } = await client
     .from("session")
-    .select("*, person!person_id (id, first_name, last_name, display_name)")
+    .select("*, person!person_id (id, first_name, last_name, display_name, role)")
     .eq("period_id", periodId);
   if (error) console.error("periodLeaderboard: query failed", error);
-  const byPerson = new Map<string, { name: string; sessions: Session[] }>();
+  const byPerson = new Map<
+    string,
+    { name: string; firstName: string; lastName: string; role: Role; sessions: Session[] }
+  >();
   for (const row of data ?? []) {
     const p = row.person as unknown as {
-      id: string; first_name: string; last_name: string; display_name: string | null;
+      id: string; first_name: string; last_name: string; display_name: string | null; role: Role;
     } | null;
     if (!p) continue;
-    const entry = byPerson.get(p.id) ?? { name: displayName(p), sessions: [] };
+    const entry =
+      byPerson.get(p.id) ?? {
+        name: displayName(p),
+        firstName: p.first_name,
+        lastName: p.last_name,
+        role: p.role,
+        sessions: [],
+      };
     entry.sessions.push(sessionFromRow(row as unknown as SessionRow));
     byPerson.set(p.id, entry);
   }
   return leaderboard(
-    [...byPerson.entries()].map(([personId, v]) => ({ personId, name: v.name, sessions: v.sessions })),
+    [...byPerson.entries()].map(([personId, v]) => ({
+      personId,
+      name: v.name,
+      firstName: v.firstName,
+      lastName: v.lastName,
+      role: v.role,
+      sessions: v.sessions,
+    })),
   );
 }
 
