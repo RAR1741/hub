@@ -3,33 +3,50 @@ import { getViewer } from "@/lib/viewer";
 import { getActivePeriod } from "@/lib/periods";
 import { listBuildDays } from "@/lib/build-days";
 import { listExcusals } from "@/lib/excusals";
+import { listExcusalRequestsForPerson } from "@/lib/excusal-requests";
 import { personSessions } from "@/lib/reports";
 import { getSetting } from "@/lib/settings";
 import { attendanceForDate, attendanceSummary } from "@/lib/attendance";
+import { ExcusalRequestForm } from "@/components/ExcusalRequestForm";
+import { ExcusalRequestList } from "@/components/ExcusalRequestList";
 
-export default async function MyAttendancePage() {
-  const viewer = await getViewer();
+export default async function MyAttendancePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ date?: string }>;
+}) {
+  const [{ date: defaultDate }, viewer] = await Promise.all([searchParams, getViewer()]);
   if (!viewer.person) {
     redirect("/login");
   }
 
+  const personId = viewer.person.id;
   const period = await getActivePeriod();
   if (!period) {
+    const myRequests = await listExcusalRequestsForPerson(personId);
     return (
       <main className="flex flex-col gap-6">
         <h1 className="text-3xl font-bold tracking-tight">My Attendance</h1>
         <p className="card text-[var(--muted)]">No active period yet.</p>
+        <section className="card flex flex-col gap-3">
+          <h2 className="text-lg font-semibold">Request excusal</h2>
+          <ExcusalRequestForm defaultDate={defaultDate} />
+        </section>
+        <section className="card flex flex-col gap-3">
+          <h2 className="text-lg font-semibold">My excusal requests</h2>
+          <ExcusalRequestList requests={myRequests} />
+        </section>
       </main>
     );
   }
 
   const tz = await getSetting<string>("team_timezone", "America/Indiana/Indianapolis");
   const range = { from: period.startsOn, to: period.endsOn };
-  const personId = viewer.person.id;
-  const [buildDays, allExcusals, sessions] = await Promise.all([
+  const [buildDays, allExcusals, sessions, myRequests] = await Promise.all([
     listBuildDays(range),
     listExcusals(range),
     personSessions(personId, period.id),
+    listExcusalRequestsForPerson(personId),
   ]);
   const excusals = allExcusals.filter((e) => e.personId === personId);
   const summary = attendanceSummary(personId, buildDays, sessions, excusals, tz);
@@ -77,6 +94,14 @@ export default async function MyAttendancePage() {
           </tbody>
         </table>
       </div>
+      <section className="card flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">Request excusal</h2>
+        <ExcusalRequestForm defaultDate={defaultDate} />
+      </section>
+      <section className="card flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">My excusal requests</h2>
+        <ExcusalRequestList requests={myRequests} />
+      </section>
     </main>
   );
 }
