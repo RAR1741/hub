@@ -1,16 +1,10 @@
--- Teams seed — the org's team tree (roster subteams).
--- Loaded on `supabase db reset` via supabase/config.toml -> [db.seed].sql_paths.
+-- Seed the org's team tree as a migration so it reaches every environment
+-- (prod included — seed files only run on local `db reset`, never on prod).
 --
--- Columns (defined in migrations/20260811032027_roster_teams.sql):
---   name            text   — REQUIRED, must be UNIQUE
---   parent_team_id  uuid   — optional; the parent team's id (self-referential tree)
---   description     text   — optional (left blank/NULL here)
---   join_mode       text   — 'admin_only' (default) | 'open' | 'requires_approval'
---
--- Every team below joins 'admin_only' (members added by a mentor/admin only) with
--- no description. Inserts are ordered parent-before-child; children look their
--- parent up by name so no uuid is ever hard-coded. `on conflict (name) do nothing`
--- keeps re-seeding idempotent.
+-- Every team joins 'admin_only' with no description. Inserts are ordered
+-- parent-before-child; children look their parent up by name so no uuid is
+-- hard-coded. `on conflict (name) do nothing` keeps it safe if a team of the
+-- same name already exists.
 --
 -- Tree:
 --   Red Alert Robotics
