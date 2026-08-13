@@ -35,7 +35,7 @@ export function parseClockToken(raw: string): ClockParse {
 
 export type ResolvedCell = { minutes: number | null; farFromColumn: boolean };
 
-function median(nums: number[]): number | null {
+export function median(nums: number[]): number | null {
   if (nums.length === 0) return null;
   const s = [...nums].sort((a, b) => a - b);
   const mid = Math.floor(s.length / 2);
