@@ -78,8 +78,10 @@ describe("reviewExcusalRequest", () => {
 
   function fakeDb(opts: {
     request: Row | null;
+    fetchError?: { code: string } | null;
     excusalError?: { code: string } | null;
     updateError?: { code: string } | null;
+    updateNoRow?: boolean;
   }) {
     const calls: { excusalInsert?: unknown; requestUpdate?: unknown } = {};
     return {
@@ -89,7 +91,10 @@ describe("reviewExcusalRequest", () => {
             return {
               select: () => ({
                 eq: () => ({
-                  maybeSingle: async () => ({ data: opts.request, error: null }),
+                  maybeSingle: async () => ({
+                    data: opts.fetchError ? null : opts.request,
+                    error: opts.fetchError ?? null,
+                  }),
                 }),
               }),
               update: (patch: unknown) => {
@@ -99,7 +104,10 @@ describe("reviewExcusalRequest", () => {
                     eq: () => ({
                       select: () => ({
                         maybeSingle: async () => ({
-                          data: opts.updateError ? null : { id: opts.request?.id ?? "r1" },
+                          data:
+                            opts.updateError || opts.updateNoRow
+                              ? null
+                              : { id: opts.request?.id ?? "r1" },
                           error: opts.updateError ?? null,
                         }),
                       }),
@@ -176,5 +184,20 @@ describe("reviewExcusalRequest", () => {
     });
     const result = await reviewExcusalRequest("r1", "approve", "reviewer1", db);
     expect(result.ok).toBe(false);
+  });
+
+  test("500 when the request fetch itself errors", async () => {
+    const { db } = fakeDb({ request: null, fetchError: { code: "57014" } });
+    const result = await reviewExcusalRequest("r1", "approve", "reviewer1", db);
+    expect(result).toEqual({ ok: false, status: 500 });
+  });
+
+  test("409 when a concurrent reviewer already flipped the guarded update", async () => {
+    const { db } = fakeDb({
+      request: { id: "r1", person_id: "p1", date: "2026-09-01", reason: null, status: "pending" },
+      updateNoRow: true,
+    });
+    const result = await reviewExcusalRequest("r1", "deny", "reviewer1", db);
+    expect(result).toEqual({ ok: false, status: 409 });
   });
 });

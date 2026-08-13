@@ -103,11 +103,15 @@ export async function reviewExcusalRequest(
   db?: SupabaseClient,
 ): Promise<{ ok: boolean; status: number }> {
   const client = db ?? (await import("./db")).getDb();
-  const { data: request } = await client
+  const { data: request, error: fetchError } = await client
     .from("excusal_request")
     .select("*")
     .eq("id", id)
     .maybeSingle();
+  if (fetchError) {
+    console.error("excusal_request fetch failed", { id, error: fetchError });
+    return { ok: false, status: 500 };
+  }
   if (!request) return { ok: false, status: 404 };
   const r = request as ExcusalRequestRow;
   if (r.status !== "pending") return { ok: false, status: 409 };
@@ -136,6 +140,8 @@ export async function reviewExcusalRequest(
     console.error("excusal_request reviewed but status update failed", { id, error });
     return { ok: false, status: 500 };
   }
-  if (!data) return { ok: false, status: 404 };
+  // We already confirmed the row existed and was pending above, so a guarded
+  // update matching nothing means a concurrent reviewer just decided it.
+  if (!data) return { ok: false, status: 409 };
   return { ok: true, status: 200 };
 }

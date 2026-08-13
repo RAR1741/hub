@@ -14,18 +14,23 @@ export function ExcusalRequestForm({ defaultDate }: { defaultDate?: string }) {
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setState("sending");
-    const res = await fetch("/api/excusal-requests", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ date, reason: reason.trim() || undefined }),
-    });
-    if (res.ok) {
-      setState("sent");
-      setReason("");
-      router.refresh();
-    } else if (res.status === 409) {
-      setState("duplicate");
-    } else {
+    try {
+      const res = await fetch("/api/excusal-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date, reason: reason.trim() || undefined }),
+      });
+      if (res.ok) {
+        setState("sent");
+        setReason("");
+        router.refresh();
+      } else if (res.status === 409) {
+        setState("duplicate");
+      } else {
+        setState("error");
+      }
+    } catch {
+      // Network failure — fetch rejected. Don't leave the button stuck on "sending".
       setState("error");
     }
   }
