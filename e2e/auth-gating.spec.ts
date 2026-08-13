@@ -25,7 +25,7 @@ test.describe("teams hidden from guests", () => {
   });
 });
 
-test.describe("people hidden from guests", () => {
+test.describe("people is mentor+ only", () => {
   test("anonymous GET /people is redirected to /login", async ({ browser }) => {
     const context = await browser.newContext();
     const page = await context.newPage();
@@ -34,9 +34,18 @@ test.describe("people hidden from guests", () => {
     await context.close();
   });
 
-  test("a signed-in student is NOT redirected away from /people", async ({ browser }) => {
+  test("a signed-in student is redirected away from /people", async ({ browser }) => {
     const context = await browser.newContext();
     await context.addCookies([await studentSessionCookie()]);
+    const page = await context.newPage();
+    await page.goto("/people");
+    expect(new URL(page.url()).pathname).toBe("/login");
+    await context.close();
+  });
+
+  test("a mentor is NOT redirected away from /people", async ({ browser }) => {
+    const context = await browser.newContext();
+    await context.addCookies([await mentorSessionCookie()]);
     const page = await context.newPage();
     await page.goto("/people");
     expect(new URL(page.url()).pathname).toBe("/people");
@@ -62,6 +71,26 @@ test.describe("People edit icon is admin-only", () => {
     await page.goto("/people");
     await expect(page.getByRole("heading", { name: "People" })).toBeVisible();
     await expect(page.locator('a[aria-label^="Edit "]')).toHaveCount(0);
+    await context.close();
+  });
+});
+
+test.describe("sign out", () => {
+  test("a signed-in user can sign out from the nav, landing signed-out", async ({ browser }) => {
+    const context = await browser.newContext();
+    await context.addCookies([await studentSessionCookie()]);
+    const page = await context.newPage();
+    await page.goto("/");
+    // Signed-in nav shows a Sign out control (and not the Sign in link).
+    const signOut = page.getByRole("button", { name: "Sign out" });
+    await expect(signOut).toBeVisible();
+    await signOut.click();
+    // The POST clears the session cookies and redirects home. Logout is proven
+    // by the Sign out control being gone; a Sign in link is now offered (the
+    // logged-out home page also shows one, so match the first).
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole("button", { name: "Sign out" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Sign in" }).first()).toBeVisible();
     await context.close();
   });
 });

@@ -22,8 +22,8 @@ export default async function PeoplePage({
   searchParams: Promise<{ q?: string }>;
 }) {
   const [{ q }, viewer] = await Promise.all([searchParams, getViewer()]);
-  // People is signed-in only — guests (the only role below student) go to login.
-  if (!hasRole(viewer.role, "student")) redirect("/login");
+  // People is mentor+ only — students and guests are redirected to login.
+  if (!hasRole(viewer.role, "mentor")) redirect("/login");
   const view = rosterView(viewer.role, await listPeople(q));
   const count = view.kind === "names" ? view.names.length : view.people.length;
   // People are edited from /admin/people, which is admin-gated.

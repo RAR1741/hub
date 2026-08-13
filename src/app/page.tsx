@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getViewer } from "@/lib/viewer";
+import { hasRole } from "@/lib/authz";
 import { WhosHere } from "@/components/WhosHere";
 import { listWhosHere } from "@/lib/sessions";
 import { getActivePeriod } from "@/lib/periods";
@@ -68,19 +69,16 @@ export default async function HomePage() {
                 ({viewer.role})
               </p>
               <nav aria-label="Quick links" className="mt-3 flex flex-wrap gap-4">
-                <Link href="/people" className="text-sm font-medium text-[var(--color-brand)]">
-                  People
-                </Link>
+                {hasRole(viewer.role, "mentor") && (
+                  <Link href="/people" className="text-sm font-medium text-[var(--color-brand)]">
+                    People
+                  </Link>
+                )}
                 <Link href="/teams" className="text-sm font-medium text-[var(--color-brand)]">
                   Teams
                 </Link>
               </nav>
             </div>
-            <form action="/api/auth/logout" method="post">
-              <button type="submit" className="btn btn-secondary">
-                Sign out
-              </button>
-            </form>
           </div>
 
           <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">

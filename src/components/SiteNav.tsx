@@ -40,7 +40,7 @@ export async function SiteNav() {
             <Link href="/" className={navLinkClass}>
               Home
             </Link>{" "}
-            {hasRole(viewer.role, "student") && (
+            {hasRole(viewer.role, "mentor") && (
               <Link href="/people" className={navLinkClass}>
                 People
               </Link>
@@ -50,9 +50,11 @@ export async function SiteNav() {
                 Teams
               </Link>
             )}{" "}
-            <Link href="/kiosk" className={navLinkClass}>
-              Kiosk
-            </Link>{" "}
+            {hasRole(viewer.role, "mentor") && (
+              <Link href="/kiosk" className={navLinkClass}>
+                Kiosk
+              </Link>
+            )}{" "}
             <Link href="/leaderboard" className={navLinkClass}>
               Leaderboard
             </Link>{" "}
@@ -75,6 +77,13 @@ export async function SiteNav() {
                 </span>
                 {viewer.person.displayName ?? viewer.person.firstName} (
                 {viewer.role})
+                {/* Native POST so sign-out works without client JS; the route
+                    clears the student-session + sb-* auth cookies server-side. */}
+                <form action="/api/auth/logout" method="post" className="contents">
+                  <button type="submit" className={navLinkClass}>
+                    Sign out
+                  </button>
+                </form>
               </span>
             ) : (
               <Link href="/login" className="btn btn-primary">
