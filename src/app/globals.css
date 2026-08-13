@@ -649,12 +649,7 @@
      --------------------------------------------------------------------- */
   .hazard {
     height: 4px;
-    background: repeating-linear-gradient(
-      -45deg,
-      var(--red) 0 11px,
-      var(--ink) 11px 22px
-    );
-    opacity: 0.9;
+    background: var(--red);
   }
 
   .status-strip {
@@ -778,7 +773,7 @@
   }
 
   .kiosk .hazard {
-    background: repeating-linear-gradient(-45deg, #e01926 0 11px, #1b1719 11px 22px);
+    background: #e01926;
     opacity: 1;
   }
 
