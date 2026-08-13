@@ -45,6 +45,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       className={`${archivo.variable} ${inter.variable} ${jetbrainsMono.variable}`}
+      // The no-flash script below sets data-theme on <html> before hydration
+      // from localStorage, which the server can't know — suppress the expected
+      // one-level attribute diff (does not affect children).
+      suppressHydrationWarning
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: noFlashThemeScript }} />
