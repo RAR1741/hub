@@ -68,7 +68,9 @@ schema_paths = []
 enabled = true
 # Specifies an ordered list of seed files to load during db reset.
 # Supports glob patterns relative to supabase directory: "./seeds/*.sql"
-sql_paths = ["./seed.sql"]
+# Ordered: base fixtures first, then per-entity seed files under ./seeds/.
+# Add new entity seeds here (keep FK dependencies earlier in the list).
+sql_paths = ["./seed.sql", "./seeds/teams.sql"]
 
 [db.network_restrictions]
 # Enable management of network restrictions.
