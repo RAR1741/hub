@@ -35,6 +35,18 @@ describe("toCsv", () => {
     const csv = toCsv(["A"], [[42], ["plain"]]);
     expect(csv).toBe("A\r\n42\r\nplain\r\n");
   });
+
+  test("neutralizes formula-injection: fields starting with = + - @ are prefixed with '", () => {
+    // A crafted name/ID must not execute as a formula in Excel/Sheets.
+    expect(toCsv(["Name"], [["=1+1"]])).toBe("Name\r\n'=1+1\r\n");
+    expect(toCsv(["Name"], [["+49"]])).toBe("Name\r\n'+49\r\n");
+    expect(toCsv(["Name"], [["-3"]])).toBe("Name\r\n'-3\r\n");
+    expect(toCsv(["Name"], [["@SUM(A1)"]])).toBe("Name\r\n'@SUM(A1)\r\n");
+    // Still quotes when the neutralized value also needs quoting.
+    expect(toCsv(["Name"], [['=HYPERLINK("x","y")']])).toBe(
+      'Name\r\n"\'=HYPERLINK(""x"",""y"")"\r\n',
+    );
+  });
 });
 
 describe("hoursReportCsv", () => {

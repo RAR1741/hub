@@ -2,11 +2,16 @@
  * RFC-4180-ish CSV encoding: quote a field when it contains a comma, a
  * double quote, or a newline; double any embedded quote; CRLF line endings;
  * header row first. `null` becomes an empty field (not the string "null").
- * PURE.
+ *
+ * Also mitigates CSV formula injection: a field beginning with `=`, `+`, `-`,
+ * or `@` is prefixed with a `'` so a crafted name/ID (e.g. `=HYPERLINK(...)`)
+ * is treated as text, not executed as a formula, when the file is opened in
+ * Excel/Sheets. The `'` is applied before the quoting logic. PURE.
  */
 function csvField(value: string | number | null): string {
   if (value === null) return "";
-  const s = String(value);
+  let s = String(value);
+  if (/^[=+\-@]/.test(s)) s = `'${s}`;
   if (/[",\n\r]/.test(s)) return `"${s.replaceAll('"', '""')}"`;
   return s;
 }
