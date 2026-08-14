@@ -33,6 +33,7 @@ alter table person
   add column street_address text,
   add column city text,
   add column zip text,
+  add column home_phone text,
   add column school text,
   add column ethnicity text,
   add column race text,
@@ -108,7 +109,8 @@ snippets, e.g.:
 | gradYear | `graduation year` |
 | school | starts `what school are you attending` (also yields **season year** from "20XX-20YY School Year" → YY) |
 | street/city/zip | `street address` / `city` / `zip code` |
-| cellPhone | `cell phone number` (first non-guardian occurrence) |
+| homePhone | `home phone number` → `home_phone` |
+| cellPhone | `cell phone number` (first non-guardian occurrence) → `phone` |
 | email | `email address` (first non-guardian occurrence) |
 | shirtSize | `t-shirt size` |
 | ethnicity / race | `your ethnicity` / `your race` |
@@ -164,8 +166,9 @@ Decision keys: `first|last|dob` (mirrors the time importer's `anomalyKey`).
 **Latest wins:** skip the applicant entirely (counted as `stale`) when the
 target person's `last_application_at` ≥ response timestamp. Otherwise overwrite
 the application-owned fields (names/preferred → `display_name` only when it
-differs from first name, dob, gradYear, school, address, phone, email, shirt,
-ethnicity, race, interests, dietary if present) and set `last_application_at`.
+differs from first name, dob, gradYear, school, address, home_phone, phone,
+email, shirt, ethnicity, race, interests, dietary if present) and set
+`last_application_at`.
 Fields the forms don't own (`student_id_number`, `role`, `bio`, `avatar_path`)
 are never touched. A matched **mentor/admin** is never role-changed; flagged in
 preview as a callout (same spirit as the time importer's role-change gate).
@@ -240,7 +243,7 @@ review.
 
 ## Out of scope (explicitly)
 
-- Essay/survey answers, "how did you learn", call-out attendance, home phone,
+- Essay/survey answers, "how did you learn", call-out attendance,
   Radical Robot Camp flag — dropped per review.
 - Guardian UI (viewing/editing guardians on person pages) — data lands in
   tables; surfacing it is a follow-up feature.
