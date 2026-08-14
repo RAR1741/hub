@@ -6,6 +6,10 @@ import {
   type BuildDayRow, type ExcusalRow, type MeetingRow,
 } from "./types";
 import { excusalRequestFromRow, type ExcusalRequestRow } from "./types";
+import {
+  firstExperienceFromRow, guardianFromRow,
+  type FirstExperienceRow, type GuardianRow,
+} from "./types";
 
 describe("teamFromRow", () => {
   test("maps snake_case to camelCase", () => {
@@ -44,6 +48,51 @@ describe("personFromRow detail fields", () => {
     expect(person.shirtSize).toBeNull();
     expect(person.dietaryRestrictions).toBeNull();
     expect(person.bio).toBeNull();
+    expect(person.dateOfBirth).toBeNull();
+    expect(person.streetAddress).toBeNull();
+    expect(person.city).toBeNull();
+    expect(person.zip).toBeNull();
+    expect(person.homePhone).toBeNull();
+    expect(person.school).toBeNull();
+    expect(person.ethnicity).toBeNull();
+    expect(person.race).toBeNull();
+    expect(person.interests).toBeNull();
+    expect(person.lastApplicationAt).toBeNull();
+  });
+
+  test("maps application-sourced fields when present", () => {
+    const person = personFromRow({
+      id: "p2",
+      first_name: "Test",
+      last_name: "Applicant",
+      display_name: null,
+      role: "student",
+      grad_year: 2028,
+      email: null,
+      is_active: true,
+      student_id_number: "1742",
+      auth_user_id: null,
+      date_of_birth: "2010-05-01",
+      street_address: "123 Main St",
+      city: "Anytown",
+      zip: "12345",
+      home_phone: "555-1234",
+      school: "Anytown High",
+      ethnicity: "Not Hispanic or Latino",
+      race: "White",
+      interests: ["robotics", "CAD"],
+      last_application_at: "2026-08-01T12:00:00Z",
+    });
+    expect(person.dateOfBirth).toBe("2010-05-01");
+    expect(person.streetAddress).toBe("123 Main St");
+    expect(person.city).toBe("Anytown");
+    expect(person.zip).toBe("12345");
+    expect(person.homePhone).toBe("555-1234");
+    expect(person.school).toBe("Anytown High");
+    expect(person.ethnicity).toBe("Not Hispanic or Latino");
+    expect(person.race).toBe("White");
+    expect(person.interests).toEqual(["robotics", "CAD"]);
+    expect(person.lastApplicationAt).toBe("2026-08-01T12:00:00Z");
   });
 });
 
@@ -141,6 +190,54 @@ describe("excusalRequestFromRow", () => {
       id: "er2", personId: "p1", date: "2026-09-02", reason: null,
       status: "approved", reviewedBy: "p9", reviewedAt: "2026-09-02T10:00:00Z",
       createdAt: "2026-08-31T12:00:00Z",
+    });
+  });
+});
+
+describe("guardianFromRow", () => {
+  test("maps all fields", () => {
+    const row: GuardianRow = {
+      id: "g1", first_name: "Pat", last_name: "Parent",
+      email: "pat@example.com", phone: "555-9999", employer: "Acme Corp",
+      last_application_at: "2026-08-01T12:00:00Z", updated_at: "2026-08-01T12:00:00Z",
+    };
+    expect(guardianFromRow(row)).toEqual({
+      id: "g1", firstName: "Pat", lastName: "Parent",
+      email: "pat@example.com", phone: "555-9999", employer: "Acme Corp",
+      lastApplicationAt: "2026-08-01T12:00:00Z", updatedAt: "2026-08-01T12:00:00Z",
+    });
+  });
+
+  test("maps null optional fields", () => {
+    const row: GuardianRow = {
+      id: "g2", first_name: "Sam", last_name: "Guardian",
+      email: null, phone: null, employer: null,
+      last_application_at: null, updated_at: "2026-08-01T12:00:00Z",
+    };
+    expect(guardianFromRow(row)).toEqual({
+      id: "g2", firstName: "Sam", lastName: "Guardian",
+      email: null, phone: null, employer: null,
+      lastApplicationAt: null, updatedAt: "2026-08-01T12:00:00Z",
+    });
+  });
+});
+
+describe("firstExperienceFromRow", () => {
+  test("maps all fields", () => {
+    const row: FirstExperienceRow = {
+      id: "fe1", person_id: "p1", level: "frc", year: 2025, name: "Reefscape",
+    };
+    expect(firstExperienceFromRow(row)).toEqual({
+      id: "fe1", personId: "p1", level: "frc", year: 2025, name: "Reefscape",
+    });
+  });
+
+  test("maps a null name", () => {
+    const row: FirstExperienceRow = {
+      id: "fe2", person_id: "p1", level: "fll_challenge", year: 2022, name: null,
+    };
+    expect(firstExperienceFromRow(row)).toEqual({
+      id: "fe2", personId: "p1", level: "fll_challenge", year: 2022, name: null,
     });
   });
 });

@@ -85,6 +85,9 @@ describe("canViewProfile", () => {
             role: role === "guest" ? "student" : (role as never), gradYear: null,
             email: null, isActive: true, studentIdNumber: null, authUserId: null,
             phone: null, shirtSize: null, dietaryRestrictions: null, bio: null,
+            dateOfBirth: null, streetAddress: null, city: null, zip: null,
+            homePhone: null, school: null, ethnicity: null, race: null,
+            interests: null, lastApplicationAt: null,
           },
           role,
         }

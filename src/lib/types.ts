@@ -16,6 +16,16 @@ export type PersonRow = {
   shirt_size?: string | null;
   dietary_restrictions?: string | null;
   bio?: string | null;
+  date_of_birth?: string | null;
+  street_address?: string | null;
+  city?: string | null;
+  zip?: string | null;
+  home_phone?: string | null;
+  school?: string | null;
+  ethnicity?: string | null;
+  race?: string | null;
+  interests?: string[] | null;
+  last_application_at?: string | null;
 };
 
 export type Person = {
@@ -33,6 +43,16 @@ export type Person = {
   shirtSize: string | null;
   dietaryRestrictions: string | null;
   bio: string | null;
+  dateOfBirth: string | null;
+  streetAddress: string | null;
+  city: string | null;
+  zip: string | null;
+  homePhone: string | null;
+  school: string | null;
+  ethnicity: string | null;
+  race: string | null;
+  interests: string[] | null;
+  lastApplicationAt: string | null;
 };
 
 export function personFromRow(row: PersonRow): Person {
@@ -51,6 +71,16 @@ export function personFromRow(row: PersonRow): Person {
     shirtSize: row.shirt_size ?? null,
     dietaryRestrictions: row.dietary_restrictions ?? null,
     bio: row.bio ?? null,
+    dateOfBirth: row.date_of_birth ?? null,
+    streetAddress: row.street_address ?? null,
+    city: row.city ?? null,
+    zip: row.zip ?? null,
+    homePhone: row.home_phone ?? null,
+    school: row.school ?? null,
+    ethnicity: row.ethnicity ?? null,
+    race: row.race ?? null,
+    interests: row.interests ?? null,
+    lastApplicationAt: row.last_application_at ?? null,
   };
 }
 
@@ -268,5 +298,68 @@ export function excusalRequestFromRow(row: ExcusalRequestRow): ExcusalRequest {
     reviewedBy: row.reviewed_by,
     reviewedAt: row.reviewed_at,
     createdAt: row.created_at,
+  };
+}
+
+export type GuardianRow = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string | null;
+  phone: string | null;
+  employer: string | null;
+  last_application_at: string | null;
+  updated_at: string;
+};
+
+export type Guardian = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string | null;
+  phone: string | null;
+  employer: string | null;
+  lastApplicationAt: string | null;
+  updatedAt: string;
+};
+
+export function guardianFromRow(row: GuardianRow): Guardian {
+  return {
+    id: row.id,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    email: row.email,
+    phone: row.phone,
+    employer: row.employer,
+    lastApplicationAt: row.last_application_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export type FirstExperienceLevel = "fll_explore" | "fll_challenge" | "ftc" | "frc";
+
+export type FirstExperienceRow = {
+  id: string;
+  person_id: string;
+  level: FirstExperienceLevel;
+  year: number;
+  name: string | null;
+};
+
+export type FirstExperience = {
+  id: string;
+  personId: string;
+  level: FirstExperienceLevel;
+  year: number;
+  name: string | null;
+};
+
+export function firstExperienceFromRow(row: FirstExperienceRow): FirstExperience {
+  return {
+    id: row.id,
+    personId: row.person_id,
+    level: row.level,
+    year: row.year,
+    name: row.name,
   };
 }
