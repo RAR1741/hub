@@ -64,13 +64,13 @@ describe("sessionFromRow", () => {
       id: "s1", person_id: "p1", period_id: "pd1",
       time_in: "2026-09-01T22:00:00Z", time_out: null,
       source: "kiosk", note: null, excluded_from_totals: false,
-      edited_by: null, edited_at: null,
+      edited_by: null, edited_at: null, flags_resolved_at: null,
     };
     expect(sessionFromRow(row)).toEqual({
       id: "s1", personId: "p1", periodId: "pd1",
       timeIn: "2026-09-01T22:00:00Z", timeOut: null,
       source: "kiosk", note: null, excludedFromTotals: false,
-      editedBy: null, editedAt: null,
+      editedBy: null, editedAt: null, flagsResolvedAt: null,
     });
   });
 });

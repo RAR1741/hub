@@ -9,7 +9,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 const s = (over: Partial<Session>): Session => ({
   id: "s", personId: "p", periodId: "pd", timeIn: "2026-09-01T18:00:00Z",
   timeOut: "2026-09-01T20:00:00Z", source: "kiosk", note: null,
-  excludedFromTotals: false, editedBy: null, editedAt: null, ...over,
+  excludedFromTotals: false, editedBy: null, editedAt: null, flagsResolvedAt: null, ...over,
 });
 
 // Fake db that pages session rows via .range() — mirrors PostgREST's 1000 cap.
@@ -117,6 +117,19 @@ describe("flaggedSessions", () => {
   test("returns empty when nothing is flagged", async () => {
     const db = fakeDb([row({ id: "s1" })]);
     expect(await flaggedSessions("pd", db)).toEqual([]);
+  });
+
+  test("excludes a session an admin resolved, even if it still carries a flag", async () => {
+    const db = fakeDb([
+      // still_open, but resolved → hidden
+      row({ id: "s1", time_out: null, flags_resolved_at: "2026-09-02T12:00:00Z" }),
+      // still_open, unresolved → shown
+      row({ id: "s2", person_id: "p2", time_out: null, flags_resolved_at: null,
+        person: { id: "p2", first_name: "Bo", last_name: "Jones", display_name: null } }),
+    ]);
+    const result = await flaggedSessions("pd", db);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ name: "Bo Jones", flags: ["still_open"] });
   });
 });
 

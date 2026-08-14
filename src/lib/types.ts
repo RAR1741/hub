@@ -123,6 +123,7 @@ export type SessionRow = {
   excluded_from_totals: boolean;
   edited_by: string | null;
   edited_at: string | null;
+  flags_resolved_at: string | null;
 };
 
 export type Session = {
@@ -136,6 +137,7 @@ export type Session = {
   excludedFromTotals: boolean;
   editedBy: string | null;
   editedAt: string | null;
+  flagsResolvedAt: string | null;
 };
 
 export function sessionFromRow(row: SessionRow): Session {
@@ -150,6 +152,7 @@ export function sessionFromRow(row: SessionRow): Session {
     excludedFromTotals: row.excluded_from_totals,
     editedBy: row.edited_by,
     editedAt: row.edited_at,
+    flagsResolvedAt: row.flags_resolved_at,
   };
 }
 

@@ -185,6 +185,10 @@ export async function flaggedSessions(
 
   const out: FlaggedSession[] = [];
   for (const s of sessions) {
+    // An admin who saved this session already reviewed it — hide it regardless
+    // of which flag it carries. A re-import replaces the row (new id, null
+    // flags_resolved_at), so re-imported sessions surface again.
+    if (s.flagsResolvedAt) continue;
     const flags = sessionFlags(s, maxShift);
     const overlapping = overlaps.has(s.id);
     if (flags.length === 0 && !overlapping) continue;

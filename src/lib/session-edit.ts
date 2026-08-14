@@ -73,6 +73,10 @@ export async function updateSession(
       excluded_from_totals: edit.excludedFromTotals,
       edited_by: editorId,
       edited_at: new Date().toISOString(),
+      // Saving a session is reviewing it: mark it resolved so it drops off the
+      // flagged screen even if it still carries a flag (e.g. an accepted
+      // over_max shift). A later re-import replaces the row and re-flags it.
+      flags_resolved_at: new Date().toISOString(),
     })
     .eq("id", id)
     .select("id")
