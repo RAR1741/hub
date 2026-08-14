@@ -8,6 +8,23 @@ file per season) into the roster: enrich `person`, populate a new many-to-many
 with mandatory dry-run preview → admin-gated API route → forced-preview form —
 reusing its person matcher and decisions pattern. One migration adds the schema.
 
+## Global Constraints
+
+- **NEVER commit real applicant PII to the repo.** The source CSVs contain
+  minors' names, DOBs, emails, phones, home addresses, and parent contact/
+  employer info. Real values must never appear in tests, fixtures, docs, or
+  commits — the repo is a GitHub remote. Test fixtures use *real header/column
+  names* (not PII) with *synthetic* data values (`@example.com`, `555-01xx`,
+  `123 Test St`, invented names). Real data flows CSV → importer → database
+  only, never into git.
+- All tests/typecheck run inside the Docker container `team-hub-app-1`
+  (`docker exec team-hub-app-1 npx vitest run …` / `npx tsc --noEmit`); host
+  node_modules won't run.
+- Migrations-as-code: new migration files only; never edit an applied one.
+- Commit to `master` and push to origin immediately after each commit.
+- `tsc` has pre-existing errors only under `.next/dev/types/**`; introduce none
+  elsewhere.
+
 **Decisions locked in (from review):**
 - Keep: DOB, address (street/city/zip), school, demographics (ethnicity, race),
   interests, guardians, prior-FIRST experience. Drop: essays/survey answers,
