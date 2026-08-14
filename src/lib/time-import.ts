@@ -5,6 +5,7 @@ import {
   median,
   parseClockToken,
   resolveColumnTimes,
+  withinNormalHours,
   type ClockParse,
   type ResolvedCell,
 } from "./time-parse";
@@ -90,7 +91,7 @@ export function resolveOutColumn(outParses: ClockParse[], inMins: (number | null
   const thr = columnFlagThreshold(mins);
   return resolved.map((m, i) => ({
     minutes: m,
-    farFromColumn: !rowAware[i] && m !== null && colMed !== null && Math.abs(m - colMed) > thr,
+    farFromColumn: !rowAware[i] && m !== null && !withinNormalHours(m) && colMed !== null && Math.abs(m - colMed) > thr,
   }));
 }
 

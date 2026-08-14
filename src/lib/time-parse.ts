@@ -1,6 +1,17 @@
 export const TIME_ANOMALY_THRESHOLD_MIN = 240; // 4h floor — a lone slip in a tight column still flags
 export const OUTLIER_MAD_K = 5;                // spread multiplier: threshold = max(floor, K * MAD)
 export const MAX_SHIFT_MIN = 1080;             // 18h, matches the max_shift_hours default
+// Normal meeting hours. A resolved time inside this window is plausible on its
+// own (weekend 9-5, weekday evenings, a little early/late), so it is never
+// flagged even if it's a column outlier — the flag is for out-of-hours weirdness
+// (a format/timezone slip that lands at 2am), not for legitimate late arrivals.
+export const NORMAL_HOURS_START_MIN = 480;  // 08:00
+export const NORMAL_HOURS_END_MIN = 1320;   // 22:00
+
+/** True when a resolved minute-of-day is within normal meeting hours. PURE. */
+export function withinNormalHours(minutes: number): boolean {
+  return minutes >= NORMAL_HOURS_START_MIN && minutes <= NORMAL_HOURS_END_MIN;
+}
 
 export type ClockParse =
   | { kind: "confident"; minutes: number }
@@ -75,6 +86,6 @@ export function resolveColumnTimes(parses: ClockParse[]): ResolvedCell[] {
   const thr = columnFlagThreshold(mins);
   return resolved.map((m) => ({
     minutes: m,
-    farFromColumn: m !== null && colMed !== null && Math.abs(m - colMed) > thr,
+    farFromColumn: m !== null && !withinNormalHours(m) && colMed !== null && Math.abs(m - colMed) > thr,
   }));
 }
