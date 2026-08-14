@@ -51,6 +51,10 @@ create table guardian (
   email text,
   phone text,
   employer text,
+  -- Same latest-wins mechanic as person.last_application_at: stores the newest
+  -- application RESPONSE timestamp applied to this row. (Wall-clock updated_at
+  -- would make every historical response look stale after the first import.)
+  last_application_at timestamptz,
   updated_at timestamptz not null default now()
 );
 
@@ -172,20 +176,22 @@ the freshest self-report).
 
 **Guardians:** global index of existing guardians by
 `nameKey(first,last)` + contact (`email` OR `phone` digit-match). Match → update
-contact/employer fields (latest wins by the same timestamp rule, using
-`guardian.updated_at`), else insert. Then upsert `person_guardian` with
+contact/employer fields (latest wins: response timestamp vs the guardian's
+`last_application_at`), else insert. Then upsert `person_guardian` with
 relationship. Two guardians on one form = two link rows; a sibling importing
 later links to the same guardian row.
 
 **Deactivation sweep** (end of every confirmed run):
 ```
-update person set is_active = false where grad_year < :currentSeasonYear;
-update person set is_active = true  where grad_year >= :currentSeasonYear and id in (:touched);
+update person set is_active = false where role = 'student' and grad_year < :currentSeasonYear;
+update person set is_active = true  where grad_year >= :currentSeasonYear and id in (:written);
 ```
 `currentSeasonYear = month >= June ? year + 1 : year` (Aug 2026 → 2027, so
 grad ≤ 2026 goes inactive — the requested rule, and it stays correct next year).
-Only applicants touched by this run are re-activated; the sweep never
-re-activates alumni.
+Scoped to `role = 'student'`: a graduate who returned as a mentor keeps their
+grad_year but must not be re-deactivated on every import. `:written` = people
+this run actually wrote (not stale-skipped ones); the sweep never re-activates
+alumni.
 
 **Preview summary** (dry-run): counts + lists for created people, auto-matched
 (with per-field old→new diffs), fuzzy candidates awaiting decision, stale-
