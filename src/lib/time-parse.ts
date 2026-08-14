@@ -2,15 +2,19 @@ export const TIME_ANOMALY_THRESHOLD_MIN = 240; // 4h floor — a lone slip in a 
 export const OUTLIER_MAD_K = 5;                // spread multiplier: threshold = max(floor, K * MAD)
 export const MAX_SHIFT_MIN = 1080;             // 18h, matches the max_shift_hours default
 // Normal meeting hours. A resolved time inside this window is plausible on its
-// own (weekend 9-5, weekday evenings, a little early/late), so it is never
-// flagged even if it's a column outlier — the flag is for out-of-hours weirdness
-// (a format/timezone slip that lands at 2am), not for legitimate late arrivals.
+// own (weekend 9-5, weekday evenings, a little early/late, late-night mentor
+// sessions clocking out up to ~2am), so it is never flagged even if it's a
+// column outlier — the flag is for dead-of-night weirdness (a format/timezone
+// slip that lands at 4am), not for legitimate late arrivals or late nights.
+// The window WRAPS past midnight: 08:00 -> 02:00 the next day.
 export const NORMAL_HOURS_START_MIN = 480;  // 08:00
-export const NORMAL_HOURS_END_MIN = 1320;   // 22:00
+export const NORMAL_HOURS_END_MIN = 120;    // 02:00 (next day)
 
-/** True when a resolved minute-of-day is within normal meeting hours. PURE. */
+/** True when a resolved minute-of-day is within normal meeting hours (wraps midnight). PURE. */
 export function withinNormalHours(minutes: number): boolean {
-  return minutes >= NORMAL_HOURS_START_MIN && minutes <= NORMAL_HOURS_END_MIN;
+  return NORMAL_HOURS_START_MIN <= NORMAL_HOURS_END_MIN
+    ? minutes >= NORMAL_HOURS_START_MIN && minutes <= NORMAL_HOURS_END_MIN
+    : minutes >= NORMAL_HOURS_START_MIN || minutes <= NORMAL_HOURS_END_MIN;
 }
 
 export type ClockParse =

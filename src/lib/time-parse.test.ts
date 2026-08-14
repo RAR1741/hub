@@ -30,13 +30,16 @@ describe("parseClockToken", () => {
 });
 
 describe("withinNormalHours", () => {
-  test("08:00–22:00 inclusive is normal; outside is not", () => {
-    expect(withinNormalHours(8 * 60)).toBe(true);   // 08:00 boundary
-    expect(withinNormalHours(22 * 60)).toBe(true);  // 22:00 boundary
-    expect(withinNormalHours(13 * 60)).toBe(true);  // 1pm weekend arrival
-    expect(withinNormalHours(8 * 60 - 1)).toBe(false);
-    expect(withinNormalHours(22 * 60 + 1)).toBe(false);
-    expect(withinNormalHours(12)).toBe(false);      // 00:12 overnight out
+  test("window wraps midnight: 08:00 through 02:00 is normal, dead-of-night is not", () => {
+    expect(withinNormalHours(8 * 60)).toBe(true);        // 08:00 start boundary
+    expect(withinNormalHours(13 * 60)).toBe(true);       // 1pm weekend arrival
+    expect(withinNormalHours(22 * 60)).toBe(true);       // 22:00
+    expect(withinNormalHours(23 * 60 + 10)).toBe(true);  // 23:10 late mentor clock-out
+    expect(withinNormalHours(12)).toBe(true);            // 00:12 past-midnight clock-out
+    expect(withinNormalHours(120)).toBe(true);           // 02:00 end boundary
+    expect(withinNormalHours(8 * 60 - 1)).toBe(false);   // 07:59
+    expect(withinNormalHours(121)).toBe(false);          // 02:01
+    expect(withinNormalHours(5 * 60)).toBe(false);       // 05:00 dead of night
   });
 });
 
@@ -55,10 +58,10 @@ describe("resolveColumnTimes", () => {
       parseClockToken("18:30"),
       parseClockToken("18:31"),
       parseClockToken("18:29"),
-      parseClockToken("2:00 AM"), // confident 02:00 — outside meeting hours
+      parseClockToken("4:00 AM"), // confident 04:00 — dead of night, outside meeting hours
     ];
     const r = resolveColumnTimes(col);
-    expect(r[3].minutes).toBe(120);
+    expect(r[3].minutes).toBe(240);
     expect(r[3].farFromColumn).toBe(true);
     expect(r.slice(0, 3).every((c) => c.farFromColumn === false)).toBe(true);
   });
