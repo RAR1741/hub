@@ -8,8 +8,15 @@ export const POST = withRole("admin", async (viewer, request) => {
   if (csv === null || periodId === null) return Response.json({ error: "invalid" }, { status: 400 });
   if (!viewer.person) return Response.json({ error: "no_person" }, { status: 400 });
 
+  // Writes require an explicit confirm; any bare call is a harmless dry-run
+  // preview. applyRoleChanges gates reassigning matched people's roles.
+  const confirm = body?.confirm === true;
+  const applyRoleChanges = body?.applyRoleChanges === true;
+
   // Never trust a client preview — runTimeImport re-parses the raw text.
-  const result = await runTimeImport({ csv, periodId, importedBy: viewer.person.id });
+  const result = await runTimeImport({
+    csv, periodId, importedBy: viewer.person.id, dryRun: !confirm, applyRoleChanges,
+  });
   if ("error" in result) return Response.json(result, { status: 400 });
   return Response.json(result, { status: 200 });
 });

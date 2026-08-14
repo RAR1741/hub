@@ -4,11 +4,15 @@ import { localDateTimeToInstant } from "./tz";
 import { getPeriod } from "./periods";
 import { getSetting } from "./settings";
 
+export type RoleChange = { name: string; from: string; to: string };
 export type TimeImportSummary = {
+  dryRun: boolean;
   createdPeople: number;
   createdStudents: number;
   createdMentors: number;
   matchedPeople: number;
+  roleChanges: RoleChange[];
+  roleChangesApplied: boolean;
   sessions: number;
   excusals: number;
   skipped: { name: string; date: string; reason: string }[];
@@ -27,8 +31,11 @@ export async function runTimeImport(args: {
   importedBy: string;
   db?: SupabaseClient;
   tz?: string;
+  dryRun?: boolean;
+  applyRoleChanges?: boolean;
 }): Promise<TimeImportSummary | { error: string }> {
   const db = args.db ?? (await import("./db")).getDb();
+  const dryRun = args.dryRun ?? false;
   const period = await getPeriod(args.periodId, db);
   if (!period) return { error: "period_not_found" };
   const tz = args.tz ?? (await getSetting<string>("team_timezone", "America/Indiana/Indianapolis", db));
@@ -36,23 +43,27 @@ export async function runTimeImport(args: {
   const parsed = parseTimeSheet(args.csv);
   if (parsed.people.length === 0) return { error: parsed.fileIssues[0] ?? "no_data" };
 
-  // Load roster once; build name/display-name -> id[] index.
-  const { data: peopleRows, error: rosterError } = await db.from("person").select("id, first_name, last_name, display_name");
+  // Load roster once; build name/display-name -> id[] index and id -> role.
+  const { data: peopleRows, error: rosterError } = await db.from("person").select("id, first_name, last_name, display_name, role");
   if (rosterError) return { error: `roster_load_failed: ${rosterError.message}` };
   const byName = new Map<string, string[]>();
   const byDisplay = new Map<string, string[]>();
+  const roleById = new Map<string, string>();
   const pushId = (m: Map<string, string[]>, k: string, id: string) => { if (k) m.set(k, [...(m.get(k) ?? []), id]); };
-  for (const p of (peopleRows ?? []) as { id: string; first_name: string; last_name: string; display_name: string | null }[]) {
+  for (const p of (peopleRows ?? []) as { id: string; first_name: string; last_name: string; display_name: string | null; role: string }[]) {
     pushId(byName, nameKey(p.first_name, p.last_name), p.id);
     if (p.display_name) pushId(byDisplay, normalizeFull(p.display_name), p.id);
+    roleById.set(p.id, p.role);
   }
 
   const summary: TimeImportSummary = {
-    createdPeople: 0, createdStudents: 0, createdMentors: 0, matchedPeople: 0, sessions: 0, excusals: 0,
+    dryRun, createdPeople: 0, createdStudents: 0, createdMentors: 0, matchedPeople: 0,
+    roleChanges: [], roleChangesApplied: false, sessions: 0, excusals: 0,
     skipped: [], anomalies: [], errors: [], createdNames: [],
   };
   const sessionRows: Record<string, unknown>[] = [];
   const excusalRows: Record<string, unknown>[] = [];
+  const roleUpdates: { id: string; role: "student" | "mentor"; name: string }[] = [];
 
   for (const person of parsed.people) {
     const name = `${person.firstName} ${person.lastName}`;
@@ -67,6 +78,20 @@ export async function runTimeImport(args: {
     } else if (candidateIds.size === 1) {
       personId = [...candidateIds][0];
       summary.matchedPeople += 1;
+      // Role change only when the sheet's group disagrees with an existing
+      // student/mentor role. Admins/guests are never reassigned by position.
+      const currentRole = roleById.get(personId);
+      if ((currentRole === "student" || currentRole === "mentor") && currentRole !== person.roleHint) {
+        summary.roleChanges.push({ name, from: currentRole, to: person.roleHint });
+        roleUpdates.push({ id: personId, role: person.roleHint, name });
+      }
+    } else if (dryRun) {
+      // Would-create. Use a placeholder id so a repeated new name dedupes.
+      personId = `dry-${summary.createdPeople}`;
+      pushId(byName, nkey, personId);
+      summary.createdPeople += 1;
+      if (person.roleHint === "mentor") summary.createdMentors += 1; else summary.createdStudents += 1;
+      summary.createdNames.push(name);
     } else {
       const { data, error } = await db.from("person")
         .insert({ first_name: person.firstName, last_name: person.lastName, role: person.roleHint, is_active: true })
@@ -75,12 +100,22 @@ export async function runTimeImport(args: {
       personId = data.id as string;
       pushId(byName, nkey, personId);
       summary.createdPeople += 1;
-      if (person.roleHint === "mentor") summary.createdMentors += 1;
-      else summary.createdStudents += 1;
+      if (person.roleHint === "mentor") summary.createdMentors += 1; else summary.createdStudents += 1;
       summary.createdNames.push(name);
     }
 
     collectRows(person, personId, name, args.periodId, tz, args.importedBy, sessionRows, excusalRows, summary);
+  }
+
+  if (dryRun) return summary; // preview only — never writes.
+
+  // Apply role changes only when the admin explicitly opted in after the callout.
+  if ((args.applyRoleChanges ?? false) && roleUpdates.length > 0) {
+    for (const u of roleUpdates) {
+      const { error } = await db.from("person").update({ role: u.role }).eq("id", u.id);
+      if (error) summary.errors.push({ name: u.name, message: `Failed to update role: ${error.message}` });
+    }
+    summary.roleChangesApplied = true;
   }
 
   // Idempotent replace: clear this period's prior import rows, then insert.

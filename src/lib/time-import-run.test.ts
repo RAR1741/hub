@@ -3,14 +3,16 @@ import { runTimeImport } from "./time-import-run";
 
 // Minimal fake db capturing inserts/deletes. person select returns the injected roster (default: Ada).
 function fakeDb(
-  people: { id: string; first_name: string; last_name: string; display_name: string | null }[] = [
-    { id: "ada", first_name: "Ada", last_name: "Lovelace", display_name: null },
+  people: { id: string; first_name: string; last_name: string; display_name: string | null; role?: string }[] = [
+    { id: "ada", first_name: "Ada", last_name: "Lovelace", display_name: null, role: "student" },
   ],
 ) {
+  const roster = people.map((p) => ({ role: "student", ...p }));
   const calls = {
     sessionInsert: [] as Record<string, unknown>[],
     excusalUpsert: [] as Record<string, unknown>[],
     personInsert: [] as Record<string, unknown>[],
+    personUpdate: [] as Record<string, unknown>[],
     deletes: [] as string[],
   };
   const db = {
@@ -23,8 +25,9 @@ function fakeDb(
       }
       if (table === "person") {
         return {
-          select: () => ({ data: people, error: null }),
+          select: () => ({ data: roster, error: null }),
           insert: (rows: Record<string, unknown>) => { calls.personInsert.push(rows); return { select: () => ({ single: async () => ({ data: { id: "new-1" }, error: null }) }) }; },
+          update: (patch: Record<string, unknown>) => ({ eq: async (_col: string, val: string) => { calls.personUpdate.push({ ...patch, id: val }); return { error: null }; } }),
           delete: () => ({ eq: () => ({ eq: async () => { calls.deletes.push("session"); return { error: null }; } }) }),
         };
       }
@@ -62,6 +65,44 @@ const SPLIT_SHEET = [
   ",,,,,,,,,,,,",
   "New,Mentor,0.00,18:00,21:00,OK,,,0:00,,,0:00,7",
 ].join("\n");
+
+describe("runTimeImport role changes", () => {
+  // Roster has "New Mentor" as a student today; the sheet lists them in the mentor group.
+  const roster = [{ id: "m1", first_name: "New", last_name: "Mentor", display_name: null, role: "student" }];
+
+  test("dry-run proposes the role change and writes nothing", async () => {
+    const { db, calls } = fakeDb(roster);
+    const summary = await runTimeImport({ csv: SPLIT_SHEET, periodId: "pd1", importedBy: "admin-1", db, dryRun: true });
+    if ("error" in summary) throw new Error(summary.error);
+    expect(summary.dryRun).toBe(true);
+    expect(summary.roleChanges).toEqual([{ name: "New Mentor", from: "student", to: "mentor" }]);
+    expect(summary.roleChangesApplied).toBe(false);
+    // The property the whole design rests on: a preview writes NOTHING.
+    expect(calls.personInsert).toEqual([]);
+    expect(calls.personUpdate).toEqual([]);
+    expect(calls.sessionInsert).toEqual([]);
+    expect(calls.deletes).toEqual([]);
+  });
+
+  test("confirmed import with applyRoleChanges updates the matched person's role", async () => {
+    const { db, calls } = fakeDb(roster);
+    const summary = await runTimeImport({ csv: SPLIT_SHEET, periodId: "pd1", importedBy: "admin-1", db, applyRoleChanges: true });
+    if ("error" in summary) throw new Error(summary.error);
+    expect(summary.roleChangesApplied).toBe(true);
+    expect(calls.personUpdate).toContainEqual({ role: "mentor", id: "m1" });
+    expect(calls.sessionInsert.length).toBeGreaterThan(0);
+  });
+
+  test("confirmed import without applyRoleChanges imports sessions but leaves roles alone", async () => {
+    const { db, calls } = fakeDb(roster);
+    const summary = await runTimeImport({ csv: SPLIT_SHEET, periodId: "pd1", importedBy: "admin-1", db, applyRoleChanges: false });
+    if ("error" in summary) throw new Error(summary.error);
+    expect(summary.roleChanges).toHaveLength(1);
+    expect(summary.roleChangesApplied).toBe(false);
+    expect(calls.personUpdate).toEqual([]);
+    expect(calls.sessionInsert.length).toBeGreaterThan(0);
+  });
+});
 
 describe("runTimeImport", () => {
   test("auto-created people get their role from the student/mentor split", async () => {

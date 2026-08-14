@@ -25,9 +25,15 @@ test("an admin imports a time-sheet CSV and sees a result summary", async ({ bro
   await page.locator('input[type="file"]').setInputFiles({
     name: "sample.csv", mimeType: "text/csv", buffer: Buffer.from(CSV, "utf8"),
   });
-  await page.getByRole("button", { name: "Import" }).click();
 
-  // Result summary appears with at least the sessions we expect (Ada x2, Bo x1).
+  // Import must be blocked until a preview has been reviewed (never import directly).
+  await expect(page.getByRole("button", { name: "Import" })).toBeDisabled();
+  await page.getByRole("button", { name: "Preview" }).click();
+  await expect(page.getByRole("heading", { name: "2. Preview" })).toBeVisible();
+
+  // After previewing, Import enables; run it and see the result summary.
+  await expect(page.getByRole("button", { name: "Import" })).toBeEnabled();
+  await page.getByRole("button", { name: "Import" }).click();
   await expect(page.getByRole("heading", { name: "3. Result" })).toBeVisible();
   // "sessions" text appears both in the status line and as a result pill; match either.
   await expect(page.getByText(/sessions/).first()).toBeVisible();
