@@ -107,6 +107,24 @@ export async function deleteExcusalRequests(personId: string, date: string): Pro
   }
 }
 
+/**
+ * Delete any person rows with the given first/last name (and any guardians
+ * linked only to them cascade via FK). Used to make the application-import
+ * E2E re-run-safe — without this, a 2nd run finds the person already
+ * imported with an identical last_application_at and treats the row as
+ * stale rather than newly created.
+ */
+export async function deletePersonByName(firstName: string, lastName: string): Promise<void> {
+  const res = await fetch(
+    `${restBaseUrl()}/person?first_name=eq.${encodeURIComponent(firstName)}&last_name=eq.${encodeURIComponent(lastName)}`,
+    { method: "DELETE", headers: authHeaders() },
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`deletePersonByName failed: ${res.status} ${body}`);
+  }
+}
+
 /** Delete the excusal row for a person+date, if any. Idempotent. */
 export async function deleteExcusal(personId: string, date: string): Promise<void> {
   const res = await fetch(
