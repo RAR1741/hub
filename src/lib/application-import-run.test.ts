@@ -303,6 +303,39 @@ describe("runApplicationImport latest-wins staleness", () => {
   });
 });
 
+describe("runApplicationImport never overwrites data with blanks", () => {
+  test("a blank incoming email does not overwrite an existing email", async () => {
+    const { db, calls } = fakeDb([{ id: "p1", first_name: "Grace", last_name: "Hopper", email: "keep@example.com" }]);
+    const summary = await runApplicationImport({ csvText: csvFor([row({ email: "" })]), dryRun: false, db, now: NOW_AUG });
+    if ("error" in summary) throw new Error(summary.error);
+    expect(summary.matched.map((m) => m.personId)).toEqual(["p1"]);
+    expect("email" in calls.personUpdate[0].patch).toBe(false);
+    expect(summary.matched[0].changes.find((c) => c.field === "email")).toBeUndefined();
+  });
+
+  test("a form with no preferred name does not clear an admin-set display_name", async () => {
+    const { db, calls } = fakeDb([{ id: "p1", first_name: "Grace", last_name: "Hopper", display_name: "Amazing Grace" }]);
+    const summary = await runApplicationImport({ csvText: csvFor([row({ preferred: "" })]), dryRun: false, db, now: NOW_AUG });
+    if ("error" in summary) throw new Error(summary.error);
+    expect("display_name" in calls.personUpdate[0].patch).toBe(false);
+    expect(summary.matched[0].changes.find((c) => c.field === "display_name")).toBeUndefined();
+  });
+
+  test("blank interests are omitted from the patch", async () => {
+    const { db, calls } = fakeDb([{ id: "p1", first_name: "Grace", last_name: "Hopper" }]);
+    await runApplicationImport({ csvText: csvFor([row({ interests: "" })]), dryRun: false, db, now: NOW_AUG });
+    expect("interests" in calls.personUpdate[0].patch).toBe(false);
+  });
+
+  test("a non-blank incoming value still overwrites (latest-wins preserved)", async () => {
+    const { db, calls } = fakeDb([{ id: "p1", first_name: "Grace", last_name: "Hopper", email: "old@example.com" }]);
+    const summary = await runApplicationImport({ csvText: csvFor([row({ email: "new@example.com" })]), dryRun: false, db, now: NOW_AUG });
+    if ("error" in summary) throw new Error(summary.error);
+    expect(calls.personUpdate[0].patch.email).toBe("new@example.com");
+    expect(summary.matched[0].changes).toContainEqual({ field: "email", from: "old@example.com", to: "new@example.com" });
+  });
+});
+
 describe("runApplicationImport experiences", () => {
   test("replace-wholesale: deletes then inserts the parsed experience set", async () => {
     const { db, calls } = fakeDb([{ id: "p1", first_name: "Grace", last_name: "Hopper" }]);

@@ -344,24 +344,12 @@ export async function runApplicationImport(args: {
       if (person && (person.role === "mentor" || person.role === "admin")) {
         summary.roleCallouts.push({ name: r.name, role: person.role });
       }
-      const patch: Record<string, unknown> = {
-        display_name: displayNameFor(r.app),
-        date_of_birth: r.app.dob,
-        grad_year: r.app.gradYear,
-        school: r.app.school,
-        street_address: r.app.streetAddress,
-        city: r.app.city,
-        zip: r.app.zip,
-        home_phone: r.app.homePhone,
-        phone: r.app.phone,
-        email: r.app.email,
-        shirt_size: r.app.shirtSize,
-        ethnicity: r.app.ethnicity,
-        race: r.app.race,
-        interests: r.app.interests,
-        last_application_at: r.app.submittedAt,
-      };
-      if (r.app.dietaryRestrictions) patch.dietary_restrictions = r.app.dietaryRestrictions;
+      // Never overwrite existing data with a blank/absent value, even from a
+      // newer response: a left-blank cell on this year's form must not wipe a
+      // populated field (and a form with no preferred name must not clear an
+      // admin-set display_name). Only non-blank incoming values are written.
+      const patch: Record<string, unknown> = { last_application_at: r.app.submittedAt };
+      for (const w of appFieldWrites(r.app)) patch[w.col] = w.value;
 
       const changes = person ? computeChanges(person, r.app) : [];
       const { error } = await db.from("person").update(patch).eq("id", r.personId);
@@ -423,31 +411,73 @@ function displayNameFor(app: ParsedApplication): string | null {
   return null;
 }
 
+/** Blank = nothing worth writing: null/undefined, empty/whitespace string, or empty array. */
+function isBlank(v: unknown): boolean {
+  if (v === null || v === undefined) return true;
+  if (typeof v === "string") return v.trim() === "";
+  if (Array.isArray(v)) return v.length === 0;
+  return false;
+}
+
+function valuesEqual(a: unknown, b: unknown): boolean {
+  if (Array.isArray(a) || Array.isArray(b)) return JSON.stringify(a ?? []) === JSON.stringify(b ?? []);
+  return a === b;
+}
+
+/**
+ * The application-owned person columns this response would write, with blanks
+ * removed. Single source of truth for both the update patch and the preview
+ * diff, so what the preview shows is exactly what gets written — and a blank
+ * incoming value never clobbers existing data (see the matched-update path).
+ */
+function appFieldWrites(app: ParsedApplication): { col: string; value: unknown }[] {
+  const all: { col: string; value: unknown }[] = [
+    { col: "display_name", value: displayNameFor(app) },
+    { col: "date_of_birth", value: app.dob },
+    { col: "grad_year", value: app.gradYear },
+    { col: "school", value: app.school },
+    { col: "street_address", value: app.streetAddress },
+    { col: "city", value: app.city },
+    { col: "zip", value: app.zip },
+    { col: "home_phone", value: app.homePhone },
+    { col: "phone", value: app.phone },
+    { col: "email", value: app.email },
+    { col: "shirt_size", value: app.shirtSize },
+    { col: "ethnicity", value: app.ethnicity },
+    { col: "race", value: app.race },
+    { col: "interests", value: app.interests },
+    { col: "dietary_restrictions", value: app.dietaryRestrictions },
+  ];
+  return all.filter((f) => !isBlank(f.value));
+}
+
 function computeChanges(
   person: RosterPerson,
   app: ParsedApplication,
 ): { field: string; from: unknown; to: unknown }[] {
-  const changes: { field: string; from: unknown; to: unknown }[] = [];
-  const check = (field: string, from: unknown, to: unknown) => {
-    if (from !== to) changes.push({ field, from, to });
+  const fromByCol: Record<string, unknown> = {
+    display_name: person.display_name,
+    date_of_birth: person.date_of_birth,
+    grad_year: person.grad_year,
+    school: person.school,
+    street_address: person.street_address,
+    city: person.city,
+    zip: person.zip,
+    home_phone: person.home_phone,
+    phone: person.phone,
+    email: person.email,
+    shirt_size: person.shirt_size,
+    ethnicity: person.ethnicity,
+    race: person.race,
+    interests: person.interests,
+    dietary_restrictions: person.dietary_restrictions,
   };
-  check("display_name", person.display_name, displayNameFor(app));
-  check("date_of_birth", person.date_of_birth, app.dob);
-  check("grad_year", person.grad_year, app.gradYear);
-  check("school", person.school, app.school);
-  check("street_address", person.street_address, app.streetAddress);
-  check("city", person.city, app.city);
-  check("zip", person.zip, app.zip);
-  check("home_phone", person.home_phone, app.homePhone);
-  check("phone", person.phone, app.phone);
-  check("email", person.email, app.email);
-  check("shirt_size", person.shirt_size, app.shirtSize);
-  check("ethnicity", person.ethnicity, app.ethnicity);
-  check("race", person.race, app.race);
-  if (JSON.stringify(person.interests ?? []) !== JSON.stringify(app.interests)) {
-    changes.push({ field: "interests", from: person.interests, to: app.interests });
+  // Only fields that will actually be written (non-blank) and that differ.
+  const changes: { field: string; from: unknown; to: unknown }[] = [];
+  for (const w of appFieldWrites(app)) {
+    const from = fromByCol[w.col];
+    if (!valuesEqual(from, w.value)) changes.push({ field: w.col, from, to: w.value });
   }
-  if (app.dietaryRestrictions) check("dietary_restrictions", person.dietary_restrictions, app.dietaryRestrictions);
   return changes;
 }
 
