@@ -30,6 +30,14 @@ export type ParsedPerson = {
 };
 export type ParsedTimeSheet = { dates: string[]; people: ParsedPerson[]; fileIssues: string[] };
 
+/**
+ * Stable identity for a flagged session (person + date). The preview UI and the
+ * importer both build this key so an admin's accept/reject decision lines up
+ * with the exact session it was made about. PURE.
+ */
+export const anomalyKey = (first: string, last: string, date: string): string =>
+  `${first}|${last}|${date}`;
+
 const BLOCK_START = 3; // cols 0,1,2 = first, last, hours-left
 const BLOCK_STRIDE = 3; // [Time In, Time Out, ignored]
 // Students come first, then a clear gap of blank/summary rows, then mentors.

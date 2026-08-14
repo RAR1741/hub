@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { parseTimeSheet, type ParsedPerson } from "./time-import";
+import { anomalyKey, parseTimeSheet, type ParsedPerson } from "./time-import";
+
+export type AnomalyDecision = "accept" | "reject";
 import { localDateTimeToInstant } from "./tz";
 import { getPeriod } from "./periods";
 import { getSetting } from "./settings";
@@ -33,15 +35,27 @@ export async function runTimeImport(args: {
   tz?: string;
   dryRun?: boolean;
   applyRoleChanges?: boolean;
+  decisions?: Record<string, AnomalyDecision>;
 }): Promise<TimeImportSummary | { error: string }> {
   const db = args.db ?? (await import("./db")).getDb();
   const dryRun = args.dryRun ?? false;
+  const decisions = args.decisions ?? {};
   const period = await getPeriod(args.periodId, db);
   if (!period) return { error: "period_not_found" };
   const tz = args.tz ?? (await getSetting<string>("team_timezone", "America/Indiana/Indianapolis", db));
 
   const parsed = parseTimeSheet(args.csv);
   if (parsed.people.length === 0) return { error: parsed.fileIssues[0] ?? "no_data" };
+
+  // Every flagged session must have an accept/reject decision before a real
+  // import. Enforce BEFORE any write (person inserts, delete-then-insert) so a
+  // rejected 400 never mutates the period. Dry-run is where deciding happens.
+  if (!dryRun) {
+    const undecided = parsed.people.some((p) =>
+      p.anomalies.some((a) => decisions[anomalyKey(p.firstName, p.lastName, a.date)] === undefined),
+    );
+    if (undecided) return { error: "undecided_anomalies" };
+  }
 
   // Load roster once; build name/display-name -> id[] index and id -> role.
   const { data: peopleRows, error: rosterError } = await db.from("person").select("id, first_name, last_name, display_name, role");
@@ -104,7 +118,7 @@ export async function runTimeImport(args: {
       summary.createdNames.push(name);
     }
 
-    collectRows(person, personId, name, args.periodId, tz, args.importedBy, sessionRows, excusalRows, summary);
+    collectRows(person, personId, name, args.periodId, tz, args.importedBy, sessionRows, excusalRows, summary, decisions);
   }
 
   if (dryRun) return summary; // preview only — never writes.
@@ -139,8 +153,14 @@ export async function runTimeImport(args: {
 function collectRows(
   person: ParsedPerson, personId: string, name: string, periodId: string, tz: string, importedBy: string,
   sessionRows: Record<string, unknown>[], excusalRows: Record<string, unknown>[], summary: TimeImportSummary,
+  decisions: Record<string, AnomalyDecision>,
 ) {
   for (const s of person.sessions) {
+    // A flagged session the admin rejected in preview is skipped, not imported.
+    if (decisions[anomalyKey(person.firstName, person.lastName, s.date)] === "reject") {
+      summary.skipped.push({ name, date: s.date, reason: "rejected in preview" });
+      continue;
+    }
     sessionRows.push({
       person_id: personId,
       period_id: periodId,

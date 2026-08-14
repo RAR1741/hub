@@ -13,9 +13,18 @@ export const POST = withRole("admin", async (viewer, request) => {
   const confirm = body?.confirm === true;
   const applyRoleChanges = body?.applyRoleChanges === true;
 
+  // Sanitize the per-anomaly accept/reject decisions to exactly our two values.
+  const decisions: Record<string, "accept" | "reject"> = {};
+  const rawDecisions = body?.decisions;
+  if (rawDecisions && typeof rawDecisions === "object") {
+    for (const [k, v] of Object.entries(rawDecisions as Record<string, unknown>)) {
+      if (v === "accept" || v === "reject") decisions[k] = v;
+    }
+  }
+
   // Never trust a client preview — runTimeImport re-parses the raw text.
   const result = await runTimeImport({
-    csv, periodId, importedBy: viewer.person.id, dryRun: !confirm, applyRoleChanges,
+    csv, periodId, importedBy: viewer.person.id, dryRun: !confirm, applyRoleChanges, decisions,
   });
   if ("error" in result) return Response.json(result, { status: 400 });
   return Response.json(result, { status: 200 });

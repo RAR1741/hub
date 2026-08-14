@@ -1,5 +1,11 @@
 import { describe, expect, test } from "vitest";
-import { parseTimeSheet } from "./time-import";
+import { anomalyKey, parseTimeSheet } from "./time-import";
+
+describe("anomalyKey", () => {
+  test("is a stable person+date identity", () => {
+    expect(anomalyKey("Ada", "Lovelace", "2026-01-08")).toBe("Ada|Lovelace|2026-01-08");
+  });
+});
 
 // A compact sheet with the real quirks. Row 1 day-of-week labels; row 2 dates
 // (block starts at col index 3, stride 3); row 3 sub-headers; then data.

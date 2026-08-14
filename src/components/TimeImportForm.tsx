@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { parseTimeSheet } from "@/lib/time-import";
+import { anomalyKey, parseTimeSheet } from "@/lib/time-import";
 import type { TimeImportSummary } from "@/lib/time-import-run";
 
 type PeriodOpt = { id: string; name: string; isActive: boolean; startsOn: string; endsOn: string };
@@ -14,6 +14,8 @@ export function TimeImportForm({ periods }: { periods: PeriodOpt[] }) {
   const [dry, setDry] = useState<TimeImportSummary | null>(null);
   // The exact (text, period) a successful preview was run for — Import is gated on this matching.
   const [previewedFor, setPreviewedFor] = useState<{ text: string; periodId: string } | null>(null);
+  // Per-flagged-session accept/reject decisions, keyed by anomalyKey.
+  const [decisions, setDecisions] = useState<Record<string, "accept" | "reject">>({});
   const [summary, setSummary] = useState<TimeImportSummary | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -22,7 +24,7 @@ export function TimeImportForm({ periods }: { periods: PeriodOpt[] }) {
 
   // Any change to the file or period invalidates a prior preview — you must re-glance before importing.
   function resetPreview() {
-    setPreview(null); setDry(null); setPreviewedFor(null); setSummary(null); setStatus(null);
+    setPreview(null); setDry(null); setPreviewedFor(null); setSummary(null); setStatus(null); setDecisions({});
   }
 
   function onFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -46,6 +48,23 @@ export function TimeImportForm({ periods }: { periods: PeriodOpt[] }) {
   const selectedPeriod = periods.find((p) => p.id === periodId);
   const outOfRange = preview && selectedPeriod ? preview.dates.filter((d) => d < selectedPeriod.startsOn || d > selectedPeriod.endsOn) : [];
   const importReady = !!previewedFor && previewedFor.text === text && previewedFor.periodId === periodId;
+
+  // One decision row per flagged session (a session may carry several anomalies).
+  type AnomalyGroup = { key: string; first: string; last: string; date: string; details: string[] };
+  const anomalyGroups: AnomalyGroup[] = preview
+    ? [...preview.people
+        .reduce((m, p) => {
+          for (const a of p.anomalies) {
+            const key = anomalyKey(p.firstName, p.lastName, a.date);
+            const g = m.get(key) ?? { key, first: p.firstName, last: p.lastName, date: a.date, details: [] };
+            g.details.push(a.detail);
+            m.set(key, g);
+          }
+          return m;
+        }, new Map<string, AnomalyGroup>())
+        .values()]
+    : [];
+  const allDecided = anomalyGroups.every((g) => decisions[g.key]);
 
   async function doPreview() {
     setBusy(true); setStatus(null); setSummary(null);
@@ -72,7 +91,7 @@ export function TimeImportForm({ periods }: { periods: PeriodOpt[] }) {
     try {
       const res = await fetch("/api/admin/time-import", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ csv: text, periodId, confirm: true, applyRoleChanges: true }),
+        body: JSON.stringify({ csv: text, periodId, confirm: true, applyRoleChanges: true, decisions }),
       });
       if (res.ok) {
         const data = (await res.json()) as TimeImportSummary;
@@ -106,10 +125,11 @@ export function TimeImportForm({ periods }: { periods: PeriodOpt[] }) {
           <button type="button" className="btn btn-secondary" onClick={doPreview} disabled={busy || !text.trim() || !periodId}>
             {busy && !summary ? "Previewing…" : "Preview"}
           </button>
-          <button type="button" className="btn btn-primary" onClick={runImport} disabled={busy || !importReady} title={importReady ? undefined : "Preview first"}>
+          <button type="button" className="btn btn-primary" onClick={runImport} disabled={busy || !importReady || !allDecided} title={importReady ? undefined : "Preview first"}>
             {busy && summary === null && importReady ? "Importing…" : "Import"}
           </button>
           {!importReady && <span className="text-sm text-[var(--muted)]">Preview first — review the summary below before importing.</span>}
+          {importReady && !allDecided && <span className="text-sm text-[var(--absent)]">Decide every flagged session (accept or reject) before importing.</span>}
         </div>
         {status && <p role="status" className="text-sm text-[var(--muted)]">{status}</p>}
       </section>
@@ -145,12 +165,38 @@ export function TimeImportForm({ periods }: { periods: PeriodOpt[] }) {
             </p>
           )}
           {preview.fileIssues.length > 0 && <ul className="text-sm text-[var(--absent)]">{preview.fileIssues.map((f, i) => <li key={i}>{f}</li>)}</ul>}
-          {counts.anomalies > 0 && (
-            <ul className="flex flex-col gap-1 text-sm">
-              {preview.people.flatMap((p) => p.anomalies.map((a, i) => (
-                <li key={`${p.sourceRow}-${i}`} className="text-[var(--absent)]">{p.firstName} {p.lastName} · {a.date}: {a.detail}</li>
-              )))}
-            </ul>
+          {anomalyGroups.length > 0 && (
+            <div className="flex flex-col gap-2 rounded-md border border-[var(--absent)] p-3">
+              <p className="text-sm">
+                <strong>{anomalyGroups.length} flagged {anomalyGroups.length === 1 ? "session" : "sessions"}</strong>
+                {" — Accept to import as normal, Reject to skip it. Decide each before importing."}
+              </p>
+              <ul className="flex flex-col gap-2">
+                {anomalyGroups.map((g) => (
+                  <li key={g.key} className="flex flex-wrap items-center gap-2 text-sm">
+                    <span className="text-[var(--absent)]">{g.first} {g.last} · {g.date}: {g.details.join("; ")}</span>
+                    <span className="ml-auto flex gap-1">
+                      <button
+                        type="button"
+                        className={"btn " + (decisions[g.key] === "accept" ? "btn-primary" : "btn-secondary")}
+                        aria-pressed={decisions[g.key] === "accept"}
+                        onClick={() => setDecisions((d) => ({ ...d, [g.key]: "accept" }))}
+                      >
+                        Accept
+                      </button>
+                      <button
+                        type="button"
+                        className={"btn " + (decisions[g.key] === "reject" ? "btn-primary" : "btn-secondary")}
+                        aria-pressed={decisions[g.key] === "reject"}
+                        onClick={() => setDecisions((d) => ({ ...d, [g.key]: "reject" }))}
+                      >
+                        Reject
+                      </button>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </section>
       )}

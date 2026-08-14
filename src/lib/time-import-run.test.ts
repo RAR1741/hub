@@ -66,6 +66,52 @@ const SPLIT_SHEET = [
   "New,Mentor,0.00,18:00,21:00,OK,,,0:00,,,0:00,7",
 ].join("\n");
 
+// Flag Person's Jan 8 session is 18:00 -> 17:00 (overnight, 23h) => over_max_shift.
+const ANOMALY_SHEET = [
+  ',,,"January 8, 2026",,,"January 10, 2026",,,"January 11, 2026",,,,Varsity',
+  ",Name,Hours Left,Time In,Time Out,Verified,Time In,Time Out,Day Total,Time In,Time Out,Day Total,Total Hours",
+  "Flag,Person,0.00,18:00,17:00,OK,,,0:00,,,0:00,3",
+].join("\n");
+const FLAG_KEY = "Flag|Person|2026-01-08";
+
+describe("runTimeImport anomaly decisions", () => {
+  test("a real import with an undecided anomaly errors and writes nothing", async () => {
+    const { db, calls } = fakeDb([]);
+    const result = await runTimeImport({ csv: ANOMALY_SHEET, periodId: "pd1", importedBy: "admin-1", db });
+    expect(result).toEqual({ error: "undecided_anomalies" });
+    // Enforcement runs before any write — no create, no delete, no insert.
+    expect(calls.personInsert).toEqual([]);
+    expect(calls.sessionInsert).toEqual([]);
+    expect(calls.deletes).toEqual([]);
+  });
+
+  test("a rejected anomaly skips the session (reported), does not import it", async () => {
+    const { db, calls } = fakeDb([]);
+    const summary = await runTimeImport({ csv: ANOMALY_SHEET, periodId: "pd1", importedBy: "admin-1", db, decisions: { [FLAG_KEY]: "reject" } });
+    if ("error" in summary) throw new Error(summary.error);
+    expect(calls.sessionInsert).toEqual([]);
+    expect(summary.skipped).toContainEqual({ name: "Flag Person", date: "2026-01-08", reason: "rejected in preview" });
+    expect(summary.anomalies.some((a) => a.kind === "over_max_shift")).toBe(true); // still surfaced
+  });
+
+  test("an accepted anomaly imports the session normally, still flagged", async () => {
+    const { db, calls } = fakeDb([]);
+    const summary = await runTimeImport({ csv: ANOMALY_SHEET, periodId: "pd1", importedBy: "admin-1", db, decisions: { [FLAG_KEY]: "accept" } });
+    if ("error" in summary) throw new Error(summary.error);
+    expect(calls.sessionInsert.length).toBe(1);
+    expect(summary.skipped).toEqual([]);
+    expect(summary.anomalies.some((a) => a.kind === "over_max_shift")).toBe(true);
+  });
+
+  test("dry-run with anomalies needs no decisions (deciding happens in the preview)", async () => {
+    const { db } = fakeDb([]);
+    const summary = await runTimeImport({ csv: ANOMALY_SHEET, periodId: "pd1", importedBy: "admin-1", db, dryRun: true });
+    if ("error" in summary) throw new Error(summary.error);
+    expect(summary.dryRun).toBe(true);
+    expect(summary.anomalies.some((a) => a.kind === "over_max_shift")).toBe(true);
+  });
+});
+
 describe("runTimeImport role changes", () => {
   // Roster has "New Mentor" as a student today; the sheet lists them in the mentor group.
   const roster = [{ id: "m1", first_name: "New", last_name: "Mentor", display_name: null, role: "student" }];
