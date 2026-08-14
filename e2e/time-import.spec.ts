@@ -31,9 +31,10 @@ test("an admin imports a time-sheet CSV and sees a result summary", async ({ bro
   await page.getByRole("button", { name: "Preview" }).click();
   await expect(page.getByRole("heading", { name: "2. Preview" })).toBeVisible();
 
-  // The fixture has one flagged session — Import stays disabled until it's decided.
+  // The fixture has one AM/PM-ambiguous clock-in — Import stays disabled until
+  // a reading is chosen. Picking AM satisfies the gate.
   await expect(page.getByRole("button", { name: "Import" })).toBeDisabled();
-  await page.getByRole("button", { name: "Accept" }).first().click();
+  await page.getByRole("button", { name: /^AM/ }).first().click();
 
   // With every anomaly decided, Import enables; run it and see the result summary.
   await expect(page.getByRole("button", { name: "Import" })).toBeEnabled();

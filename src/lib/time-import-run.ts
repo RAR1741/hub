@@ -1,7 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { anomalyKey, parseTimeSheet, type ParsedPerson } from "./time-import";
+import { anomalyKey, nextDay, parseTimeSheet, type ParsedPerson } from "./time-import";
 
-export type AnomalyDecision = "accept" | "reject";
+// accept/reject for ordinary anomalies; am/pm additionally pick the reading of
+// an AM/PM-ambiguous clock-in. reject skips the session either way.
+export type AnomalyDecision = "accept" | "reject" | "am" | "pm";
 import { localDateTimeToInstant } from "./tz";
 import { getPeriod } from "./periods";
 import { getSetting } from "./settings";
@@ -156,16 +158,25 @@ function collectRows(
   decisions: Record<string, AnomalyDecision>,
 ) {
   for (const s of person.sessions) {
+    const decision = decisions[anomalyKey(person.firstName, person.lastName, s.date)];
     // A flagged session the admin rejected in preview is skipped, not imported.
-    if (decisions[anomalyKey(person.firstName, person.lastName, s.date)] === "reject") {
+    if (decision === "reject") {
       summary.skipped.push({ name, date: s.date, reason: "rejected in preview" });
       continue;
+    }
+    // An AM/PM decision overrides the ambiguous clock-in; recompute whether the
+    // (fixed) clock-out now rolls past midnight relative to the chosen in-time.
+    let timeIn = s.timeIn;
+    let timeOutDate = s.timeOutDate;
+    if (s.amPm && (decision === "am" || decision === "pm")) {
+      timeIn = decision === "am" ? s.amPm.am : s.amPm.pm;
+      timeOutDate = toMinutes(s.timeOut) < toMinutes(timeIn) ? nextDay(s.date) : s.date;
     }
     sessionRows.push({
       person_id: personId,
       period_id: periodId,
-      time_in: localDateTimeToInstant(s.date, toMinutes(s.timeIn), tz),
-      time_out: localDateTimeToInstant(s.timeOutDate, toMinutes(s.timeOut), tz),
+      time_in: localDateTimeToInstant(s.date, toMinutes(timeIn), tz),
+      time_out: localDateTimeToInstant(timeOutDate, toMinutes(s.timeOut), tz),
       source: "import",
     });
     summary.sessions += 1;

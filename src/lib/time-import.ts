@@ -10,7 +10,16 @@ import {
   type ResolvedCell,
 } from "./time-parse";
 
-export type ParsedSession = { date: string; timeIn: string; timeOut: string; timeOutDate: string };
+export type ParsedSession = {
+  date: string;
+  timeIn: string;
+  timeOut: string;
+  timeOutDate: string;
+  // Present when the clock-in was AM/PM-ambiguous (see am_pm_uncertain). timeIn
+  // holds the consensus guess; amPm carries both readings so an admin's AM/PM
+  // decision can override it at import.
+  amPm?: { am: string; pm: string };
+};
 export type ParsedExcusal = { date: string };
 export type SkippedEntry = { date: string; reason: string };
 export type TimeAnomaly = {
@@ -73,7 +82,7 @@ function hhmm(minutes: number): string {
   return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
 }
 
-function nextDay(dateIso: string): string {
+export function nextDay(dateIso: string): string {
   const [y, m, d] = dateIso.split("-").map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d + 1));
   return dt.toISOString().slice(0, 10);
@@ -204,28 +213,26 @@ export function parseTimeSheet(csvText: string): ParsedTimeSheet {
       if (inCell.minutes !== null && outCell.minutes !== null) {
         const overnight = outCell.minutes < inCell.minutes;
         const durMin = outCell.minutes + (overnight ? 1440 : 0) - inCell.minutes;
+        // A suspect AM/PM guess: a bare clock-in whose morning reading is a
+        // plausible arrival, but which column consensus flipped to the evening
+        // (PM) reading. A morning time left as morning is unremarkable; one
+        // pushed to night (e.g. 8:46 -> 20:46) is the coin-flip worth a look.
+        // Noon times (00:xx morning reading) aren't arrival-plausible → excluded.
+        const amPm = inRaw.kind === "ambiguous" && inCell.minutes === inRaw.pm && arrivalPlausible(inRaw.am) && arrivalPlausible(inRaw.pm)
+          ? { am: hhmm(inRaw.am), pm: hhmm(inRaw.pm) }
+          : undefined;
         person.sessions.push({
           date,
           timeIn: hhmm(inCell.minutes),
           timeOut: hhmm(outCell.minutes),
           timeOutDate: overnight ? nextDay(date) : date,
+          ...(amPm ? { amPm } : {}),
         });
         if (inCell.farFromColumn) person.anomalies.push({ date, kind: "time_far_from_column", detail: `Time In ${hhmm(inCell.minutes)} is far from the column norm` });
         if (outCell.farFromColumn) person.anomalies.push({ date, kind: "time_far_from_column", detail: `Time Out ${hhmm(outCell.minutes)} is far from the column norm` });
         if (durMin <= 0) person.anomalies.push({ date, kind: "zero_or_negative", detail: "Session has zero or negative length" });
         else if (durMin > MAX_SHIFT_MIN) person.anomalies.push({ date, kind: "over_max_shift", detail: `Session is ${(durMin / 60).toFixed(1)}h (over ${MAX_SHIFT_MIN / 60}h)` });
-        // Flag a suspect AM/PM guess for manual review: a bare clock-in whose
-        // morning reading is a plausible arrival, but which column consensus
-        // flipped to the evening (PM) reading. A morning time left as morning is
-        // unremarkable; one pushed to night (e.g. 8:46 -> 20:46) is the coin-flip
-        // worth a look. Noon times (00:xx morning reading) aren't arrival-
-        // plausible, so they're excluded.
-        if (inRaw.kind === "ambiguous" && inCell.minutes === inRaw.pm && arrivalPlausible(inRaw.am) && arrivalPlausible(inRaw.pm)) {
-          person.anomalies.push({
-            date, kind: "am_pm_uncertain",
-            detail: `Time In ${cell(rec, b.col)} read as PM (${hhmm(inRaw.pm)}) — could be ${hhmm(inRaw.am)}`,
-          });
-        }
+        if (amPm) person.anomalies.push({ date, kind: "am_pm_uncertain", detail: `Time In ${cell(rec, b.col)} read as PM (${amPm.pm}) — could be ${amPm.am}` });
       } else if (inCell.minutes !== null && outCell.minutes === null) {
         person.skipped.push({ date, reason: "missing clock-out" });
       } else if (inCell.minutes === null && outCell.minutes !== null) {

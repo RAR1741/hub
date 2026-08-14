@@ -74,6 +74,44 @@ const ANOMALY_SHEET = [
 ].join("\n");
 const FLAG_KEY = "Flag|Person|2026-01-08";
 
+// Evening column (Eve/Fred confident 18:2x, no clock-out) flips Mort's bare
+// "8:46" to PM → am_pm_uncertain, so his clock-in is decidable AM vs PM.
+const AMPM_SHEET = [
+  ',,,"January 8, 2026",,,"January 10, 2026",,,"January 11, 2026",,,,Varsity',
+  ",Name,Hours Left,Time In,Time Out,Verified,Time In,Time Out,Day Total,Time In,Time Out,Day Total,Total Hours",
+  "Eve,Evening,0.00,18:30,,OK,,,0:00,,,0:00,5",
+  "Fred,Evening,0.00,18:20,,OK,,,0:00,,,0:00,5",
+  "Mort,Morning,0.00,8:46,21:15,OK,,,0:00,,,0:00,12",
+].join("\n");
+const MORT_KEY = "Mort|Morning|2026-01-08";
+
+describe("runTimeImport AM/PM decisions", () => {
+  test("an undecided ambiguous clock-in errors and writes nothing", async () => {
+    const { db, calls } = fakeDb([]);
+    const r = await runTimeImport({ csv: AMPM_SHEET, periodId: "pd1", importedBy: "a", db });
+    expect(r).toEqual({ error: "undecided_anomalies" });
+    expect(calls.sessionInsert).toEqual([]);
+  });
+
+  test("AM vs PM changes the imported clock-in by 12h", async () => {
+    const am = fakeDb([]); const pm = fakeDb([]);
+    const rAm = await runTimeImport({ csv: AMPM_SHEET, periodId: "pd1", importedBy: "a", db: am.db, decisions: { [MORT_KEY]: "am" } });
+    const rPm = await runTimeImport({ csv: AMPM_SHEET, periodId: "pd1", importedBy: "a", db: pm.db, decisions: { [MORT_KEY]: "pm" } });
+    if ("error" in rAm || "error" in rPm) throw new Error("unexpected error");
+    const inAm = new Date(am.calls.sessionInsert[0].time_in as string).getTime();
+    const inPm = new Date(pm.calls.sessionInsert[0].time_in as string).getTime();
+    expect((inPm - inAm) / 3_600_000).toBe(12); // 08:46 vs 20:46
+  });
+
+  test("reject skips the ambiguous session", async () => {
+    const { db, calls } = fakeDb([]);
+    const r = await runTimeImport({ csv: AMPM_SHEET, periodId: "pd1", importedBy: "a", db, decisions: { [MORT_KEY]: "reject" } });
+    if ("error" in r) throw new Error(r.error);
+    expect(calls.sessionInsert).toEqual([]);
+    expect(r.skipped).toContainEqual({ name: "Mort Morning", date: "2026-01-08", reason: "rejected in preview" });
+  });
+});
+
 describe("runTimeImport anomaly decisions", () => {
   test("a real import with an undecided anomaly errors and writes nothing", async () => {
     const { db, calls } = fakeDb([]);

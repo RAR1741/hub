@@ -7,6 +7,12 @@ import type { TimeImportSummary } from "@/lib/time-import-run";
 
 type PeriodOpt = { id: string; name: string; isActive: boolean; startsOn: string; endsOn: string };
 
+const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+// "2026-02-06" -> "Fri 2026-02-06". Meeting hours vary by day, so the weekday
+// is worth showing next to every date under review. Parsed as UTC to avoid
+// a local-timezone off-by-one on the date.
+const withDow = (dateIso: string) => `${DOW[new Date(`${dateIso}T00:00:00Z`).getUTCDay()]} ${dateIso}`;
+
 export function TimeImportForm({ periods }: { periods: PeriodOpt[] }) {
   const [text, setText] = useState("");
   const [periodId, setPeriodId] = useState(periods.find((p) => p.isActive)?.id ?? periods[0]?.id ?? "");
@@ -14,8 +20,9 @@ export function TimeImportForm({ periods }: { periods: PeriodOpt[] }) {
   const [dry, setDry] = useState<TimeImportSummary | null>(null);
   // The exact (text, period) a successful preview was run for — Import is gated on this matching.
   const [previewedFor, setPreviewedFor] = useState<{ text: string; periodId: string } | null>(null);
-  // Per-flagged-session accept/reject decisions, keyed by anomalyKey.
-  const [decisions, setDecisions] = useState<Record<string, "accept" | "reject">>({});
+  // Per-flagged-session decisions, keyed by anomalyKey. accept/reject for
+  // ordinary anomalies; am/pm additionally set the reading of an ambiguous in.
+  const [decisions, setDecisions] = useState<Record<string, "accept" | "reject" | "am" | "pm">>({});
   const [summary, setSummary] = useState<TimeImportSummary | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -50,7 +57,9 @@ export function TimeImportForm({ periods }: { periods: PeriodOpt[] }) {
   const importReady = !!previewedFor && previewedFor.text === text && previewedFor.periodId === periodId;
 
   // One decision row per flagged session (a session may carry several anomalies).
-  type AnomalyGroup = { key: string; first: string; last: string; date: string; details: string[] };
+  // amPm, when set, means the clock-in is AM/PM-ambiguous → the row offers
+  // AM/PM/Reject instead of Accept/Reject.
+  type AnomalyGroup = { key: string; first: string; last: string; date: string; details: string[]; amPm?: { am: string; pm: string } };
   const anomalyGroups: AnomalyGroup[] = preview
     ? [...preview.people
         .reduce((m, p) => {
@@ -58,6 +67,10 @@ export function TimeImportForm({ periods }: { periods: PeriodOpt[] }) {
             const key = anomalyKey(p.firstName, p.lastName, a.date);
             const g = m.get(key) ?? { key, first: p.firstName, last: p.lastName, date: a.date, details: [] };
             g.details.push(a.detail);
+            if (a.kind === "am_pm_uncertain") {
+              const s = p.sessions.find((x) => x.date === a.date);
+              if (s?.amPm) g.amPm = s.amPm;
+            }
             m.set(key, g);
           }
           return m;
@@ -169,32 +182,29 @@ export function TimeImportForm({ periods }: { periods: PeriodOpt[] }) {
             <div className="flex flex-col gap-2 rounded-md border border-[var(--absent)] p-3">
               <p className="text-sm">
                 <strong>{anomalyGroups.length} flagged {anomalyGroups.length === 1 ? "session" : "sessions"}</strong>
-                {" — Accept to import as normal, Reject to skip it. Decide each before importing."}
+                {" — for an AM/PM-ambiguous clock-in, pick the correct reading; otherwise Accept to import or Reject to skip. Decide each before importing."}
               </p>
               <ul className="flex flex-col gap-2">
-                {anomalyGroups.map((g) => (
-                  <li key={g.key} className="flex flex-wrap items-center gap-2 text-sm">
-                    <span className="text-[var(--absent)]">{g.first} {g.last} · {g.date}: {g.details.join("; ")}</span>
-                    <span className="ml-auto flex gap-1">
-                      <button
-                        type="button"
-                        className={"btn " + (decisions[g.key] === "accept" ? "btn-primary" : "btn-secondary")}
-                        aria-pressed={decisions[g.key] === "accept"}
-                        onClick={() => setDecisions((d) => ({ ...d, [g.key]: "accept" }))}
-                      >
-                        Accept
-                      </button>
-                      <button
-                        type="button"
-                        className={"btn " + (decisions[g.key] === "reject" ? "btn-primary" : "btn-secondary")}
-                        aria-pressed={decisions[g.key] === "reject"}
-                        onClick={() => setDecisions((d) => ({ ...d, [g.key]: "reject" }))}
-                      >
-                        Reject
-                      </button>
-                    </span>
-                  </li>
-                ))}
+                {anomalyGroups.map((g) => {
+                  const decide = (v: "accept" | "reject" | "am" | "pm") => () => setDecisions((d) => ({ ...d, [g.key]: v }));
+                  const cls = (v: string) => "btn " + (decisions[g.key] === v ? "btn-primary" : "btn-secondary");
+                  return (
+                    <li key={g.key} className="flex flex-wrap items-center gap-2 text-sm">
+                      <span className="text-[var(--absent)]">{g.first} {g.last} · {withDow(g.date)}: {g.details.join("; ")}</span>
+                      <span className="ml-auto flex gap-1">
+                        {g.amPm ? (
+                          <>
+                            <button type="button" className={cls("am")} aria-pressed={decisions[g.key] === "am"} onClick={decide("am")}>AM ({g.amPm.am})</button>
+                            <button type="button" className={cls("pm")} aria-pressed={decisions[g.key] === "pm"} onClick={decide("pm")}>PM ({g.amPm.pm})</button>
+                          </>
+                        ) : (
+                          <button type="button" className={cls("accept")} aria-pressed={decisions[g.key] === "accept"} onClick={decide("accept")}>Accept</button>
+                        )}
+                        <button type="button" className={cls("reject")} aria-pressed={decisions[g.key] === "reject"} onClick={decide("reject")}>Reject</button>
+                      </span>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           )}
@@ -232,7 +242,7 @@ export function TimeImportForm({ periods }: { periods: PeriodOpt[] }) {
           {summary.anomalies.length > 0 && (
             <ul className="flex flex-col gap-1 text-sm">
               {summary.anomalies.map((a, i) => (
-                <li key={i} className="text-[var(--absent)]">{a.name} · {a.date}: {a.detail}</li>
+                <li key={i} className="text-[var(--absent)]">{a.name} · {withDow(a.date)}: {a.detail}</li>
               ))}
             </ul>
           )}
@@ -241,7 +251,7 @@ export function TimeImportForm({ periods }: { periods: PeriodOpt[] }) {
               <summary className="cursor-pointer">{summary.skipped.length} skipped entries</summary>
               <ul className="mt-2 flex flex-col gap-1">
                 {summary.skipped.map((s, i) => (
-                  <li key={i} className="text-[var(--muted)]">{s.name} · {s.date}: {s.reason}</li>
+                  <li key={i} className="text-[var(--muted)]">{s.name} · {withDow(s.date)}: {s.reason}</li>
                 ))}
               </ul>
             </details>
