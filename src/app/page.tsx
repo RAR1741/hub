@@ -36,6 +36,9 @@ export default async function HomePage() {
           .map((d) => d.date)
       : [],
   );
+  // Render times in the team's timezone — on the server `undefined` resolves to
+  // the host zone (UTC in prod), which showed the clock hours ahead of local.
+  const teamTz = await getSetting<string>("team_timezone", "America/Indiana/Indianapolis");
   const now = new Date();
 
   return (
@@ -51,8 +54,8 @@ export default async function HomePage() {
           {activePeriod && <span>{activePeriod.name}</span>}
           <span className="grow" />
           <span className="date mono">
-            {now.toLocaleDateString(undefined, { weekday: "short" })} ·{" "}
-            {now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+            {now.toLocaleDateString(undefined, { weekday: "short", timeZone: teamTz })} ·{" "}
+            {now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", timeZone: teamTz })}
           </span>
         </div>
       )}
@@ -131,7 +134,7 @@ export default async function HomePage() {
               <div key={m.id} className="meet">
                 <span className="d mono">
                   {start
-                    .toLocaleDateString(undefined, { weekday: "short", month: "numeric", day: "numeric" })
+                    .toLocaleDateString(undefined, { weekday: "short", month: "numeric", day: "numeric", timeZone: teamTz })
                     .toUpperCase()}
                 </span>
                 <span className="t">{m.title}</span>
