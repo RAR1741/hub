@@ -71,6 +71,40 @@ const SPLIT_SHEET = [
   "Dana,Coach,0.00,18:05,21:00,OK,,,0:00,,,0:00,7",
 ].join("\n");
 
+// Evening column (Eve/Fred confident ~18:2x) flips Mort's bare "8:46" to PM;
+// Nora's "12:30" is noon (morning reading 00:30 is not a plausible arrival).
+const UNCERTAIN_SHEET = [
+  ",,,,,,Friday,,,Sunday,,,,Varsity",
+  ',,,"January 8, 2026",,,"January 10, 2026",,,"January 11, 2026",,,,Letter',
+  ",Name,Hours Left,Time In,Time Out,Verified,Time In,Time Out,Day Total,Time In,Time Out,Day Total,Total Hours",
+  "Eve,Evening,0.00,18:30,21:00,OK,,,0:00,,,0:00,5",
+  "Fred,Evening,0.00,18:20,21:00,OK,,,0:00,,,0:00,5",
+  "Mort,Morning,0.00,8:46,21:15,OK,,,0:00,,,0:00,12",
+  "Nora,Noon,0.00,12:30,17:00,OK,,,0:00,,,0:00,4",
+].join("\n");
+
+describe("am_pm_uncertain flag", () => {
+  test("flags a morning-looking clock-in that consensus flipped to PM", () => {
+    const mort = parseTimeSheet(UNCERTAIN_SHEET).people.find((x) => x.firstName === "Mort")!;
+    expect(mort.anomalies.some((a) => a.kind === "am_pm_uncertain")).toBe(true);
+    expect(mort.sessions[0].timeIn).toBe("20:46"); // surfaced, not coerced — still the consensus guess
+  });
+  test("does not flag noon — the 00:xx morning reading is not a plausible arrival", () => {
+    const nora = parseTimeSheet(UNCERTAIN_SHEET).people.find((x) => x.firstName === "Nora")!;
+    expect(nora.anomalies.some((a) => a.kind === "am_pm_uncertain")).toBe(false);
+    expect(nora.sessions[0].timeIn).toBe("12:30");
+  });
+  test("does not flag a confident 24-hour clock-in", () => {
+    const eve = parseTimeSheet(UNCERTAIN_SHEET).people.find((x) => x.firstName === "Eve")!;
+    expect(eve.anomalies).toEqual([]);
+  });
+  test("does not flag a morning clock-in resolved to AM (unremarkable)", () => {
+    // In SHEET, Ada's Jan-10 "9:00" resolves to 09:00 — morning stays morning.
+    const anomalies = parseTimeSheet(SHEET).people.flatMap((p) => p.anomalies);
+    expect(anomalies.some((a) => a.kind === "am_pm_uncertain")).toBe(false);
+  });
+});
+
 describe("student/mentor split", () => {
   test("splits on the largest gap: pre-gap people are students, post-gap are mentors", () => {
     const p = parseTimeSheet(SPLIT_SHEET);
