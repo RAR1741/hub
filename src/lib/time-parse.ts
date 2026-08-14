@@ -1,4 +1,5 @@
-export const TIME_ANOMALY_THRESHOLD_MIN = 240; // 4h — catches AM/PM (12h) and tz (~5h) slips
+export const TIME_ANOMALY_THRESHOLD_MIN = 240; // 4h floor — a lone slip in a tight column still flags
+export const OUTLIER_MAD_K = 5;                // spread multiplier: threshold = max(floor, K * MAD)
 export const MAX_SHIFT_MIN = 1080;             // 18h, matches the max_shift_hours default
 
 export type ClockParse =
@@ -42,17 +43,38 @@ export function median(nums: number[]): number | null {
   return s.length % 2 ? s[mid] : Math.round((s[mid - 1] + s[mid]) / 2);
 }
 
-/** Two-pass column consensus over one sub-column (same index across people). PURE. */
+/**
+ * Spread-aware outlier band for a column of resolved minutes: max(floor, K * MAD).
+ * On a tight column MAD is tiny so the floor governs (a lone 5h slip still flags);
+ * on a genuinely spread column (e.g. all-day sessions with morning + afternoon
+ * arrivals) the MAD term widens the band so normal spread isn't flagged. PURE.
+ */
+export function columnFlagThreshold(mins: number[]): number {
+  const med = median(mins);
+  if (med === null) return Infinity;
+  const mad = median(mins.map((v) => Math.abs(v - med))) ?? 0;
+  return Math.max(TIME_ANOMALY_THRESHOLD_MIN, OUTLIER_MAD_K * mad);
+}
+
+/**
+ * Two-pass column resolution over one sub-column (same index across people).
+ * Pass 1 resolves each ambiguous cell's AM/PM toward the confident median.
+ * Pass 2 flags outliers against the *resolved* value distribution (which
+ * includes the resolved-ambiguous cells, so a column that is mostly bare
+ * morning times isn't judged against a lone 24-hour straggler). PURE.
+ */
 export function resolveColumnTimes(parses: ClockParse[]): ResolvedCell[] {
   const ref = median(parses.flatMap((p) => (p.kind === "confident" ? [p.minutes] : [])));
-  return parses.map((p) => {
-    if (p.kind === "confident") {
-      return { minutes: p.minutes, farFromColumn: ref !== null && Math.abs(p.minutes - ref) > TIME_ANOMALY_THRESHOLD_MIN };
-    }
-    if (p.kind === "ambiguous") {
-      const chosen = ref === null || Math.abs(p.am - ref) <= Math.abs(p.pm - ref) ? p.am : p.pm;
-      return { minutes: chosen, farFromColumn: ref !== null && Math.abs(chosen - ref) > TIME_ANOMALY_THRESHOLD_MIN };
-    }
-    return { minutes: null, farFromColumn: false };
+  const resolved = parses.map((p) => {
+    if (p.kind === "confident") return p.minutes;
+    if (p.kind === "ambiguous") return ref === null || Math.abs(p.am - ref) <= Math.abs(p.pm - ref) ? p.am : p.pm;
+    return null;
   });
+  const mins = resolved.filter((m): m is number => m !== null);
+  const colMed = median(mins);
+  const thr = columnFlagThreshold(mins);
+  return resolved.map((m) => ({
+    minutes: m,
+    farFromColumn: m !== null && colMed !== null && Math.abs(m - colMed) > thr,
+  }));
 }

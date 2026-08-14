@@ -1,7 +1,7 @@
 import { parseCsvRecords } from "./csv";
 import {
   MAX_SHIFT_MIN,
-  TIME_ANOMALY_THRESHOLD_MIN,
+  columnFlagThreshold,
   median,
   parseClockToken,
   resolveColumnTimes,
@@ -57,30 +57,41 @@ function nextDay(dateIso: string): string {
 const cell = (rec: string[], i: number): string => (rec[i] ?? "").trim();
 
 /**
- * Resolve a Time-Out cell. Row-aware: for an ambiguous (bare small-hour) out,
- * prefer whichever AM/PM reading yields a sensible shift (0 < duration <=
- * MAX_SHIFT_MIN) against this row's resolved Time-In — so a real overnight out
- * (e.g. "1:00" after an 18:00 in => 1 AM, 7h) resolves correctly instead of
- * being read as PM by column consensus. Falls back to column consensus (nearest
- * the confident median) when both or neither reading is sensible, or when the
- * Time-In is unknown. A row-aware pick is trusted (never flagged far-from-column). PURE.
+ * Resolve a whole Time-Out sub-column, row-aware. For an ambiguous (bare
+ * small-hour) out, prefer whichever AM/PM reading yields a sensible shift
+ * (0 < duration <= MAX_SHIFT_MIN) against that row's resolved Time-In — so a
+ * real overnight out (e.g. "1:00" after an 18:00 in => 1 AM, 7h) resolves
+ * correctly instead of being read as PM by column consensus. Falls back to
+ * column consensus (nearest the confident median) when both or neither reading
+ * is sensible, or when the Time-In is unknown. Outlier flagging is spread-aware
+ * over the resolved distribution (see columnFlagThreshold); a row-aware pick is
+ * trusted and never flagged. PURE.
  */
-function resolveOutCell(out: ClockParse, inMinutes: number | null, columnMedian: number | null): ResolvedCell {
-  if (out.kind === "confident") {
-    return { minutes: out.minutes, farFromColumn: columnMedian !== null && Math.abs(out.minutes - columnMedian) > TIME_ANOMALY_THRESHOLD_MIN };
-  }
-  if (out.kind === "ambiguous") {
-    if (inMinutes !== null) {
-      const dur = (c: number) => (c < inMinutes ? c + 1440 : c) - inMinutes;
-      const amOk = dur(out.am) > 0 && dur(out.am) <= MAX_SHIFT_MIN;
-      const pmOk = dur(out.pm) > 0 && dur(out.pm) <= MAX_SHIFT_MIN;
-      if (amOk && !pmOk) return { minutes: out.am, farFromColumn: false };
-      if (pmOk && !amOk) return { minutes: out.pm, farFromColumn: false };
+export function resolveOutColumn(outParses: ClockParse[], inMins: (number | null)[]): ResolvedCell[] {
+  const ref = median(outParses.flatMap((p) => (p.kind === "confident" ? [p.minutes] : [])));
+  const rowAware: boolean[] = new Array(outParses.length).fill(false);
+  const resolved = outParses.map((op, i) => {
+    if (op.kind === "confident") return op.minutes;
+    if (op.kind === "ambiguous") {
+      const inM = inMins[i];
+      if (inM !== null) {
+        const dur = (c: number) => (c < inM ? c + 1440 : c) - inM;
+        const amOk = dur(op.am) > 0 && dur(op.am) <= MAX_SHIFT_MIN;
+        const pmOk = dur(op.pm) > 0 && dur(op.pm) <= MAX_SHIFT_MIN;
+        if (amOk && !pmOk) { rowAware[i] = true; return op.am; }
+        if (pmOk && !amOk) { rowAware[i] = true; return op.pm; }
+      }
+      return ref === null || Math.abs(op.am - ref) <= Math.abs(op.pm - ref) ? op.am : op.pm;
     }
-    const chosen = columnMedian === null || Math.abs(out.am - columnMedian) <= Math.abs(out.pm - columnMedian) ? out.am : out.pm;
-    return { minutes: chosen, farFromColumn: columnMedian !== null && Math.abs(chosen - columnMedian) > TIME_ANOMALY_THRESHOLD_MIN };
-  }
-  return { minutes: null, farFromColumn: false };
+    return null;
+  });
+  const mins = resolved.filter((m): m is number => m !== null);
+  const colMed = median(mins);
+  const thr = columnFlagThreshold(mins);
+  return resolved.map((m, i) => ({
+    minutes: m,
+    farFromColumn: !rowAware[i] && m !== null && colMed !== null && Math.abs(m - colMed) > thr,
+  }));
 }
 
 export function parseTimeSheet(csvText: string): ParsedTimeSheet {
@@ -120,11 +131,12 @@ export function parseTimeSheet(csvText: string): ParsedTimeSheet {
   const inResolved: ResolvedCell[][] = blocks.map((b) =>
     resolveColumnTimes(dataRows.map(({ rec }) => parseClockToken(cell(rec, b.col)))),
   );
-  const outResolved: ResolvedCell[][] = blocks.map((b, blockIdx) => {
-    const outParses = dataRows.map(({ rec }) => parseClockToken(cell(rec, b.col + 1)));
-    const columnMedian = median(outParses.flatMap((p) => (p.kind === "confident" ? [p.minutes] : [])));
-    return outParses.map((op, personIdx) => resolveOutCell(op, inResolved[blockIdx][personIdx].minutes, columnMedian));
-  });
+  const outResolved: ResolvedCell[][] = blocks.map((b, blockIdx) =>
+    resolveOutColumn(
+      dataRows.map(({ rec }) => parseClockToken(cell(rec, b.col + 1))),
+      inResolved[blockIdx].map((c) => c.minutes),
+    ),
+  );
 
   const people: ParsedPerson[] = dataRows.map(({ rec, sourceRow }, personIdx) => {
     const person: ParsedPerson = {

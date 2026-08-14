@@ -53,4 +53,27 @@ describe("resolveColumnTimes", () => {
     const r = resolveColumnTimes([parseClockToken("Excused"), parseClockToken("")]);
     expect(r).toEqual([{ minutes: null, farFromColumn: false }, { minutes: null, farFromColumn: false }]);
   });
+
+  test("morning column with one 24h straggler: only the straggler flags, not the crowd", () => {
+    // Real all-day-session shape: everyone taps in ~9am (bare = ambiguous), one
+    // person's cell is 24-hour "13:22" (confident). The norm must be the 9am
+    // crowd, so the lone 1:22pm entry is the outlier — not all 5 morning people.
+    const col = ["8:55", "9:00", "9:02", "8:58", "9:05", "13:22"].map(parseClockToken);
+    const r = resolveColumnTimes(col);
+    expect(r.slice(0, 5).every((c) => c.farFromColumn === false)).toBe(true);
+    expect(r[5].farFromColumn).toBe(true);
+    expect(r[0].minutes).toBe(8 * 60 + 55); // morning resolved to AM, not 8:55pm
+  });
+
+  test("genuinely spread column (8h of arrivals) is not flagged — MAD widens the band", () => {
+    const col = ["9:00 AM", "11:00 AM", "1:00 PM", "3:00 PM", "5:00 PM", "7:00 PM"].map(parseClockToken);
+    // Under the old fixed 4h band the 9am and 7pm ends would flag; MAD absorbs them.
+    expect(resolveColumnTimes(col).every((c) => c.farFromColumn === false)).toBe(true);
+  });
+
+  test("a single-cell column never flags (MAD undefined, n=1)", () => {
+    expect(resolveColumnTimes([parseClockToken("18:29")])).toEqual([
+      { minutes: 18 * 60 + 29, farFromColumn: false },
+    ]);
+  });
 });
