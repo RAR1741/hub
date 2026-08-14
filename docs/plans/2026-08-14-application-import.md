@@ -21,7 +21,7 @@ reusing its person matcher and decisions pattern. One migration adds the schema.
 
 ---
 
-## Schema (Task 1)
+## Task 1: Schema migration + types
 
 `supabase/migrations/<ts>_application_import.sql`:
 
@@ -93,7 +93,7 @@ Notes:
 Also extend `PersonRow`/`Person`/`personFromRow` in `src/lib/types.ts`, plus new
 `GuardianRow`/`FirstExperienceRow` types + mappers, with `types.test.ts` cases.
 
-## Parsing (Task 2) — `src/lib/application-parse.ts` (pure)
+## Task 2: Parsing — `src/lib/application-parse.ts` (pure)
 
 Reuses `parseCsvRecords` from `src/lib/csv.ts`.
 
@@ -144,7 +144,7 @@ matrix), experience parsing (range year, single year, garbage), guardian-2
 header quirk, 2025 unlabeled dietary column, phone/DOB normalization, dedup
 keeps-newest.
 
-## Matching & merge (Task 3) — `src/lib/application-import-run.ts`
+## Task 3: Matching & merge — `src/lib/application-import-run.ts`
 
 `runApplicationImport({ csvText, dryRun, decisions, confirm })`, following
 `time-import-run.ts` conventions (summary object, decisions map, no writes on
@@ -206,14 +206,14 @@ Tests: fake-db runner tests — auto-match by name/email, fuzzy needs-decision
 experience replace, guardian sibling-sharing + contact update, deactivation
 math at the June boundary, undecided-blocks-write.
 
-## API route (Task 4) — `src/app/api/admin/application-import/route.ts`
+## Task 4: API route — `src/app/api/admin/application-import/route.ts`
 
 `withRole("admin")`, multipart/form or JSON body `{ csv, confirm?, decisions? }`.
 Default **dry-run**; writes only when `confirm === true` and no undecided
 fuzzy matches (server-enforced, mirroring `undecided_anomalies`). Sanitize
 decisions to `link:<uuid> | create | skip`.
 
-## UI (Task 5) — `/admin/application-import`
+## Task 5: UI + e2e — `/admin/application-import`
 
 Page + `ApplicationImportForm.tsx`, modeled on `TimeImportForm`:
 - File picker → server dry-run → preview sections (created / matched-with-diffs
