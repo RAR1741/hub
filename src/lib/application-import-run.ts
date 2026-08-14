@@ -330,7 +330,7 @@ export async function runApplicationImport(args: {
       summary.created.push(r.name);
       writtenPersonIds.add(personId);
       await writeExperiences(db, personId, r.app, summary);
-      await writeGuardians(db, personId, r.app, guardianByNameKey, guardianRoster, now(), summary);
+      await writeGuardians(db, personId, r.app, guardianByNameKey, guardianRoster, summary);
       continue;
     }
 
@@ -372,7 +372,7 @@ export async function runApplicationImport(args: {
       summary.matched.push({ name: r.name, personId: r.personId, changes });
       writtenPersonIds.add(r.personId);
       await writeExperiences(db, r.personId, r.app, summary);
-      await writeGuardians(db, r.personId, r.app, guardianByNameKey, guardianRoster, now(), summary);
+      await writeGuardians(db, r.personId, r.app, guardianByNameKey, guardianRoster, summary);
     }
   }
 
@@ -502,7 +502,6 @@ async function writeGuardians(
   app: ParsedApplication,
   guardianByNameKey: Map<string, RosterGuardian[]>,
   guardianRoster: RosterGuardian[],
-  now: Date,
   summary: ApplicationImportSummary,
 ): Promise<void> {
   for (const g of app.guardians) {

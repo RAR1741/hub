@@ -145,7 +145,7 @@ entries → anomaly, not a crash.
 
 **Normalization:** trim everything; phone → digits-only (strip punctuation),
 empty/`N/A`/`n/a` → null; DOB `M/D/YYYY` → ISO, flag implausible years
-(< 1980 or > season−10, e.g. the real `9/19/0006`) as anomalies with the raw
+(< 1980 or > season−10, e.g. a four-digit year far in the past) as anomalies with the raw
 value preserved in the preview; gradYear must be 4-digit int.
 
 **Encoding:** decode as UTF-8; the files contain some CP-1252 mojibake (`I�m`)

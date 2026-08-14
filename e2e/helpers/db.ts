@@ -108,8 +108,10 @@ export async function deleteExcusalRequests(personId: string, date: string): Pro
 }
 
 /**
- * Delete any person rows with the given first/last name (and any guardians
- * linked only to them cascade via FK). Used to make the application-import
+ * Delete any person rows with the given first/last name (and, via FK cascade,
+ * their person_guardian link rows). Note: guardian rows themselves have no FK
+ * to person, so a guardian linked only to this person is intentionally left
+ * behind (orphaned), not cascade-deleted. Used to make the application-import
  * E2E re-run-safe — without this, a 2nd run finds the person already
  * imported with an identical last_application_at and treats the row as
  * stale rather than newly created.

@@ -330,7 +330,7 @@ describe("parseApplications - header drift matrix", () => {
       Timestamp: "4/25/2024 21:19:31",
       "First Name": "Lyra",
       "Last Name": "Example",
-      "Date of Birth": "9/19/0006",
+      "Date of Birth": "3/3/0007",
       "What is your high school graduation year?": "2025",
       "What school are you attending for the 2024-2025 School Year?": "Test High School",
       "Street Address": "321 Test St",
@@ -360,10 +360,10 @@ describe("parseApplications - header drift matrix", () => {
 
     const app = result.applications[0];
     expect(app.dietaryRestrictions).toBe("Peanut allergy");
-    // 9/19/0006 is a synthetic date-format edge case (implausible year, still parseable).
-    expect(app.dob).toBe("0006-09-19");
+    // 3/3/0007 — invented malformed date: implausible year (< 1980), still parseable.
+    expect(app.dob).toBe("0007-03-03");
     expect(result.anomalies).toEqual(
-      expect.arrayContaining([expect.objectContaining({ field: "dob", detail: "implausible birth year", raw: "9/19/0006" })]),
+      expect.arrayContaining([expect.objectContaining({ field: "dob", detail: "implausible birth year", raw: "3/3/0007" })]),
     );
   });
 
