@@ -130,11 +130,17 @@ describe("attendanceSummaryForPeriod", () => {
       from(table: string) {
         const result = tables[table] ?? { data: null, error: null };
         const chain: Record<string, unknown> = {};
-        for (const m of ["select", "eq", "gte", "lte"]) {
+        for (const m of ["select", "eq", "gte", "lte", "order"]) {
           chain[m] = () => chain;
         }
-        chain.order = async () => result;
+        // Paginated readers call .range(); others await the builder directly.
+        chain.range = async (f: number, t: number) => ({
+          data: Array.isArray(result.data) ? (result.data as unknown[]).slice(f, t + 1) : result.data,
+          error: result.error,
+        });
         chain.maybeSingle = async () => result;
+        // Thenable so `await ...order()` (non-paginated reads) still resolves.
+        chain.then = (onF: (v: unknown) => unknown) => onF(result);
         return chain;
       },
     } as never;

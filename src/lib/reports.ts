@@ -4,6 +4,7 @@ import { sessionFromRow } from "./types";
 import { totalHours, overlappingSessionIds, sessionFlags, type FlagKind } from "./hours";
 import { displayName, listPeople } from "./people";
 import { getSetting } from "./settings";
+import { fetchAllRows } from "./paginate";
 
 export type LeaderboardEntry = {
   personId: string;
@@ -69,10 +70,17 @@ export async function periodLeaderboard(
   db?: SupabaseClient,
 ): Promise<LeaderboardEntry[]> {
   const client = db ?? (await import("./db")).getDb();
-  const { data, error } = await client
-    .from("session")
-    .select("*, person!person_id (id, first_name, last_name, display_name, role)")
-    .eq("period_id", periodId);
+  // Page past the 1000-row cap — otherwise people whose sessions land beyond it
+  // silently drop off the board (and everyone's totals may undercount).
+  const { rows: data, error } = await fetchAllRows(async (from, to) => {
+    const r = await client
+      .from("session")
+      .select("*, person!person_id (id, first_name, last_name, display_name, role)")
+      .eq("period_id", periodId)
+      .order("id")
+      .range(from, to);
+    return { data: r.data as Record<string, unknown>[] | null, error: r.error };
+  });
   if (error) console.error("periodLeaderboard: query failed", error);
   const byPerson = new Map<
     string,
@@ -153,11 +161,16 @@ export async function flaggedSessions(
 ): Promise<FlaggedSession[]> {
   const client = db ?? (await import("./db")).getDb();
   const maxShift = await getSetting<number>("max_shift_hours", 18, client);
-  const { data, error } = await client
-    .from("session")
-    .select("*, person!person_id (id, first_name, last_name, display_name)")
-    .eq("period_id", periodId)
-    .order("time_in", { ascending: false });
+  const { rows: data, error } = await fetchAllRows(async (from, to) => {
+    const r = await client
+      .from("session")
+      .select("*, person!person_id (id, first_name, last_name, display_name)")
+      .eq("period_id", periodId)
+      .order("time_in", { ascending: false })
+      .order("id")
+      .range(from, to);
+    return { data: r.data as Record<string, unknown>[] | null, error: r.error };
+  });
   if (error) console.error("flaggedSessions: query failed", error);
 
   const sessions = (data ?? []).map((r) => sessionFromRow(r as unknown as SessionRow));
@@ -195,12 +208,15 @@ export async function listSessionsForPeriod(
   db?: SupabaseClient,
 ): Promise<SessionWithName[]> {
   const client = db ?? (await import("./db")).getDb();
-  let query = client
-    .from("session")
-    .select("*, person!person_id (id, first_name, last_name, display_name)")
-    .eq("period_id", periodId);
-  if (personId) query = query.eq("person_id", personId);
-  const { data, error } = await query.order("time_in", { ascending: false });
+  const { rows: data, error } = await fetchAllRows(async (from, to) => {
+    let query = client
+      .from("session")
+      .select("*, person!person_id (id, first_name, last_name, display_name)")
+      .eq("period_id", periodId);
+    if (personId) query = query.eq("person_id", personId);
+    const r = await query.order("time_in", { ascending: false }).order("id").range(from, to);
+    return { data: r.data as Record<string, unknown>[] | null, error: r.error };
+  });
   if (error) console.error("listSessionsForPeriod: query failed", error);
   return (data ?? []).map((row) => {
     const p = row.person as unknown as {
@@ -219,10 +235,15 @@ export async function sessionsForPeriod(
   db?: SupabaseClient,
 ): Promise<Session[]> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client
-    .from("session")
-    .select("*")
-    .eq("period_id", periodId)
-    .order("time_in");
-  return ((data ?? []) as SessionRow[]).map(sessionFromRow);
+  const { rows: data } = await fetchAllRows(async (from, to) => {
+    const r = await client
+      .from("session")
+      .select("*")
+      .eq("period_id", periodId)
+      .order("time_in")
+      .order("id")
+      .range(from, to);
+    return { data: r.data as SessionRow[] | null, error: r.error };
+  });
+  return (data as SessionRow[]).map(sessionFromRow);
 }

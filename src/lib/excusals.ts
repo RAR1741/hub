@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Excusal, ExcusalRow } from "./types";
 import { excusalFromRow } from "./types";
 import { optString, reqString } from "./validate";
+import { fetchAllRows } from "./paginate";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -25,13 +26,19 @@ export async function listExcusals(
   db?: SupabaseClient,
 ): Promise<Excusal[]> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client
-    .from("excusal")
-    .select("*")
-    .gte("date", range.from)
-    .lte("date", range.to)
-    .order("date");
-  return ((data ?? []) as ExcusalRow[]).map(excusalFromRow);
+  // Page past the 1000-row cap — a full season's excusals can exceed it.
+  const { rows: data } = await fetchAllRows(async (from, to) => {
+    const r = await client
+      .from("excusal")
+      .select("*")
+      .gte("date", range.from)
+      .lte("date", range.to)
+      .order("date")
+      .order("id")
+      .range(from, to);
+    return { data: r.data as ExcusalRow[] | null, error: r.error };
+  });
+  return (data as ExcusalRow[]).map(excusalFromRow);
 }
 
 export async function createExcusal(
