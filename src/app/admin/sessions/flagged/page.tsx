@@ -31,7 +31,7 @@ export default async function FlaggedSessionsPage() {
           <div style={{ overflowX: "auto" }}>
             <table className="table">
               <thead>
-                <tr><th>Member</th><th>In</th><th>Out</th><th>Note</th><th>Excl.</th><th>Flags / actions</th></tr>
+                <tr><th>Member</th><th>In</th><th>Out</th><th>Hours</th><th>Note</th><th>Excl.</th><th>Flags / actions</th></tr>
               </thead>
               <tbody>
                 {flagged.map((f) => (

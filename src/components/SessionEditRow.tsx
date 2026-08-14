@@ -25,6 +25,12 @@ export function SessionEditRow({
   const [busy, setBusy] = useState(false);
   const router = useRouter();
 
+  // Computed hours for this session, live from the (possibly edited) in/out.
+  // Blank for an open session (no clock-out). Matches sessionHours: end - start.
+  const hours = tin && tout
+    ? Math.max(0, (new Date(tout).getTime() - new Date(tin).getTime()) / 3_600_000)
+    : null;
+
   async function save() {
     setStatus(null);
     if (!tin) { setStatus("Time in is required."); return; }
@@ -64,6 +70,7 @@ export function SessionEditRow({
       <td>{label}</td>
       <td><input className="input w-48" type="datetime-local" aria-label={`Time in for ${label}`} value={tin} onChange={(e) => setTin(e.target.value)} /></td>
       <td><input className="input w-48" type="datetime-local" aria-label={`Time out for ${label}`} value={tout} onChange={(e) => setTout(e.target.value)} /></td>
+      <td className="mono" aria-label={`Hours for ${label}`}>{hours === null ? "—" : hours.toFixed(2)}</td>
       <td><input className="input w-36" aria-label={`Note for ${label}`} value={n} onChange={(e) => setN(e.target.value)} placeholder="note" /></td>
       <td><input type="checkbox" aria-label={`Exclude ${label} from totals`} checked={exc} onChange={(e) => setExc(e.target.checked)} /></td>
       <td className="flex items-center gap-2">

@@ -66,7 +66,7 @@ export default async function AdminSessionsPage({
           <div style={{ overflowX: "auto" }}>
             <table className="table">
               <thead>
-                <tr><th>Member</th><th>In</th><th>Out</th><th>Note</th><th>Excl.</th><th>Actions</th></tr>
+                <tr><th>Member</th><th>In</th><th>Out</th><th>Hours</th><th>Note</th><th>Excl.</th><th>Actions</th></tr>
               </thead>
               <tbody>
                 {sessions.map((s) => (
