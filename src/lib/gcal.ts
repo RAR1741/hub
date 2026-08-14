@@ -103,7 +103,27 @@ export type GcalDeps = {
   now?: () => number;
 };
 
-export type SyncResult = { meetings: number; buildDays: number };
+export type SyncResult = { meetings: number; buildDays: number; backfilledPeriods: number };
+
+/**
+ * Does this period already have at least one meeting? Used to decide whether a
+ * past period still needs a backfill. The bounds are generous by a few hours at
+ * each edge — good enough to answer "is this period empty?", which is all we
+ * need. Returns false on a query error (treat as empty → try to backfill).
+ */
+async function periodHasMeetings(
+  db: SupabaseClient,
+  startsOn: string,
+  endsOn: string,
+): Promise<boolean> {
+  const { data } = await db
+    .from("meeting")
+    .select("id")
+    .gte("starts_at", `${startsOn}T00:00:00Z`)
+    .lte("starts_at", `${endsOn}T23:59:59Z`)
+    .limit(1);
+  return (data?.length ?? 0) > 0;
+}
 
 /**
  * Is a calendar event a REQUIRED attendance day? True when the title contains
@@ -161,13 +181,40 @@ async function fetchAllEvents(
 
 export async function syncCalendar(deps: GcalDeps): Promise<SyncResult> {
   const nowMs = deps.now ? deps.now() : Date.now();
-  const timeMin = new Date(nowMs - WINDOW_MS).toISOString();
+  const rollingMinIso = new Date(nowMs - WINDOW_MS).toISOString();
   const timeMax = new Date(nowMs + WINDOW_MS).toISOString();
+  const rollingMinDate = localDateOf(rollingMinIso, deps.tz);
+
+  // Load the season calendar. It does two jobs here: (a) any past period that
+  // has no meetings yet gets pulled into the fetch window so its events
+  // backfill, and (b) the far-past meeting prune is bounded at the EARLIEST
+  // period, never at the (dynamic) fetch window — otherwise a run made after
+  // everything is backfilled would collapse the window to `now − 1yr` and
+  // delete all the history the previous runs built.
+  const { data: periodData } = await deps.db
+    .from("period")
+    .select("id, starts_on, ends_on")
+    .order("starts_on", { ascending: true });
+  const periods = (periodData ?? []) as { id: string; starts_on: string; ends_on: string }[];
+
+  // Extend the fetch window back over each empty past period. A period starting
+  // within the rolling window is already covered. A period with no calendar
+  // events at all stays "empty" and is re-fetched every run — acceptable, and
+  // matches "doesn't have meetings" literally.
+  let fetchMinIso = rollingMinIso;
+  let backfilledPeriods = 0;
+  for (const p of periods) {
+    if (p.starts_on >= rollingMinDate) continue; // already inside the rolling window
+    if (await periodHasMeetings(deps.db, p.starts_on, p.ends_on)) continue;
+    backfilledPeriods++;
+    const pStartIso = `${p.starts_on}T00:00:00Z`;
+    if (Date.parse(pStartIso) < Date.parse(fetchMinIso)) fetchMinIso = pStartIso;
+  }
 
   const token = await fetchAccessToken(deps);
-  const allItems = await fetchAllEvents(deps, token, timeMin, timeMax);
+  const allItems = await fetchAllEvents(deps, token, fetchMinIso, timeMax);
   const events = allItems.filter((e) => e.id && (e.start?.dateTime || e.start?.date));
-  if (events.length === 0) return { meetings: 0, buildDays: 0 };
+  if (events.length === 0) return { meetings: 0, buildDays: 0, backfilledPeriods };
 
   const syncedAt = new Date(nowMs).toISOString();
   const meetingRows = events.map((e) => {
@@ -189,11 +236,13 @@ export async function syncCalendar(deps: GcalDeps): Promise<SyncResult> {
     .upsert(meetingRows, { onConflict: "gcal_event_id" });
   if (meetingError) throw new Error(`meeting upsert failed: ${meetingError.message}`);
 
-  // Prune gcal-sourced meetings outside the synced window so a prior wider
-  // sync's stale far-past/far-future rows don't linger. Scoped to
-  // gcal_event_id IS NOT NULL so a manual (admin-created) meeting outside the
-  // ±12-month window is never swept up by this cleanup.
-  await deps.db.from("meeting").delete().lt("starts_at", timeMin).not("gcal_event_id", "is", null);
+  // Prune gcal-sourced meetings outside the calendar's coverage. The far-past
+  // bound is the EARLIEST period's start (never fetchMin — see above), so
+  // backfilled history survives a later, narrower run; the far-future bound is
+  // the rolling window edge. Scoped to gcal_event_id IS NOT NULL so a manual
+  // (admin-created) meeting outside this range is never swept up.
+  const pruneMinIso = periods.length ? `${periods[0].starts_on}T00:00:00Z` : rollingMinIso;
+  await deps.db.from("meeting").delete().lt("starts_at", pruneMinIso).not("gcal_event_id", "is", null);
   await deps.db.from("meeting").delete().gte("starts_at", timeMax).not("gcal_event_id", "is", null);
 
   // One build_day per distinct local start date. Its kind is REQUIRED if ANY
@@ -216,17 +265,24 @@ export async function syncCalendar(deps: GcalDeps): Promise<SyncResult> {
   }));
 
   // The sync owns gcal-sourced build days: clear them so a re-sync reclassifies
-  // (e.g. after the calendar changes), then re-insert. `ignoreDuplicates` leaves
+  // (e.g. after the calendar changes), then re-insert. Scoped to the LOCAL-date
+  // range we actually fetched (same localDateOf used for classification, so the
+  // boundary can't drift by a day) — a global delete would wipe historical gcal
+  // build days from periods this run didn't re-fetch. `ignoreDuplicates` leaves
   // any manual admin override (source = 'manual') on a date untouched.
+  const clearFromDate = localDateOf(fetchMinIso, deps.tz);
+  const clearToDate = localDateOf(timeMax, deps.tz);
   const { error: bdDeleteError } = await deps.db
     .from("build_day")
     .delete()
-    .eq("source", "gcal");
+    .eq("source", "gcal")
+    .gte("date", clearFromDate)
+    .lte("date", clearToDate);
   if (bdDeleteError) throw new Error(`build_day cleanup failed: ${bdDeleteError.message}`);
   const { error: bdError } = await deps.db
     .from("build_day")
     .upsert(buildDayRows, { onConflict: "date", ignoreDuplicates: true });
   if (bdError) throw new Error(`build_day upsert failed: ${bdError.message}`);
 
-  return { meetings: meetingRows.length, buildDays: buildDayRows.length };
+  return { meetings: meetingRows.length, buildDays: buildDayRows.length, backfilledPeriods };
 }

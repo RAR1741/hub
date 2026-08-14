@@ -6,11 +6,23 @@ import {
   syncCalendar,
   type GcalTransport,
 } from "./gcal";
+import { localDateOf } from "./attendance";
 import { generateKeyPairSync } from "node:crypto";
 
 // A throwaway RSA key so buildServiceAccountJwt can actually sign in the test.
 const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const PEM = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
+
+const NOW = 1_700_000_000_000;
+const YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+const TZ = "America/Indiana/Indianapolis";
+const ROLLING_MIN_ISO = new Date(NOW - YEAR_MS).toISOString();
+const ROLLING_MAX_ISO = new Date(NOW + YEAR_MS).toISOString();
+const CREDS = {
+  clientEmail: "svc@proj.iam.gserviceaccount.com",
+  privateKey: PEM,
+  calendarId: "team@group.calendar.google.com",
+};
 
 describe("pickCalendarId", () => {
   test("the env var wins when set", () => {
@@ -39,10 +51,17 @@ describe("buildServiceAccountJwt", () => {
   });
 });
 
+type PeriodSeed = { id: string; starts_on: string; ends_on: string };
+
 // Captures upsert + delete calls per table so we can assert what sync wrote.
-function fakeDb() {
+// `seed.periods` feeds the season-calendar read; `seed.meetingDates` is the set
+// of starts_at ISO strings a meeting exists on, so periodHasMeetings can answer
+// range queries.
+function fakeDb(seed?: { periods?: PeriodSeed[]; meetingDates?: string[] }) {
   const calls: { table: string; rows: unknown; opts: unknown }[] = [];
   const deletes: { table: string; filters: { op: string; col: string; val: unknown }[] }[] = [];
+  const periods = seed?.periods ?? [];
+  const meetingDates = seed?.meetingDates ?? [];
   return {
     calls,
     deletes,
@@ -53,6 +72,38 @@ function fakeDb() {
             calls.push({ table, rows, opts });
             return { error: null };
           },
+          select(_cols: string) {
+            let gteVal: string | undefined;
+            let lteVal: string | undefined;
+            const chain = {
+              order() {
+                return chain;
+              },
+              gte(_col: string, val: string) {
+                gteVal = val;
+                return chain;
+              },
+              lte(_col: string, val: string) {
+                lteVal = val;
+                return chain;
+              },
+              limit() {
+                return chain;
+              },
+              then(resolve: (v: { data: unknown; error: null }) => void) {
+                if (table === "period") {
+                  resolve({ data: periods, error: null });
+                  return;
+                }
+                // meeting existence: any seeded meeting date within [gte, lte]?
+                const hit = meetingDates.filter(
+                  (d) => (!gteVal || d >= gteVal) && (!lteVal || d <= lteVal),
+                );
+                resolve({ data: hit.map((d) => ({ id: d })), error: null });
+              },
+            };
+            return chain;
+          },
           delete() {
             const filters: { op: string; col: string; val: unknown }[] = [];
             const chain = {
@@ -62,6 +113,10 @@ function fakeDb() {
               },
               lt(col: string, val: unknown) {
                 filters.push({ op: "lt", col, val });
+                return chain;
+              },
+              lte(col: string, val: unknown) {
+                filters.push({ op: "lte", col, val });
                 return chain;
               },
               gte(col: string, val: unknown) {
@@ -181,7 +236,7 @@ describe("syncCalendar", () => {
       now: () => 1_700_000_000_000,
     });
 
-    expect(result).toEqual({ meetings: 1, buildDays: 1 });
+    expect(result).toEqual({ meetings: 1, buildDays: 1, backfilledPeriods: 0 });
 
     const meetingCall = db.calls.find((c) => c.table === "meeting")!;
     expect(meetingCall.opts).toEqual({ onConflict: "gcal_event_id" });
@@ -196,10 +251,15 @@ describe("syncCalendar", () => {
       { date: "2026-09-01", kind: "optional", source: "gcal" },
     ]);
 
-    // gcal-owned build days are cleared before re-insert (re-sync reclassifies).
+    // gcal-owned build days are cleared before re-insert (re-sync reclassifies),
+    // scoped to the fetched local-date range (no periods → rolling window).
     expect(db.deletes).toContainEqual({
       table: "build_day",
-      filters: [{ op: "eq", col: "source", val: "gcal" }],
+      filters: [
+        { op: "eq", col: "source", val: "gcal" },
+        { op: "gte", col: "date", val: localDateOf(ROLLING_MIN_ISO, TZ) },
+        { op: "lte", col: "date", val: localDateOf(ROLLING_MAX_ISO, TZ) },
+      ],
     });
   });
 
@@ -225,7 +285,7 @@ describe("syncCalendar", () => {
       now: () => 1_700_000_000_000,
     });
 
-    expect(result).toEqual({ meetings: 1, buildDays: 1 });
+    expect(result).toEqual({ meetings: 1, buildDays: 1, backfilledPeriods: 0 });
 
     const buildDayCall = db.calls.find((c) => c.table === "build_day")!;
     expect(buildDayCall.rows).toEqual([
@@ -254,7 +314,7 @@ describe("syncCalendar", () => {
       tz: "America/Indiana/Indianapolis",
       now: () => 1_700_000_000_000,
     });
-    expect(result).toEqual({ meetings: 3, buildDays: 2 });
+    expect(result).toEqual({ meetings: 3, buildDays: 2, backfilledPeriods: 0 });
 
     const buildDayCall = db.calls.find((c) => c.table === "build_day")!;
     expect(buildDayCall.rows).toEqual([
@@ -307,7 +367,7 @@ describe("syncCalendar", () => {
       now: () => 1_700_000_000_000,
     });
 
-    expect(result).toEqual({ meetings: 2, buildDays: 2 });
+    expect(result).toEqual({ meetings: 2, buildDays: 2, backfilledPeriods: 0 });
 
     const meetingCall = db.calls.find((c) => c.table === "meeting")!;
     expect(meetingCall.rows).toMatchObject([
@@ -336,7 +396,78 @@ describe("syncCalendar", () => {
       tz: "America/Indiana/Indianapolis",
       now: () => 1_700_000_000_000,
     });
-    expect(result).toEqual({ meetings: 0, buildDays: 0 });
+    expect(result).toEqual({ meetings: 0, buildDays: 0, backfilledPeriods: 0 });
     expect(db.calls).toHaveLength(0);
+  });
+
+  // NOW (1_700_000_000_000) is 2023-11-14; the rolling window is 2022-11-14 →
+  // 2024-11-13. These periods sit BEFORE that window, so they're backfill
+  // candidates when they have no meetings.
+  const OLD_PERIOD: PeriodSeed = { id: "p-old", starts_on: "2021-06-01", ends_on: "2021-12-31" };
+  const MID_PERIOD: PeriodSeed = { id: "p-mid", starts_on: "2022-01-01", ends_on: "2022-05-31" };
+
+  test("extends the fetch window back to an empty past period and counts it", async () => {
+    const db = fakeDb({ periods: [OLD_PERIOD, MID_PERIOD], meetingDates: [] });
+    const { transport, requestedUrls } = fakeFetchPaged([
+      { token: undefined, events: [] },
+    ]);
+    const result = await syncCalendar({
+      fetch: transport,
+      db: db.client,
+      credentials: CREDS,
+      tz: TZ,
+      now: () => NOW,
+    });
+    // Both past periods are empty → both backfilled.
+    expect(result.backfilledPeriods).toBe(2);
+    // The fetch window's timeMin is pulled back to the EARLIEST empty period's
+    // start, not the rolling window's start.
+    const params = new URL(requestedUrls[0]).searchParams;
+    expect(params.get("timeMin")).toBe("2021-06-01T00:00:00Z");
+    expect(params.get("timeMax")).toBe(ROLLING_MAX_ISO);
+  });
+
+  test("does NOT extend the window for a past period that already has meetings", async () => {
+    // OLD_PERIOD has a meeting; MID_PERIOD is empty → only MID is backfilled,
+    // window pulls back to MID's start (2022-01-01), not OLD's (2021-06-01).
+    const db = fakeDb({ periods: [OLD_PERIOD, MID_PERIOD], meetingDates: ["2021-07-15T18:00:00Z"] });
+    const { transport, requestedUrls } = fakeFetchPaged([
+      { token: undefined, events: [] },
+    ]);
+    const result = await syncCalendar({
+      fetch: transport,
+      db: db.client,
+      credentials: CREDS,
+      tz: TZ,
+      now: () => NOW,
+    });
+    expect(result.backfilledPeriods).toBe(1);
+    expect(new URL(requestedUrls[0]).searchParams.get("timeMin")).toBe("2022-01-01T00:00:00Z");
+  });
+
+  test("prune bound is the earliest period's start, not the (dynamic) fetch window — so a fully-backfilled run keeps history", async () => {
+    // Every past period already has meetings → no backfill, window collapses to
+    // the rolling min. The far-past prune must STILL be bounded at the earliest
+    // period (2021-06-01), or it would delete the backfilled history.
+    const db = fakeDb({
+      periods: [OLD_PERIOD, MID_PERIOD],
+      meetingDates: ["2021-07-15T18:00:00Z", "2022-02-10T18:00:00Z"],
+    });
+    const events = [
+      { id: "cur", summary: "Meeting", start: { dateTime: "2023-11-16T23:30:00Z" }, end: { dateTime: "2023-11-17T01:00:00Z" } },
+    ];
+    const result = await syncCalendar({
+      fetch: fakeFetch(events),
+      db: db.client,
+      credentials: CREDS,
+      tz: TZ,
+      now: () => NOW,
+    });
+    expect(result.backfilledPeriods).toBe(0);
+
+    // The far-past meeting prune uses the earliest period start, NOT rolling min.
+    const meetingDeletes = db.deletes.filter((d) => d.table === "meeting");
+    const ltPrune = meetingDeletes.find((d) => d.filters.some((f) => f.op === "lt"))!;
+    expect(ltPrune.filters).toContainEqual({ op: "lt", col: "starts_at", val: "2021-06-01T00:00:00Z" });
   });
 });
