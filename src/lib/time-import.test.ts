@@ -50,3 +50,33 @@ describe("parseTimeSheet", () => {
     expect(parseTimeSheet(SHEET).people[1].anomalies).toEqual([]);
   });
 });
+
+// Students first, a >=3-row gap of blank/summary rows, then mentors.
+const SPLIT_SHEET = [
+  ",,,,,,Saturday,,,Sunday,,,,Varsity",
+  ',,,"January 8, 2026",,,"January 10, 2026",,,"January 11, 2026",,,,Letter',
+  ",Name,Hours Left,Time In,Time Out,Verified,Time In,Time Out,Day Total,Time In,Time Out,Day Total,Total Hours",
+  "Ada,Lovelace,0.00,18:29,20:58,OK,,,0:00,,,0:00,10",
+  "Bo,Peep,0.00,18:00,20:00,OK,,,0:00,,,0:00,7",
+  ",,,,,,,,,,,,",             // gap row 1 (blank)
+  ",Available Time,,,,,,,,,,,", // gap row 2 (summary label)
+  ",,,,,,,,,,,,",             // gap row 3 (blank)
+  "Cody,Mentor,0.00,18:00,21:00,OK,,,0:00,,,0:00,7",
+  "Dana,Coach,0.00,18:05,21:00,OK,,,0:00,,,0:00,7",
+].join("\n");
+
+describe("student/mentor split", () => {
+  test("splits on the largest gap: pre-gap people are students, post-gap are mentors", () => {
+    const p = parseTimeSheet(SPLIT_SHEET);
+    expect(p.people.map((x) => `${x.firstName}:${x.roleHint}`)).toEqual([
+      "Ada:student", "Bo:student", "Cody:mentor", "Dana:mentor",
+    ]);
+    expect(p.fileIssues).toEqual([]);
+  });
+
+  test("no clear divider (contiguous rows) -> everyone a student, with a warning", () => {
+    const p = parseTimeSheet(SHEET); // Ada + Bo, no gap between them
+    expect(p.people.every((x) => x.roleHint === "student")).toBe(true);
+    expect(p.fileIssues.some((f) => /divider/i.test(f))).toBe(true);
+  });
+});

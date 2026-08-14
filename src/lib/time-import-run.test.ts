@@ -53,7 +53,28 @@ const SHEET = [
   "New,Person,0.00,18:30,21:00,OK,,,0:00,,,0:00,3",
 ].join("\n");
 
+const SPLIT_SHEET = [
+  ',,,"January 8, 2026",,,"January 10, 2026",,,"January 11, 2026",,,,Varsity',
+  ",Name,Hours Left,Time In,Time Out,Verified,Time In,Time Out,Day Total,Time In,Time Out,Day Total,Total Hours",
+  "New,Student,0.00,18:30,21:00,OK,,,0:00,,,0:00,3",
+  ",,,,,,,,,,,,",
+  ",Full Time,,,,,,,,,,,",
+  ",,,,,,,,,,,,",
+  "New,Mentor,0.00,18:00,21:00,OK,,,0:00,,,0:00,7",
+].join("\n");
+
 describe("runTimeImport", () => {
+  test("auto-created people get their role from the student/mentor split", async () => {
+    const { db, calls } = fakeDb([]); // empty roster — both are created
+    const summary = await runTimeImport({ csv: SPLIT_SHEET, periodId: "pd1", importedBy: "admin-1", db });
+    if ("error" in summary) throw new Error(summary.error);
+    expect(summary.createdStudents).toBe(1);
+    expect(summary.createdMentors).toBe(1);
+    const roles = Object.fromEntries(calls.personInsert.map((r) => [`${r.first_name} ${r.last_name}`, r.role]));
+    expect(roles["New Student"]).toBe("student");
+    expect(roles["New Mentor"]).toBe("mentor");
+  });
+
   test("matches existing person, auto-creates unknown, inserts sessions with source=import", async () => {
     const { db, calls } = fakeDb();
     const summary = await runTimeImport({ csv: SHEET, periodId: "pd1", importedBy: "admin-1", db });

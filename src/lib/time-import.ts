@@ -22,6 +22,7 @@ export type ParsedPerson = {
   firstName: string;
   lastName: string;
   sourceRow: number;
+  roleHint: "student" | "mentor";
   sessions: ParsedSession[];
   excusals: ParsedExcusal[];
   skipped: SkippedEntry[];
@@ -31,6 +32,12 @@ export type ParsedTimeSheet = { dates: string[]; people: ParsedPerson[]; fileIss
 
 const BLOCK_START = 3; // cols 0,1,2 = first, last, hours-left
 const BLOCK_STRIDE = 3; // [Time In, Time Out, ignored]
+// Students come first, then a clear gap of blank/summary rows, then mentors.
+// A run of at least this many non-data rows between two data rows marks that
+// student -> mentor divider (in-group rows are contiguous, so real in-group
+// gaps are 0; the divider here is ~25). Gap size alone is the signal — the
+// gap's label text ("Full Time", "60%er") is not parsed.
+const GROUP_GAP_MIN_ROWS = 3;
 
 /** "January 8, 2026" -> "2026-01-08", else null. PURE. */
 function parseSheetDate(raw: string): string | null {
@@ -128,6 +135,22 @@ export function parseTimeSheet(csvText: string): ParsedTimeSheet {
   }
   if (dataRows.length === 0) fileIssues.push("No data rows found");
 
+  // Student/mentor split: the largest run of non-data rows between two data
+  // rows is the divider. Largest (not first) so an accidental blank inside a
+  // group can't split it early. roleHint applies only to auto-created people.
+  let splitAt = -1;
+  let maxGap = 0;
+  for (let i = 0; i < dataRows.length - 1; i++) {
+    const gap = dataRows[i + 1].sourceRow - dataRows[i].sourceRow - 1;
+    if (gap > maxGap) { maxGap = gap; splitAt = i; }
+  }
+  const hasSplit = maxGap >= GROUP_GAP_MIN_ROWS;
+  if (!hasSplit && dataRows.length > 0) {
+    fileIssues.push("No clear student/mentor divider found — everyone imported as a student; set mentor roles manually.");
+  }
+  const roleHintFor = (personIdx: number): "student" | "mentor" =>
+    hasSplit && personIdx > splitAt ? "mentor" : "student";
+
   // 4. Per-column consensus for Time-In and Time-Out sub-columns.
   const inResolved: ResolvedCell[][] = blocks.map((b) =>
     resolveColumnTimes(dataRows.map(({ rec }) => parseClockToken(cell(rec, b.col)))),
@@ -144,6 +167,7 @@ export function parseTimeSheet(csvText: string): ParsedTimeSheet {
       firstName: cell(rec, 0),
       lastName: cell(rec, 1),
       sourceRow,
+      roleHint: roleHintFor(personIdx),
       sessions: [],
       excusals: [],
       skipped: [],

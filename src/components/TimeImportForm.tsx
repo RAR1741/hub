@@ -27,6 +27,8 @@ export function TimeImportForm({ periods }: { periods: PeriodOpt[] }) {
 
   const counts = preview && {
     people: preview.people.length,
+    students: preview.people.filter((p) => p.roleHint === "student").length,
+    mentors: preview.people.filter((p) => p.roleHint === "mentor").length,
     sessions: preview.people.reduce((n, p) => n + p.sessions.length, 0),
     excusals: preview.people.reduce((n, p) => n + p.excusals.length, 0),
     skipped: preview.people.reduce((n, p) => n + p.skipped.length, 0),
@@ -83,6 +85,7 @@ export function TimeImportForm({ periods }: { periods: PeriodOpt[] }) {
           <h2 className="text-base font-semibold">2. Preview</h2>
           <div className="flex flex-wrap gap-2">
             <span className="pill new">{counts.people} people</span>
+            <span className="pill">{counts.students} students · {counts.mentors} mentors</span>
             <span className="pill">{counts.sessions} sessions</span>
             <span className="pill">{counts.excusals} excusals</span>
             <span className="pill update">{counts.skipped} skipped</span>
@@ -115,7 +118,9 @@ export function TimeImportForm({ periods }: { periods: PeriodOpt[] }) {
             <span className="pill error">{summary.errors.length} errors</span>
           </div>
           {summary.createdNames.length > 0 && (
-            <p className="text-sm text-[var(--muted)]">New people (default role student — review): {summary.createdNames.join(", ")}</p>
+            <p className="text-sm text-[var(--muted)]">
+              New people ({summary.createdStudents} students, {summary.createdMentors} mentors — review): {summary.createdNames.join(", ")}
+            </p>
           )}
           {summary.errors.length > 0 && (
             <ul className="flex flex-col gap-1 text-sm">

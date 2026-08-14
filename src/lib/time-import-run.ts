@@ -6,6 +6,8 @@ import { getSetting } from "./settings";
 
 export type TimeImportSummary = {
   createdPeople: number;
+  createdStudents: number;
+  createdMentors: number;
   matchedPeople: number;
   sessions: number;
   excusals: number;
@@ -46,7 +48,7 @@ export async function runTimeImport(args: {
   }
 
   const summary: TimeImportSummary = {
-    createdPeople: 0, matchedPeople: 0, sessions: 0, excusals: 0,
+    createdPeople: 0, createdStudents: 0, createdMentors: 0, matchedPeople: 0, sessions: 0, excusals: 0,
     skipped: [], anomalies: [], errors: [], createdNames: [],
   };
   const sessionRows: Record<string, unknown>[] = [];
@@ -67,12 +69,14 @@ export async function runTimeImport(args: {
       summary.matchedPeople += 1;
     } else {
       const { data, error } = await db.from("person")
-        .insert({ first_name: person.firstName, last_name: person.lastName, role: "student", is_active: true })
+        .insert({ first_name: person.firstName, last_name: person.lastName, role: person.roleHint, is_active: true })
         .select("id").single();
       if (error || !data) { summary.errors.push({ name, message: "Failed to create person" }); continue; }
       personId = data.id as string;
       pushId(byName, nkey, personId);
       summary.createdPeople += 1;
+      if (person.roleHint === "mentor") summary.createdMentors += 1;
+      else summary.createdStudents += 1;
       summary.createdNames.push(name);
     }
 
