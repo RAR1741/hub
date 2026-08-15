@@ -60,7 +60,6 @@ function PeopleColumn({
               <thead>
                 <tr>
                   <th>Member</th>
-                  <th>ID</th>
                   <th>Status</th>
                   {canEdit && <th aria-label="Edit" />}
                 </tr>
@@ -79,12 +78,8 @@ function PeopleColumn({
                             <div className="nm" style={{ color: "var(--ink)" }}>
                               {name}
                             </div>
-                            {p.email && <div className="em">{p.email}</div>}
                           </span>
                         </Link>
-                      </td>
-                      <td>
-                        <span className="sid">{p.studentIdNumber ?? "—"}</span>
                       </td>
                       <td>
                         <span className={`pill ${p.isActive ? "on" : "off"}`}>
