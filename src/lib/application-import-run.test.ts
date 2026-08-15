@@ -9,6 +9,7 @@ type PersonSeed = {
   role?: "admin" | "mentor" | "student";
   grad_year?: number | null;
   email?: string | null;
+  is_active?: boolean;
   last_application_at?: string | null;
 };
 type GuardianSeed = {
@@ -29,6 +30,7 @@ function fakeDb(people: PersonSeed[] = [], guardians: GuardianSeed[] = []) {
     display_name: null,
     grad_year: null,
     email: null,
+    is_active: true,
     last_application_at: null,
     date_of_birth: null,
     school: null,
@@ -96,6 +98,9 @@ function fakeDb(people: PersonSeed[] = [], guardians: GuardianSeed[] = []) {
       lt: (col: string, val: unknown) => { filters[col] = { op: "lt", val }; return finish(); },
       gte: (col: string, val: unknown) => { filters[col] = { op: "gte", val }; return finish(); },
       in: (col: string, vals: unknown[]) => { filters[col] = { op: "in", val: vals }; return finish(); },
+      // Mirrors PostgREST .not(col, "in", "(a,b,c)"): keyed distinctly so it
+      // doesn't clobber a same-column eq/in filter.
+      not: (col: string, op: string, val: unknown) => { filters[`not:${col}:${op}`] = { op: `not_${op}`, val }; return finish(); },
     };
     function finish(): Record<string, unknown> {
       const record = () => {
@@ -105,19 +110,26 @@ function fakeDb(people: PersonSeed[] = [], guardians: GuardianSeed[] = []) {
       const matched = () => {
         const roster = table === "person" ? personRoster : guardianRoster;
         return roster.filter((row) => {
-          return Object.entries(filters).every(([col, f]) => {
+          return Object.entries(filters).every(([key, f]) => {
             const fv = f as { op: string; val: unknown };
+            // not-filters are keyed `not:<col>:<op>`; plain ones by column.
+            const col = key.startsWith("not:") ? key.split(":")[1] : key;
             const rowVal = (row as Record<string, unknown>)[col];
             if (fv.op === "eq") return rowVal === fv.val;
             if (fv.op === "lt") return (rowVal as number) !== null && (rowVal as number) < (fv.val as number);
             if (fv.op === "gte") return (rowVal as number) !== null && (rowVal as number) >= (fv.val as number);
             if (fv.op === "in") return (fv.val as unknown[]).includes(rowVal);
+            if (fv.op === "not_in") {
+              // val is a PostgREST list literal: "(id1,id2,...)".
+              const ids = String(fv.val).replace(/^\(|\)$/g, "").split(",").filter(Boolean);
+              return !ids.includes(String(rowVal));
+            }
             return true;
           });
         });
       };
       return {
-        eq: chain.eq, lt: chain.lt, gte: chain.gte, in: chain.in,
+        eq: chain.eq, lt: chain.lt, gte: chain.gte, in: chain.in, not: chain.not,
         select: (_cols: string) => {
           record();
           const rows = matched().map((r: Record<string, unknown>) => ({ id: r.id }));
@@ -196,7 +208,6 @@ function row(overrides: Partial<Record<string, string>>): string[] {
 }
 
 const NOW_AUG = () => new Date("2026-08-14T00:00:00Z"); // month 7 -> season 2027
-const NOW_MAY = () => new Date("2026-05-01T00:00:00Z"); // month 4 -> season 2026
 
 describe("runApplicationImport matching", () => {
   test("auto-matches by name and applies latest-wins field changes", async () => {
@@ -383,34 +394,62 @@ describe("runApplicationImport guardians", () => {
   });
 });
 
-describe("runApplicationImport deactivation sweep", () => {
-  test("May (pre-June) boundary: season year is the current calendar year", async () => {
+describe("runApplicationImport roster sweep (current-season membership)", () => {
+  // The generated CSV header ("...2026-2027 School Year") parses to season 2027,
+  // which matches currentSeasonYear(NOW_AUG) — so these imports are the current
+  // season and DO re-derive the active roster.
+  test("current-season import deactivates active students NOT in the application", async () => {
     const { db, calls } = fakeDb([
-      { id: "p1", first_name: "Old", last_name: "Grad", role: "student", grad_year: 2025 },
-      { id: "p2", first_name: "Grace", last_name: "Hopper", role: "student", grad_year: 2028 },
+      // A returning student (matched by this import) — should stay active.
+      { id: "p1", first_name: "Grace", last_name: "Hopper", role: "student", email: "grace@example.com", is_active: true },
+      // An active student who did NOT re-apply — should be deactivated.
+      { id: "p2", first_name: "Gone", last_name: "Missing", role: "student", is_active: true },
     ]);
-    const csv = csvFor([row({})]);
-    const summary = await runApplicationImport({ csvText: csv, dryRun: false, db, now: NOW_MAY });
+    const csv = csvFor([row({})]); // Grace Hopper only
+    const summary = await runApplicationImport({ csvText: csv, dryRun: false, db, now: NOW_AUG });
     if ("error" in summary) throw new Error(summary.error);
-    expect(calls.personUpdate.some((u) => u.patch.is_active === false && u.filters.grad_year?.val === 2026)).toBe(true);
-    void summary;
+
+    // Deactivation targets active students, excluding the written set.
+    const deactivate = calls.personUpdate.find((u) => u.patch.is_active === false);
+    expect(deactivate).toBeDefined();
+    expect(deactivate!.filters["role"]?.val).toBe("student");
+    expect(deactivate!.filters["is_active"]?.val).toBe(true);
+    expect(deactivate!.filters["not:id:in"]?.val).toContain("p1");
+    expect(summary.deactivated).toBe(1); // only p2 (p1 excluded as written)
   });
 
-  test("June boundary: season year rolls to next year, deactivating this year's grads", async () => {
-    const { db, calls } = fakeDb([{ id: "p1", first_name: "Grace", last_name: "Hopper", role: "student", grad_year: 2028 }]);
-    const csv = csvFor([row({})]);
-    await runApplicationImport({ csvText: csv, dryRun: false, db, now: NOW_AUG });
-    expect(calls.personUpdate.some((u) => u.patch.is_active === false && u.filters.grad_year?.val === 2027)).toBe(true);
-  });
-
-  test("dry-run projects wouldDeactivate without writing", async () => {
+  test("an OLD/historical import never deactivates current students", async () => {
     const { db, calls } = fakeDb([
-      { id: "p1", first_name: "Old", last_name: "Grad", role: "student", grad_year: 2025 },
+      { id: "p1", first_name: "Grace", last_name: "Hopper", role: "student", is_active: true },
     ]);
-    const csv = csvFor([row({ first: "New", last: "Person" })]);
+    // The school-column header carries the season ("...2026-2027"); rewrite it
+    // to an old range so this parses as a historical (non-current) import.
+    const csv = csvFor([row({})]).replace("2026-2027", "2019-2020");
+    const summary = await runApplicationImport({ csvText: csv, dryRun: false, db, now: NOW_AUG });
+    if ("error" in summary) throw new Error(summary.error);
+    expect(calls.personUpdate.some((u) => u.patch.is_active === false)).toBe(false);
+    expect(summary.deactivated).toBe(0);
+  });
+
+  test("new applicants from the current-season import are created active", async () => {
+    const { db, calls } = fakeDb([]);
+    const csv = csvFor([row({ first: "New", last: "Student", email: "new@example.com" })]);
+    const summary = await runApplicationImport({ csvText: csv, dryRun: false, db, now: NOW_AUG });
+    if ("error" in summary) throw new Error(summary.error);
+    expect(calls.personInsert[0].is_active).toBe(true);
+  });
+
+  test("dry-run projects wouldDeactivate for the current season without writing", async () => {
+    const { db, calls } = fakeDb([
+      { id: "p1", first_name: "Grace", last_name: "Hopper", role: "student", email: "grace@example.com", is_active: true },
+      { id: "p2", first_name: "Gone", last_name: "Missing", role: "student", is_active: true },
+      { id: "p3", first_name: "Already", last_name: "Inactive", role: "student", is_active: false },
+    ]);
+    const csv = csvFor([row({})]); // matches p1 only
     const summary = await runApplicationImport({ csvText: csv, dryRun: true, db, now: NOW_AUG });
     if ("error" in summary) throw new Error(summary.error);
-    expect(summary.wouldDeactivate).toBe(1); // p1 (2025 < 2027)
+    // p2 is active and not in the import; p1 is written (kept); p3 already inactive.
+    expect(summary.wouldDeactivate).toBe(1);
     expect(summary.deactivated).toBe(0);
     expect(calls.personUpdate).toEqual([]);
     expect(calls.personInsert).toEqual([]);

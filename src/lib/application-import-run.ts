@@ -37,6 +37,7 @@ type RosterPerson = {
   role: "admin" | "mentor" | "student";
   grad_year: number | null;
   email: string | null;
+  is_active: boolean;
   last_application_at: string | null;
   date_of_birth: string | null;
   school: string | null;
@@ -91,7 +92,7 @@ export async function runApplicationImport(args: {
   const { data: peopleRows, error: rosterError } = await db
     .from("person")
     .select(
-      "id, first_name, last_name, display_name, role, grad_year, email, last_application_at, date_of_birth, school, street_address, city, zip, home_phone, phone, shirt_size, ethnicity, race, interests, dietary_restrictions",
+      "id, first_name, last_name, display_name, role, grad_year, email, is_active, last_application_at, date_of_birth, school, street_address, city, zip, home_phone, phone, shirt_size, ethnicity, race, interests, dietary_restrictions",
     );
   if (rosterError) return { error: `roster_load_failed: ${rosterError.message}` };
   const roster = (peopleRows ?? []) as RosterPerson[];
@@ -249,9 +250,13 @@ export async function runApplicationImport(args: {
   }
 
   if (dryRun) {
-    // Project matched/created/stale without writing, using season-year math for wouldDeactivate.
-    const seasonYear = currentSeasonYear(now());
-    const dryCreatedGradYears: number[] = [];
+    // Project matched/created/stale without writing. wouldDeactivate mirrors the
+    // real roster sweep below: only a current-season import re-derives
+    // membership, and it deactivates every currently-active student who isn't in
+    // this import (i.e. didn't submit the most recent application).
+    const isCurrentSeasonImport =
+      parsed.seasonYear !== null && parsed.seasonYear >= currentSeasonYear(now());
+    const wouldWriteIds = new Set<string>();
     for (const r of resolved) {
       if (r.action === "matched" && r.personId) {
         const person = personById.get(r.personId);
@@ -265,14 +270,14 @@ export async function runApplicationImport(args: {
         }
         const changes = person ? computeChanges(person, r.app) : [];
         summary.matched.push({ name: r.name, personId: r.personId, changes });
+        wouldWriteIds.add(r.personId);
       } else if (r.action === "create") {
         summary.created.push(r.name);
-        if (r.app.gradYear !== null) dryCreatedGradYears.push(r.app.gradYear);
       }
     }
-    const rosterStudentGradYears = roster.filter((p) => p.role === "student").map((p) => p.grad_year);
-    const allGradYears = [...rosterStudentGradYears, ...dryCreatedGradYears];
-    summary.wouldDeactivate = allGradYears.filter((y) => y !== null && y < seasonYear).length;
+    summary.wouldDeactivate = isCurrentSeasonImport
+      ? roster.filter((p) => p.role === "student" && p.is_active && !wouldWriteIds.has(p.id)).length
+      : 0;
     summary.deactivated = 0;
     // Guardian projection (best-effort counts only; no writes).
     for (const r of resolved) {
@@ -290,12 +295,18 @@ export async function runApplicationImport(args: {
 
   // Phase 2: real writes.
   const writtenPersonIds = new Set<string>();
+  // A student is only "on the team" if they're in the current season's
+  // application. When importing the current-season file, applicants are created
+  // active and a roster sweep (below) deactivates everyone else; an
+  // older/historical file creates its applicants inactive and never sweeps.
+  const isCurrentSeasonImport =
+    parsed.seasonYear !== null && parsed.seasonYear >= currentSeasonYear(now());
 
   for (const r of resolved) {
     if (r.action === "skip" || r.action === "error") continue;
 
     if (r.action === "create") {
-      const isActive = computeIsActive(r.app.gradYear, now());
+      const isActive = isCurrentSeasonImport;
       const { data, error } = await db
         .from("person")
         .insert({
@@ -364,38 +375,47 @@ export async function runApplicationImport(args: {
     }
   }
 
-  // Deactivation sweep.
-  const seasonYear = currentSeasonYear(now());
-  const deactivateRes = await db
-    .from("person")
-    .update({ is_active: false })
-    .eq("role", "student")
-    .lt("grad_year", seasonYear)
-    .select("id");
-  if (deactivateRes.error) summary.errors.push({ name: "deactivation", message: deactivateRes.error.message });
-
-  let deactivatedCount = (deactivateRes.data as { id: string }[] | null)?.length ?? 0;
-  if (writtenPersonIds.size > 0) {
-    const activateRes = await db
+  // Roster sweep — membership follows the current season's application.
+  //
+  // Only a current-season import re-derives who's active; importing an older,
+  // historical file must never deactivate this year's students. When it IS the
+  // current-season file: activate every student in the import, then deactivate
+  // every other (still-active) student — anyone who didn't submit the most
+  // recent application. They can re-apply, or a mentor can re-activate them by
+  // hand. This is order-independent: whichever import is the current season is
+  // the sole authority on the active roster.
+  if (isCurrentSeasonImport) {
+    const writtenIds = [...writtenPersonIds];
+    if (writtenIds.length > 0) {
+      const activateRes = await db
+        .from("person")
+        .update({ is_active: true })
+        .eq("role", "student")
+        .in("id", writtenIds)
+        .select("id");
+      if (activateRes.error) summary.errors.push({ name: "activation", message: activateRes.error.message });
+    }
+    let deactivateQuery = db
       .from("person")
-      .update({ is_active: true })
-      .gte("grad_year", seasonYear)
-      .in("id", [...writtenPersonIds])
-      .select("id");
-    if (activateRes.error) summary.errors.push({ name: "activation", message: activateRes.error.message });
+      .update({ is_active: false })
+      .eq("role", "student")
+      .eq("is_active", true);
+    if (writtenIds.length > 0) {
+      // Everyone active who wasn't in this application.
+      deactivateQuery = deactivateQuery.not("id", "in", `(${writtenIds.join(",")})`);
+    }
+    const deactivateRes = await deactivateQuery.select("id");
+    if (deactivateRes.error) summary.errors.push({ name: "deactivation", message: deactivateRes.error.message });
+    summary.deactivated = (deactivateRes.data as { id: string }[] | null)?.length ?? 0;
+  } else {
+    summary.deactivated = 0;
   }
-  summary.deactivated = deactivatedCount;
 
   return summary;
 }
 
 function currentSeasonYear(now: Date): number {
   return now.getMonth() >= 5 ? now.getFullYear() + 1 : now.getFullYear();
-}
-
-function computeIsActive(gradYear: number | null, now: Date): boolean {
-  if (gradYear === null) return true;
-  return gradYear >= currentSeasonYear(now);
 }
 
 function isStale(personLastApplicationAt: string | null, submittedAt: string | null): boolean {
