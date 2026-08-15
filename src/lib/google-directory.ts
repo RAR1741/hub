@@ -30,13 +30,26 @@ export function directoryCredentialsFromEnv(): DirectoryCredentials | null {
   return { clientEmail, privateKey, adminSubject };
 }
 
+// One access token is reused for every call sharing the same `deps` object.
+// A reconcile run builds a single `deps` and threads it through listing plus
+// every insert, so the whole run costs one token exchange instead of N+1 —
+// keeping us well clear of Google's token-endpoint rate limits (#45). The
+// real-time hooks build a fresh `deps` per change, so they still fetch one
+// token each, unchanged. Keyed by object identity via a WeakMap so cached
+// promises are collected with their deps and never leak.
+const tokenCache = new WeakMap<DirectoryDeps, Promise<string>>();
+
 async function fetchAccessToken(deps: DirectoryDeps): Promise<string> {
-  return fetchGoogleAccessToken(
+  const cached = tokenCache.get(deps);
+  if (cached) return cached;
+  const promise = fetchGoogleAccessToken(
     deps.fetch,
     deps.credentials,
     { scope: DIRECTORY_SCOPE, subject: deps.credentials.adminSubject },
     deps.now,
   );
+  tokenCache.set(deps, promise);
+  return promise;
 }
 
 /** List every member email of a group, lowercased, following pagination. */

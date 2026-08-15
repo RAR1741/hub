@@ -210,3 +210,39 @@ describe("token exchange", () => {
     expect(claims.scope).toBe(DIRECTORY_SCOPE);
   });
 });
+
+describe("token reuse (#45)", () => {
+  const tokenReqs = (requests: CapturedRequest[]) =>
+    requests.filter((r) => r.url.includes("oauth2.googleapis.com/token"));
+
+  test("calls sharing one deps object exchange only a single token", async () => {
+    // A reconcile run lists members then inserts several — all on one deps.
+    const { fetchFn, requests } = fakeFetch([
+      { status: 200, body: { members: [{ email: "a@example.com" }] } },
+      { status: 200, body: {} },
+      { status: 200, body: {} },
+    ]);
+    const deps: DirectoryDeps = { fetch: fetchFn, credentials: CREDS };
+
+    await listGroupMembers(deps, "team@group.example.com");
+    await insertGroupMember(deps, "team@group.example.com", "b@example.com");
+    await insertGroupMember(deps, "team@group.example.com", "c@example.com");
+
+    expect(tokenReqs(requests)).toHaveLength(1);
+  });
+
+  test("separate deps objects each exchange their own token", async () => {
+    // Each real-time hook builds a fresh deps, so it fetches its own token.
+    const { fetchFn, requests } = fakeFetch([
+      { status: 200, body: {} },
+      { status: 200, body: {} },
+    ]);
+    const deps1: DirectoryDeps = { fetch: fetchFn, credentials: CREDS };
+    const deps2: DirectoryDeps = { fetch: fetchFn, credentials: CREDS };
+
+    await insertGroupMember(deps1, "team@group.example.com", "a@example.com");
+    await insertGroupMember(deps2, "team@group.example.com", "b@example.com");
+
+    expect(tokenReqs(requests)).toHaveLength(2);
+  });
+});
