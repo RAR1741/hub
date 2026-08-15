@@ -51,10 +51,11 @@ export function SettingsForm({ initial }: { initial: SettingsValues }) {
           onChange={(e) => setValues({ ...values, autoCloseEnabled: e.target.checked })} />
         Auto-close stale open sessions overnight
       </label>
-      <label className="label">Auto-close hours{" "}
+      <label className={`label${values.autoCloseEnabled ? "" : " opacity-50"}`}>Auto-close hours{" "}
         <input className="input" type="number" min={1} max={24} value={values.autoCloseHours}
           disabled={!values.autoCloseEnabled}
-          onChange={(e) => setValues({ ...values, autoCloseHours: Number(e.target.value) })} required />
+          onChange={(e) => setValues({ ...values, autoCloseHours: Number(e.target.value) })}
+          required={values.autoCloseEnabled} />
       </label>
       <label className="label">Max shift hours{" "}
         <input className="input" type="number" min={1} max={48} value={values.maxShiftHours}

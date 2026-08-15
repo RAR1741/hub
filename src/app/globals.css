@@ -369,6 +369,11 @@
     outline-offset: 1px;
   }
 
+  .input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
   /* ---------------------------------------------------------------------
      Pills / badges (badge kept as an alias of pill for existing pages)
      --------------------------------------------------------------------- */
