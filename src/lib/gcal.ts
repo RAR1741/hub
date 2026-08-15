@@ -1,6 +1,6 @@
-import { createSign } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { localDateOf } from "./attendance";
+import { buildServiceAccountJwt as buildJwt, fetchGoogleAccessToken } from "./google-auth";
 
 export type GcalTransport = typeof globalThis.fetch;
 
@@ -10,7 +10,6 @@ export type GcalCredentials = {
   calendarId: string;
 };
 
-const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
 
 // Sync pulls a window of ±12 months around "now" so a recently-edited past
@@ -22,10 +21,6 @@ const WINDOW_MS = 365 * 24 * 60 * 60 * 1000;
 // meeting (Thursday, starting at/after this hour, team-local).
 const MANDATORY_RE = /mandatory/i;
 const THURSDAY_NIGHT_HOUR = 17; // 5:00 PM local
-
-function base64url(input: Buffer | string): string {
-  return Buffer.from(input).toString("base64url");
-}
 
 /**
  * Resolve the calendar id: the `GOOGLE_CALENDAR_ID` env var wins when set,
@@ -53,39 +48,11 @@ export function buildServiceAccountJwt(
   creds: Pick<GcalCredentials, "clientEmail" | "privateKey">,
   now: () => number = Date.now,
 ): string {
-  const iat = Math.floor(now() / 1000);
-  const header = base64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
-  const claims = base64url(
-    JSON.stringify({
-      iss: creds.clientEmail,
-      scope: SCOPE,
-      aud: TOKEN_URL,
-      iat,
-      exp: iat + 3600,
-    }),
-  );
-  const signingInput = `${header}.${claims}`;
-  const signature = createSign("RSA-SHA256")
-    .update(signingInput)
-    .sign(creds.privateKey)
-    .toString("base64url");
-  return `${signingInput}.${signature}`;
+  return buildJwt(creds, { scope: SCOPE }, now);
 }
 
 async function fetchAccessToken(deps: GcalDeps): Promise<string> {
-  const assertion = buildServiceAccountJwt(deps.credentials, deps.now);
-  const res = await deps.fetch(TOKEN_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-      assertion,
-    }),
-  });
-  if (!res.ok) throw new Error(`token exchange failed: ${res.status}`);
-  const json = (await res.json()) as { access_token?: string };
-  if (!json.access_token) throw new Error("token exchange returned no access_token");
-  return json.access_token;
+  return fetchGoogleAccessToken(deps.fetch, deps.credentials, { scope: SCOPE }, deps.now);
 }
 
 type GcalEvent = {
