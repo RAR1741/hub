@@ -249,6 +249,24 @@ describe("parseApplications - header drift matrix", () => {
     );
   });
 
+  test("mixed-case emails are lowercased (person + guardian)", () => {
+    const row = rowFor(HEADER_2022, {
+      Timestamp: "5/19/2021 16:05:09",
+      "First Name": "Ada",
+      "Last Name": "Lovelace",
+      "What is your high school graduation year?": "2022",
+      "Cell Phone Number": "555-0101",
+      "Email Address": "Ada.Lovelace@Example.COM",
+      "Parent/Guardian First Name": "Pat",
+      "Parent/Guardian Last Name": "Lovelace",
+      "Parent/Guardian email address": "Pat.Lovelace@Example.COM",
+    });
+    const csv = `${csvRow(HEADER_2022)}\n${row}`;
+    const app = parseApplications(csv).applications[0];
+    expect(app.email).toBe("ada.lovelace@example.com");
+    expect(app.guardians[0].email).toBe("pat.lovelace@example.com");
+  });
+
   test("2023 header: email moved to col 4, still parses correctly", () => {
     const row = rowFor(HEADER_2023, {
       Timestamp: "8/4/2022 19:07:31",

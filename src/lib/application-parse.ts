@@ -72,6 +72,13 @@ function nullIfEmptyOrNA(v: string): string | null {
   return t;
 }
 
+function normalizeEmail(v: string): string | null {
+  const t = nullIfEmptyOrNA(v);
+  // The person/guardian tables enforce email = lower(email); emails are
+  // case-insensitive, so lowercasing here is both correct and required.
+  return t === null ? null : t.toLowerCase();
+}
+
 function normalizePhone(v: string): string | null {
   const t = v.trim();
   if (t === "" || t.toLowerCase() === "n/a") return null;
@@ -303,7 +310,7 @@ function buildGuardian(
   return {
     firstName: first,
     lastName: last,
-    email: nullIfEmptyOrNA(email),
+    email: normalizeEmail(email),
     phone: normalizePhone(phone),
     employer: nullIfEmptyOrNA(employer),
     relationship: nullIfEmptyOrNA(relationship),
@@ -378,7 +385,7 @@ export function parseApplications(csvText: string): ApplicationParseResult {
       firstName,
       lastName,
       preferredName: nullIfEmptyOrNA(getCell(row, map.preferredName)),
-      email: nullIfEmptyOrNA(getCell(row, map.email)),
+      email: normalizeEmail(getCell(row, map.email)),
       gradYear,
       dob,
       school: nullIfEmptyOrNA(getCell(row, map.school)),
