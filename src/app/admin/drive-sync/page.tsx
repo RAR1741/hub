@@ -24,7 +24,7 @@ async function expectedCount(teamId: string, db: ReturnType<typeof getDb>): Prom
 
 export default async function AdminDriveSyncPage() {
   const viewer = await getViewer();
-  if (!hasRole(viewer.role, "admin")) redirect("/login");
+  if (!hasRole(viewer.role, "admin")) redirect("/");
 
   const db = getDb();
   const [allTeams, lastReport, people] = await Promise.all([
