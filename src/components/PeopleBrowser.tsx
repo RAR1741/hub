@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/Icon";
+import { sortByName } from "@/lib/name-sort";
 import type { Person } from "@/lib/types";
 
 /** Only the fields the roster renders — keeps the server→client payload small. */
@@ -124,9 +125,9 @@ export function PeopleBrowser({
       (p) => (includeInactive || p.isActive) && matches(p, search),
     );
     return {
-      students: visible.filter((p) => p.role === "student"),
+      students: sortByName(visible.filter((p) => p.role === "student")),
       // Mentors column holds mentors and admins, mirroring the leaderboard split.
-      mentors: visible.filter((p) => p.role !== "student"),
+      mentors: sortByName(visible.filter((p) => p.role !== "student")),
     };
   }, [people, search, includeInactive]);
 
