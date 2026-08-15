@@ -34,6 +34,10 @@
   --optional-fg: #ffffff;
   --absent-fg: #ffffff;
 
+  /* roster role colors — kept in sync with ROLE_COLORS in src/lib/roster-colors.ts */
+  --role-student: #4c9df0;
+  --role-mentor: #e0a020;
+
   --shadow: 0 1px 2px rgba(20, 16, 14, 0.04), 0 6px 20px -10px rgba(20, 16, 14, 0.14);
 
   /* legacy token aliases — existing pages reference these; re-pointed at the
@@ -865,9 +869,36 @@
     color: #9aa0a8;
   }
 
+  .kiosk-search-row {
+    padding: 14px 20px 0;
+  }
+
+  .k-search {
+    width: 100%;
+    font: inherit;
+    font-size: 17px;
+    font-weight: 600;
+    background: #1b1e23;
+    border: 1px solid #2a2e35;
+    color: #f3f1ec;
+    border-radius: 11px;
+    padding: 14px 16px;
+    min-height: 52px;
+  }
+
+  .k-search::placeholder {
+    color: #8b919a;
+    font-weight: 500;
+  }
+
+  .k-search:focus-visible {
+    outline: none;
+    border-color: #e01926;
+  }
+
   .kiosk-body {
     display: grid;
-    grid-template-columns: 1.4fr 1fr;
+    grid-template-columns: 1.4fr 1fr 0.9fr;
     gap: 0;
   }
 
@@ -879,6 +910,17 @@
     padding: 18px 20px;
     background: #0b0c0e;
     border-left: 1px solid #23262c;
+  }
+
+  .k-mentors {
+    padding: 18px 20px;
+    border-left: 1px solid #23262c;
+  }
+
+  .k-mentor-list {
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
   }
 
   .k-title {
@@ -970,7 +1012,8 @@
       grid-template-columns: 1fr;
     }
 
-    .k-here {
+    .k-here,
+    .k-mentors {
       border-left: 0;
       border-top: 1px solid #23262c;
     }

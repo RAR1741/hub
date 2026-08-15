@@ -40,13 +40,13 @@ export async function clockOut(personId: string, db?: SupabaseClient): Promise<C
   return { ok: true };
 }
 
-export type WhosHereEntry = { personId: string; name: string; since: string };
+export type WhosHereEntry = { personId: string; name: string; since: string; role: string };
 
 export async function listWhosHere(db?: SupabaseClient): Promise<WhosHereEntry[]> {
   const client = db ?? (await import("./db")).getDb();
   const { data, error } = await client
     .from("session")
-    .select("time_in, person!person_id (id, first_name, last_name, display_name)")
+    .select("time_in, person!person_id (id, first_name, last_name, display_name, role)")
     .is("time_out", null)
     .order("time_in");
   if (error) console.error("listWhosHere: query failed", error);
@@ -54,27 +54,38 @@ export async function listWhosHere(db?: SupabaseClient): Promise<WhosHereEntry[]
     .filter((r) => r.person)
     .map((r) => {
       const p = r.person as unknown as {
-        id: string; first_name: string; last_name: string; display_name: string | null;
+        id: string; first_name: string; last_name: string; display_name: string | null; role: string;
       };
-      return { personId: p.id, name: displayName(p), since: r.time_in as string };
+      return { personId: p.id, name: displayName(p), since: r.time_in as string, role: p.role };
     });
 }
 
-/** Active members not currently clocked in — the kiosk sign-in grid. */
+export type KioskMember = { id: string; name: string; role: string };
+
+/**
+ * Active members not currently clocked in — the kiosk sign-in lists, split by
+ * role. Students = role === "student"; mentors = everything else (mentors +
+ * admins), matching the People-page split. Each list is sorted by name.
+ */
 export async function activeMembersForKiosk(
   db?: SupabaseClient,
-): Promise<{ id: string; name: string }[]> {
+): Promise<{ students: KioskMember[]; mentors: KioskMember[] }> {
   const client = db ?? (await import("./db")).getDb();
   const [{ data: people }, { data: open }] = await Promise.all([
-    client.from("person").select("id, first_name, last_name, display_name").eq("is_active", true),
+    client.from("person").select("id, first_name, last_name, display_name, role").eq("is_active", true),
     client.from("session").select("person_id").is("time_out", null),
   ]);
   const openIds = new Set((open ?? []).map((s) => s.person_id as string));
-  return (people ?? [])
+  const members = (people ?? [])
     .filter((p) => !openIds.has(p.id as string))
     .map((p) => ({
       id: p.id as string,
       name: displayName(p as unknown as { first_name: string; last_name: string; display_name: string | null }),
+      role: (p as { role: string }).role,
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
+  return {
+    students: members.filter((m) => m.role === "student"),
+    mentors: members.filter((m) => m.role !== "student"),
+  };
 }

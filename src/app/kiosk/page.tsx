@@ -23,10 +23,13 @@ export default async function KioskPage() {
       </main>
     );
   }
-  const [members, here] = await Promise.all([activeMembersForKiosk(), listWhosHere()]);
+  const [{ students, mentors }, here] = await Promise.all([
+    activeMembersForKiosk(),
+    listWhosHere(),
+  ]);
   return (
     <main className="flex min-h-full flex-col p-4 sm:p-6 lg:p-8">
-      <KioskBoard members={members} here={here} />
+      <KioskBoard students={students} mentors={mentors} here={here} />
     </main>
   );
 }

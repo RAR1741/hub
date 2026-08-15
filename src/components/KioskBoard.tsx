@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatClockDuration } from "@/lib/format";
+import { roleColorVar } from "@/lib/roster-colors";
 
 export function KioskSetupForm() {
   const [token, setToken] = useState("");
@@ -42,13 +43,23 @@ export function KioskSetupForm() {
   );
 }
 
-type Member = { id: string; name: string };
-type Here = { personId: string; name: string; since: string };
+type Member = { id: string; name: string; role: string };
+type Here = { personId: string; name: string; since: string; role: string };
 
-export function KioskBoard({ members, here }: { members: Member[]; here: Here[] }) {
+export function KioskBoard({
+  students,
+  mentors,
+  here,
+}: {
+  students: Member[];
+  mentors: Member[];
+  here: Here[];
+}) {
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [search, setSearch] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -67,11 +78,36 @@ export function KioskBoard({ members, here }: { members: Member[]; here: Here[] 
       body: JSON.stringify({ personId }),
     });
     setBusy(false);
-    if (res.ok) { setFlash(`${verb} ${name}`); router.refresh(); }
+    if (res.ok) {
+      setFlash(`${verb} ${name}`);
+      setSearch("");
+      searchRef.current?.focus();
+      router.refresh();
+    }
     else if (res.status === 401) { setFlash("This tablet is not registered."); }
     else {
       const data = (await res.json().catch(() => ({}))) as { reason?: string };
       setFlash(data.reason === "no_active_period" ? "No active period — ask a mentor." : "Try again.");
+    }
+  }
+
+  const q = search.trim().toLowerCase();
+  const match = (name: string) => q === "" || name.toLowerCase().includes(q);
+  const shownStudents = students.filter((m) => match(m.name));
+  const shownMentors = mentors.filter((m) => match(m.name));
+  const shownHere = here.filter((h) => match(h.name));
+
+  function onSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== "Enter" || busy || q === "") return;
+    const total = shownStudents.length + shownMentors.length + shownHere.length;
+    if (total !== 1) return;
+    e.preventDefault();
+    if (shownHere.length === 1) {
+      const h = shownHere[0];
+      call("/api/kiosk/clock-out", h.personId, h.name, "Signed out");
+    } else {
+      const m = shownStudents[0] ?? shownMentors[0];
+      call("/api/kiosk/clock-in", m.id, m.name, "Signed in");
     }
   }
 
@@ -107,16 +143,36 @@ export function KioskBoard({ members, here }: { members: Member[]; here: Here[] 
         </p>
       )}
 
+      <div className="kiosk-search-row">
+        <input
+          ref={searchRef}
+          type="text"
+          className="k-search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onKeyDown={onSearchKeyDown}
+          autoFocus
+          placeholder="Search name…"
+          aria-label="Search names"
+          autoComplete="off"
+          spellCheck={false}
+        />
+      </div>
+
       <div className="kiosk-body flex-1">
         <section className="k-signin">
           <p className="k-title">Tap your name to sign in</p>
-          {members.length === 0 ? (
+          {students.length === 0 ? (
             <p className="text-sm" style={{ color: "#8b919a" }}>
               Everyone active is already signed in.
             </p>
+          ) : shownStudents.length === 0 ? (
+            <p className="text-sm" style={{ color: "#8b919a" }}>
+              No match.
+            </p>
           ) : (
             <div className="k-grid">
-              {members.map((m) => (
+              {shownStudents.map((m) => (
                 <button
                   key={m.id}
                   type="button"
@@ -136,19 +192,51 @@ export function KioskBoard({ members, here }: { members: Member[]; here: Here[] 
             <p className="text-sm" style={{ color: "#8b919a" }}>
               Nobody is signed in yet.
             </p>
+          ) : shownHere.length === 0 ? (
+            <p className="text-sm" style={{ color: "#8b919a" }}>
+              No match.
+            </p>
           ) : (
-            here.map((h) => (
+            shownHere.map((h) => (
               <button
                 key={h.personId}
                 type="button"
                 disabled={busy}
                 onClick={() => call("/api/kiosk/clock-out", h.personId, h.name, "Signed out")}
                 className="k-out"
+                data-role={h.role}
+                style={{ borderLeftColor: roleColorVar(h.role), borderLeftWidth: 4 }}
               >
                 <span className="knm">{h.name}</span>
                 <span className="kt mono">{formatClockDuration(h.since, now)}</span>
               </button>
             ))
+          )}
+        </section>
+        <section className="k-mentors">
+          <p className="k-title">Mentor sign in</p>
+          {mentors.length === 0 ? (
+            <p className="text-sm" style={{ color: "#8b919a" }}>
+              All mentors are signed in.
+            </p>
+          ) : shownMentors.length === 0 ? (
+            <p className="text-sm" style={{ color: "#8b919a" }}>
+              No match.
+            </p>
+          ) : (
+            <div className="k-mentor-list">
+              {shownMentors.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => call("/api/kiosk/clock-in", m.id, m.name, "Signed in")}
+                  className="k-name"
+                >
+                  {m.name}
+                </button>
+              ))}
+            </div>
           )}
         </section>
       </div>
