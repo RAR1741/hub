@@ -3,6 +3,7 @@ import type { JoinMode, Team, TeamRow } from "./types";
 import { teamFromRow } from "./types";
 import { displayName } from "./people";
 import { optString, reqString } from "./validate";
+import { syncMembershipChange } from "./drive-group-sync";
 
 export type TeamNode = Team & { children: TeamNode[] };
 
@@ -158,6 +159,7 @@ export async function upsertMember(
       { onConflict: "person_id,team_id" },
     );
   if (error) return { ok: false, status: 500 };
+  await syncMembershipChange("add", teamId, personId, client);
   return { ok: true, status: 200 };
 }
 
@@ -173,6 +175,7 @@ export async function removeMember(
     .eq("team_id", teamId)
     .eq("person_id", personId);
   if (error) return { ok: false, status: 500 };
+  await syncMembershipChange("remove", teamId, personId, client);
   return { ok: true, status: 200 };
 }
 
@@ -234,6 +237,7 @@ export async function joinTeam(
       { onConflict: "person_id,team_id" },
     );
   if (error) return { ok: false, status: 500 };
+  await syncMembershipChange("add", teamId, personId, client);
   return { ok: true, status: 200 };
 }
 
