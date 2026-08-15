@@ -8,6 +8,7 @@ export type TeamFormValues = {
   parentTeamId: string;
   description: string;
   joinMode: string;
+  googleGroupEmail: string;
 };
 
 export function TeamForm({
@@ -19,7 +20,9 @@ export function TeamForm({
   initial?: TeamFormValues;
   teamId?: string; // present = edit
 }) {
-  const EMPTY: TeamFormValues = { name: "", parentTeamId: "", description: "", joinMode: "admin_only" };
+  const EMPTY: TeamFormValues = {
+    name: "", parentTeamId: "", description: "", joinMode: "admin_only", googleGroupEmail: "",
+  };
   const [values, setValues] = useState<TeamFormValues>(initial ?? EMPTY);
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -38,6 +41,7 @@ export function TeamForm({
           parentTeamId: values.parentTeamId || undefined,
           description: values.description || undefined,
           joinMode: values.joinMode,
+          googleGroupEmail: values.googleGroupEmail || undefined,
         }),
       });
       if (res.ok) {
@@ -66,6 +70,17 @@ export function TeamForm({
         </select>
       </label>
       <label className="label">Description <input className="input" value={values.description} onChange={(e) => setValues({ ...values, description: e.target.value })} /></label>
+      <label className="label">Google Group email
+        <input
+          className="input"
+          type="email"
+          value={values.googleGroupEmail}
+          onChange={(e) => setValues({ ...values, googleGroupEmail: e.target.value })}
+        />
+        <span className="text-sm text-[var(--color-muted-fg)]">
+          Members of this team are synced into this Workspace group. Leave blank to disable.
+        </span>
+      </label>
       <label className="label">Join mode{" "}
         <select className="input" value={values.joinMode} onChange={(e) => setValues({ ...values, joinMode: e.target.value })}>
           <option value="admin_only">admin only</option>

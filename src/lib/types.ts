@@ -92,6 +92,7 @@ export type TeamRow = {
   parent_team_id: string | null;
   description: string | null;
   join_mode: JoinMode;
+  google_group_email: string | null;
 };
 
 export type Team = {
@@ -100,6 +101,7 @@ export type Team = {
   parentTeamId: string | null;
   description: string | null;
   joinMode: JoinMode;
+  googleGroupEmail: string | null;
 };
 
 export function teamFromRow(row: TeamRow): Team {
@@ -109,6 +111,7 @@ export function teamFromRow(row: TeamRow): Team {
     parentTeamId: row.parent_team_id,
     description: row.description,
     joinMode: row.join_mode,
+    googleGroupEmail: row.google_group_email,
   };
 }
 

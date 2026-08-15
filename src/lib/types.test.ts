@@ -19,6 +19,7 @@ describe("teamFromRow", () => {
       parent_team_id: "t0",
       description: "Software",
       join_mode: "open",
+      google_group_email: null,
     };
     expect(teamFromRow(row)).toEqual({
       id: "t1",
@@ -26,6 +27,7 @@ describe("teamFromRow", () => {
       parentTeamId: "t0",
       description: "Software",
       joinMode: "open",
+      googleGroupEmail: null,
     });
   });
 });

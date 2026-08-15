@@ -1,9 +1,10 @@
 import { describe, expect, test } from "vitest";
 import { buildTeamTree, joinAction, parseTeamInput } from "./teams";
+import { teamFromRow } from "./types";
 import type { Team } from "./types";
 
 const team = (id: string, name: string, parentTeamId: string | null): Team => ({
-  id, name, parentTeamId, description: null, joinMode: "admin_only",
+  id, name, parentTeamId, description: null, joinMode: "admin_only", googleGroupEmail: null,
 });
 
 describe("buildTeamTree", () => {
@@ -32,7 +33,10 @@ describe("parseTeamInput", () => {
   test("accepts valid input", () => {
     expect(
       parseTeamInput({ name: " Pit Crew ", joinMode: "open" }),
-    ).toEqual({ name: "Pit Crew", parentTeamId: null, description: null, joinMode: "open" });
+    ).toEqual({
+      name: "Pit Crew", parentTeamId: null, description: null, joinMode: "open",
+      googleGroupEmail: null,
+    });
   });
   test.each([
     [{ name: "", joinMode: "open" }],
@@ -42,11 +46,51 @@ describe("parseTeamInput", () => {
   ])("rejects %j", (body) => {
     expect(parseTeamInput(body)).toBeNull();
   });
+
+  test("googleGroupEmail absent is fine (not synced)", () => {
+    const result = parseTeamInput({ name: "X", joinMode: "open" });
+    expect(result).not.toBeNull();
+    expect(result?.googleGroupEmail).toBeNull();
+  });
+
+  test("googleGroupEmail blank string becomes null", () => {
+    const result = parseTeamInput({ name: "X", joinMode: "open", googleGroupEmail: "  " });
+    expect(result?.googleGroupEmail).toBeNull();
+  });
+
+  test("googleGroupEmail value is trimmed and kept", () => {
+    const result = parseTeamInput({
+      name: "X", joinMode: "open", googleGroupEmail: " pit-crew@redalert1741.org ",
+    });
+    expect(result?.googleGroupEmail).toBe("pit-crew@redalert1741.org");
+  });
+
+  test("googleGroupEmail rejects non-string values", () => {
+    expect(parseTeamInput({ name: "X", joinMode: "open", googleGroupEmail: 42 })).toBeNull();
+  });
+});
+
+describe("teamFromRow", () => {
+  test("maps google_group_email column", () => {
+    const t = teamFromRow({
+      id: "t1", name: "Pit Crew", parent_team_id: null, description: null,
+      join_mode: "admin_only", google_group_email: "pit-crew@redalert1741.org",
+    });
+    expect(t.googleGroupEmail).toBe("pit-crew@redalert1741.org");
+  });
+
+  test("maps null google_group_email", () => {
+    const t = teamFromRow({
+      id: "t1", name: "Pit Crew", parent_team_id: null, description: null,
+      join_mode: "admin_only", google_group_email: null,
+    });
+    expect(t.googleGroupEmail).toBeNull();
+  });
 });
 
 describe("joinAction", () => {
   const t = (joinMode: Team["joinMode"]): Team => ({
-    id: "t1", name: "T", parentTeamId: null, description: null, joinMode,
+    id: "t1", name: "T", parentTeamId: null, description: null, joinMode, googleGroupEmail: null,
   });
 
   test("existing member", () => {

@@ -34,6 +34,7 @@ export type TeamInput = {
   parentTeamId: string | null;
   description: string | null;
   joinMode: JoinMode;
+  googleGroupEmail: string | null;
 };
 
 /** Validate a team payload. PURE. Null = invalid. */
@@ -43,13 +44,15 @@ export function parseTeamInput(body: unknown): TeamInput | null {
   const name = reqString(b.name, 80);
   const parentTeamId = optString(b.parentTeamId, 64);
   const description = optString(b.description, 500);
+  const googleGroupEmail = optString(b.googleGroupEmail, 254);
   const joinMode = JOIN_MODES.find((m) => m === b.joinMode);
-  if (!name || !parentTeamId || !description || !joinMode) return null;
+  if (!name || !parentTeamId || !description || !googleGroupEmail || !joinMode) return null;
   return {
     name,
     parentTeamId: parentTeamId.value,
     description: description.value,
     joinMode,
+    googleGroupEmail: googleGroupEmail.value,
   };
 }
 
@@ -79,6 +82,7 @@ export async function createTeam(
       parent_team_id: input.parentTeamId,
       description: input.description,
       join_mode: input.joinMode,
+      google_group_email: input.googleGroupEmail,
     })
     .select("id")
     .single();
@@ -100,6 +104,7 @@ export async function updateTeam(
       parent_team_id: input.parentTeamId,
       description: input.description,
       join_mode: input.joinMode,
+      google_group_email: input.googleGroupEmail,
     })
     .eq("id", id)
     .select("id")

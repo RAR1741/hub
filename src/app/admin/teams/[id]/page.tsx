@@ -46,6 +46,7 @@ export default async function AdminTeamPage({
             parentTeamId: team.parentTeamId ?? "",
             description: team.description ?? "",
             joinMode: team.joinMode,
+            googleGroupEmail: team.googleGroupEmail ?? "",
           }}
         />
       </section>
