@@ -122,6 +122,19 @@ describe("listGroupMembers", () => {
     const deps: DirectoryDeps = { fetch: fetchFn, credentials: CREDS };
     expect(await listGroupMembers(deps, "team@group.example.com")).toEqual([]);
   });
+
+  test("skips members with no email instead of throwing", async () => {
+    const { fetchFn } = fakeFetch([
+      {
+        status: 200,
+        body: { members: [{ email: "Real@Example.com" }, { role: "MEMBER" }] },
+      },
+    ]);
+    const deps: DirectoryDeps = { fetch: fetchFn, credentials: CREDS };
+    await expect(listGroupMembers(deps, "team@group.example.com")).resolves.toEqual([
+      "real@example.com",
+    ]);
+  });
 });
 
 describe("insertGroupMember", () => {

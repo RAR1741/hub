@@ -52,8 +52,8 @@ export async function listGroupMembers(deps: DirectoryDeps, groupEmail: string):
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) throw new Error(`list members failed: ${res.status}`);
-    const json = (await res.json()) as { members?: { email: string }[]; nextPageToken?: string };
-    for (const m of json.members ?? []) emails.push(m.email.toLowerCase());
+    const json = (await res.json()) as { members?: { email?: string }[]; nextPageToken?: string };
+    for (const m of json.members ?? []) if (m.email) emails.push(m.email.toLowerCase());
     pageToken = json.nextPageToken;
   } while (pageToken);
   return emails;
