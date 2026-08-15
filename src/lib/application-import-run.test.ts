@@ -431,6 +431,21 @@ describe("runApplicationImport roster sweep (current-season membership)", () => 
     expect(summary.deactivated).toBe(0);
   });
 
+  test("a current-season import that writes NOBODY (all stale) never deactivates the roster", async () => {
+    // Grace already has a newer application on file → matched-as-stale → skipped,
+    // so writtenPersonIds is empty. This must NOT wipe the active roster.
+    const { db, calls } = fakeDb([
+      { id: "p1", first_name: "Grace", last_name: "Hopper", role: "student", email: "grace@example.com", is_active: true, last_application_at: "2026-09-01T00:00:00Z" },
+      { id: "p2", first_name: "Other", last_name: "Active", role: "student", is_active: true },
+    ]);
+    const csv = csvFor([row({})]); // Grace only; she's stale
+    const summary = await runApplicationImport({ csvText: csv, dryRun: false, db, now: NOW_AUG });
+    if ("error" in summary) throw new Error(summary.error);
+    expect(summary.stale.length).toBe(1);
+    expect(calls.personUpdate.some((u) => u.patch.is_active === false)).toBe(false);
+    expect(summary.deactivated).toBe(0);
+  });
+
   test("new applicants from the current-season import are created active", async () => {
     const { db, calls } = fakeDb([]);
     const csv = csvFor([row({ first: "New", last: "Student", email: "new@example.com" })]);

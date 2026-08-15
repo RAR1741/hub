@@ -384,27 +384,29 @@ export async function runApplicationImport(args: {
   // recent application. They can re-apply, or a mentor can re-activate them by
   // hand. This is order-independent: whichever import is the current season is
   // the sole authority on the active roster.
-  if (isCurrentSeasonImport) {
+  // Guard on writtenPersonIds being non-empty: a current-season import that
+  // wrote nobody (every applicant already up-to-date/stale, or all skipped)
+  // carries no roster signal, so it must NOT sweep — otherwise a harmless
+  // re-import of the current file would deactivate the ENTIRE active roster
+  // (deactivate-all-except-nobody). This also makes re-imports idempotent.
+  if (isCurrentSeasonImport && writtenPersonIds.size > 0) {
     const writtenIds = [...writtenPersonIds];
-    if (writtenIds.length > 0) {
-      const activateRes = await db
-        .from("person")
-        .update({ is_active: true })
-        .eq("role", "student")
-        .in("id", writtenIds)
-        .select("id");
-      if (activateRes.error) summary.errors.push({ name: "activation", message: activateRes.error.message });
-    }
-    let deactivateQuery = db
+    const activateRes = await db
+      .from("person")
+      .update({ is_active: true })
+      .eq("role", "student")
+      .in("id", writtenIds)
+      .select("id");
+    if (activateRes.error) summary.errors.push({ name: "activation", message: activateRes.error.message });
+
+    // Deactivate every active student who wasn't in this application.
+    const deactivateRes = await db
       .from("person")
       .update({ is_active: false })
       .eq("role", "student")
-      .eq("is_active", true);
-    if (writtenIds.length > 0) {
-      // Everyone active who wasn't in this application.
-      deactivateQuery = deactivateQuery.not("id", "in", `(${writtenIds.join(",")})`);
-    }
-    const deactivateRes = await deactivateQuery.select("id");
+      .eq("is_active", true)
+      .not("id", "in", `(${writtenIds.join(",")})`)
+      .select("id");
     if (deactivateRes.error) summary.errors.push({ name: "deactivation", message: deactivateRes.error.message });
     summary.deactivated = (deactivateRes.data as { id: string }[] | null)?.length ?? 0;
   } else {
