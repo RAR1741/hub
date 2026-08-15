@@ -36,7 +36,7 @@ describe("rosterView", () => {
 
   test("guest gets alphabetized names of active people only — nothing else", () => {
     const view = rosterView("guest", rows);
-    expect(view).toEqual({ kind: "names", names: ["Ada Lovelace", "Z"] });
+    expect(view).toEqual({ kind: "names", names: ["Ada Lovelace", "Zed Adams"] });
   });
 
   test("student also gets names only", () => {
@@ -54,10 +54,10 @@ describe("rosterView", () => {
 });
 
 describe("displayName", () => {
-  test("prefers display_name", () => {
-    expect(displayName({ first_name: "A", last_name: "B", display_name: "C" })).toBe("C");
+  test("uses first + last, ignoring display_name (nicknames disabled for now)", () => {
+    expect(displayName({ first_name: "A", last_name: "B", display_name: "C" })).toBe("A B");
   });
-  test("falls back to first + last", () => {
+  test("works with no display_name at all", () => {
     expect(displayName({ first_name: "A", last_name: "B", display_name: null })).toBe("A B");
   });
 });

@@ -19,7 +19,7 @@ export default async function PersonPage({
   const activePeriod = await getActivePeriod();
   const sessions = activePeriod ? await personSessions(person.id, activePeriod.id) : [];
 
-  const name = person.displayName ?? `${person.firstName} ${person.lastName}`;
+  const name = `${person.firstName} ${person.lastName}`;
   const totalH = Math.round(totalHours(sessions) * 100) / 100;
 
   return (

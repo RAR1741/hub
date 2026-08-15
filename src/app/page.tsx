@@ -67,7 +67,7 @@ export default async function HomePage() {
               <p className="text-[var(--color-muted-fg)]">
                 Signed in as{" "}
                 <span className="font-medium text-[var(--color-fg)]">
-                  {viewer.person.displayName ?? viewer.person.firstName}
+                  {viewer.person.firstName} {viewer.person.lastName}
                 </span>{" "}
                 ({viewer.role})
               </p>

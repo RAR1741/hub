@@ -75,7 +75,7 @@ export async function listPendingApplications(
       return {
         id: r.id as string,
         personId: p.id,
-        personName: p.display_name ?? `${p.first_name} ${p.last_name}`,
+        personName: `${p.first_name} ${p.last_name}`,
         teamId: t.id,
         teamName: t.name,
         message: (r.message as string | null) ?? null,

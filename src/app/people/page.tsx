@@ -101,7 +101,7 @@ export default async function PeoplePage({
               </thead>
               <tbody>
                 {view.people.map((p) => {
-                  const name = p.displayName ?? `${p.firstName} ${p.lastName}`;
+                  const name = `${p.firstName} ${p.lastName}`;
                   return (
                     <tr key={p.id}>
                       <td>

@@ -16,7 +16,7 @@ export default async function AdminEditPersonPage({
   const result = await getPersonWithTeams(id);
   if (!result) notFound();
   const p = result.person;
-  const name = p.displayName ?? `${p.firstName} ${p.lastName}`;
+  const name = `${p.firstName} ${p.lastName}`;
 
   return (
     <main className="flex flex-col gap-6">

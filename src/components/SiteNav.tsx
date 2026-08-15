@@ -9,7 +9,7 @@ const navLinkClass =
 export async function SiteNav() {
   const viewer = await getViewer();
   const initials = viewer.person
-    ? (viewer.person.displayName ?? viewer.person.firstName ?? "")
+    ? `${viewer.person.firstName ?? ""} ${viewer.person.lastName ?? ""}`
         .trim()
         .split(/\s+/)
         .map((part) => part[0])
@@ -75,7 +75,7 @@ export async function SiteNav() {
                 >
                   {initials}
                 </span>
-                {viewer.person.displayName ?? viewer.person.firstName} (
+                {viewer.person.firstName} {viewer.person.lastName} (
                 {viewer.role})
                 {/* Native POST so sign-out works without client JS; the route
                     clears the student-session + sb-* auth cookies server-side. */}

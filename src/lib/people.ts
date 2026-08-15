@@ -5,12 +5,19 @@ import { personFromRow, teamFromRow } from "./types";
 import { optInt, optString, reqString } from "./validate";
 import type { Viewer } from "./viewer";
 
+/**
+ * The name to show for a person. Deliberately ignores `display_name` for now:
+ * the application import populated it with self-entered nicknames, much of it
+ * junk, so every surface except the admin person-edit form shows the real
+ * legal name instead. `display_name` is still stored and editable there; flip
+ * this back to `p.display_name ?? …` to re-enable it everywhere.
+ */
 export function displayName(p: {
   first_name: string;
   last_name: string;
-  display_name: string | null;
+  display_name?: string | null;
 }): string {
-  return p.display_name ?? `${p.first_name} ${p.last_name}`;
+  return `${p.first_name} ${p.last_name}`;
 }
 
 /**

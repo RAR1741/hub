@@ -5,7 +5,7 @@ export async function GET() {
   return Response.json({
     role: viewer.role,
     name: viewer.person
-      ? (viewer.person.displayName ?? viewer.person.firstName)
+      ? `${viewer.person.firstName} ${viewer.person.lastName}`
       : null,
   });
 }
