@@ -328,8 +328,39 @@ describe("parsePersonInput", () => {
     [{ ...valid, gradYear: 1990 }],
     [{ ...valid, email: 42 }],
     [{ ...valid, isActive: "yes" }],
+    [{ ...valid, dateOfBirth: "2004-13-40" }],
+    [{ ...valid, dateOfBirth: "8/7/2004" }],
+    [{ ...valid, interests: [1, 2] }],
     [null],
   ])("rejects %j", (body) => {
     expect(parsePersonInput(body)).toBeNull();
+  });
+
+  test("parses the application-derived fields", () => {
+    const input = parsePersonInput({
+      ...valid,
+      dateOfBirth: "2004-08-07",
+      streetAddress: "123 Test St",
+      city: "Testville",
+      zip: "00000",
+      homePhone: "555-0100",
+      school: "Test High",
+      ethnicity: "Prefer not to say",
+      race: "Prefer not to say",
+      interests: " Programming , Electronics ,, ",
+    });
+    expect(input).not.toBeNull();
+    expect(input!.dateOfBirth).toBe("2004-08-07");
+    expect(input!.streetAddress).toBe("123 Test St");
+    expect(input!.homePhone).toBe("555-0100");
+    // Comma string is split, trimmed, and blanks dropped.
+    expect(input!.interests).toEqual(["Programming", "Electronics"]);
+  });
+
+  test("accepts an interests array and blanks unspecified fields to null", () => {
+    const input = parsePersonInput({ ...valid, interests: ["Robotics"] });
+    expect(input!.interests).toEqual(["Robotics"]);
+    expect(input!.dateOfBirth).toBeNull();
+    expect(input!.school).toBeNull();
   });
 });

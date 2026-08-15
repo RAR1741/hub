@@ -239,10 +239,25 @@ function parseDob(
   }
   const month = parseInt(m[1], 10);
   const day = parseInt(m[2], 10);
-  const year = parseInt(m[3], 10);
-  const iso = `${String(year).padStart(4, "0")}-${pad2(month)}-${pad2(day)}`;
+  let year = parseInt(m[3], 10);
 
   const maxPlausible = seasonYear !== null ? seasonYear - 10 : null;
+
+  // A one/two-digit or zero-padded year (e.g. "06" or "0006") is a truncated
+  // 20xx birth year — every applicant is a current high-schooler, so expand it
+  // into the 2000s, falling back to the 1900s only if the 2000s reading would
+  // land in the future relative to the season.
+  if (year < 100) {
+    const asTwentyFirst = 2000 + year;
+    const asTwentieth = 1900 + year;
+    year =
+      maxPlausible !== null && asTwentyFirst > maxPlausible && asTwentieth <= maxPlausible
+        ? asTwentieth
+        : asTwentyFirst;
+  }
+
+  const iso = `${String(year).padStart(4, "0")}-${pad2(month)}-${pad2(day)}`;
+
   if (year < 1980 || (maxPlausible !== null && year > maxPlausible)) {
     anomalies.push({ rowIndex, name, field: "dob", detail: "implausible birth year", raw: t });
   }

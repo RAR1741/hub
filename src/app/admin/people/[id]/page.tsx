@@ -43,6 +43,15 @@ export default async function AdminEditPersonPage({
             bio: p.bio ?? "",
             studentIdNumber: p.studentIdNumber ?? "",
             isActive: p.isActive,
+            dateOfBirth: p.dateOfBirth ?? "",
+            streetAddress: p.streetAddress ?? "",
+            city: p.city ?? "",
+            zip: p.zip ?? "",
+            homePhone: p.homePhone ?? "",
+            school: p.school ?? "",
+            ethnicity: p.ethnicity ?? "",
+            race: p.race ?? "",
+            interests: (p.interests ?? []).join(", "),
           }}
         />
       </section>

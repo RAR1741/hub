@@ -110,7 +110,58 @@ export type PersonInput = {
   bio: string | null;
   studentIdNumber: string | null;
   isActive: boolean;
+  // Application-derived fields. Optional so callers that build a PersonInput
+  // from a narrower source (roster CSV, account-request approval) needn't
+  // supply them; the admin person form always sets them via parsePersonInput.
+  dateOfBirth?: string | null;
+  streetAddress?: string | null;
+  city?: string | null;
+  zip?: string | null;
+  homePhone?: string | null;
+  school?: string | null;
+  ethnicity?: string | null;
+  race?: string | null;
+  interests?: string[] | null;
 };
+
+/**
+ * Normalize an optional `interests` payload into a clean string[] (or null).
+ * Accepts an array of strings or a comma-separated string; trims, drops blanks,
+ * and returns null when nothing survives so a blank input clears the column.
+ * The outer-null-means-invalid convention matches optString.
+ */
+function optStringArray(v: unknown): { value: string[] | null } | null {
+  if (v === undefined || v === null) return { value: null };
+  let parts: string[];
+  if (Array.isArray(v)) {
+    if (!v.every((x) => typeof x === "string")) return null;
+    parts = v as string[];
+  } else if (typeof v === "string") {
+    parts = v.split(",");
+  } else {
+    return null;
+  }
+  const cleaned = parts.map((s) => s.trim()).filter((s) => s.length > 0);
+  return { value: cleaned.length ? cleaned : null };
+}
+
+/** ISO calendar date (YYYY-MM-DD). Same outer-null convention as optString. */
+function optDate(v: unknown): { value: string | null } | null {
+  if (v === undefined || v === null) return { value: null };
+  if (typeof v !== "string") return null;
+  const s = v.trim();
+  if (s === "") return { value: null };
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  // Reject formatting-valid but non-existent dates (e.g. 2004-13-40) by
+  // round-tripping through Date and requiring the components to survive.
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) {
+    return null;
+  }
+  return { value: s };
+}
 
 /** Validate + normalize an admin person payload. PURE. Null = invalid. */
 export function parsePersonInput(body: unknown): PersonInput | null {
@@ -129,11 +180,22 @@ export function parsePersonInput(body: unknown): PersonInput | null {
   const studentIdNumber = optString(b.studentIdNumber, 64);
   const role = ASSIGNABLE_ROLES.find((r) => r === b.role);
   const isActive = typeof b.isActive === "boolean" ? b.isActive : null;
+  const dateOfBirth = optDate(b.dateOfBirth);
+  const streetAddress = optString(b.streetAddress, 200);
+  const city = optString(b.city, 100);
+  const zip = optString(b.zip, 20);
+  const homePhone = optString(b.homePhone, 32);
+  const school = optString(b.school, 200);
+  const ethnicity = optString(b.ethnicity, 200);
+  const race = optString(b.race, 200);
+  const interests = optStringArray(b.interests);
 
   if (
     !firstName || !lastName || !displayName || !gradYear || !email ||
     !phone || !shirtSize || !dietaryRestrictions || !bio ||
-    !studentIdNumber || !role || isActive === null
+    !studentIdNumber || !role || isActive === null ||
+    !dateOfBirth || !streetAddress || !city || !zip || !homePhone ||
+    !school || !ethnicity || !race || !interests
   ) {
     return null;
   }
@@ -152,6 +214,15 @@ export function parsePersonInput(body: unknown): PersonInput | null {
     bio: bio.value,
     studentIdNumber: studentIdNumber.value,
     isActive,
+    dateOfBirth: dateOfBirth.value,
+    streetAddress: streetAddress.value,
+    city: city.value,
+    zip: zip.value,
+    homePhone: homePhone.value,
+    school: school.value,
+    ethnicity: ethnicity.value,
+    race: race.value,
+    interests: interests.value,
   };
 }
 
@@ -169,6 +240,15 @@ export function personRowFromInput(input: PersonInput): Record<string, unknown> 
     bio: input.bio,
     student_id_number: input.studentIdNumber,
     is_active: input.isActive,
+    date_of_birth: input.dateOfBirth ?? null,
+    street_address: input.streetAddress ?? null,
+    city: input.city ?? null,
+    zip: input.zip ?? null,
+    home_phone: input.homePhone ?? null,
+    school: input.school ?? null,
+    ethnicity: input.ethnicity ?? null,
+    race: input.race ?? null,
+    interests: input.interests ?? null,
   };
 }
 

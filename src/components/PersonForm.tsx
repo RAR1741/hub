@@ -8,12 +8,17 @@ export type PersonFormValues = {
   gradYear: string; email: string; phone: string; shirtSize: string;
   dietaryRestrictions: string; bio: string; studentIdNumber: string;
   isActive: boolean;
+  dateOfBirth: string; streetAddress: string; city: string; zip: string;
+  homePhone: string; school: string; ethnicity: string; race: string;
+  interests: string;
 };
 
 const EMPTY: PersonFormValues = {
   firstName: "", lastName: "", displayName: "", role: "student",
   gradYear: "", email: "", phone: "", shirtSize: "",
   dietaryRestrictions: "", bio: "", studentIdNumber: "", isActive: true,
+  dateOfBirth: "", streetAddress: "", city: "", zip: "",
+  homePhone: "", school: "", ethnicity: "", race: "", interests: "",
 };
 
 export function PersonForm({
@@ -50,6 +55,16 @@ export function PersonForm({
         bio: values.bio || undefined,
         studentIdNumber: values.studentIdNumber || undefined,
         isActive: values.isActive,
+        dateOfBirth: values.dateOfBirth || undefined,
+        streetAddress: values.streetAddress || undefined,
+        city: values.city || undefined,
+        zip: values.zip || undefined,
+        homePhone: values.homePhone || undefined,
+        school: values.school || undefined,
+        ethnicity: values.ethnicity || undefined,
+        race: values.race || undefined,
+        // Comma-separated in the UI; the server splits/normalizes into text[].
+        interests: values.interests || undefined,
       };
       const res = await fetch(
         personId ? `/api/admin/people/${personId}` : "/api/admin/people",
@@ -92,6 +107,15 @@ export function PersonForm({
       <label className="label">Dietary restrictions <input className="input" value={values.dietaryRestrictions} onChange={(e) => set("dietaryRestrictions", e.target.value)} /></label>
       <label className="label">Bio <textarea className="input" value={values.bio} onChange={(e) => set("bio", e.target.value)} /></label>
       <label className="label">Student ID <input className="input" value={values.studentIdNumber} onChange={(e) => set("studentIdNumber", e.target.value)} /></label>
+      <label className="label">Date of birth <input className="input" type="date" value={values.dateOfBirth} onChange={(e) => set("dateOfBirth", e.target.value)} /></label>
+      <label className="label">Home phone <input className="input" value={values.homePhone} onChange={(e) => set("homePhone", e.target.value)} /></label>
+      <label className="label">School <input className="input" value={values.school} onChange={(e) => set("school", e.target.value)} /></label>
+      <label className="label">Street address <input className="input" value={values.streetAddress} onChange={(e) => set("streetAddress", e.target.value)} /></label>
+      <label className="label">City <input className="input" value={values.city} onChange={(e) => set("city", e.target.value)} /></label>
+      <label className="label">Zip <input className="input" value={values.zip} onChange={(e) => set("zip", e.target.value)} /></label>
+      <label className="label">Ethnicity <input className="input" value={values.ethnicity} onChange={(e) => set("ethnicity", e.target.value)} /></label>
+      <label className="label">Race <input className="input" value={values.race} onChange={(e) => set("race", e.target.value)} /></label>
+      <label className="label">Interests <span className="text-xs text-[var(--color-muted-fg)]">(comma-separated)</span> <input className="input" value={values.interests} onChange={(e) => set("interests", e.target.value)} /></label>
       <label className="flex items-center gap-2 text-sm font-medium text-[var(--color-muted-fg)]">Active <input type="checkbox" checked={values.isActive} onChange={(e) => set("isActive", e.target.checked)} /></label>
       <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? "Saving…" : personId ? "Save changes" : "Create person"}</button>
       {status && <p role="status" className="text-sm text-[var(--color-muted-fg)]">{status}</p>}

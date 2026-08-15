@@ -378,10 +378,40 @@ describe("parseApplications - header drift matrix", () => {
 
     const app = result.applications[0];
     expect(app.dietaryRestrictions).toBe("Peanut allergy");
-    // 3/3/0007 — invented malformed date: implausible year (< 1980), still parseable.
-    expect(app.dob).toBe("0007-03-03");
+    // 3/3/0007 — truncated 20xx birth year: auto-expanded to 2007, no anomaly.
+    expect(app.dob).toBe("2007-03-03");
+    expect(result.anomalies).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ field: "dob", detail: "implausible birth year" })]),
+    );
+  });
+
+  test("truncated two-digit birth years expand into the 2000s", () => {
+    const csv = `${csvRow(HEADER_2025)}\n${rowFor(HEADER_2025, {
+      Timestamp: "4/25/2024 21:19:31",
+      "First Name": "Iris",
+      "Last Name": "Example",
+      "Date of Birth": "9/19/06",
+      "What is your high school graduation year?": "2025",
+      "Cell Phone Number": "555-0170",
+    })}`;
+    const result = parseApplications(csv);
+    expect(result.applications[0].dob).toBe("2006-09-19");
+    expect(result.anomalies).toHaveLength(0);
+  });
+
+  test("a genuinely implausible birth year is still flagged", () => {
+    const csv = `${csvRow(HEADER_2025)}\n${rowFor(HEADER_2025, {
+      Timestamp: "4/25/2024 21:19:31",
+      "First Name": "Otto",
+      "Last Name": "Example",
+      "Date of Birth": "3/3/1975",
+      "What is your high school graduation year?": "2025",
+      "Cell Phone Number": "555-0171",
+    })}`;
+    const result = parseApplications(csv);
+    expect(result.applications[0].dob).toBe("1975-03-03");
     expect(result.anomalies).toEqual(
-      expect.arrayContaining([expect.objectContaining({ field: "dob", detail: "implausible birth year", raw: "3/3/0007" })]),
+      expect.arrayContaining([expect.objectContaining({ field: "dob", detail: "implausible birth year", raw: "3/3/1975" })]),
     );
   });
 
