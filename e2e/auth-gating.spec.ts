@@ -105,6 +105,7 @@ test.describe("admin hub is mentor-scoped", () => {
     "/admin/meetings",
     "/admin/periods",
     "/admin/kiosk-devices",
+    "/admin/drive-sync",
     "/admin/settings",
   ];
 

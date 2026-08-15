@@ -164,6 +164,7 @@ export default async function AdminHubPage() {
       {isAdmin && (
         <Section label="Config">
           <Card href="/admin/kiosk-devices" icon="chevron" title="Kiosk devices" count={kioskDevices.length} hint="Shop-tablet sign-in tokens." />
+          <Card href="/admin/drive-sync" icon="users" title="Drive group sync" hint="Linked teams, reconcile report, and Sync now." />
           <Card href="/admin/settings" icon="x" title="Settings" hint="Timezone, calendar sync, shift limits." />
         </Section>
       )}
