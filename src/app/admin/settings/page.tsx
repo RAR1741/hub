@@ -9,10 +9,11 @@ export default async function AdminSettingsPage() {
   const viewer = await getViewer();
   if (!hasRole(viewer.role, "admin")) redirect("/");
 
-  const [teamTimezone, gcalCalendarId, autoCloseHours, maxShiftHours, seasonHoursGoal] =
+  const [teamTimezone, gcalCalendarId, autoCloseEnabled, autoCloseHours, maxShiftHours, seasonHoursGoal] =
     await Promise.all([
       getSetting<string>("team_timezone", "America/Indiana/Indianapolis"),
       getSetting<string>("gcal_calendar_id", ""),
+      getSetting<boolean>("auto_close_enabled", false),
       getSetting<number>("auto_close_hours", 4),
       getSetting<number>("max_shift_hours", 18),
       getSetting<number>("season_hours_goal", 0),
@@ -28,7 +29,7 @@ export default async function AdminSettingsPage() {
       </div>
       <section className="card flex flex-col gap-4">
         <SettingsForm
-          initial={{ teamTimezone, gcalCalendarId, autoCloseHours, maxShiftHours, seasonHoursGoal }}
+          initial={{ teamTimezone, gcalCalendarId, autoCloseEnabled, autoCloseHours, maxShiftHours, seasonHoursGoal }}
         />
       </section>
       <p>

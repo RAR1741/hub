@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 export type SettingsValues = {
   teamTimezone: string;
   gcalCalendarId: string;
+  autoCloseEnabled: boolean;
   autoCloseHours: number;
   maxShiftHours: number;
   seasonHoursGoal: number;
@@ -45,8 +46,14 @@ export function SettingsForm({ initial }: { initial: SettingsValues }) {
         <input className="input" value={values.gcalCalendarId}
           onChange={(e) => setValues({ ...values, gcalCalendarId: e.target.value })} />
       </label>
+      <label className="flex items-center gap-2 text-sm font-medium text-[var(--color-muted-fg)]">
+        <input type="checkbox" checked={values.autoCloseEnabled}
+          onChange={(e) => setValues({ ...values, autoCloseEnabled: e.target.checked })} />
+        Auto-close stale open sessions overnight
+      </label>
       <label className="label">Auto-close hours{" "}
         <input className="input" type="number" min={1} max={24} value={values.autoCloseHours}
+          disabled={!values.autoCloseEnabled}
           onChange={(e) => setValues({ ...values, autoCloseHours: Number(e.target.value) })} required />
       </label>
       <label className="label">Max shift hours{" "}
