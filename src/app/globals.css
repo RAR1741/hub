@@ -487,11 +487,21 @@
 
   .search input {
     flex: 1;
+    min-width: 0;
     border: 0;
     background: transparent;
     color: var(--ink);
     font: inherit;
     outline: none;
+  }
+
+  /* The Icon SVG carries no intrinsic size — constrain it to a leading glyph
+     so it never balloons to the replaced-element default inside the pill. */
+  .search svg {
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+    color: var(--muted);
   }
 
   /* The input's own outline is suppressed above (it sits flush inside the

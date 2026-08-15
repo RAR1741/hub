@@ -36,18 +36,23 @@ function PeopleColumn({
   title,
   rows,
   canEdit,
+  emptyHint,
 }: {
   title: string;
   rows: PeopleRow[];
   canEdit: boolean;
+  emptyHint: string;
 }) {
   return (
-    <div className="card flex flex-col gap-3">
-      <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
-        {title} · {rows.length}
-      </h2>
+    <section className="card flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
+          {title}
+        </h2>
+        <span className="count">{rows.length}</span>
+      </div>
       {rows.length === 0 ? (
-        <p className="text-sm text-[var(--muted)]">No matching members.</p>
+        <p className="py-6 text-center text-sm text-[var(--muted)]">{emptyHint}</p>
       ) : (
         <div className="tablewrap">
           <div style={{ overflowX: "auto" }}>
@@ -55,7 +60,7 @@ function PeopleColumn({
               <thead>
                 <tr>
                   <th>Member</th>
-                  <th>Student ID</th>
+                  <th>ID</th>
                   <th>Status</th>
                   {canEdit && <th aria-label="Edit" />}
                 </tr>
@@ -105,7 +110,7 @@ function PeopleColumn({
           </div>
         </div>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -130,19 +135,21 @@ export function PeopleBrowser({
     };
   }, [people, search, includeInactive]);
 
+  const searching = search.trim() !== "";
+
   return (
     <div className="flex flex-col gap-6">
-      <div className="card flex flex-wrap items-center gap-3">
-        <label className="search">
+      <div className="card flex flex-wrap items-center gap-x-5 gap-y-3">
+        <label className="search" style={{ maxWidth: "24rem" }}>
           <Icon name="search" />
           <input
-            aria-label="Search names"
+            aria-label="Search people"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search name, email, or ID…"
           />
         </label>
-        <label className="flex items-center gap-2 text-sm font-medium text-[var(--muted)]">
+        <label className="flex cursor-pointer select-none items-center gap-2 text-sm font-medium text-[var(--muted)]">
           <input
             type="checkbox"
             checked={includeInactive}
@@ -152,8 +159,18 @@ export function PeopleBrowser({
         </label>
       </div>
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <PeopleColumn title="Students" rows={students} canEdit={canEdit} />
-        <PeopleColumn title="Mentors" rows={mentors} canEdit={canEdit} />
+        <PeopleColumn
+          title="Students"
+          rows={students}
+          canEdit={canEdit}
+          emptyHint={searching ? "No students match your search." : "No active students."}
+        />
+        <PeopleColumn
+          title="Mentors"
+          rows={mentors}
+          canEdit={canEdit}
+          emptyHint={searching ? "No mentors match your search." : "No active mentors."}
+        />
       </div>
     </div>
   );
