@@ -1,0 +1,47 @@
+name: DB backup to Drive
+on:
+  schedule:
+    - cron: "0 7 * * *" # 07:00 UTC nightly (~2-3am US Central)
+  workflow_dispatch: {}
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install PostgreSQL 17 client
+        run: |
+          sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+      - name: Dump, gzip, encrypt
+        env:
+          BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+          BACKUP_GPG_PASSPHRASE: ${{ secrets.BACKUP_GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          STAMP="$(date -u +%Y-%m-%dT%H-%M-%SZ)"
+          echo "BACKUP_STAMP=$STAMP" >> "$GITHUB_ENV"
+          FILE="teamhub-backup-$STAMP.sql.gz.gpg"
+          echo "BACKUP_FILE=$FILE" >> "$GITHUB_ENV"
+          pg_dump "$BACKUP_DATABASE_URL" --no-owner --no-privileges \
+            | gzip -9 \
+            | gpg --batch --yes --symmetric --cipher-algo AES256 \
+                  --pinentry-mode loopback --passphrase "$BACKUP_GPG_PASSPHRASE" -o "$FILE"
+          ls -la "$FILE"
+      - name: Upload to Drive + prune
+        env:
+          GOOGLE_SA_CLIENT_EMAIL: ${{ secrets.GOOGLE_SA_CLIENT_EMAIL }}
+          GOOGLE_SA_PRIVATE_KEY: ${{ secrets.GOOGLE_SA_PRIVATE_KEY }}
+          BACKUP_DRIVE_FOLDER_ID: ${{ secrets.BACKUP_DRIVE_FOLDER_ID }}
+          # Optional: only needed for the DWD-impersonation fallback (My-Drive
+          # target). Unset when uploading to a Shared Drive. secrets.* that are
+          # unset resolve to an empty string, which the CLI treats as absent.
+          BACKUP_DRIVE_SUBJECT: ${{ secrets.BACKUP_DRIVE_SUBJECT }}
+          BACKUP_KEEP: "30"
+        run: npm run backup:db -- "$BACKUP_FILE"
