@@ -26,10 +26,13 @@ type GuardianSeed = {
 // records the operation + filters; terminal awaiting resolves { data, error }.
 type IdentitySeed = { person_id: string; email: string };
 
+type AliasSeed = { person_id: string; name_key: string };
+
 function fakeDb(
   people: PersonSeed[] = [],
   guardians: GuardianSeed[] = [],
   identities?: IdentitySeed[],
+  aliases: AliasSeed[] = [],
 ) {
   const personRoster = people.map((p) => ({
     role: "student" as const,
@@ -179,6 +182,9 @@ function fakeDb(
       if (table === "person_identity") {
         return { select: (_cols: string) => ({ data: identityRows, error: null }) };
       }
+      if (table === "person_name_alias") {
+        return { select: (_cols: string) => ({ data: aliases, error: null }) };
+      }
       throw new Error(`unexpected table ${table}`);
     },
   } as never;
@@ -259,6 +265,25 @@ describe("runApplicationImport matching", () => {
     if ("error" in summary) throw new Error(summary.error);
     expect(summary.matched.map((m) => m.personId)).toEqual(["p1"]);
     expect(summary.created).toEqual([]);
+    expect(calls.personInsert).toEqual([]);
+  });
+
+  test("a merged-away name resolves via alias to the canonical person, not a create", async () => {
+    // "Grace Hopper" was merged into p1 under a different old name; an alias
+    // row maps that old name key to p1. A re-import of the old name must
+    // auto-match p1, not create a duplicate or fall to needs-decision.
+    const { db, calls } = fakeDb(
+      [{ id: "p1", first_name: "Amazing", last_name: "Grace", email: "grace@example.com" }],
+      [],
+      undefined,
+      [{ person_id: "p1", name_key: "grace|hopper" }],
+    );
+    const csv = csvFor([row({ first: "Grace", last: "Hopper", email: "different@example.com" })]);
+    const summary = await runApplicationImport({ csvText: csv, dryRun: false, db, now: NOW_AUG });
+    if ("error" in summary) throw new Error(summary.error);
+    expect(summary.matched.map((m) => m.personId)).toEqual(["p1"]);
+    expect(summary.created).toEqual([]);
+    expect(summary.needsDecision).toEqual([]);
     expect(calls.personInsert).toEqual([]);
   });
 

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { parseApplications, nameKey, type ParsedApplication, type ParsedGuardian } from "./application-parse";
+import { parseApplications, type ParsedApplication, type ParsedGuardian } from "./application-parse";
+import { nameKey } from "./name-match";
 
 export type ApplicationDecision = "create" | "skip" | `link:${string}`;
 
@@ -108,6 +109,15 @@ export async function runApplicationImport(args: {
     .select("person_id, email");
   if (identityError) return { error: `identity_load_failed: ${identityError.message}` };
 
+  const { data: aliasRows, error: aliasError } = await db
+    .from("person_name_alias")
+    .select("person_id, name_key");
+  if (aliasError) return { error: `roster_load_failed: ${aliasError.message}` };
+  const aliasByKey = new Map<string, string>();
+  for (const a of (aliasRows ?? []) as { person_id: string; name_key: string }[]) {
+    aliasByKey.set(a.name_key, a.person_id);
+  }
+
   // Indexes for exact + fuzzy matching.
   const byNameKey = new Map<string, string[]>();
   const byPreferredKey = new Map<string, string[]>();
@@ -162,6 +172,14 @@ export async function runApplicationImport(args: {
     ]);
     if (exactIds.size === 1) {
       return { kind: "auto-match", personId: [...exactIds][0] };
+    }
+    if (exactIds.size === 0) {
+      // A merged-away name — resolve to the canonical person rather than
+      // falling through to the fuzzy stage or auto-create.
+      const aliasPersonId = aliasByKey.get(nkey);
+      if (aliasPersonId) {
+        return { kind: "auto-match", personId: aliasPersonId };
+      }
     }
     const key = decisionKey(app.firstName, app.lastName, app.dob);
     if (exactIds.size > 1) {

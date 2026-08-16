@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { anomalyKey, nextDay, parseTimeSheet, type ParsedPerson } from "./time-import";
+import { nameKey } from "./name-match";
 
 // accept/reject for ordinary anomalies; am/pm additionally pick the reading of
 // an AM/PM-ambiguous clock-in. reject skips the session either way.
@@ -25,7 +26,6 @@ export type TimeImportSummary = {
   createdNames: string[];
 };
 
-const nameKey = (first: string, last: string) => `${first.trim().toLowerCase()}\x00${last.trim().toLowerCase()}`;
 const normalizeFull = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
 const toMinutes = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
 
@@ -62,6 +62,12 @@ export async function runTimeImport(args: {
   // Load roster once; build name/display-name -> id[] index and id -> role.
   const { data: peopleRows, error: rosterError } = await db.from("person").select("id, first_name, last_name, display_name, role");
   if (rosterError) return { error: `roster_load_failed: ${rosterError.message}` };
+  const { data: aliasRows, error: aliasError } = await db.from("person_name_alias").select("person_id, name_key");
+  if (aliasError) return { error: `roster_load_failed: ${aliasError.message}` };
+  const aliasByKey = new Map<string, string>();
+  for (const a of (aliasRows ?? []) as { person_id: string; name_key: string }[]) {
+    aliasByKey.set(a.name_key, a.person_id);
+  }
   const byName = new Map<string, string[]>();
   const byDisplay = new Map<string, string[]>();
   const roleById = new Map<string, string>();
@@ -96,6 +102,15 @@ export async function runTimeImport(args: {
       summary.matchedPeople += 1;
       // Role change only when the sheet's group disagrees with an existing
       // student/mentor role. Admins/guests are never reassigned by position.
+      const currentRole = roleById.get(personId);
+      if ((currentRole === "student" || currentRole === "mentor") && currentRole !== person.roleHint) {
+        summary.roleChanges.push({ name, from: currentRole, to: person.roleHint });
+        roleUpdates.push({ id: personId, role: person.roleHint, name });
+      }
+    } else if (aliasByKey.has(nkey)) {
+      // A merged-away name — resolve to the canonical person instead of creating a duplicate.
+      personId = aliasByKey.get(nkey)!;
+      summary.matchedPeople += 1;
       const currentRole = roleById.get(personId);
       if ((currentRole === "student" || currentRole === "mentor") && currentRole !== person.roleHint) {
         summary.roleChanges.push({ name, from: currentRole, to: person.roleHint });

@@ -6,6 +6,7 @@ function fakeDb(
   people: { id: string; first_name: string; last_name: string; display_name: string | null; role?: string }[] = [
     { id: "ada", first_name: "Ada", last_name: "Lovelace", display_name: null, role: "student" },
   ],
+  aliases: { person_id: string; name_key: string }[] = [],
 ) {
   const roster = people.map((p) => ({ role: "student", ...p }));
   const calls = {
@@ -36,6 +37,9 @@ function fakeDb(
           delete: () => ({ eq: () => ({ eq: async () => { calls.deletes.push("session"); return { error: null }; } }) }),
           insert: async (rows: Record<string, unknown>[]) => { calls.sessionInsert.push(...rows); return { error: null }; },
         };
+      }
+      if (table === "person_name_alias") {
+        return { select: () => ({ data: aliases, error: null }) };
       }
       if (table === "excusal") {
         return {
@@ -222,6 +226,22 @@ describe("runTimeImport", () => {
     if ("error" in summary) throw new Error(summary.error);
     expect(summary.matchedPeople).toBe(1);
     expect(summary.errors).toEqual([]);
+  });
+
+  test("a merged-away name resolves via alias to the canonical person, not a new create", async () => {
+    // "New Person" was merged into "ada" — an alias row maps their old name key
+    // to the canonical person. A re-import of that name must match, not create.
+    const { db, calls } = fakeDb(
+      [{ id: "ada", first_name: "Ada", last_name: "Lovelace", display_name: null, role: "student" }],
+      [{ person_id: "ada", name_key: "new|person" }],
+    );
+    const summary = await runTimeImport({ csv: SHEET, periodId: "pd1", importedBy: "admin-1", db });
+    if ("error" in summary) throw new Error(summary.error);
+    expect(summary.matchedPeople).toBe(2); // Ada (exact) + New Person (alias)
+    expect(summary.createdPeople).toBe(0);
+    expect(summary.createdNames).toEqual([]);
+    expect(calls.personInsert).toEqual([]);
+    expect(calls.sessionInsert.some((s) => s.person_id === "ada")).toBe(true);
   });
 
   test("a name matching two distinct people is reported ambiguous and not imported", async () => {
