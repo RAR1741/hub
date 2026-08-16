@@ -302,19 +302,12 @@ begin
   update first_experience set person_id = p_winner where person_id = p_loser;
 
   -- person_identity: emails are globally unique (no collision). Move to winner
-  -- as secondaries; winner keeps its own primary.
+  -- as secondaries; winner keeps its own primary. (The winner adopting the
+  -- loser's email as its primary happens AFTER the loser row is deleted below,
+  -- so it can't collide with the loser's still-present person.email.)
   update person_identity
     set person_id = p_winner, is_primary = false
     where person_id = p_loser;
-
-  -- Restore the #32 exactly-one-primary invariant: if the winner had NO email
-  -- of its own (e.g. a name-only time-import auto-create picked as canonical),
-  -- it now holds identities but no primary. Setting person.email fires the
-  -- mirror trigger, which promotes the just-moved matching identity to primary.
-  if v_loser_email is not null then
-    update person set email = v_loser_email
-      where id = p_winner and email is null;
-  end if;
 
   -- account_request / kiosk_device actor columns (RESTRICT).
   update account_request set reviewed_by = p_winner where reviewed_by = p_loser;
@@ -329,6 +322,17 @@ begin
     on conflict (name_key) do nothing;
 
   delete from person where id = p_loser;
+
+  -- Restore the #32 exactly-one-primary invariant: if the winner had NO email
+  -- of its own (e.g. a name-only time-import auto-create picked as canonical),
+  -- it now holds moved identities but no primary. Done AFTER deleting the loser
+  -- so the winner can adopt the loser's email without colliding with the (now
+  -- gone) loser's person.email UNIQUE. Setting person.email fires the mirror
+  -- trigger, which promotes the matching moved identity to primary.
+  if v_loser_email is not null then
+    update person set email = v_loser_email
+      where id = p_winner and email is null;
+  end if;
 end $$;
 
 grant execute on function merge_person(uuid, uuid) to service_role;
