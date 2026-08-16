@@ -73,7 +73,15 @@ export async function getViewer(): Promise<Viewer> {
     studentToken: cookieStore.get(STUDENT_SESSION_COOKIE)?.value ?? null,
     verifyToken: (t) =>
       verifyStudentSessionToken(t, process.env.STUDENT_SESSION_SECRET!),
-    findPersonByAuthUserId: (id) => findOne("auth_user_id", id),
+    findPersonByAuthUserId: async (id) => {
+      const { data } = await db
+        .from("person_identity")
+        .select("person (*)")
+        .eq("auth_user_id", id)
+        .maybeSingle();
+      const person = (data as { person: PersonRow | PersonRow[] | null } | null)?.person;
+      return (Array.isArray(person) ? person[0] : person) ?? null;
+    },
     findPersonById: (id) => findOne("id", id),
   });
 }
