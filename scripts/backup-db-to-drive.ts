@@ -12,6 +12,12 @@ async function main() {
   if (!folderId) throw new Error("BACKUP_DRIVE_FOLDER_ID is required");
   if (!iso) throw new Error("BACKUP_STAMP is required");
   if (!credentials) throw new Error("GOOGLE_SA_CLIENT_EMAIL / GOOGLE_SA_PRIVATE_KEY are required");
+  // Guard a misconfigured BACKUP_KEEP: a non-numeric value would become NaN and,
+  // untrapped, prune the ENTIRE backup folder (slice(NaN) === slice(0)). Fail
+  // fast instead of silently deleting every backup.
+  if (!Number.isInteger(keep) || keep < 0) {
+    throw new Error(`BACKUP_KEEP must be a non-negative integer, got "${process.env.BACKUP_KEEP}"`);
+  }
 
   const data = new Uint8Array(await readFile(filePath));
   const deps = { fetch: globalThis.fetch, credentials };

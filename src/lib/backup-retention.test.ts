@@ -36,6 +36,11 @@ describe("selectBackupsToDelete", () => {
     expect(result.sort()).toEqual(["a", "b", "c", "d"].sort());
   });
 
+  it("fails safe (deletes nothing) when keep is NaN/non-finite", () => {
+    expect(selectBackupsToDelete(files, Number.NaN)).toEqual([]);
+    expect(selectBackupsToDelete(files, Number.POSITIVE_INFINITY)).toEqual([]);
+  });
+
   it("deterministically tiebreaks on equal createdTime by name desc", () => {
     const tied: DriveFileMeta[] = [
       { id: "x", name: "teamhub-backup-b.sql.gz.gpg", createdTime: "2026-08-16T07-00-00Z" },
