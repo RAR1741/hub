@@ -12,12 +12,11 @@ const student: PersonRow = {
   email: null,
   is_active: true,
   student_id_number: "1741",
-  auth_user_id: null,
 };
 
 describe("resolveViewer", () => {
-  test("supabase auth user resolves via auth_user_id", async () => {
-    const mentorRow = { ...student, id: "p2", role: "mentor" as const, auth_user_id: "u9" };
+  test("supabase auth user resolves via findPersonByAuthUserId", async () => {
+    const mentorRow = { ...student, id: "p2", role: "mentor" as const };
     const viewer = await resolveViewer({
       supabaseUserId: "u9",
       studentToken: null,

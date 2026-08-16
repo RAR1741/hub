@@ -23,7 +23,6 @@ const row = (over: Partial<PersonRow>): PersonRow => ({
   email: "ada@example.org",
   is_active: true,
   student_id_number: "1741",
-  auth_user_id: null,
   ...over,
 });
 
@@ -83,7 +82,7 @@ describe("canViewProfile", () => {
           person: {
             id: personId, firstName: "X", lastName: "Y", displayName: null,
             role: role === "guest" ? "student" : (role as never), gradYear: null,
-            email: null, isActive: true, studentIdNumber: null, authUserId: null,
+            email: null, isActive: true, studentIdNumber: null,
             phone: null, shirtSize: null, dietaryRestrictions: null, bio: null,
             dateOfBirth: null, streetAddress: null, city: null, zip: null,
             homePhone: null, school: null, ethnicity: null, race: null,

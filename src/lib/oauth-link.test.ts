@@ -12,7 +12,6 @@ const mentor: PersonRow = {
   email: "ada@example.org",
   is_active: true,
   student_id_number: null,
-  auth_user_id: null,
 };
 
 const admin: PersonRow = {
@@ -25,7 +24,6 @@ const admin: PersonRow = {
   email: "admin@example.org",
   is_active: true,
   student_id_number: null,
-  auth_user_id: null,
 };
 
 describe("decideOAuthLink", () => {

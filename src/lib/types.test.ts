@@ -44,7 +44,6 @@ describe("personFromRow detail fields", () => {
       email: null,
       is_active: true,
       student_id_number: "1741",
-      auth_user_id: null,
     });
     expect(person.phone).toBeNull();
     expect(person.shirtSize).toBeNull();
@@ -73,7 +72,6 @@ describe("personFromRow detail fields", () => {
       email: null,
       is_active: true,
       student_id_number: "1742",
-      auth_user_id: null,
       date_of_birth: "2010-05-01",
       street_address: "123 Main St",
       city: "Anytown",

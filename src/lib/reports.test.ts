@@ -241,9 +241,9 @@ describe("hoursReportForPeriod", () => {
   test("includes active people with zero sessions, alongside people with logged hours", async () => {
     const sessionRows = [row({ id: "s1", person_id: "p1" })]; // 2h
     const personRows = [
-      { id: "p1", first_name: "Ada", last_name: "Lovelace", display_name: null, role: "student", grad_year: null, email: null, is_active: true, student_id_number: "1001", auth_user_id: null },
-      { id: "p2", first_name: "Bo", last_name: "Jones", display_name: null, role: "student", grad_year: null, email: null, is_active: true, student_id_number: "1002", auth_user_id: null },
-      { id: "p3", first_name: "Cy", last_name: "Inactive", display_name: null, role: "student", grad_year: null, email: null, is_active: false, student_id_number: "1003", auth_user_id: null },
+      { id: "p1", first_name: "Ada", last_name: "Lovelace", display_name: null, role: "student", grad_year: null, email: null, is_active: true, student_id_number: "1001" },
+      { id: "p2", first_name: "Bo", last_name: "Jones", display_name: null, role: "student", grad_year: null, email: null, is_active: true, student_id_number: "1002" },
+      { id: "p3", first_name: "Cy", last_name: "Inactive", display_name: null, role: "student", grad_year: null, email: null, is_active: false, student_id_number: "1003" },
     ];
     const db = fakeDb(sessionRows, personRows);
 

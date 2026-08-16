@@ -11,7 +11,6 @@ export type PersonRow = {
   email: string | null;
   is_active: boolean;
   student_id_number: string | null;
-  auth_user_id: string | null;
   phone?: string | null;
   shirt_size?: string | null;
   dietary_restrictions?: string | null;
@@ -38,7 +37,6 @@ export type Person = {
   email: string | null;
   isActive: boolean;
   studentIdNumber: string | null;
-  authUserId: string | null;
   phone: string | null;
   shirtSize: string | null;
   dietaryRestrictions: string | null;
@@ -66,7 +64,6 @@ export function personFromRow(row: PersonRow): Person {
     email: row.email,
     isActive: row.is_active,
     studentIdNumber: row.student_id_number,
-    authUserId: row.auth_user_id,
     phone: row.phone ?? null,
     shirtSize: row.shirt_size ?? null,
     dietaryRestrictions: row.dietary_restrictions ?? null,

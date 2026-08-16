@@ -170,8 +170,8 @@ describe("attendanceSummaryForPeriod", () => {
       app_setting: { data: { value: "America/Indiana/Indianapolis" }, error: null },
       person: {
         data: [
-          { id: "p1", first_name: "Ada", last_name: "Lovelace", display_name: null, role: "student", grad_year: null, email: null, is_active: true, student_id_number: "1001", auth_user_id: null },
-          { id: "p2", first_name: "Bo", last_name: "Jones", display_name: null, role: "student", grad_year: null, email: null, is_active: false, student_id_number: "1002", auth_user_id: null },
+          { id: "p1", first_name: "Ada", last_name: "Lovelace", display_name: null, role: "student", grad_year: null, email: null, is_active: true, student_id_number: "1001" },
+          { id: "p2", first_name: "Bo", last_name: "Jones", display_name: null, role: "student", grad_year: null, email: null, is_active: false, student_id_number: "1002" },
         ],
         error: null,
       },

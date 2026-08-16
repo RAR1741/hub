@@ -16,7 +16,7 @@ describe("withRole", () => {
       person: {
         id: "p1", firstName: "A", lastName: "B", displayName: null,
         role: "admin", gradYear: null, email: null, isActive: true,
-        studentIdNumber: null, authUserId: null,
+        studentIdNumber: null,
         phone: null, shirtSize: null, dietaryRestrictions: null, bio: null,
         dateOfBirth: null, streetAddress: null, city: null, zip: null,
         homePhone: null, school: null, ethnicity: null, race: null,
@@ -45,7 +45,7 @@ describe("withRole", () => {
         person: {
           id: "p1", firstName: "A", lastName: "B", displayName: null,
           role: "admin", gradYear: null, email: null, isActive: true,
-          studentIdNumber: null, authUserId: null,
+          studentIdNumber: null,
           phone: null, shirtSize: null, dietaryRestrictions: null, bio: null,
           dateOfBirth: null, streetAddress: null, city: null, zip: null,
           homePhone: null, school: null, ethnicity: null, race: null,
