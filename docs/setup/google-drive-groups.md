@@ -102,12 +102,27 @@ either a mentor+ session, **or** a request carrying the header `x-sync-secret` m
 browser session. An empty `drive_sync_secret` authorizes no one via that path — only the mentor+
 session gate (and the "Sync now" button) works until you set it.
 
-```bash
-./dev npm run db:psql -- -c "update app_setting set value = '\"<a-long-random-string>\"' where key='drive_sync_secret';"
-```
-
 Generate a random string with `openssl rand -hex 32`. pg_cron's `drive-group-nightly-sync` job
 sends this same value as the `x-sync-secret` header.
+
+**Local dev** (in the container):
+
+```bash
+./dev npm run db:psql -- -c "insert into app_setting (key, value) values ('drive_sync_secret', '\"<a-long-random-string>\"') on conflict (key) do update set value = excluded.value;"
+```
+
+**Production** — the migration does **not** seed `drive_sync_secret` (an unset secret authorizes
+no one via the header path), so you must insert it in the production database yourself, the same
+way you set `gcal_sync_secret`. Run against prod (Supabase SQL editor or `psql`):
+
+```sql
+insert into app_setting (key, value) values ('drive_sync_secret', '"<a-long-random-string>"')
+  on conflict (key) do update set value = excluded.value;
+```
+
+> If `drive_sync_secret` is missing or empty, the header (`x-sync-secret`) path can never
+> authorize, so a `curl` call — and the nightly pg_cron job — get `403 { "error": "forbidden" }`.
+> The **Sync now** button still works, because it authorizes off your admin session, not the secret.
 
 The nightly cron migration (`supabase/migrations/20260815200000_drive_group_sync.sql`) seeds
 `drive_sync_url` with the **local** dev host, `http://host.docker.internal:3000/api/admin/drive-group/sync`,
