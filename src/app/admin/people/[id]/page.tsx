@@ -2,8 +2,10 @@ import { notFound, redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
 import { getPersonWithTeams } from "@/lib/people";
+import { listPersonIdentities } from "@/lib/identities";
 import { PersonForm } from "@/components/PersonForm";
 import { DeletePersonButton } from "@/components/DeletePersonButton";
+import { PersonEmails } from "@/components/PersonEmails";
 
 export default async function AdminEditPersonPage({
   params,
@@ -13,7 +15,10 @@ export default async function AdminEditPersonPage({
   const [{ id }, viewer] = await Promise.all([params, getViewer()]);
   if (!hasRole(viewer.role, "admin")) redirect("/");
 
-  const result = await getPersonWithTeams(id);
+  const [result, identities] = await Promise.all([
+    getPersonWithTeams(id),
+    listPersonIdentities(id),
+  ]);
   if (!result) notFound();
   const p = result.person;
   const name = `${p.firstName} ${p.lastName}`;
@@ -53,6 +58,22 @@ export default async function AdminEditPersonPage({
             race: p.race ?? "",
             interests: (p.interests ?? []).join(", "),
           }}
+        />
+      </section>
+      <section className="card flex flex-col gap-3">
+        <h2 className="text-base font-semibold">Sign-in emails</h2>
+        <p className="text-sm text-[var(--muted)]">
+          Any of these Google accounts signs in as {name}. The primary email is
+          what shows elsewhere on the site (it&rsquo;s the Email field above).
+        </p>
+        <PersonEmails
+          personId={p.id}
+          identities={identities.map((i) => ({
+            id: i.id,
+            email: i.email,
+            isPrimary: i.is_primary,
+            linked: i.auth_user_id !== null,
+          }))}
         />
       </section>
     </main>
