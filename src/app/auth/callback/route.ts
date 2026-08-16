@@ -54,21 +54,25 @@ export async function GET(request: Request) {
   const db = getDb();
 
   const [
-    { data: matched, error: matchedError },
+    { data: matchedIdentity, error: matchedError },
     { count, error: countError },
     { count: linkedCount, error: linkedCountError },
     { data: firstAdmin, error: firstAdminError },
   ] = await Promise.all([
     email
-      ? db.from("person").select("*").eq("email", email).maybeSingle()
+      ? db
+          .from("person_identity")
+          .select("id, auth_user_id, person (*)")
+          .eq("email", email)
+          .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
     db
       .from("person")
       .select("id", { count: "exact", head: true })
       .eq("role", "admin"),
-    // How many people already have a Google account attached. Zero = fresh setup.
+    // How many Google accounts are attached anywhere. Zero = fresh setup.
     db
-      .from("person")
+      .from("person_identity")
       .select("id", { count: "exact", head: true })
       .not("auth_user_id", "is", null),
     // The first admin (earliest created) — the fresh-setup login adopts this one.
@@ -80,6 +84,16 @@ export async function GET(request: Request) {
       .limit(1)
       .maybeSingle(),
   ]);
+
+  type IdentityMatch = {
+    id: string;
+    auth_user_id: string | null;
+    person: PersonRow | PersonRow[] | null;
+  };
+  const identity = (matchedIdentity as IdentityMatch | null) ?? null;
+  const matchedPerson = identity
+    ? ((Array.isArray(identity.person) ? identity.person[0] : identity.person) ?? null)
+    : null;
 
   if (matchedError) {
     console.error("oauth callback: failed to look up matched person", {
@@ -121,23 +135,40 @@ export async function GET(request: Request) {
   }
 
   const decision = decideOAuthLink({
-    matchedPerson: matched ?? null,
+    matchedPerson,
     adminCount: count ?? 0,
     linkedCount: linkedCount ?? 0,
     firstAdmin: (firstAdmin as PersonRow | null) ?? null,
   });
 
   if (decision.action === "bootstrap-admin") {
-    if (matched) {
+    if (matchedPerson) {
       const { error: updateError } = await db
         .from("person")
-        .update({ role: "admin", auth_user_id: data.user.id, is_active: true })
-        .eq("id", matched.id);
+        .update({ role: "admin", is_active: true })
+        .eq("id", matchedPerson.id);
       if (updateError) {
         console.error(
           "oauth callback: failed to promote matched person to admin",
-          { personId: matched.id, authUserId: data.user.id, error: updateError },
+          {
+            personId: matchedPerson.id,
+            authUserId: data.user.id,
+            error: updateError,
+          },
         );
+        return toErrorRedirect();
+      }
+      const { error: linkError } = await db
+        .from("person_identity")
+        .update({ auth_user_id: data.user.id })
+        .eq("id", identity!.id)
+        .is("auth_user_id", null);
+      if (linkError) {
+        console.error("oauth callback: failed to link bootstrap admin identity", {
+          identityId: identity!.id,
+          authUserId: data.user.id,
+          error: linkError,
+        });
         return toErrorRedirect();
       }
     } else {
@@ -151,10 +182,10 @@ export async function GET(request: Request) {
         first_name: meta.given_name ?? meta.name ?? "Admin",
         last_name: meta.family_name ?? "",
         // person.email is the OAuth allowlist key — always store lowercased
-        // so case-insensitive match holds.
+        // so case-insensitive match holds. The Task 1 trigger mirrors this into
+        // a primary person_identity row, which we attach the login to below.
         email,
         role: "admin",
-        auth_user_id: data.user.id,
       });
       if (insertError) {
         console.error("oauth callback: failed to insert bootstrap admin", {
@@ -164,15 +195,29 @@ export async function GET(request: Request) {
         });
         return toErrorRedirect();
       }
+      const { error: attachError } = await db
+        .from("person_identity")
+        .update({ auth_user_id: data.user.id })
+        .eq("email", email!)
+        .is("auth_user_id", null);
+      if (attachError) {
+        console.error("oauth callback: failed to attach bootstrap admin identity", {
+          email,
+          authUserId: data.user.id,
+          error: attachError,
+        });
+        return toErrorRedirect();
+      }
     }
   } else if (decision.action === "adopt-admin") {
-    // Fresh setup: attach this login to the first admin, but only while it's
-    // still unlinked. The `.is auth_user_id null` guard makes two simultaneous
-    // first logins safe — the loser updates nothing and simply stays a guest.
+    // Fresh setup: attach this login to the first admin's primary identity,
+    // but only while it's unlinked — the .is() guard keeps two simultaneous
+    // first logins safe (the loser matches nothing and stays a guest).
     const { data: adopted, error: adoptError } = await db
-      .from("person")
-      .update({ auth_user_id: data.user.id, is_active: true })
-      .eq("id", decision.personId!)
+      .from("person_identity")
+      .update({ auth_user_id: data.user.id })
+      .eq("person_id", decision.personId!)
+      .eq("is_primary", true)
       .is("auth_user_id", null)
       .select("id");
     if (adoptError) {
@@ -183,23 +228,91 @@ export async function GET(request: Request) {
       });
       return toErrorRedirect();
     }
-    if (!adopted || adopted.length === 0) {
-      // Another first login adopted it first — this user stays a guest.
-      console.warn(
-        "oauth callback: first admin already adopted by a concurrent login",
-        { personId: decision.personId, authUserId: data.user.id },
-      );
-    }
-  } else if (decision.action === "link") {
-    const { error: linkError } = await db
-      .from("person")
-      .update({ auth_user_id: data.user.id })
-      .eq("id", decision.personId!);
-    if (linkError) {
-      console.error("oauth callback: failed to link person", {
+    if (adopted && adopted.length > 0) {
+      const { error: activateError } = await db
+        .from("person")
+        .update({ is_active: true })
+        .eq("id", decision.personId!);
+      if (activateError) {
+        console.error("oauth callback: failed to activate the first admin", {
+          personId: decision.personId,
+          authUserId: data.user.id,
+          error: activateError,
+        });
+        return toErrorRedirect();
+      }
+    } else if (email) {
+      // First admin has no (unlinked) primary identity — e.g. seeded with no
+      // email. Insert one; the one-primary partial unique index and the email
+      // unique constraint make a concurrent duplicate fail loudly.
+      const { error: insertError } = await db.from("person_identity").insert({
+        person_id: decision.personId!,
+        email,
+        auth_user_id: data.user.id,
+        is_primary: true,
+      });
+      if (insertError) {
+        console.warn("oauth callback: first admin already adopted by a concurrent login", {
+          personId: decision.personId,
+          authUserId: data.user.id,
+          error: insertError,
+        });
+        // stays a guest — same outcome as today's lost race
+      } else {
+        const { error: activateError } = await db
+          .from("person")
+          .update({ is_active: true, email })
+          .eq("id", decision.personId!);
+        if (activateError) {
+          console.error("oauth callback: failed to activate the first admin", {
+            personId: decision.personId,
+            authUserId: data.user.id,
+            error: activateError,
+          });
+          return toErrorRedirect();
+        }
+        // note: setting person.email fires the mirror trigger, which finds the
+        // identity we just inserted and simply promotes it (already primary) — safe.
+      }
+    } else {
+      console.warn("oauth callback: adopt-admin skipped — login has no email", {
         personId: decision.personId,
         authUserId: data.user.id,
+      });
+    }
+  } else if (decision.action === "link") {
+    // Repeat login by an already-linked account is a no-op success.
+    if (identity!.auth_user_id === data.user.id) return redirect;
+    // Same email suddenly presenting a DIFFERENT auth user (e.g. the Supabase
+    // auth user was deleted and re-created) must never silently steal the
+    // identity — fail loudly. Q5 in issue #32.
+    if (identity!.auth_user_id !== null) {
+      console.error("oauth callback: identity email already linked to another auth user", {
+        identityId: identity!.id,
+        email,
+        authUserId: data.user.id,
+      });
+      return toErrorRedirect();
+    }
+    const { data: linked, error: linkError } = await db
+      .from("person_identity")
+      .update({ auth_user_id: data.user.id })
+      .eq("id", identity!.id)
+      .is("auth_user_id", null)
+      .select("id");
+    if (linkError) {
+      console.error("oauth callback: failed to link identity", {
+        identityId: identity!.id,
+        authUserId: data.user.id,
         error: linkError,
+      });
+      return toErrorRedirect();
+    }
+    if (!linked || linked.length === 0) {
+      // Concurrent login won the race — fail loudly rather than guess.
+      console.error("oauth callback: identity linked concurrently", {
+        identityId: identity!.id,
+        authUserId: data.user.id,
       });
       return toErrorRedirect();
     }

@@ -15,10 +15,11 @@ export function decideOAuthLink(input: {
 }): OAuthLinkDecision {
   // No admins at all → the first-ever OAuth login provisions one.
   if (input.adminCount === 0) return { action: "bootstrap-admin" };
-  // Fresh setup: admins already exist (e.g. the seeded admin) but nobody has
-  // linked a Google account yet → adopt the first admin so initial setup can
-  // get in. Guarded by linkedCount === 0 so this fires only once, before any
-  // account is connected; afterwards it can never re-fire.
+  // Fresh setup: admins already exist (e.g. the seeded admin) but no linked
+  // identities exist yet → adopt the first admin so initial setup can get in.
+  // Guarded by linkedCount === 0 (count of person_identity rows with a non-null
+  // auth_user_id) so this fires only once, before any account is connected;
+  // afterwards it can never re-fire.
   if (input.linkedCount === 0 && input.firstAdmin) {
     return { action: "adopt-admin", personId: input.firstAdmin.id };
   }
