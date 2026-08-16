@@ -79,12 +79,14 @@ function DuplicatePair({ pair }: { pair: CandidatePair }) {
       <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
         <PersonCardView
           person={a}
+          groupName={`winner-${a.id}-${b.id}`}
           isWinner={winnerId === a.id}
           disabled={busy}
           onChoose={() => setWinnerId(a.id)}
         />
         <PersonCardView
           person={b}
+          groupName={`winner-${a.id}-${b.id}`}
           isWinner={winnerId === b.id}
           disabled={busy}
           onChoose={() => setWinnerId(b.id)}
@@ -139,11 +141,13 @@ function DuplicatePair({ pair }: { pair: CandidatePair }) {
 
 function PersonCardView({
   person,
+  groupName,
   isWinner,
   disabled,
   onChoose,
 }: {
   person: PersonCard;
+  groupName: string;
   isWinner: boolean;
   disabled: boolean;
   onChoose: () => void;
@@ -156,7 +160,7 @@ function PersonCardView({
       <div className="flex items-center gap-2">
         <input
           type="radio"
-          name={`winner-${person.id}`}
+          name={groupName}
           checked={isWinner}
           disabled={disabled}
           onChange={onChoose}
@@ -165,6 +169,7 @@ function PersonCardView({
         <span className="font-medium">{name}</span>
         <span className="pill">{person.role}</span>
         {!person.isActive && <span className="pill off">Inactive</span>}
+        {isWinner && <span className="pill on">Keeping</span>}
       </div>
       <div className="text-sm text-[var(--muted)]">
         {person.sessionCount} session{person.sessionCount === 1 ? "" : "s"}
