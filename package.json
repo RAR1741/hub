@@ -11,6 +11,7 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "e2e": "playwright test",
+    "backup:db": "tsx scripts/backup-db-to-drive.ts",
     "//db-scripts": "Flags below are required for running the CLI inside the dev container — see supabase/README.md before changing.",
     "db:start": "supabase start --ignore-health-check",
     "db:stop": "supabase stop",
@@ -37,6 +38,7 @@
     "eslint-config-next": "16.3.0",
     "supabase": "^2.113.0",
     "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.12",
     "typescript": "^5",
     "vitest": "^4.1.10"
   }
