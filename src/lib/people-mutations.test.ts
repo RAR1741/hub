@@ -42,4 +42,8 @@ describe("updatePerson", () => {
     const r = await updatePerson("p1", input, updateDb({ error: { code: "23505" } }));
     expect(r).toEqual({ ok: false, status: 409 });
   });
+  test("409 email_has_secondaries when the mirror trigger blocks blanking", async () => {
+    const r = await updatePerson("p1", input, updateDb({ error: { code: "P0001" } }));
+    expect(r).toEqual({ ok: false, status: 409, reason: "email_has_secondaries" });
+  });
 });

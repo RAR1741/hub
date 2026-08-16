@@ -308,11 +308,16 @@ export async function deletePerson(
   return { ok: true, status: 200 };
 }
 
+// Raised by the person_identity mirror trigger when person.email is blanked
+// while the person still holds secondary sign-in emails (issue #32). Surfaced
+// to the admin as a clear 409 rather than an opaque 500.
+const EMAIL_HAS_SECONDARIES = "P0001";
+
 export async function updatePerson(
   id: string,
   input: PersonInput,
   db?: SupabaseClient,
-): Promise<{ ok: boolean; status: number }> {
+): Promise<{ ok: boolean; status: number; reason?: string }> {
   const client = db ?? (await import("./db")).getDb();
   const { data, error } = await client
     .from("person")
@@ -321,6 +326,9 @@ export async function updatePerson(
     .select("id")
     .maybeSingle();
   if (error) {
+    if (error.code === EMAIL_HAS_SECONDARIES) {
+      return { ok: false, status: 409, reason: "email_has_secondaries" };
+    }
     return { ok: false, status: error.code === UNIQUE_VIOLATION ? 409 : 500 };
   }
   if (!data) return { ok: false, status: 404 };
@@ -369,6 +377,9 @@ export async function updatePersonRosterFields(
     first_name: input.firstName,
     last_name: input.lastName,
   };
+  // Writing person.email fires the person_identity mirror trigger: it renames
+  // this person's primary sign-in email (or promotes a matching secondary to
+  // primary) rather than adding an identity — intended on re-import.
   if (input.email !== null) patch.email = input.email;
   if (input.role !== null) patch.role = input.role;
   if (input.gradYear !== null) patch.grad_year = input.gradYear;

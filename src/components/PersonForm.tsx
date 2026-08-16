@@ -79,7 +79,12 @@ export function PersonForm({
         router.refresh();
         if (!personId) setValues(EMPTY);
       } else if (res.status === 409) {
-        setStatus("Email or student ID already in use.");
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        setStatus(
+          body?.error === "email_has_secondaries"
+            ? "Remove this person's other sign-in emails before clearing their primary email."
+            : "Email or student ID already in use.",
+        );
       } else {
         setStatus("Save failed — check the fields.");
       }

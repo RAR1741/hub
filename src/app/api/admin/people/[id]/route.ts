@@ -9,7 +9,9 @@ export const PATCH = withRole<Ctx>("admin", async (_viewer, request, context) =>
   const input = parsePersonInput(body);
   if (!input) return Response.json({ error: "invalid" }, { status: 400 });
   const result = await updatePerson(id, input);
-  if (!result.ok) return Response.json({ error: "failed" }, { status: result.status });
+  if (!result.ok) {
+    return Response.json({ error: result.reason ?? "failed" }, { status: result.status });
+  }
   return Response.json({ ok: true });
 });
 
