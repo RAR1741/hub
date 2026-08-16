@@ -328,32 +328,6 @@ export async function updatePerson(
 }
 
 /**
- * Associate an email with a person — set `person.email` to `email`, lowercased
- * (the DB enforces a lowercase check + a unique index). Used by the Drive-sync
- * report to claim an unrecognized Google-Group email for an existing person.
- * 400 on a blank/malformed email, 409 when the email already belongs to
- * someone else, 404 when the person doesn't exist.
- */
-export async function setPersonEmail(
-  id: string,
-  email: string,
-  db?: SupabaseClient,
-): Promise<{ ok: boolean; status: number }> {
-  const normalized = email.trim().toLowerCase();
-  if (!normalized || !normalized.includes("@")) return { ok: false, status: 400 };
-  const client = db ?? (await import("./db")).getDb();
-  const { data, error } = await client
-    .from("person")
-    .update({ email: normalized })
-    .eq("id", id)
-    .select("id")
-    .maybeSingle();
-  if (error) return { ok: false, status: error.code === UNIQUE_VIOLATION ? 409 : 500 };
-  if (!data) return { ok: false, status: 404 };
-  return { ok: true, status: 200 };
-}
-
-/**
  * The subset of person columns a roster CSV row can supply. `firstName` /
  * `lastName` are always applied (the CSV parser requires them on every row).
  * `email` / `role` / `gradYear` / `studentIdNumber` are `null` when the CSV

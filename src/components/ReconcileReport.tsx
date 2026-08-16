@@ -142,7 +142,7 @@ function AssociateModal({
     setBusyId(personId);
     setError(null);
     try {
-      const res = await fetch(`/api/admin/people/${personId}/associate-email`, {
+      const res = await fetch(`/api/admin/people/${personId}/emails`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
