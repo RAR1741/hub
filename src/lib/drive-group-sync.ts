@@ -65,13 +65,24 @@ export async function reconcileDriveGroups(deps: {
     try {
       const { data: memberships } = await db
         .from("team_membership")
-        .select("person (email, is_active)")
+        .select("person (is_active, person_identity (email))")
         .eq("team_id", team.id);
-      type PersonJoin = { email: string | null; is_active: boolean };
+      type IdentityJoin = { email: string };
+      type PersonJoin = {
+        is_active: boolean;
+        person_identity: IdentityJoin | IdentityJoin[] | null;
+      };
       const expected = ((memberships ?? []) as unknown as { person: PersonJoin | PersonJoin[] | null }[])
         .map((m) => (Array.isArray(m.person) ? m.person[0] : m.person))
-        .filter((p): p is PersonJoin => !!p && p.is_active && !!p.email)
-        .map((p) => (p.email as string).toLowerCase());
+        .filter((p): p is PersonJoin => !!p && p.is_active)
+        .flatMap((p) =>
+          (Array.isArray(p.person_identity)
+            ? p.person_identity
+            : p.person_identity
+              ? [p.person_identity]
+              : []
+          ).map((i) => i.email.toLowerCase()),
+        );
 
       const actual = await listGroupMembers(dirDeps, groupEmail);
       report.expectedCount = expected.length;
@@ -133,17 +144,24 @@ export async function syncMembershipChange(
 
     const { data: person } = await db
       .from("person")
-      .select("email, is_active")
+      .select("is_active, person_identity (email)")
       .eq("id", personId)
       .maybeSingle();
-    const p = person as { email: string | null; is_active: boolean } | null;
-    if (!p || !p.email || !p.is_active) return;
+    type IdentityJoin = { email: string };
+    const p = person as { is_active: boolean; person_identity: IdentityJoin | IdentityJoin[] | null } | null;
+    const emails = !p || !p.is_active
+      ? []
+      : (Array.isArray(p.person_identity) ? p.person_identity : p.person_identity ? [p.person_identity] : [])
+          .map((i) => i.email);
+    if (emails.length === 0) return;
 
     const dirDeps = { fetch: globalThis.fetch, credentials };
-    if (action === "add") {
-      await insertGroupMember(dirDeps, groupEmail, p.email);
-    } else {
-      await deleteGroupMember(dirDeps, groupEmail, p.email);
+    for (const email of emails) {
+      if (action === "add") {
+        await insertGroupMember(dirDeps, groupEmail, email);
+      } else {
+        await deleteGroupMember(dirDeps, groupEmail, email);
+      }
     }
   } catch (error) {
     console.error("drive-group sync failed", { action, teamId, personId, error });

@@ -75,9 +75,15 @@ describe("reconcileDriveGroups", () => {
         },
         team_membership: {
           data: [
-            { person: { email: "keep@x.com", is_active: true } },
-            { person: { email: "inactive@x.com", is_active: false } },
-            { person: { email: null, is_active: true } },
+            { person: { is_active: true, person_identity: { email: "keep@x.com" } } },
+            {
+              person: {
+                is_active: true,
+                person_identity: [{ email: "primary@x.com" }, { email: "secondary@x.com" }],
+              },
+            },
+            { person: { is_active: false, person_identity: { email: "inactive@x.com" } } },
+            { person: { is_active: true, person_identity: null } },
           ],
           error: null,
         },
@@ -112,15 +118,15 @@ describe("reconcileDriveGroups", () => {
     const g = result.groups[0];
     expect(g.teamName).toBe("Team A");
     expect(g.groupEmail).toBe("team-a@example.org");
-    expect(g.expectedCount).toBe(1);
+    expect(g.expectedCount).toBe(3);
     expect(g.actualCount).toBe(1);
-    expect(g.added).toEqual(["keep@x.com"]);
+    expect(new Set(g.added)).toEqual(new Set(["keep@x.com", "primary@x.com", "secondary@x.com"]));
     expect(g.wouldRemove).toEqual(["extra@x.com"]);
     expect(g.errors).toEqual([]);
 
     // No delete call was ever made.
     expect(calls.some((c) => c.method === "DELETE")).toBe(false);
-    // One insert call for the missing member.
+    // Insert calls for the missing members.
     expect(calls.some((c) => c.method === "POST")).toBe(true);
 
     // Persisted.
@@ -141,7 +147,7 @@ describe("reconcileDriveGroups", () => {
           error: null,
         },
         team_membership: {
-          data: [{ person: { email: "keep@x.com", is_active: true } }],
+          data: [{ person: { is_active: true, person_identity: { email: "keep@x.com" } } }],
           error: null,
         },
       },
@@ -196,7 +202,7 @@ describe("syncMembershipChange", () => {
     delete process.env.GOOGLE_SA_CLIENT_EMAIL;
     const db = fakeDb({
       team: { data: { google_group_email: "g@example.org" }, error: null },
-      person: { data: { email: "a@x.com", is_active: true }, error: null },
+      person: { data: { is_active: true, person_identity: { email: "a@x.com" } }, error: null },
     });
     await expect(syncMembershipChange("add", "t1", "p1", db as never)).resolves.toBeUndefined();
   });
@@ -204,15 +210,15 @@ describe("syncMembershipChange", () => {
   test("no-ops when the team has no google_group_email", async () => {
     const db = fakeDb({
       team: { data: { google_group_email: null }, error: null },
-      person: { data: { email: "a@x.com", is_active: true }, error: null },
+      person: { data: { is_active: true, person_identity: { email: "a@x.com" } }, error: null },
     });
     await expect(syncMembershipChange("add", "t1", "p1", db as never)).resolves.toBeUndefined();
   });
 
-  test("no-ops when the person has no email", async () => {
+  test("no-ops when the person has no identities", async () => {
     const db = fakeDb({
       team: { data: { google_group_email: "g@example.org" }, error: null },
-      person: { data: { email: null, is_active: true }, error: null },
+      person: { data: { is_active: true, person_identity: null }, error: null },
     });
     await expect(syncMembershipChange("add", "t1", "p1", db as never)).resolves.toBeUndefined();
   });
@@ -220,7 +226,7 @@ describe("syncMembershipChange", () => {
   test("no-ops when the person is inactive", async () => {
     const db = fakeDb({
       team: { data: { google_group_email: "g@example.org" }, error: null },
-      person: { data: { email: "a@x.com", is_active: false }, error: null },
+      person: { data: { is_active: false, person_identity: { email: "a@x.com" } }, error: null },
     });
     await expect(syncMembershipChange("add", "t1", "p1", db as never)).resolves.toBeUndefined();
   });
@@ -228,7 +234,7 @@ describe("syncMembershipChange", () => {
   test("calls insert on add when configured", async () => {
     const db = fakeDb({
       team: { data: { google_group_email: "g@example.org" }, error: null },
-      person: { data: { email: "a@x.com", is_active: true }, error: null },
+      person: { data: { is_active: true, person_identity: { email: "a@x.com" } }, error: null },
     });
     const calls: string[] = [];
     globalThis.fetch = vi.fn(async (url: string, init?: RequestInit) => {
@@ -244,10 +250,38 @@ describe("syncMembershipChange", () => {
     expect(calls).toEqual(["POST"]);
   });
 
+  test("adds every linked identity email when the person has multiple", async () => {
+    const db = fakeDb({
+      team: { data: { google_group_email: "g@example.org" }, error: null },
+      person: {
+        data: {
+          is_active: true,
+          person_identity: [{ email: "primary@x.com" }, { email: "secondary@x.com" }],
+        },
+        error: null,
+      },
+    });
+    const emails: string[] = [];
+    globalThis.fetch = vi.fn(async (url: string, init?: RequestInit) => {
+      const u = String(url);
+      if (u.includes("oauth2")) {
+        return new Response(JSON.stringify({ access_token: "tok", expires_in: 3600 }), { status: 200 });
+      }
+      if (init?.method === "POST") {
+        const body = JSON.parse(String(init.body)) as { email: string };
+        emails.push(body.email);
+      }
+      return new Response(JSON.stringify({}), { status: 200 });
+    }) as unknown as typeof globalThis.fetch;
+
+    await syncMembershipChange("add", "t1", "p1", db as never);
+    expect(emails).toEqual(["primary@x.com", "secondary@x.com"]);
+  });
+
   test("calls delete on remove when configured", async () => {
     const db = fakeDb({
       team: { data: { google_group_email: "g@example.org" }, error: null },
-      person: { data: { email: "a@x.com", is_active: true }, error: null },
+      person: { data: { is_active: true, person_identity: { email: "a@x.com" } }, error: null },
     });
     const calls: string[] = [];
     globalThis.fetch = vi.fn(async (url: string, init?: RequestInit) => {
@@ -266,7 +300,7 @@ describe("syncMembershipChange", () => {
   test("never throws even when the Google call fails", async () => {
     const db = fakeDb({
       team: { data: { google_group_email: "g@example.org" }, error: null },
-      person: { data: { email: "a@x.com", is_active: true }, error: null },
+      person: { data: { is_active: true, person_identity: { email: "a@x.com" } }, error: null },
     });
     globalThis.fetch = vi.fn(async () => {
       throw new Error("boom");

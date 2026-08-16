@@ -9,18 +9,25 @@ import type { ReconcileResult } from "@/lib/drive-group-sync";
 import { DriveSyncPanel } from "@/components/DriveSyncPanel";
 import { ReconcileReport } from "@/components/ReconcileReport";
 
-type MembershipPersonRow = { email: string | null; is_active: boolean };
+type IdentityJoin = { email: string };
+type MembershipPersonRow = {
+  is_active: boolean;
+  person_identity: IdentityJoin | IdentityJoin[] | null;
+};
 
-/** How many active, emailed members a linked team's group should contain. */
+/** How many linked identity emails of active members a linked team's group should contain. */
 async function expectedCount(teamId: string, db: ReturnType<typeof getDb>): Promise<number> {
   const { data } = await db
     .from("team_membership")
-    .select("person (email, is_active)")
+    .select("person (is_active, person_identity (email))")
     .eq("team_id", teamId);
   const rows = (data ?? []) as unknown as { person: MembershipPersonRow | MembershipPersonRow[] | null }[];
   return rows
     .map((r) => (Array.isArray(r.person) ? r.person[0] : r.person))
-    .filter((p): p is MembershipPersonRow => !!p && p.is_active && !!p.email).length;
+    .filter((p): p is MembershipPersonRow => !!p && p.is_active)
+    .flatMap((p) =>
+      Array.isArray(p.person_identity) ? p.person_identity : p.person_identity ? [p.person_identity] : [],
+    ).length;
 }
 
 export default async function AdminDriveSyncPage() {
@@ -38,9 +45,16 @@ export default async function AdminDriveSyncPage() {
   const counts = await Promise.all(linkedTeams.map((t) => expectedCount(t.id, db)));
 
   // email (lowercase) -> display name, for resolving added/wouldRemove lists.
+  const { data: identityRows } = await db
+    .from("person_identity")
+    .select("email, person (first_name, last_name)");
   const nameByEmail: Record<string, string> = {};
-  for (const p of people) {
-    if (p.email) nameByEmail[p.email.toLowerCase()] = `${p.first_name} ${p.last_name}`;
+  for (const row of (identityRows ?? []) as unknown as {
+    email: string;
+    person: { first_name: string; last_name: string } | { first_name: string; last_name: string }[] | null;
+  }[]) {
+    const p = Array.isArray(row.person) ? row.person[0] : row.person;
+    if (p) nameByEmail[row.email] = `${p.first_name} ${p.last_name}`;
   }
 
   // The picker for associating an unrecognized email with a person.

@@ -23,6 +23,11 @@ Google Group member immediately; it's only the nightly reconcile's *removal* sid
 report-only, to guard against acting on stale or bad data unattended overnight. People without an
 email are skipped entirely — there's nothing to add to the group for them.
 
+A person can have more than one sign-in email linked via `person_identity` (e.g. a personal Google
+account alongside a school/district account). Every linked email of an active member gets Google
+Group access, not just their primary `person.email` — both real-time sync and the nightly
+reconcile treat each identity email as its own group membership to add, remove, or report.
+
 ## 1. Enable the Admin SDK API
 
 In [Google Cloud Console](https://console.cloud.google.com/), use the **same project** as the
