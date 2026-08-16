@@ -1018,4 +1018,83 @@
       border-top: 1px solid #23262c;
     }
   }
+
+  /* Inline text button — an unrecognized email in the reconcile report that can
+     be clicked to associate it with a person. */
+  .link-btn {
+    background: none;
+    border: 0;
+    padding: 0;
+    font: inherit;
+    color: var(--red);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+  }
+
+  .link-btn:hover,
+  .link-btn:focus-visible {
+    text-decoration-thickness: 2px;
+  }
+
+  /* Lightweight modal (person picker for email association). */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.5);
+  }
+
+  .modal-card {
+    width: 100%;
+    max-width: 26rem;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    border: 1px solid var(--hair);
+    border-radius: 12px;
+    padding: 18px;
+    box-shadow: 0 12px 40px -12px rgba(0, 0, 0, 0.5);
+  }
+
+  .modal-list {
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    border: 1px solid var(--hair);
+    border-radius: 9px;
+    padding: 4px;
+  }
+
+  .modal-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    text-align: left;
+    font: inherit;
+    color: var(--ink);
+    background: none;
+    border: 0;
+    border-radius: 7px;
+    padding: 9px 11px;
+    cursor: pointer;
+  }
+
+  .modal-row:hover:not(:disabled),
+  .modal-row:focus-visible {
+    background: var(--surface-2);
+  }
+
+  .modal-row:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
 }

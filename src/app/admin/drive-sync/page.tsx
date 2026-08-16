@@ -7,6 +7,7 @@ import { listTeams } from "@/lib/teams";
 import { listPeople } from "@/lib/people";
 import type { ReconcileResult } from "@/lib/drive-group-sync";
 import { DriveSyncPanel } from "@/components/DriveSyncPanel";
+import { ReconcileReport } from "@/components/ReconcileReport";
 
 type MembershipPersonRow = { email: string | null; is_active: boolean };
 
@@ -37,11 +38,15 @@ export default async function AdminDriveSyncPage() {
   const counts = await Promise.all(linkedTeams.map((t) => expectedCount(t.id, db)));
 
   // email (lowercase) -> display name, for resolving added/wouldRemove lists.
-  const nameByEmail = new Map<string, string>();
+  const nameByEmail: Record<string, string> = {};
   for (const p of people) {
-    if (p.email) nameByEmail.set(p.email.toLowerCase(), `${p.first_name} ${p.last_name}`);
+    if (p.email) nameByEmail[p.email.toLowerCase()] = `${p.first_name} ${p.last_name}`;
   }
-  const resolve = (email: string) => nameByEmail.get(email.toLowerCase()) ?? email;
+
+  // The picker for associating an unrecognized email with a person.
+  const peoplePicker = people
+    .map((p) => ({ id: p.id, name: `${p.first_name} ${p.last_name}` }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <main className="flex flex-col gap-6">
@@ -95,45 +100,7 @@ export default async function AdminDriveSyncPage() {
         {!lastReport ? (
           <p className="text-sm text-[var(--muted)]">No reconcile has run yet.</p>
         ) : (
-          <>
-            <p className="text-sm text-[var(--muted)]">
-              Ran at <span className="mono">{new Date(lastReport.ranAt).toLocaleString()}</span>
-            </p>
-            <div className="flex flex-col gap-4">
-              {lastReport.groups.map((g) => (
-                <div key={g.groupEmail} className="flex flex-col gap-2 border-t border-[var(--hair)] pt-3 first:border-t-0 first:pt-0">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="font-medium">{g.teamName}</span>
-                    <span className="text-xs text-[var(--muted)]">
-                      {g.actualCount} actual / {g.expectedCount} expected
-                    </span>
-                  </div>
-                  <div className="text-sm">
-                    <span className="font-medium">Added: </span>
-                    {g.added.length === 0 ? (
-                      <span className="text-[var(--muted)]">none</span>
-                    ) : (
-                      g.added.map(resolve).join(", ")
-                    )}
-                  </div>
-                  <div className="text-sm">
-                    <span className="font-medium">Would remove: </span>
-                    {g.wouldRemove.length === 0 ? (
-                      <span className="text-[var(--muted)]">none</span>
-                    ) : (
-                      g.wouldRemove.map(resolve).join(", ")
-                    )}
-                  </div>
-                  {g.errors.length > 0 && (
-                    <div className="text-sm text-[var(--red)]">
-                      <span className="font-medium">Errors: </span>
-                      {g.errors.join("; ")}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </>
+          <ReconcileReport report={lastReport} nameByEmail={nameByEmail} people={peoplePicker} />
         )}
       </section>
     </main>
