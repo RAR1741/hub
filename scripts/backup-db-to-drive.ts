@@ -6,7 +6,10 @@ async function main() {
   const filePath = process.argv[2];
   const folderId = process.env.BACKUP_DRIVE_FOLDER_ID;
   const iso = process.env.BACKUP_STAMP; // filesystem-safe ISO from the workflow
-  const keep = Number(process.env.BACKUP_KEEP ?? "30");
+  // `?? "30"` only covers an UNSET var; an empty/whitespace string (how an unset
+  // GitHub secret/var actually arrives) is not nullish, and Number("") === 0 —
+  // which would mean "prune everything". Treat blank as absent, default to 30.
+  const keep = Number((process.env.BACKUP_KEEP ?? "").trim() || "30");
   const credentials = driveBackupCredentialsFromEnv();
   if (!filePath) throw new Error("usage: backup-db-to-drive <encrypted-dump-path>");
   if (!folderId) throw new Error("BACKUP_DRIVE_FOLDER_ID is required");
@@ -15,8 +18,8 @@ async function main() {
   // Guard a misconfigured BACKUP_KEEP: a non-numeric value would become NaN and,
   // untrapped, prune the ENTIRE backup folder (slice(NaN) === slice(0)). Fail
   // fast instead of silently deleting every backup.
-  if (!Number.isInteger(keep) || keep < 0) {
-    throw new Error(`BACKUP_KEEP must be a non-negative integer, got "${process.env.BACKUP_KEEP}"`);
+  if (!Number.isInteger(keep) || keep < 1) {
+    throw new Error(`BACKUP_KEEP must be a positive integer, got "${process.env.BACKUP_KEEP}"`);
   }
 
   const data = new Uint8Array(await readFile(filePath));

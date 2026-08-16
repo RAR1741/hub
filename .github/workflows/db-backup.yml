@@ -25,6 +25,7 @@ jobs:
           BACKUP_GPG_PASSPHRASE: ${{ secrets.BACKUP_GPG_PASSPHRASE }}
         run: |
           set -euo pipefail
+          pg_dump --version # log the client version so a client/server mismatch is visible
           STAMP="$(date -u +%Y-%m-%dT%H-%M-%SZ)"
           echo "BACKUP_STAMP=$STAMP" >> "$GITHUB_ENV"
           FILE="teamhub-backup-$STAMP.sql.gz.gpg"
