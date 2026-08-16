@@ -388,11 +388,13 @@ export async function updatePersonRosterFields(
 }
 
 /**
- * Find an existing person by email (exact match — person.email is always
- * stored lowercased, and CSV rows are lowercased at parse time) or, failing
- * that, by student_id_number. Uses `.eq()` (parameterized) rather than a
- * `.or()` filter string so free-text student IDs from an uploaded CSV can
- * never influence PostgREST filter syntax.
+ * Find an existing person by any linked email (exact match against
+ * person_identity, which covers every sign-in email a person has — not just
+ * their primary; emails are always stored lowercased, and CSV rows are
+ * lowercased at parse time) or, failing that, by student_id_number. Uses
+ * `.eq()` (parameterized) rather than a `.or()` filter string so free-text
+ * student IDs from an uploaded CSV can never influence PostgREST filter
+ * syntax.
  */
 export async function findPersonForRosterRow(
   row: { email: string | null; studentIdNumber: string | null },
@@ -400,12 +402,16 @@ export async function findPersonForRosterRow(
 ): Promise<string | null> {
   const client = db ?? (await import("./db")).getDb();
   if (row.email) {
+    // Look up via person_identity (every sign-in email, not just the
+    // primary) so a CSV row carrying someone's secondary email still
+    // resolves to their existing person. Identity emails are a superset of
+    // person.email after Task 1's backfill, so nothing is lost.
     const { data } = await client
-      .from("person")
-      .select("id")
+      .from("person_identity")
+      .select("person_id")
       .eq("email", row.email)
       .maybeSingle();
-    if (data) return data.id as string;
+    if (data) return data.person_id as string;
   }
   if (row.studentIdNumber) {
     const { data } = await client

@@ -24,7 +24,13 @@ type GuardianSeed = {
 
 // Generic chainable fake db. Each `from(table)` call returns a builder that
 // records the operation + filters; terminal awaiting resolves { data, error }.
-function fakeDb(people: PersonSeed[] = [], guardians: GuardianSeed[] = []) {
+type IdentitySeed = { person_id: string; email: string };
+
+function fakeDb(
+  people: PersonSeed[] = [],
+  guardians: GuardianSeed[] = [],
+  identities?: IdentitySeed[],
+) {
   const personRoster = people.map((p) => ({
     role: "student" as const,
     display_name: null,
@@ -53,6 +59,14 @@ function fakeDb(people: PersonSeed[] = [], guardians: GuardianSeed[] = []) {
     last_application_at: null,
     ...g,
   }));
+  // Default: mirror person.email into person_identity (one row per person
+  // with an email) so existing email-matching tests keep working without
+  // having to seed identities explicitly. Pass `identities` to override.
+  const identityRows: IdentitySeed[] =
+    identities ??
+    personRoster
+      .filter((p) => p.email)
+      .map((p) => ({ person_id: p.id, email: p.email as string }));
 
   const calls = {
     personInsert: [] as Record<string, unknown>[],
@@ -162,6 +176,9 @@ function fakeDb(people: PersonSeed[] = [], guardians: GuardianSeed[] = []) {
           insert: async (rows: Record<string, unknown>[]) => { calls.experienceInsert.push(...rows); return { error: null }; },
         };
       }
+      if (table === "person_identity") {
+        return { select: (_cols: string) => ({ data: identityRows, error: null }) };
+      }
       throw new Error(`unexpected table ${table}`);
     },
   } as never;
@@ -226,6 +243,23 @@ describe("runApplicationImport matching", () => {
     const summary = await runApplicationImport({ csvText: csv, dryRun: false, db, now: NOW_AUG });
     if ("error" in summary) throw new Error(summary.error);
     expect(summary.matched.map((m) => m.personId)).toEqual(["p1"]);
+  });
+
+  test("auto-matches by a secondary identity email, not just person.email", async () => {
+    // person.email is the old primary; the applicant's email is only linked
+    // via person_identity — proving byEmail is fed from identities, not
+    // person.email, so this doesn't create a duplicate person.
+    const { db, calls } = fakeDb(
+      [{ id: "p1", first_name: "Grace", last_name: "Hopper", email: "old-primary@example.com" }],
+      [],
+      [{ person_id: "p1", email: "grace@example.com" }],
+    );
+    const csv = csvFor([row({ first: "Different", email: "grace@example.com" })]);
+    const summary = await runApplicationImport({ csvText: csv, dryRun: false, db, now: NOW_AUG });
+    if ("error" in summary) throw new Error(summary.error);
+    expect(summary.matched.map((m) => m.personId)).toEqual(["p1"]);
+    expect(summary.created).toEqual([]);
+    expect(calls.personInsert).toEqual([]);
   });
 
   test("ambiguous exact match (two candidates) needs a decision", async () => {

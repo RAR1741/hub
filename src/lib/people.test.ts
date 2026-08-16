@@ -262,7 +262,7 @@ describe("findPersonForRosterRow", () => {
         select: () => ({
           eq: (col: string) => {
             calls.push(col);
-            return { maybeSingle: async () => ({ data: { id: "p-email" } }) };
+            return { maybeSingle: async () => ({ data: { person_id: "p-email" } }) };
           },
         }),
       }),
@@ -290,6 +290,31 @@ describe("findPersonForRosterRow", () => {
     } as never;
     const id = await findPersonForRosterRow({ email: "ada@example.org", studentIdNumber: "1741" }, db);
     expect(id).toBe("p-sid");
+  });
+
+  test("matches by a secondary identity email (not person.email)", async () => {
+    const calls: { table: string; col: string }[] = [];
+    const db = {
+      from: (table: string) => ({
+        select: () => ({
+          eq: (col: string) => {
+            calls.push({ table, col });
+            return {
+              maybeSingle: async () =>
+                table === "person_identity" && col === "email"
+                  ? { data: { person_id: "p-existing" } }
+                  : { data: null },
+            };
+          },
+        }),
+      }),
+    } as never;
+    const id = await findPersonForRosterRow(
+      { email: "secondary@example.org", studentIdNumber: null },
+      db,
+    );
+    expect(id).toBe("p-existing");
+    expect(calls).toEqual([{ table: "person_identity", col: "email" }]);
   });
 
   test("returns null when neither is present or matches", async () => {

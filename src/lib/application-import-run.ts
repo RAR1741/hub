@@ -103,6 +103,11 @@ export async function runApplicationImport(args: {
   if (guardianError) return { error: `guardian_load_failed: ${guardianError.message}` };
   const guardianRoster = (guardianRows ?? []) as RosterGuardian[];
 
+  const { data: identityRows, error: identityError } = await db
+    .from("person_identity")
+    .select("person_id, email");
+  if (identityError) return { error: `identity_load_failed: ${identityError.message}` };
+
   // Indexes for exact + fuzzy matching.
   const byNameKey = new Map<string, string[]>();
   const byPreferredKey = new Map<string, string[]>();
@@ -116,10 +121,21 @@ export async function runApplicationImport(args: {
     personById.set(p.id, p);
     pushId(byNameKey, nameKey(p.first_name, p.last_name), p.id);
     if (p.display_name) pushId(byPreferredKey, normalizeFull(p.display_name), p.id);
-    const em = normalizeEmail(p.email);
-    if (em) pushId(byEmail, em, p.id);
     const lastKey = p.last_name.trim().toLowerCase();
     byLastName.set(lastKey, [...(byLastName.get(lastKey) ?? []), p]);
+  }
+  // byEmail is built from person_identity (every linked sign-in email), not
+  // person.email — identities are a superset of person.email after Task 1's
+  // backfill, so this replaces (rather than augments) the old per-person
+  // email loop to avoid double-pushing the primary. Note: the per-column
+  // patch below that writes `person.email` on a matched update now RENAMES
+  // the person's primary email (or promotes a matching secondary) via the
+  // identity mirror trigger — intended, not a regression.
+  for (const row of (identityRows ?? []) as { person_id: string; email: string }[]) {
+    const em = normalizeEmail(row.email);
+    if (em && !(byEmail.get(em) ?? []).includes(row.person_id)) {
+      pushId(byEmail, em, row.person_id);
+    }
   }
 
   const guardianByNameKey = new Map<string, RosterGuardian[]>();
