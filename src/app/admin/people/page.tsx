@@ -30,9 +30,14 @@ export default async function AdminPeoplePage() {
           <h1>People</h1>
           <div className="sub">Roster, roles, and student IDs · {rows.length} member{rows.length === 1 ? "" : "s"}</div>
         </div>
-        <Link href="/admin/people/import" className="btn btn-secondary">
-          <Icon name="users" /> Import CSV
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/admin/people/duplicates" className="btn btn-secondary">
+            Find duplicates
+          </Link>
+          <Link href="/admin/people/import" className="btn btn-secondary">
+            <Icon name="users" /> Import CSV
+          </Link>
+        </div>
       </div>
       <details className="card">
         <summary className="cursor-pointer text-base font-semibold">Add person</summary>
