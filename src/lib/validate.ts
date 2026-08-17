@@ -1,3 +1,10 @@
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** A well-formed UUID string, or null. Rejects malformed ids before they hit a `uuid`-typed DB column (which would otherwise 500). */
+export function reqUuid(v: unknown): string | null {
+  return typeof v === "string" && UUID_RE.test(v) ? v : null;
+}
+
 /** Required trimmed string, 1..max chars. Returns null when missing/invalid. */
 export function reqString(v: unknown, max: number): string | null {
   if (typeof v !== "string") return null;

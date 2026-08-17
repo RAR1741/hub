@@ -1,6 +1,6 @@
 import { withRole } from "@/lib/api";
 import { checkInPerson, uncheckIn } from "@/lib/event-signups";
-import { reqString } from "@/lib/validate";
+import { reqString, reqUuid } from "@/lib/validate";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -17,7 +17,7 @@ export const POST = withRole<Ctx>("mentor", async (viewer, request, context) => 
 
 export const DELETE = withRole<Ctx>("mentor", async (_viewer, request, context) => {
   const { id } = await context.params;
-  const sessionId = new URL(request.url).searchParams.get("sessionId");
+  const sessionId = reqUuid(new URL(request.url).searchParams.get("sessionId"));
   if (!sessionId) return Response.json({ error: "invalid" }, { status: 400 });
   const result = await uncheckIn(id, sessionId);
   return result.ok ? Response.json({ ok: true }) : Response.json({ error: "failed" }, { status: result.status });

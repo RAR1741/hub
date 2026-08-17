@@ -42,6 +42,12 @@ alter table session add constraint session_source_check
 
 alter table session add column event_id uuid references event (id) on delete restrict;
 
+-- event_id must be set if and only if source='event', so every event
+-- check-in is scopable and the per-person-per-event uniqueness guarantee
+-- below can't be bypassed by a source='event' row with a null event_id.
+alter table session add constraint session_event_id_requires_event_source
+  check ((source = 'event') = (event_id is not null));
+
 create unique index one_session_per_person_per_event
   on session (person_id, event_id)
   where event_id is not null;
