@@ -2,16 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { CandidatePair, PersonCard } from "@/lib/merge-people";
+import type { CandidatePair, PersonCard, RejectedPair } from "@/lib/merge-people";
 
 function fullName(p: PersonCard): string {
   return `${p.firstName} ${p.lastName}`.trim();
 }
 
-/**
- * Default winner pick: more sessions wins; tie -> the one with any email/identity;
- * still tie -> lexicographically-smaller id.
- */
 function defaultWinnerId(a: PersonCard, b: PersonCard): string {
   if (a.sessionCount !== b.sessionCount) {
     return a.sessionCount > b.sessionCount ? a.id : b.id;
@@ -22,16 +18,25 @@ function defaultWinnerId(a: PersonCard, b: PersonCard): string {
   return a.id < b.id ? a.id : b.id;
 }
 
-export function DuplicatePeople({ pairs }: { pairs: CandidatePair[] }) {
-  if (pairs.length === 0) {
-    return <p className="text-sm text-[var(--muted)]">No likely duplicates found.</p>;
-  }
-
+export function DuplicatePeople({
+  pairs,
+  rejectedPairs,
+}: {
+  pairs: CandidatePair[];
+  rejectedPairs: RejectedPair[];
+}) {
   return (
     <div className="flex flex-col gap-4">
-      {pairs.map((pair) => (
-        <DuplicatePair key={`${pair.a.id}-${pair.b.id}`} pair={pair} />
-      ))}
+      {pairs.length === 0 ? (
+        <p className="text-sm text-[var(--muted)]">No likely duplicates found.</p>
+      ) : (
+        pairs.map((pair) => (
+          <DuplicatePair key={`${pair.a.id}-${pair.b.id}`} pair={pair} />
+        ))
+      )}
+      {rejectedPairs.length > 0 && (
+        <DismissedPairs pairs={rejectedPairs} />
+      )}
     </div>
   );
 }
@@ -67,6 +72,30 @@ function DuplicatePair({ pair }: { pair: CandidatePair }) {
       setError(body?.error ?? "Couldn't merge those people. Please try again.");
     } catch {
       setError("Couldn't merge those people. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function dismissPair() {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/people/reject", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ aId: a.id, bId: b.id }),
+      });
+      if (res.ok) {
+        setDone(true);
+        router.refresh();
+        return;
+      }
+      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      setError(body?.error ?? "Couldn't dismiss this pair. Please try again.");
+    } catch {
+      setError("Couldn't dismiss this pair. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -124,7 +153,7 @@ function DuplicatePair({ pair }: { pair: CandidatePair }) {
           </div>
         </div>
       ) : (
-        <div className="mt-3">
+        <div className="mt-3 flex gap-2">
           <button
             type="button"
             className="btn"
@@ -133,6 +162,82 @@ function DuplicatePair({ pair }: { pair: CandidatePair }) {
           >
             Merge
           </button>
+          <button
+            type="button"
+            className="btn"
+            disabled={busy}
+            onClick={dismissPair}
+          >
+            {busy ? "Dismissing…" : "Not a match"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DismissedPairs({ pairs }: { pairs: RejectedPair[] }) {
+  const [open, setOpen] = useState(false);
+  const router = useRouter();
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function undoPair(a: PersonCard, b: PersonCard) {
+    const key = `${a.id}-${b.id}`;
+    if (busyKey) return;
+    setBusyKey(key);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/people/reject", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ aId: a.id, bId: b.id }),
+      });
+      if (res.ok) {
+        router.refresh();
+        return;
+      }
+      setError("Couldn't undo. Please try again.");
+    } catch {
+      setError("Couldn't undo. Please try again.");
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  return (
+    <div className="border-t border-[var(--hair)] pt-4">
+      <button
+        type="button"
+        className="flex items-center gap-1 text-sm text-[var(--muted)] hover:text-[var(--fg)]"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span>{open ? "▾" : "▸"}</span>
+        <span>Dismissed pairs ({pairs.length})</span>
+      </button>
+      {open && (
+        <div className="mt-3 flex flex-col gap-3">
+          {error && <p className="text-sm text-[var(--red)]">{error}</p>}
+          {pairs.map(({ a, b }) => {
+            const key = `${a.id}-${b.id}`;
+            return (
+              <div key={key} className="flex items-center justify-between gap-4 text-sm">
+                <span>
+                  <span className="font-medium">{fullName(a)}</span>
+                  {" & "}
+                  <span className="font-medium">{fullName(b)}</span>
+                </span>
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={busyKey !== null}
+                  onClick={() => undoPair(a, b)}
+                >
+                  {busyKey === key ? "Undoing…" : "Undo"}
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

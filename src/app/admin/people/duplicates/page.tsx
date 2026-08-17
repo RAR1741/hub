@@ -1,14 +1,17 @@
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
-import { listDuplicateCandidates } from "@/lib/merge-people";
+import { listDuplicateCandidates, listRejectedPairs } from "@/lib/merge-people";
 import { DuplicatePeople } from "@/components/DuplicatePeople";
 
 export default async function AdminDuplicatePeoplePage() {
   const viewer = await getViewer();
   if (!hasRole(viewer.role, "admin")) redirect("/");
 
-  const pairs = await listDuplicateCandidates();
+  const [pairs, rejectedPairs] = await Promise.all([
+    listDuplicateCandidates(),
+    listRejectedPairs(),
+  ]);
 
   return (
     <main className="flex flex-col gap-6">
@@ -26,7 +29,7 @@ export default async function AdminDuplicatePeoplePage() {
           record&rsquo;s sessions, teams, emails, and history move to the one you keep,
           and it is deleted. This can&rsquo;t be undone.
         </p>
-        <DuplicatePeople pairs={pairs} />
+        <DuplicatePeople pairs={pairs} rejectedPairs={rejectedPairs} />
       </section>
     </main>
   );
