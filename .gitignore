@@ -10,3 +10,7 @@ next-env.d.ts
 /playwright-report
 /blob-report
 /playwright/.cache
+
+
+# Graphify (local-only files; cache/ is committed for speed)
+graphify-out/cost.json
