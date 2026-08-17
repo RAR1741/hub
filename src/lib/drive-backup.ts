@@ -80,7 +80,7 @@ export async function uploadBackup(
     },
     body,
   });
-  if (!res.ok) throw new Error(`drive upload failed: ${res.status}`);
+  if (!res.ok) throw new Error(`drive upload failed: ${res.status} ${await res.text()}`);
   const json = (await res.json()) as { id?: string };
   if (!json.id) throw new Error("drive upload returned no id");
   return { id: json.id };
@@ -106,7 +106,7 @@ export async function listBackups(
   const res = await deps.fetch(url.toString(), {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) throw new Error(`list backups failed: ${res.status}`);
+  if (!res.ok) throw new Error(`list backups failed: ${res.status} ${await res.text()}`);
   const json = (await res.json()) as {
     files?: { id?: string; name?: string; createdTime?: string }[];
   };
@@ -125,7 +125,8 @@ export async function deleteDriveFile(deps: DriveBackupDeps, id: string): Promis
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok && res.status !== 404) throw new Error(`delete backup failed: ${res.status}`);
+  if (!res.ok && res.status !== 404)
+    throw new Error(`delete backup failed: ${res.status} ${await res.text()}`);
 }
 
 /** List, select, and delete backups beyond the `keep` most recent; returns deleted ids. */
