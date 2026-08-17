@@ -12,12 +12,19 @@ set -euo pipefail
 BRANCH="${1:?usage: scripts/new-worktree.sh <branch-name>}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WORKTREES_DIR="$ROOT/.claude/worktrees"
-TARGET="$WORKTREES_DIR/$BRANCH"
+# Branch names often contain "/" (e.g. "feat/foo"); git is fine with that, but
+# it would otherwise create nested directories under WORKTREES_DIR, breaking
+# the offset scan below. Keep the on-disk dir a flat slug; the branch itself
+# still gets the name as given.
+SLUG="${BRANCH//\//-}"
+TARGET="$WORKTREES_DIR/$SLUG"
 
 if [ -e "$TARGET" ]; then
   echo "error: $TARGET already exists" >&2
   exit 1
 fi
+
+mkdir -p "$WORKTREES_DIR"
 
 # Next free offset: count existing worktrees that already claimed one.
 # Each offset shifts every port by 10, well clear of Supabase's own port block.
@@ -37,8 +44,8 @@ STUDIO_PORT=$((54323 + OFFSET * 10))
 SMTP_PORT=$((54324 + OFFSET * 10))
 ANALYTICS_PORT=$((54327 + OFFSET * 10))
 INSPECTOR_PORT=$((8083 + OFFSET))
-PROJECT_NAME="hub-$BRANCH"
-SUPABASE_PROJECT_ID="hub-$BRANCH"
+PROJECT_NAME="hub-$SLUG"
+SUPABASE_PROJECT_ID="hub-$SLUG"
 
 git -C "$ROOT" worktree add "$TARGET" -b "$BRANCH"
 
@@ -60,7 +67,9 @@ EOF
 # copy in this worktree directly. skip-worktree hides the diff from `git
 # status` in this worktree so it's never accidentally committed.
 CFG="$TARGET/supabase/config.toml"
-sed -i \
+# `-i.bak` (with suffix, no space) is the one form both GNU and BSD/macOS sed
+# accept; drop the backup right after.
+sed -i.bak \
   -e "s/^project_id = \".*\"/project_id = \"$SUPABASE_PROJECT_ID\"/" \
   -e "0,/^port = 54321\$/s//port = $API_PORT/" \
   -e "0,/^port = 54322\$/s//port = $DB_PORT/" \
@@ -70,7 +79,11 @@ sed -i \
   -e "0,/^port = 54324\$/s//port = $SMTP_PORT/" \
   -e "0,/^port = 54327\$/s//port = $ANALYTICS_PORT/" \
   -e "0,/^inspector_port = 8083\$/s//inspector_port = $INSPECTOR_PORT/" \
+  -e "s#^site_url = \"http://localhost:3000\"#site_url = \"http://localhost:$APP_PORT\"#" \
+  -e "s#^additional_redirect_urls = \\[\"http://localhost:3000/auth/callback\"\\]#additional_redirect_urls = [\"http://localhost:$APP_PORT/auth/callback\"]#" \
+  -e "s#^redirect_uri = \"http://127.0.0.1:54321/auth/v1/callback\"#redirect_uri = \"http://127.0.0.1:$API_PORT/auth/v1/callback\"#" \
   "$CFG"
+rm -f "$CFG.bak"
 git -C "$TARGET" update-index --skip-worktree supabase/config.toml
 
 echo "Worktree ready: $TARGET"
