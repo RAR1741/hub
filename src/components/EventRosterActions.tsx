@@ -11,12 +11,14 @@ export function EventRosterActions({ eventId, entry }: { eventId: string; entry:
   async function checkIn() {
     setBusy(true);
     try {
-      const res = await fetch(`/api/admin/events/${eventId}/checkin`, {
+      await fetch(`/api/admin/events/${eventId}/checkin`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ personId: entry.personId }),
       });
-      if (res.ok) router.refresh();
+      // Refresh even on a non-2xx (e.g. 409 someone else already checked
+      // them in) — the roster should reflect whatever the server now has.
+      router.refresh();
     } finally {
       setBusy(false);
     }
@@ -26,11 +28,11 @@ export function EventRosterActions({ eventId, entry }: { eventId: string; entry:
     if (!entry.sessionId) return;
     setBusy(true);
     try {
-      const res = await fetch(
+      await fetch(
         `/api/admin/events/${eventId}/checkin?sessionId=${encodeURIComponent(entry.sessionId)}`,
         { method: "DELETE" },
       );
-      if (res.ok) router.refresh();
+      router.refresh();
     } finally {
       setBusy(false);
     }
@@ -67,12 +69,12 @@ export function ManualAddPerson({
     if (!personId) return;
     setBusy(true);
     try {
-      const res = await fetch(`/api/admin/events/${eventId}/checkin`, {
+      await fetch(`/api/admin/events/${eventId}/checkin`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ personId }),
       });
-      if (res.ok) router.refresh();
+      router.refresh();
     } finally {
       setBusy(false);
     }
