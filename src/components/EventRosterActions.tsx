@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { RosterEntry } from "@/lib/event-signups";
 
 export function EventRosterActions({ eventId, entry }: { eventId: string; entry: RosterEntry }) {
@@ -55,16 +55,13 @@ export function ManualAddPerson({
   people: { id: string; name: string }[];
 }) {
   const router = useRouter();
-  const [personId, setPersonId] = useState(people[0]?.id ?? "");
+  const [selected, setSelected] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   // `people` shrinks after a successful add (router.refresh()); if the
-  // selected id fell out of the list, fall back to the new first option.
-  useEffect(() => {
-    if (!people.some((p) => p.id === personId)) {
-      setPersonId(people[0]?.id ?? "");
-    }
-  }, [people, personId]);
+  // stored selection fell out of the list, fall back to the first option
+  // rather than stashing a stale id in state.
+  const personId = selected && people.some((p) => p.id === selected) ? selected : (people[0]?.id ?? "");
 
   async function add() {
     if (!personId) return;
@@ -86,7 +83,7 @@ export function ManualAddPerson({
   return (
     <div className="card flex flex-wrap items-center gap-3">
       <span className="font-semibold">Add someone who didn&apos;t sign up:</span>
-      <select className="input" value={personId} onChange={(e) => setPersonId(e.target.value)}>
+      <select className="input" value={personId} onChange={(e) => setSelected(e.target.value)}>
         {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
       </select>
       <button disabled={busy} onClick={add} className="btn btn-primary px-3 py-1">

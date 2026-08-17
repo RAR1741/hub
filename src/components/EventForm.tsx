@@ -28,8 +28,8 @@ export function EventForm({ periods }: { periods: Period[] }) {
           periodId,
           location: location || null,
           description: description || null,
-          startsAt: new Date(startsAt).toISOString(),
-          endsAt: new Date(endsAt).toISOString(),
+          startsAt: startsAt ? new Date(startsAt).toISOString() : "",
+          endsAt: endsAt ? new Date(endsAt).toISOString() : "",
         }),
       });
       if (res.ok) {
