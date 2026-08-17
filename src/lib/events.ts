@@ -20,11 +20,11 @@ export function parseEventInput(body: unknown): EventInput | null {
   const periodId = reqString(b.periodId, 64);
   const startsAt =
     typeof b.startsAt === "string" && !Number.isNaN(Date.parse(b.startsAt))
-      ? b.startsAt
+      ? new Date(b.startsAt).toISOString()
       : null;
   const endsAt =
     typeof b.endsAt === "string" && !Number.isNaN(Date.parse(b.endsAt))
-      ? b.endsAt
+      ? new Date(b.endsAt).toISOString()
       : null;
   if (!name || !periodId || !startsAt || !endsAt) return null;
   if (Date.parse(endsAt) <= Date.parse(startsAt)) return null;

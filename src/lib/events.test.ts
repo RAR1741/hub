@@ -9,9 +9,17 @@ describe("parseEventInput", () => {
     endsAt: "2027-03-01T20:00:00Z",
   };
 
+  // parseEventInput normalizes timestamps via toISOString()
+  const normalized = {
+    name: "Robot Demo",
+    periodId: "pd1",
+    startsAt: new Date(base.startsAt).toISOString(),
+    endsAt: new Date(base.endsAt).toISOString(),
+  };
+
   test("accepts a valid event with no location/description", () => {
     expect(parseEventInput(base)).toEqual({
-      ...base,
+      ...normalized,
       location: null,
       description: null,
     });
@@ -19,7 +27,7 @@ describe("parseEventInput", () => {
 
   test("accepts and trims optional location/description", () => {
     expect(parseEventInput({ ...base, location: " Library ", description: " Bring robot " })).toEqual({
-      ...base,
+      ...normalized,
       location: "Library",
       description: "Bring robot",
     });
