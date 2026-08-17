@@ -167,3 +167,51 @@ export async function syncMembershipChange(
     console.error("drive-group sync failed", { action, teamId, personId, error });
   }
 }
+
+export type AddRecommendation = { personId: string; name: string; emails: string[] };
+export type TeamAddRecommendations = {
+  teamId: string;
+  teamName: string;
+  groupEmail: string;
+  people: AddRecommendation[];
+};
+
+/**
+ * Derive "add these people to the team" recommendations from the last reconcile
+ * report. A recommendation is a wouldRemove email that resolves to an ACTIVE
+ * person who is NOT currently a member of that team. PURE. Keys are lowercased.
+ *
+ * The current-membership filter is load-bearing: after an add, the stored report
+ * still lists the email in wouldRemove, so this filter is what drops added people
+ * on the next page load. Do not remove it as "redundant".
+ */
+export function computeAddRecommendations(
+  report: ReconcileResult,
+  groupEmailToTeam: Map<string, { teamId: string; teamName: string }>,
+  personByEmail: Map<string, { personId: string; name: string; isActive: boolean }>,
+  membersByTeam: Map<string, Set<string>>,
+): TeamAddRecommendations[] {
+  const out: TeamAddRecommendations[] = [];
+  for (const group of report.groups) {
+    const team = groupEmailToTeam.get(group.groupEmail.toLowerCase());
+    if (!team) continue;
+    const members = membersByTeam.get(team.teamId) ?? new Set<string>();
+    const byPerson = new Map<string, AddRecommendation>();
+    for (const rawEmail of group.wouldRemove) {
+      const email = rawEmail.toLowerCase();
+      const person = personByEmail.get(email);
+      if (!person || !person.isActive) continue;
+      if (members.has(person.personId)) continue;
+      const existing = byPerson.get(person.personId);
+      if (existing) {
+        existing.emails.push(email);
+      } else {
+        byPerson.set(person.personId, { personId: person.personId, name: person.name, emails: [email] });
+      }
+    }
+    if (byPerson.size === 0) continue;
+    const people = [...byPerson.values()].sort((a, b) => a.name.localeCompare(b.name));
+    out.push({ teamId: team.teamId, teamName: team.teamName, groupEmail: group.groupEmail, people });
+  }
+  return out.sort((a, b) => a.teamName.localeCompare(b.teamName));
+}

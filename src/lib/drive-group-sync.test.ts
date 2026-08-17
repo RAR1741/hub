@@ -2,10 +2,12 @@ import { generateKeyPairSync } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
   computeGroupDiff,
+  computeAddRecommendations,
   reconcileDriveGroups,
   syncMembershipChange,
 } from "./drive-group-sync";
 import type { DirectoryCredentials } from "./google-directory";
+import type { ReconcileResult } from "./drive-group-sync";
 
 const { privateKey: rawKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const PEM = rawKey.export({ type: "pkcs8", format: "pem" }).toString();
@@ -309,5 +311,53 @@ describe("syncMembershipChange", () => {
 
     await expect(syncMembershipChange("add", "t1", "p1", db as never)).resolves.toBeUndefined();
     expect(errSpy).toHaveBeenCalled();
+  });
+});
+
+describe("computeAddRecommendations", () => {
+  const report = (groups: Partial<ReconcileResult["groups"][number]>[]): ReconcileResult => ({
+    ranAt: "2026-08-16T00:00:00Z",
+    groups: groups.map((g) => ({
+      teamName: "T", groupEmail: "g@x.org", expectedCount: 0, actualCount: 0,
+      added: [], wouldRemove: [], errors: [], ...g,
+    })),
+  });
+  const g2t = new Map([["team-a@x.org", { teamId: "t1", teamName: "Team A" }]]);
+
+  test("recommends an active, resolved, non-member person", () => {
+    const r = report([{ groupEmail: "team-a@x.org", wouldRemove: ["bob@x.com"] }]);
+    const people = new Map([["bob@x.com", { personId: "p1", name: "Bob", isActive: true }]]);
+    const members = new Map<string, Set<string>>();
+    expect(computeAddRecommendations(r, g2t, people, members)).toEqual([
+      { teamId: "t1", teamName: "Team A", groupEmail: "team-a@x.org",
+        people: [{ personId: "p1", name: "Bob", emails: ["bob@x.com"] }] },
+    ]);
+  });
+
+  test("skips unresolved emails, inactive people, and current members", () => {
+    const r = report([{ groupEmail: "team-a@x.org",
+      wouldRemove: ["ghost@x.com", "old@x.com", "mem@x.com"] }]);
+    const people = new Map([
+      ["old@x.com", { personId: "p2", name: "Old", isActive: false }],
+      ["mem@x.com", { personId: "p3", name: "Mem", isActive: true }],
+    ]);
+    const members = new Map([["t1", new Set(["p3"])]]);
+    expect(computeAddRecommendations(r, g2t, people, members)).toEqual([]);
+  });
+
+  test("dedupes a multi-email person into one entry with all emails", () => {
+    const r = report([{ groupEmail: "TEAM-A@x.org", wouldRemove: ["A@x.com", "b@x.com"] }]);
+    const people = new Map([
+      ["a@x.com", { personId: "p1", name: "Bob", isActive: true }],
+      ["b@x.com", { personId: "p1", name: "Bob", isActive: true }],
+    ]);
+    const out = computeAddRecommendations(r, g2t, people, new Map());
+    expect(out[0].people).toEqual([{ personId: "p1", name: "Bob", emails: ["a@x.com", "b@x.com"] }]);
+  });
+
+  test("omits groups with no linked team and teams with no recommendations", () => {
+    const r = report([{ groupEmail: "unlinked@x.org", wouldRemove: ["bob@x.com"] }]);
+    const people = new Map([["bob@x.com", { personId: "p1", name: "Bob", isActive: true }]]);
+    expect(computeAddRecommendations(r, g2t, people, new Map())).toEqual([]);
   });
 });
