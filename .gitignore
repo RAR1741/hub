@@ -12,7 +12,5 @@ next-env.d.ts
 /playwright/.cache
 
 
-# Graphify (local-only files; cache/ is committed for speed)
-graphify-out/cost.json
-graphify-out/.graphify_python
-graphify-out/.graphify_root
+# Graphify (local-only, regenerate with `graphify update .`)
+graphify-out/
