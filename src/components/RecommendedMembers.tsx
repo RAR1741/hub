@@ -31,7 +31,10 @@ export function RecommendedMembers({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ personId }),
       });
-      if (res.ok) return true;
+      if (res.ok) {
+        setState((s) => ({ ...s, [k]: "idle" }));
+        return true;
+      }
       setState((s) => ({ ...s, [k]: "failed" }));
       return false;
     } catch {
