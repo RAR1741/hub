@@ -212,6 +212,20 @@ export async function memberTeamIds(
   return new Set((data ?? []).map((r) => r.team_id as string));
 }
 
+/** Direct-member counts per team. ONE query + JS aggregation — avoids the
+ *  PostgREST embedded-count path, which has documented dual-FK (PGRST201)
+ *  problems against team_membership. Missing team → 0 via `?? 0` at call sites. */
+export async function teamMemberCounts(db?: SupabaseClient): Promise<Map<string, number>> {
+  const client = db ?? (await import("./db")).getDb();
+  const { data } = await client.from("team_membership").select("team_id");
+  const counts = new Map<string, number>();
+  for (const row of data ?? []) {
+    const teamId = row.team_id as string;
+    counts.set(teamId, (counts.get(teamId) ?? 0) + 1);
+  }
+  return counts;
+}
+
 export async function pendingApplicationTeamIds(
   personId: string,
   db?: SupabaseClient,

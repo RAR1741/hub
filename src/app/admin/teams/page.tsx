@@ -2,31 +2,28 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
-import { buildTeamTree, listTeams, type TeamNode } from "@/lib/teams";
+import { buildTeamTree, listTeams, teamMemberCounts, type TeamNode } from "@/lib/teams";
 import { TeamForm } from "@/components/TeamForm";
-
-function Tree({ nodes }: { nodes: TeamNode[] }) {
-  if (nodes.length === 0) return null;
-  return (
-    <ul className="flex flex-col gap-1 pl-4">
-      {nodes.map((n) => (
-        <li key={n.id} className="py-1">
-          <Link href={`/admin/teams/${n.id}`} className="font-medium text-[var(--red)]">
-            {n.name}
-          </Link>{" "}
-          <span className="pill role">{n.joinMode}</span>
-          <Tree nodes={n.children} />
-        </li>
-      ))}
-    </ul>
-  );
-}
+import { TeamTreeView } from "@/components/TeamTree";
 
 export default async function AdminTeamsPage() {
   const viewer = await getViewer();
   if (!hasRole(viewer.role, "admin")) redirect("/");
 
-  const teams = await listTeams();
+  const [teams, counts] = await Promise.all([listTeams(), teamMemberCounts()]);
+
+  function renderNode(n: TeamNode) {
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        <Link href={`/admin/teams/${n.id}`} className="font-medium text-[var(--red)]">
+          {n.name}
+        </Link>
+        <span className="pill role">{n.joinMode}</span>
+        <span className="pill role">{counts.get(n.id) ?? 0} members</span>
+      </div>
+    );
+  }
+
   return (
     <main className="flex flex-col gap-6">
       <div className="page-head">
@@ -46,7 +43,7 @@ export default async function AdminTeamsPage() {
         {teams.length === 0 ? (
           <p className="text-sm text-[var(--color-muted-fg)]">No teams yet — create the first one above.</p>
         ) : (
-          <Tree nodes={buildTeamTree(teams)} />
+          <TeamTreeView roots={buildTeamTree(teams)} renderNode={renderNode} />
         )}
       </section>
     </main>
