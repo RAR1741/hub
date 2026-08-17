@@ -14,3 +14,5 @@ next-env.d.ts
 
 # Graphify (local-only files; cache/ is committed for speed)
 graphify-out/cost.json
+graphify-out/.graphify_python
+graphify-out/.graphify_root
