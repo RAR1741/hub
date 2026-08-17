@@ -87,7 +87,8 @@ export default async function AdminHubPage() {
     excusalRequests,
     events,
   ] = await Promise.all([
-    // Admin-only data isn't fetched for mentors — they can't see those cards.
+    // Admin-only rows skip their query for mentors (they can't see those
+    // cards); the rest (excusal requests, events) run for every viewer.
     isAdmin ? listPeople() : Promise.resolve([]),
     isAdmin ? listTeams() : Promise.resolve([]),
     isAdmin ? listPeriods() : Promise.resolve([]),
