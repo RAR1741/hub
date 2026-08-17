@@ -18,6 +18,8 @@ create table event (
 
 create index event_period_idx on event (period_id, starts_at);
 create index event_starts_at_idx on event (starts_at);
+-- Serves listUpcomingEvents()'s `ends_at >= now()` filter, ordered by starts_at.
+create index event_ends_at_idx on event (ends_at, starts_at);
 
 alter table event enable row level security;
 -- Deliberately NO policies: default-deny; all access via service role.
@@ -29,9 +31,10 @@ create table event_signup (
   primary key (event_id, person_id)
 );
 
--- Composite PK covers the roster query (event_id = ...); this index covers
--- signedUpEventIds()'s lookup (person_id = ... AND event_id IN (...)).
-create index event_signup_person_idx on event_signup (person_id);
+-- Composite PK covers the roster query (event_id = ...); this composite
+-- index (leading person_id) covers signedUpEventIds()'s lookup
+-- (person_id = ... AND event_id IN (...)) in the direction the PK doesn't.
+create index event_signup_person_event_idx on event_signup (person_id, event_id);
 
 alter table event_signup enable row level security;
 -- Deliberately NO policies: default-deny; all access via service role.
