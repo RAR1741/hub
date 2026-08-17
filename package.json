@@ -15,8 +15,8 @@
     "//db-scripts": "Flags below are required for running the CLI inside the dev container — see supabase/README.md before changing.",
     "db:start": "supabase start --ignore-health-check",
     "db:stop": "supabase stop",
-    "db:reset": "supabase db reset --db-url postgresql://postgres:postgres@host.docker.internal:54322/postgres?sslmode=disable --yes",
-    "db:psql": "psql postgresql://postgres:postgres@host.docker.internal:54322/postgres"
+    "db:reset": "supabase db reset --db-url postgresql://postgres:postgres@host.docker.internal:${SUPABASE_DB_PORT:-54322}/postgres?sslmode=disable --yes",
+    "db:psql": "psql postgresql://postgres:postgres@host.docker.internal:${SUPABASE_DB_PORT:-54322}/postgres"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",

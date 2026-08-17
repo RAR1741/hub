@@ -16,7 +16,7 @@
 #
 # `./dev <cmd>` still works against whichever mode is running (it execs into the app
 # container). Run one-off commands like `./dev npm run test` that way.
-name: team-hub
+name: ${COMPOSE_PROJECT_NAME:-team-hub}
 
 services:
   app:

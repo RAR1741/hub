@@ -1,4 +1,4 @@
-name: team-hub
+name: ${COMPOSE_PROJECT_NAME:-team-hub}
 
 services:
   app:
@@ -17,10 +17,14 @@ services:
     environment:
       # Host path of the repo, for tooling that bind-mounts into sibling containers.
       LOCAL_WORKSPACE_FOLDER: ${LOCAL_WORKSPACE_FOLDER:-}
+      # Per-worktree Supabase DB port (see scripts/new-worktree.sh), read by
+      # `npm run db:reset`/`db:psql` since the sibling Supabase containers
+      # publish on this worktree's own port block, not the default 54322.
+      SUPABASE_DB_PORT: ${SUPABASE_DB_PORT:-54322}
     extra_hosts:
       # Provided automatically by Docker Desktop; declared for Linux hosts too.
       - "host.docker.internal:host-gateway"
     ports:
-      - "3000:3000"
+      - "${APP_PORT:-3000}:3000"
     # Keep the container alive so VS Code (and `docker compose exec`) can attach.
     command: sleep infinity
