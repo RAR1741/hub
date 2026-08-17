@@ -36,7 +36,7 @@ alter table event_signup enable row level security;
 -- the event. `event_id` is restrict-on-delete (like `session.period_id`) so
 -- deleting an event can't silently orphan attendance history; deleteEvent()
 -- checks for existing check-ins first and returns a clean 409 instead.
-alter table session drop constraint session_source_check;
+alter table session drop constraint if exists session_source_check;
 alter table session add constraint session_source_check
   check (source in ('kiosk', 'manual', 'admin', 'import', 'event'));
 

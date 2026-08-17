@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { checkInPerson, listEventRoster, signUpForEvent, signedUpEventIds } from "./event-signups";
+import { checkInPerson, listEventRoster, signUpForEvent, signedUpEventIds, uncheckIn } from "./event-signups";
 
 describe("signUpForEvent", () => {
   function fakeDb(opts: { conflict?: boolean; fkViolation?: boolean }) {
@@ -125,6 +125,40 @@ describe("listEventRoster", () => {
       { personId: "p2", name: "Bo B", role: "mentor", signedUp: true, checkedIn: false, sessionId: null },
       { personId: "p3", name: "Cy C", role: "student", signedUp: false, checkedIn: true, sessionId: "s2" },
     ]);
+  });
+});
+
+describe("uncheckIn", () => {
+  function fakeDb(opts: { matches: boolean }) {
+    return {
+      from(table: string) {
+        if (table !== "session") throw new Error(`unexpected table ${table}`);
+        return {
+          delete: () => ({
+            eq: () => ({
+              eq: () => ({
+                eq: () => ({
+                  select: () => ({
+                    maybeSingle: async () => ({
+                      data: opts.matches ? { id: "s1" } : null,
+                      error: null,
+                    }),
+                  }),
+                }),
+              }),
+            }),
+          }),
+        };
+      },
+    } as never;
+  }
+
+  test("200 when the session matches this event", async () => {
+    expect(await uncheckIn("e1", "s1", fakeDb({ matches: true }))).toEqual({ ok: true, status: 200 });
+  });
+
+  test("404 when the session belongs to a different event (or doesn't exist)", async () => {
+    expect(await uncheckIn("e1", "s1", fakeDb({ matches: false }))).toEqual({ ok: false, status: 404 });
   });
 });
 

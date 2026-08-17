@@ -15,9 +15,10 @@ export const POST = withRole<Ctx>("mentor", async (viewer, request, context) => 
     : Response.json({ error: "failed" }, { status: result.status });
 });
 
-export const DELETE = withRole<Ctx>("mentor", async (_viewer, request) => {
+export const DELETE = withRole<Ctx>("mentor", async (_viewer, request, context) => {
+  const { id } = await context.params;
   const sessionId = new URL(request.url).searchParams.get("sessionId");
   if (!sessionId) return Response.json({ error: "invalid" }, { status: 400 });
-  const result = await uncheckIn(sessionId);
+  const result = await uncheckIn(id, sessionId);
   return result.ok ? Response.json({ ok: true }) : Response.json({ error: "failed" }, { status: result.status });
 });

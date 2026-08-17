@@ -116,11 +116,28 @@ export async function checkInPerson(
   return { ok: true, status: 201 };
 }
 
-/** Undo a mistaken check-in. Scoped to source='event' so it can never delete a kiosk/manual/admin session. */
-export async function uncheckIn(sessionId: string, db?: SupabaseClient): Promise<{ ok: boolean; status: number }> {
+/**
+ * Undo a mistaken check-in. Scoped to source='event' AND the given eventId,
+ * so it can never delete a kiosk/manual/admin session, or a session
+ * belonging to a different event, even if the caller has/guesses another
+ * event's session id. 404 if the session doesn't exist (or doesn't match).
+ */
+export async function uncheckIn(
+  eventId: string,
+  sessionId: string,
+  db?: SupabaseClient,
+): Promise<{ ok: boolean; status: number }> {
   const client = db ?? (await import("./db")).getDb();
-  const { error } = await client.from("session").delete().eq("id", sessionId).eq("source", "event");
+  const { data, error } = await client
+    .from("session")
+    .delete()
+    .eq("id", sessionId)
+    .eq("source", "event")
+    .eq("event_id", eventId)
+    .select("id")
+    .maybeSingle();
   if (error) return { ok: false, status: 500 };
+  if (!data) return { ok: false, status: 404 };
   return { ok: true, status: 200 };
 }
 
