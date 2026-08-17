@@ -56,6 +56,7 @@ export function ThemeToggle() {
   ];
 
   return (
+
     <div
       role="group"
       aria-label="Theme"
@@ -83,5 +84,6 @@ export function ThemeToggle() {
         </button>
       ))}
     </div>
+
   );
 }

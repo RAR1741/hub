@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-17T00:00:00.000Z",
+  "title": "Design System: Team Hub",
+  "extensions": {
+    "colorMeta": {
+      "red": { "role": "primary", "displayName": "Red Alert Red", "canonical": "#e01926", "tonalRamp": ["#3a0509", "#5c0a10", "#8a0e16", "#b4131d", "#e01926", "#ff3b45", "#ff7a80", "#ffc2c4"] },
+      "steel": { "role": "secondary", "displayName": "Steel", "canonical": "#55636e", "tonalRamp": ["#141719", "#22282c", "#3a444b", "#55636e", "#8ea0ad", "#b6c2ca", "#d7dee2", "#eaedef"] },
+      "canvas": { "role": "neutral", "displayName": "Shop Paper Canvas", "canonical": "#f5f2ee", "tonalRamp": ["#131417", "#1e1f22", "#3a3b3e", "#6e6863", "#a8a19a", "#d3cec7", "#e5e0d9", "#f5f2ee"] },
+      "surface": { "role": "neutral", "displayName": "Surface", "canonical": "#ffffff", "tonalRamp": ["#1b1d21", "#26282c", "#3a3d42", "#6e6863", "#a8a19a", "#e5e0d9", "#fbf9f6", "#ffffff"] },
+      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "#1b1719", "tonalRamp": ["#0c0a0b", "#1b1719", "#3a3436", "#6e6863", "#a8a19a", "#d3cec7", "#ece9e4", "#f5f2ee"] },
+      "present": { "role": "status", "displayName": "Present Green", "canonical": "#1f9d57", "tonalRamp": ["#0c3a20", "#146b34", "#1f9d57", "#35c878", "#5fd995", "#8ee6b6", "#c2f2d8", "#e8faef"] },
+      "excused": { "role": "status", "displayName": "Excused Blue", "canonical": "#2c6be6", "tonalRamp": ["#0f1f4a", "#173e85", "#2c6be6", "#5a93ff", "#84aeff", "#adc7ff", "#d3e0ff", "#eef3ff"] },
+      "optional": { "role": "status", "displayName": "Optional Gray", "canonical": "#6b7079", "tonalRamp": ["#161719", "#26282c", "#454a52", "#6b7079", "#8b93a0", "#b0b6bf", "#d5d9de", "#eef0f2"] },
+      "absent": { "role": "status", "displayName": "Absent Orange", "canonical": "#d67a22", "tonalRamp": ["#3d2107", "#6b3a0e", "#a2591a", "#d67a22", "#f0973e", "#f7b874", "#fbd7ac", "#fdedd9"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Archivo Display", "purpose": "Page-level h1/h2 on admin and list screens." },
+      "title": { "displayName": "Archivo Title", "purpose": "Card header titles (.card-head h3)." },
+      "body": { "displayName": "Inter Body", "purpose": "Default page and UI text." },
+      "label": { "displayName": "Eyebrow Label", "purpose": "Small uppercase section labels and table column headers." },
+      "mono": { "displayName": "JetBrains Mono Instrument Face", "purpose": "Every quantitative readout: hours, percentages, IDs, timestamps, counts, the pit-board clock." }
+    },
+    "shadows": [
+      { "name": "ambient-card", "value": "0 1px 2px rgba(20, 16, 14, 0.04), 0 6px 20px -10px rgba(20, 16, 14, 0.14)", "purpose": "Light ambient lift on cards, tables, the skip-link, and the kiosk shell (dark-mode value uses a heavier black alpha)." },
+      { "name": "modal", "value": "0 12px 40px -12px rgba(0, 0, 0, 0.5)", "purpose": "Heavier lift for the modal card, which stacks above a dimmed backdrop." }
+    ],
+    "motion": [
+      { "name": "control-transition", "value": "150ms ease", "purpose": "Default transition for background-color/border-color/color state changes on buttons and inputs." },
+      { "name": "status-pulse", "value": "hub-pulse 2s infinite", "purpose": "Live status-dot pulse in the status strip; disabled entirely under prefers-reduced-motion." }
+    ],
+    "breakpoints": [
+      { "name": "kiosk-grid-3up", "value": "640px" },
+      { "name": "kiosk-single-column", "value": "720px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single primary action per view.",
+      "html": "<button class=\"ds-btn ds-btn-primary\">Save changes</button>",
+      "css": ".ds-btn { font: inherit; display: inline-flex; align-items: center; justify-content: center; gap: 0.4375rem; border-radius: 9px; padding: 8px 14px; font-size: 13.5px; font-weight: 650; border: 1px solid transparent; cursor: pointer; transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease; } .ds-btn-primary { background: #e01926; border-color: #e01926; color: #ffffff; } .ds-btn-primary:hover { background: #b4131d; border-color: #b4131d; } .ds-btn-primary:focus-visible { outline: 2px solid #e01926; outline-offset: 2px; border-radius: 2px; } .ds-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Default action button; hovers to the surface-2 tone.",
+      "html": "<button class=\"ds-btn ds-btn-secondary\">Cancel</button>",
+      "css": ".ds-btn-secondary { font: inherit; display: inline-flex; align-items: center; justify-content: center; gap: 0.4375rem; border-radius: 9px; padding: 8px 14px; font-size: 13.5px; font-weight: 650; border: 1px solid #e5e0d9; background: #ffffff; color: #1b1719; cursor: pointer; transition: background-color 0.15s ease, border-color 0.15s ease; } .ds-btn-secondary:hover { background: #fbf9f6; border-color: #55636e; }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Standard raised surface with a card header.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card-head\"><h3>Roster</h3><span class=\"ds-count\">42</span></div><p style=\"margin:0;color:#6e6863;font-size:14px;\">Card body content.</p></div>",
+      "css": ".ds-card { background: #ffffff; border: 1px solid #e5e0d9; border-radius: 12px; box-shadow: 0 1px 2px rgba(20,16,14,0.04), 0 6px 20px -10px rgba(20,16,14,0.14); padding: 1.25rem; } .ds-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 16px; margin: -1.25rem -1.25rem 1.25rem; border-bottom: 1px solid #e5e0d9; } .ds-card-head h3 { font-weight: 750; font-size: 14px; letter-spacing: 0.01em; margin: 0; } .ds-count { font-family: ui-monospace, monospace; font-size: 12px; font-weight: 700; color: #6e6863; background: #eaedef; padding: 2px 8px; border-radius: 999px; }"
+    },
+    {
+      "name": "Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Standard text field with the app-wide red focus ring.",
+      "html": "<div class=\"ds-field\"><label class=\"ds-label\">Email</label><input class=\"ds-input\" type=\"email\" placeholder=\"you@team1741.org\" /></div>",
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 0.25rem; } .ds-label { font-size: 0.8125rem; font-weight: 600; color: #6e6863; } .ds-input { display: block; width: 100%; border-radius: 8px; border: 1px solid #e5e0d9; background: #ffffff; color: #1b1719; padding: 0.5rem 0.75rem; font-size: 0.875rem; } .ds-input:focus-visible { outline: 2px solid #e01926; outline-offset: 1px; }"
+    },
+    {
+      "name": "Status Pill",
+      "kind": "chip",
+      "refersTo": "pill",
+      "description": "Fixed four-color attendance-status vocabulary; also used for role/admin/on-off pills.",
+      "html": "<div style=\"display:flex;gap:8px;flex-wrap:wrap;\"><span class=\"ds-pill ds-pill-present\">Present</span><span class=\"ds-pill ds-pill-excused\">Excused</span><span class=\"ds-pill ds-pill-optional\">Optional</span><span class=\"ds-pill ds-pill-absent\">Absent</span></div>",
+      "css": ".ds-pill { display: inline-flex; align-items: center; gap: 0.25rem; font-size: 11.5px; font-weight: 700; padding: 3px 9px; border-radius: 999px; letter-spacing: 0.01em; } .ds-pill-present { background: #1f9d57; color: #ffffff; } .ds-pill-excused { background: #2c6be6; color: #ffffff; } .ds-pill-optional { background: #6b7079; color: #ffffff; } .ds-pill-absent { background: #d67a22; color: #ffffff; }"
+    },
+    {
+      "name": "Pit Board Row",
+      "kind": "custom",
+      "refersTo": "pit-row",
+      "description": "The system's signature component: index, name, and a live mono clock-in duration with a pulsing present-colored dot.",
+      "html": "<div class=\"ds-pit-row\"><span class=\"ds-idx\">01</span><span class=\"ds-nm\">Ada Lovelace</span><span class=\"ds-clock\"><span class=\"ds-live-dot\"></span>2:14:08</span></div>",
+      "css": ".ds-pit-row { display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #e5e0d9; } .ds-idx { font-family: ui-monospace, monospace; font-size: 12px; color: #6e6863; } .ds-nm { font-weight: 650; font-size: 15.5px; } .ds-clock { display: inline-flex; align-items: center; gap: 8px; font-family: ui-monospace, monospace; font-size: 14px; font-weight: 700; color: #1b1719; } .ds-live-dot { width: 7px; height: 7px; border-radius: 50%; background: #1f9d57; }"
+    },
+    {
+      "name": "Stat Block",
+      "kind": "custom",
+      "refersTo": "stat",
+      "description": "Big mono instrument-reading number with an optional goal-progress bar.",
+      "html": "<div class=\"ds-stat\"><div class=\"ds-stat-num\">128<small>h</small></div><div class=\"ds-stat-bar\"><i style=\"width:64%;\"></i></div></div>",
+      "css": ".ds-stat { padding: 16px; } .ds-stat-num { font-family: ui-monospace, monospace; font-weight: 750; font-size: 44px; line-height: 1; letter-spacing: -0.02em; } .ds-stat-num small { font-size: 18px; color: #6e6863; font-weight: 650; } .ds-stat-bar { height: 7px; border-radius: 4px; background: #eaedef; margin-top: 12px; overflow: hidden; } .ds-stat-bar i { display: block; height: 100%; background: #e01926; border-radius: 4px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Shop-Floor Control Panel",
+    "overview": "Team Hub reads like the instrument panel on a robotics team's shop floor, not a generic SaaS dashboard. Warm-neutral \"shop paper\" surfaces hold the page; Red Alert red is the single loud signal reserved for brand and primary action; a cool steel secondary handles quieter structural UI (badges, counts, borders-on-hover); and every number that matters — hours, percentages, IDs, timestamps, live clock-in durations — renders in a monospace, tabular-nums readout, so it feels measured rather than typeset. The kiosk (/kiosk) pushes this furthest: it's committed dark regardless of theme, because it's an always-on shop tablet, not a themed page a person configures.\n\nThe system is functional first: dense admin tables, role-gated CRUD, and status pills carry more of the visual weight than decoration does. Personality lives in specific, repeated details — the hazard stripe, the pit board, the live pulsing status dot — not in broad ornament.",
+    "keyCharacteristics": [
+      "Warm-neutral paper canvas with a single loud red accent, used sparingly and consistently for brand + primary action.",
+      "Mono, tabular-numeric readouts for every quantitative value (hours, counts, IDs, durations).",
+      "Mostly flat surfaces with tonal layering (canvas → surface → surface-2) for depth; shadow is a light ambient touch, not a structural signal.",
+      "The kiosk is intentionally always-dark — a shop-floor instrument, not a themed screen.",
+      "Full light/dark/system theming via a data-theme attribute, with an inline pre-paint script to avoid a flash of the wrong theme."
+    ],
+    "rules": [
+      { "name": "The One Red Rule", "body": "Red is brand and primary-action only — it never appears as a generic accent, decorative color, or a fifth attendance status. If something needs emphasis that isn't \"do this now,\" reach for steel or a status color, not red.", "section": "colors" },
+      { "name": "The Mono-Numbers Rule", "body": "Any value the user reads as a measurement — hours, percentages, counts, IDs, durations, timestamps — renders in the mono font with tabular-nums, never the body or display font.", "section": "typography" },
+      { "name": "The Instrument Face Rule", "body": "Mono is a distinct visual register, not a stylistic variant of body text — it signals \"this is data,\" so it never carries prose, labels, or button text.", "section": "typography" },
+      { "name": "The Tonal-Layering Rule", "body": "Reach for the next canvas/surface/surface-2 step before reaching for a heavier shadow. Shadow is ambient texture on raised surfaces, not the primary way this system expresses \"this is above that.\"", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep red to brand + the single primary action per view (The One Red Rule).",
+      "Do render every quantitative value — hours, percentages, IDs, durations, timestamps — in the mono font with tabular-nums (The Mono-Numbers Rule).",
+      "Do reach for the next canvas/surface/surface-2 tonal step before adding a heavier shadow.",
+      "Do keep kiosk touch targets large and the kiosk dark regardless of theme.",
+      "Do give every interactive control a visible :focus-visible outline (inherited from the global rule) and respect prefers-reduced-motion."
+    ],
+    "donts": [
+      "Don't introduce a second loud accent color alongside red; use steel or a status color.",
+      "Don't add shadow as a state-change signal (hover/active elevation) — this system's shadow is ambient, not structural.",
+      "Don't style numeric readouts in the body or display font — that's reserved for the mono face.",
+      "Don't theme the kiosk to follow light/dark — it's fixed dark by design.",
+      "Don't invent a fifth attendance-status color; present/excused/optional/absent is a closed, semantically fixed set."
+    ]
+  }
+}
