@@ -5,9 +5,11 @@ import { getDb } from "@/lib/db";
 import { getSetting } from "@/lib/settings";
 import { listTeams } from "@/lib/teams";
 import { listPeople } from "@/lib/people";
+import { computeAddRecommendations } from "@/lib/drive-group-sync";
 import type { ReconcileResult } from "@/lib/drive-group-sync";
 import { DriveSyncPanel } from "@/components/DriveSyncPanel";
 import { ReconcileReport } from "@/components/ReconcileReport";
+import { RecommendedMembers } from "@/components/RecommendedMembers";
 
 type IdentityJoin = { email: string };
 type MembershipPersonRow = {
@@ -47,20 +49,54 @@ export default async function AdminDriveSyncPage() {
   // email (lowercase) -> display name, for resolving added/wouldRemove lists.
   const { data: identityRows } = await db
     .from("person_identity")
-    .select("email, person (first_name, last_name)");
+    .select("email, person (id, is_active, first_name, last_name)");
   const nameByEmail: Record<string, string> = {};
+  const personByEmail = new Map<string, { personId: string; name: string; isActive: boolean }>();
   for (const row of (identityRows ?? []) as unknown as {
     email: string;
-    person: { first_name: string; last_name: string } | { first_name: string; last_name: string }[] | null;
+    person:
+      | { id: string; is_active: boolean; first_name: string; last_name: string }
+      | { id: string; is_active: boolean; first_name: string; last_name: string }[]
+      | null;
   }[]) {
     const p = Array.isArray(row.person) ? row.person[0] : row.person;
-    if (p) nameByEmail[row.email] = `${p.first_name} ${p.last_name}`;
+    if (!p) continue;
+    const name = `${p.first_name} ${p.last_name}`;
+    nameByEmail[row.email] = name;
+    personByEmail.set(row.email.toLowerCase(), { personId: p.id, name, isActive: p.is_active });
   }
 
   // The picker for associating an unrecognized email with a person.
   const peoplePicker = people
     .map((p) => ({ id: p.id, name: `${p.first_name} ${p.last_name}` }))
     .sort((a, b) => a.name.localeCompare(b.name));
+
+  // teamId -> set of current member personIds, over the linked teams only.
+  const linkedTeamIds = linkedTeams.map((t) => t.id);
+  const membersByTeam = new Map<string, Set<string>>();
+  if (linkedTeamIds.length > 0) {
+    const { data: memberRows } = await db
+      .from("team_membership")
+      .select("team_id, person_id")
+      .in("team_id", linkedTeamIds);
+    for (const row of (memberRows ?? []) as { team_id: string; person_id: string }[]) {
+      const set = membersByTeam.get(row.team_id) ?? new Set<string>();
+      set.add(row.person_id);
+      membersByTeam.set(row.team_id, set);
+    }
+  }
+
+  // lowercased group email -> team.
+  const groupEmailToTeam = new Map<string, { teamId: string; teamName: string }>();
+  for (const t of linkedTeams) {
+    if (t.googleGroupEmail) {
+      groupEmailToTeam.set(t.googleGroupEmail.toLowerCase(), { teamId: t.id, teamName: t.name });
+    }
+  }
+
+  const recommendations = lastReport
+    ? computeAddRecommendations(lastReport, groupEmailToTeam, personByEmail, membersByTeam)
+    : [];
 
   return (
     <main className="flex flex-col gap-6">
@@ -117,6 +153,15 @@ export default async function AdminDriveSyncPage() {
           <ReconcileReport report={lastReport} nameByEmail={nameByEmail} people={peoplePicker} />
         )}
       </section>
+
+      {lastReport ? (
+        <RecommendedMembers teams={recommendations} ranAt={lastReport.ranAt} />
+      ) : (
+        <section className="card flex flex-col gap-2">
+          <h2 className="text-base font-semibold">Recommended members</h2>
+          <p className="text-sm text-[var(--muted)]">Run a sync first to see recommendations.</p>
+        </section>
+      )}
     </main>
   );
 }

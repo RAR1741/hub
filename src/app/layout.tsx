@@ -58,7 +58,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           Skip to main content
         </a>
         <SiteNav />
-        <div id="main" className="mx-auto max-w-6xl px-4 py-6">
+        <div id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 flex flex-col">
           {children}
         </div>
       </body>

@@ -48,7 +48,7 @@ export default async function TeamsPage() {
   }
 
   return (
-    <main className="flex flex-col gap-6">
+    <main className="flex min-h-0 flex-1 flex-col gap-6">
       <div className="page-head">
         <div>
           <h1>Teams</h1>
@@ -59,7 +59,7 @@ export default async function TeamsPage() {
           Sign in to join a team.
         </p>
       )}
-      <div className="card">
+      <div className="mx-[calc(50%-50vw)] -mb-6 min-h-0 flex-1 overflow-auto p-4">
         <TeamTreeView roots={buildTeamTree(teams)} renderNode={renderNode} />
       </div>
     </main>
