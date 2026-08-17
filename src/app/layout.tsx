@@ -61,10 +61,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <div id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 flex flex-col">
           {children}
         </div>
-      {/* impeccable-live-start */}
-<script src="http://localhost:8400/live.js?token=b080af61-c88c-4e1b-b1dc-8be169d61e47"></script>
-{/* impeccable-live-end */}
-</body>
+      </body>
     </html>
   );
 }
