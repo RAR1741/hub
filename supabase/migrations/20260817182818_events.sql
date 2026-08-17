@@ -29,6 +29,10 @@ create table event_signup (
   primary key (event_id, person_id)
 );
 
+-- Composite PK covers the roster query (event_id = ...); this index covers
+-- signedUpEventIds()'s lookup (person_id = ... AND event_id IN (...)).
+create index event_signup_person_idx on event_signup (person_id);
+
 alter table event_signup enable row level security;
 -- Deliberately NO policies: default-deny; all access via service role.
 
