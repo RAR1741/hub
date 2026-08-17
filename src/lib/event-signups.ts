@@ -57,7 +57,7 @@ export async function listEventRoster(eventId: string, db?: SupabaseClient): Pro
   const client = db ?? (await import("./db")).getDb();
   const [{ data: signups, error: signupError }, { data: sessions, error: sessionError }] = await Promise.all([
     client.from("event_signup").select("person_id, person(id, first_name, last_name, display_name, role)").eq("event_id", eventId),
-    client.from("session").select("id, person_id, person!person_id(id, first_name, last_name, display_name, role)").eq("event_id", eventId),
+    client.from("session").select("id, person_id, person!person_id(id, first_name, last_name, display_name, role)").eq("event_id", eventId).eq("source", "event"),
   ]);
   if (signupError) console.error("listEventRoster: signup query failed", signupError);
   if (sessionError) console.error("listEventRoster: session query failed", sessionError);

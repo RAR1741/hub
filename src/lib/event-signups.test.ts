@@ -103,13 +103,15 @@ describe("listEventRoster", () => {
         if (table === "session") {
           return {
             select: () => ({
-              eq: async () => ({
-                data: [
-                  // p1 signed up AND checked in; p3 checked in without signing up (manual add)
-                  { id: "s1", person_id: "p1", person: { id: "p1", first_name: "Ann", last_name: "A", display_name: null, role: "student" } },
-                  { id: "s2", person_id: "p3", person: { id: "p3", first_name: "Cy", last_name: "C", display_name: null, role: "student" } },
-                ],
-                error: null,
+              eq: () => ({
+                eq: async () => ({
+                  data: [
+                    // p1 signed up AND checked in; p3 checked in without signing up (manual add)
+                    { id: "s1", person_id: "p1", person: { id: "p1", first_name: "Ann", last_name: "A", display_name: null, role: "student" } },
+                    { id: "s2", person_id: "p3", person: { id: "p3", first_name: "Cy", last_name: "C", display_name: null, role: "student" } },
+                  ],
+                  error: null,
+                }),
               }),
             }),
           };

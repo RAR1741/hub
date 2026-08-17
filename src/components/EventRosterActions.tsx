@@ -27,7 +27,7 @@ export function EventRosterActions({ eventId, entry }: { eventId: string; entry:
     setBusy(true);
     try {
       const res = await fetch(
-        `/api/admin/events/${eventId}/checkin?sessionId=${entry.sessionId}`,
+        `/api/admin/events/${eventId}/checkin?sessionId=${encodeURIComponent(entry.sessionId)}`,
         { method: "DELETE" },
       );
       if (res.ok) router.refresh();
