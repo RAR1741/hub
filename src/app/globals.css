@@ -464,6 +464,7 @@
     --tree-line: var(--hair);
     width: max-content;
     text-align: center;
+    margin-inline: auto;
   }
 
   .team-tree ul {
