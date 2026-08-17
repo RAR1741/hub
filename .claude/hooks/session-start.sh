@@ -19,14 +19,66 @@
 # https://code.claude.com/docs/en/claude-code-on-the-web
 set -euo pipefail
 
-# Only run in the remote (web) environment; local dev uses `docker compose up`.
+log() { echo "[session-start] $*"; }
+
+# --- Local mode: per-worktree isolated stacks --------------------------------
+# See scripts/new-worktree.sh. Two cases:
+#   1. This session is in one of those worktrees (.env has COMPOSE_PROJECT_NAME)
+#      → make sure its stack is up so it's ready before anyone asks.
+#   2. This session is in the main checkout → nudge Claude to create one for
+#      any new feature work, so the user never has to ask for it.
 if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
+  cd "$CLAUDE_PROJECT_DIR" 2>/dev/null || exit 0
+
+  if [ -f .env ] && grep -q '^COMPOSE_PROJECT_NAME=' .env; then
+    set -a; source .env; set +a
+    if [ -z "$(docker compose -p "$COMPOSE_PROJECT_NAME" ps -q app 2>/dev/null)" ]; then
+      log "Bringing up isolated stack '$COMPOSE_PROJECT_NAME'…"
+      ( docker compose up -d >"/tmp/compose-up-$COMPOSE_PROJECT_NAME.log" 2>&1 & ) || true
+    fi
+    log "Isolated worktree stack: app http://localhost:${APP_PORT:-3000}, Supabase Studio http://localhost:${SUPABASE_STUDIO_PORT:-54323}"
+  elif [ -d .git ] && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    # Only nudge from the MAIN checkout, not other/older worktrees that
+    # predate this scheme (.git here is a real dir; a linked worktree's .git
+    # is a gitdir-pointer file).
+
+    # Finish removals queued by post-merge-cleanup.sh: it can't rmdir a
+    # worktree that was still its own cwd, so it defers to here — a fresh,
+    # unrelated process that holds no handle on that directory.
+    PENDING=".claude/worktrees/.pending-cleanup"
+    if [ -s "$PENDING" ]; then
+      REMAINING="$(mktemp)"
+      while IFS="$(printf '\t')" read -r DIR BR; do
+        [ -n "$DIR" ] || continue
+        if git worktree remove "$DIR" --force 2>/dev/null; then
+          git branch -D "$BR" 2>/dev/null || true
+          log "Cleaned up merged worktree '$BR'."
+        else
+          echo -e "$DIR\t$BR" >> "$REMAINING"
+        fi
+      done < "$PENDING"
+      mv "$REMAINING" "$PENDING"
+      [ -s "$PENDING" ] || rm -f "$PENDING"
+    fi
+
+    cat <<'EOF'
+You are in the hub repo's MAIN checkout (not an isolated worktree). Per
+standing user preference: before starting any new feature/bugfix work that
+involves writing code, create an isolated worktree with its own Docker/
+Supabase stack and do the work there instead of in this checkout:
+
+    scripts/new-worktree.sh <branch-name>
+    cd .claude/worktrees/<branch-name> && ./dev
+
+Do this automatically, without asking — the stack starts itself in the
+background. Only skip it if already inside a worktree, or the user
+explicitly says not to bother for a trivial change.
+EOF
+  fi
   exit 0
 fi
 
 cd "$CLAUDE_PROJECT_DIR"
-
-log() { echo "[session-start] $*"; }
 
 # --- 1. npm dependencies (idempotent, cache-friendly) ------------------------
 if [ ! -x node_modules/.bin/next ]; then

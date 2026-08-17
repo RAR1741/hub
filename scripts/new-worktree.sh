@@ -52,6 +52,8 @@ WORKTREE_OFFSET=$OFFSET
 COMPOSE_PROJECT_NAME=$PROJECT_NAME
 APP_PORT=$APP_PORT
 SUPABASE_DB_PORT=$DB_PORT
+SUPABASE_API_PORT=$API_PORT
+SUPABASE_STUDIO_PORT=$STUDIO_PORT
 EOF
 
 # supabase/config.toml has no env-var indirection for ports, so rewrite the
@@ -75,5 +77,14 @@ echo "Worktree ready: $TARGET"
 echo "  App:              http://localhost:$APP_PORT"
 echo "  Supabase Studio:  http://localhost:$STUDIO_PORT"
 echo "  Supabase API:     http://localhost:$API_PORT"
+
+# Bring the isolated stack up in the background so it's ready by the time
+# anything looks for it (e.g. the SessionStart hook). Non-fatal if it fails —
+# `./dev` / `docker compose up` still work from the worktree directly.
+if [ "${NEW_WORKTREE_SKIP_UP:-}" != "1" ]; then
+  echo "Starting isolated stack '$PROJECT_NAME' in the background…"
+  ( cd "$TARGET" && docker compose up -d >"/tmp/compose-up-$PROJECT_NAME.log" 2>&1 & ) || true
+fi
+
 echo
 echo "cd \"$TARGET\" && ./dev"
