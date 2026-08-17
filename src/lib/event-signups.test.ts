@@ -2,9 +2,29 @@ import { describe, expect, test } from "vitest";
 import { checkInPerson, listEventRoster, signUpForEvent, signedUpEventIds, uncheckIn } from "./event-signups";
 
 describe("signUpForEvent", () => {
-  function fakeDb(opts: { conflict?: boolean; fkViolation?: boolean }) {
+  function fakeDb(opts: { conflict?: boolean; fkViolation?: boolean; eventEnded?: boolean; noEvent?: boolean }) {
     return {
       from(table: string) {
+        if (table === "event") {
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: opts.noEvent
+                    ? null
+                    : {
+                        id: "e1", period_id: "pd1", name: "Demo", location: null,
+                        description: null,
+                        starts_at: opts.eventEnded ? "2020-01-01T18:00:00Z" : "2099-01-01T18:00:00Z",
+                        ends_at: opts.eventEnded ? "2020-01-01T20:00:00Z" : "2099-01-01T20:00:00Z",
+                        created_by: "m1", created_at: "2020-01-01T00:00:00Z",
+                      },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
         if (table !== "event_signup") throw new Error(`unexpected table ${table}`);
         return {
           insert: async () => ({
@@ -31,6 +51,16 @@ describe("signUpForEvent", () => {
   test("400 on a bad event/person id", async () => {
     expect(await signUpForEvent("e1", "p1", fakeDb({ fkViolation: true })))
       .toEqual({ ok: false, status: 400 });
+  });
+
+  test("409 when the event doesn't exist", async () => {
+    expect(await signUpForEvent("e1", "p1", fakeDb({ noEvent: true })))
+      .toEqual({ ok: false, status: 409 });
+  });
+
+  test("409 when the event has already ended", async () => {
+    expect(await signUpForEvent("e1", "p1", fakeDb({ eventEnded: true })))
+      .toEqual({ ok: false, status: 409 });
   });
 });
 

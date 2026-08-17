@@ -5,12 +5,15 @@ import { getEvent } from "./events";
 const UNIQUE_VIOLATION = "23505";
 const FOREIGN_KEY_VIOLATION = "23503";
 
+/** 409 if the event doesn't exist or has already ended — no signing up for the past. */
 export async function signUpForEvent(
   eventId: string,
   personId: string,
   db?: SupabaseClient,
 ): Promise<{ ok: boolean; status: number }> {
   const client = db ?? (await import("./db")).getDb();
+  const event = await getEvent(eventId, client);
+  if (!event || Date.parse(event.endsAt) <= Date.now()) return { ok: false, status: 409 };
   const { error } = await client.from("event_signup").insert({ event_id: eventId, person_id: personId });
   if (error) {
     if (error.code === UNIQUE_VIOLATION) return { ok: false, status: 409 };

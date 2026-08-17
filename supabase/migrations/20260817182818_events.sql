@@ -43,9 +43,14 @@ alter table event_signup enable row level security;
 -- the event. `event_id` is restrict-on-delete (like `session.period_id`) so
 -- deleting an event can't silently orphan attendance history; deleteEvent()
 -- checks for existing check-ins first and returns a clean 409 instead.
+-- NOT VALID + separate VALIDATE skips the full-table scan while dropping
+-- the lock; existing rows already satisfy both constraints (the new source
+-- check is a superset of the old, and event_id is a brand-new nullable
+-- column so no row can yet violate the event_id/source pairing).
 alter table session drop constraint if exists session_source_check;
 alter table session add constraint session_source_check
-  check (source in ('kiosk', 'manual', 'admin', 'import', 'event'));
+  check (source in ('kiosk', 'manual', 'admin', 'import', 'event')) not valid;
+alter table session validate constraint session_source_check;
 
 alter table session add column event_id uuid references event (id) on delete restrict;
 
@@ -53,7 +58,8 @@ alter table session add column event_id uuid references event (id) on delete res
 -- check-in is scopable and the per-person-per-event uniqueness guarantee
 -- below can't be bypassed by a source='event' row with a null event_id.
 alter table session add constraint session_event_id_requires_event_source
-  check ((source = 'event') = (event_id is not null));
+  check ((source = 'event') = (event_id is not null)) not valid;
+alter table session validate constraint session_event_id_requires_event_source;
 
 create unique index one_session_per_person_per_event
   on session (person_id, event_id)
