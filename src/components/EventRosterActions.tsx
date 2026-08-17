@@ -82,8 +82,13 @@ export function ManualAddPerson({
 
   return (
     <div className="card flex flex-wrap items-center gap-3">
-      <span className="font-semibold">Add someone who didn&apos;t sign up:</span>
-      <select className="input" value={personId} onChange={(e) => setSelected(e.target.value)}>
+      <span className="font-semibold" id="manual-add-label">Add someone who didn&apos;t sign up:</span>
+      <select
+        className="input"
+        aria-labelledby="manual-add-label"
+        value={personId}
+        onChange={(e) => setSelected(e.target.value)}
+      >
         {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
       </select>
       <button disabled={busy} onClick={add} className="btn btn-primary px-3 py-1">
