@@ -10,7 +10,7 @@ import {
   firstExperienceFromRow, guardianFromRow,
   type FirstExperienceRow, type GuardianRow,
 } from "./types";
-import { eventFromRow, type EventRow } from "./types";
+import { eventFromRow } from "./types";
 
 describe("teamFromRow", () => {
   test("maps snake_case to camelCase", () => {
