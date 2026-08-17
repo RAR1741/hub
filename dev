@@ -13,15 +13,29 @@
 # MSYS_NO_PATHCONV=1, e.g.: MSYS_NO_PATHCONV=1 ./dev cat /etc/hosts
 set -euo pipefail
 
-COMPOSE_FILE="$(cd "$(dirname "$0")" && pwd)/.devcontainer/docker-compose.yml"
-export LOCAL_WORKSPACE_FOLDER="${LOCAL_WORKSPACE_FOLDER:-$(cd "$(dirname "$0")" && pwd)}"
+ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
+COMPOSE_FILE="$ROOT_DIR/.devcontainer/docker-compose.yml"
+export LOCAL_WORKSPACE_FOLDER="${LOCAL_WORKSPACE_FOLDER:-$ROOT_DIR}"
+
+# Load per-worktree overrides (COMPOSE_PROJECT_NAME, APP_PORT, ...) if present.
+# Only fills in vars not already set in the environment — an explicit
+# `COMPOSE_PROJECT_NAME=foo ./dev` should win over whatever's in .env, not
+# get silently clobbered by it (standard dotenv precedence).
+if [ -f "$ROOT_DIR/.env" ]; then
+  while IFS='=' read -r key val; do
+    [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+    [ -n "${!key+x}" ] && continue
+    export "$key=$val"
+  done < <(grep -v '^\s*#' "$ROOT_DIR/.env" | grep '=')
+fi
 
 # Pin the compose project name so this script always joins the same stack
 # VS Code's Dev Containers extension starts (it reads the `name:` in
 # docker-compose.yml). Without this, a project name derived from the
 # invoking directory could drift from VS Code's, starting a second stack
-# that fights the first one for port 3000.
-PROJECT_NAME="team-hub"
+# that fights the first one for port 3000. Overridden per-worktree via
+# .env so parallel git worktrees don't collide.
+PROJECT_NAME="${COMPOSE_PROJECT_NAME:-team-hub}"
 
 # Start the service if it isn't already running.
 if [ -z "$(docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" ps -q app 2>/dev/null)" ]; then
