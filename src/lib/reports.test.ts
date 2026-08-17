@@ -9,7 +9,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 const s = (over: Partial<Session>): Session => ({
   id: "s", personId: "p", periodId: "pd", timeIn: "2026-09-01T18:00:00Z",
   timeOut: "2026-09-01T20:00:00Z", source: "kiosk", note: null,
-  excludedFromTotals: false, editedBy: null, editedAt: null, flagsResolvedAt: null, ...over,
+  excludedFromTotals: false, editedBy: null, editedAt: null, flagsResolvedAt: null, eventId: null, ...over,
 });
 
 // Fake db that pages session rows via .range() — mirrors PostgREST's 1000 cap.

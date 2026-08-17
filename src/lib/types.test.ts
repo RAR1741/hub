@@ -10,6 +10,7 @@ import {
   firstExperienceFromRow, guardianFromRow,
   type FirstExperienceRow, type GuardianRow,
 } from "./types";
+import { eventFromRow, type EventRow } from "./types";
 
 describe("teamFromRow", () => {
   test("maps snake_case to camelCase", () => {
@@ -114,12 +115,59 @@ describe("sessionFromRow", () => {
       time_in: "2026-09-01T22:00:00Z", time_out: null,
       source: "kiosk", note: null, excluded_from_totals: false,
       edited_by: null, edited_at: null, flags_resolved_at: null,
+      event_id: null,
     };
     expect(sessionFromRow(row)).toEqual({
       id: "s1", personId: "p1", periodId: "pd1",
       timeIn: "2026-09-01T22:00:00Z", timeOut: null,
       source: "kiosk", note: null, excludedFromTotals: false,
       editedBy: null, editedAt: null, flagsResolvedAt: null,
+      eventId: null,
+    });
+  });
+
+  test("maps event_id through", () => {
+    const row: SessionRow = {
+      id: "s1", person_id: "p1", period_id: "pd1",
+      time_in: "2027-03-01T18:00:00Z", time_out: "2027-03-01T20:00:00Z",
+      source: "event" as const, note: null, excluded_from_totals: false,
+      edited_by: "m1", edited_at: "2027-01-01T00:00:00Z",
+      flags_resolved_at: null, event_id: "e1",
+    };
+    expect(sessionFromRow(row)).toEqual({
+      id: "s1", personId: "p1", periodId: "pd1",
+      timeIn: "2027-03-01T18:00:00Z", timeOut: "2027-03-01T20:00:00Z",
+      source: "event", note: null, excludedFromTotals: false,
+      editedBy: "m1", editedAt: "2027-01-01T00:00:00Z",
+      flagsResolvedAt: null, eventId: "e1",
+    });
+  });
+});
+
+describe("eventFromRow", () => {
+  test("maps snake_case columns to camelCase", () => {
+    expect(
+      eventFromRow({
+        id: "e1",
+        period_id: "p1",
+        name: "Robot Demo",
+        location: "Library",
+        description: null,
+        starts_at: "2027-03-01T18:00:00Z",
+        ends_at: "2027-03-01T20:00:00Z",
+        created_by: "m1",
+        created_at: "2027-01-01T00:00:00Z",
+      }),
+    ).toEqual({
+      id: "e1",
+      periodId: "p1",
+      name: "Robot Demo",
+      location: "Library",
+      description: null,
+      startsAt: "2027-03-01T18:00:00Z",
+      endsAt: "2027-03-01T20:00:00Z",
+      createdBy: "m1",
+      createdAt: "2027-01-01T00:00:00Z",
     });
   });
 });
