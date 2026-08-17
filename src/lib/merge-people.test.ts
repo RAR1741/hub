@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { mergePeople, rejectPair, unrejectPair } from "./merge-people";
+import { listDuplicateCandidates, listRejectedPairs, mergePeople, rejectPair, unrejectPair } from "./merge-people";
 
 function rpcDb(result: { error?: { code: string; message?: string } | null }) {
   return {
@@ -107,5 +107,72 @@ describe("unrejectPair", () => {
     const db = makeDb({ deleteResult: { error: { message: "boom" } } });
     const r = await unrejectPair("aaa", "bbb", db);
     expect(r).toEqual({ ok: false, status: 500 });
+  });
+});
+
+/**
+ * Build a multi-table mock db whose from(table) returns different data
+ * depending on the table name. Supports the fluent select/in/order/eq chains
+ * used by listDuplicateCandidates and listRejectedPairs.
+ */
+function makeMultiTableDb(tableData: Record<string, unknown[]>) {
+  function makeQuery(rows: unknown[]) {
+    const q = {
+      data: rows,
+      error: null,
+      select: (_: string) => q,
+      order: (_col: string, _opts?: unknown) => q,
+      in: (_col: string, _vals: unknown[]) => q,
+      eq: (_col: string, _val: unknown) => q,
+    };
+    return q;
+  }
+  return {
+    from: (table: string) => makeQuery(tableData[table] ?? []),
+  } as never;
+}
+
+describe("listDuplicateCandidates", () => {
+  test("filters out a rejected pair; the filter runs before the MAX_PAIRS cap", async () => {
+    // Two people with identical names → findDuplicateCandidates will score them
+    // at 1.0 (well above the 0.72 threshold). Their pair is then dismissed.
+    // id ordering: "id-a" < "id-b" so the stored pair key is "id-a|id-b".
+    const personRows = [
+      { id: "id-a", first_name: "Jordan", last_name: "Smith", role: "mentor", is_active: true },
+      { id: "id-b", first_name: "Jordan", last_name: "Smith", role: "mentor", is_active: true },
+    ];
+    const db = makeMultiTableDb({
+      person: personRows,
+      person_merge_rejection: [{ a: "id-a", b: "id-b" }],
+      // enrichment tables — empty since no candidates survive the filter
+      person_identity: [],
+      session: [],
+      team_membership: [],
+    });
+
+    const result = await listDuplicateCandidates(db);
+    expect(result).toEqual([]);
+  });
+});
+
+describe("listRejectedPairs", () => {
+  test("returns both people's names for each rejection row", async () => {
+    const db = makeMultiTableDb({
+      person_merge_rejection: [{ a: "id-a", b: "id-b" }],
+      person: [
+        { id: "id-a", first_name: "Alice", last_name: "Alpha", role: "student", is_active: true },
+        { id: "id-b", first_name: "Bob", last_name: "Beta", role: "mentor", is_active: false },
+      ],
+      person_identity: [],
+      session: [],
+      team_membership: [],
+    });
+
+    const result = await listRejectedPairs(db);
+    expect(result).toHaveLength(1);
+    expect(result[0].a.firstName).toBe("Alice");
+    expect(result[0].a.lastName).toBe("Alpha");
+    expect(result[0].b.firstName).toBe("Bob");
+    expect(result[0].b.lastName).toBe("Beta");
   });
 });
