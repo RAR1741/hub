@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cancelEventSignup, signUpForEvent } from "@/lib/event-signups";
 import { clientIp, createRateLimiter } from "@/lib/rate-limit";
+import { reqUuid } from "@/lib/validate";
 import { getViewer } from "@/lib/viewer";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -13,7 +14,9 @@ export async function POST(request: Request, context: Ctx) {
   }
   const viewer = await getViewer();
   if (!viewer.person) return NextResponse.json({ ok: false }, { status: 401 });
-  const { id } = await context.params;
+  const { id: rawId } = await context.params;
+  const id = reqUuid(rawId);
+  if (!id) return NextResponse.json({ ok: false }, { status: 400 });
   // person_id is ALWAYS the viewer's own id — never read from the body.
   const result = await signUpForEvent(id, viewer.person.id);
   return NextResponse.json({ ok: result.ok }, { status: result.status });
@@ -22,7 +25,9 @@ export async function POST(request: Request, context: Ctx) {
 export async function DELETE(_request: Request, context: Ctx) {
   const viewer = await getViewer();
   if (!viewer.person) return NextResponse.json({ ok: false }, { status: 401 });
-  const { id } = await context.params;
+  const { id: rawId } = await context.params;
+  const id = reqUuid(rawId);
+  if (!id) return NextResponse.json({ ok: false }, { status: 400 });
   const result = await cancelEventSignup(id, viewer.person.id);
   return NextResponse.json({ ok: result.ok }, { status: result.status });
 }

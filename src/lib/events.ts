@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Event, EventRow } from "./types";
 import { eventFromRow } from "./types";
-import { optString, reqString } from "./validate";
+import { optString, reqString, reqUuid } from "./validate";
 
 export type EventInput = {
   name: string;
@@ -17,7 +17,7 @@ export function parseEventInput(body: unknown): EventInput | null {
   if (typeof body !== "object" || body === null) return null;
   const b = body as Record<string, unknown>;
   const name = reqString(b.name, 120);
-  const periodId = reqString(b.periodId, 64);
+  const periodId = reqUuid(b.periodId);
   const startsAt =
     typeof b.startsAt === "string" && !Number.isNaN(Date.parse(b.startsAt))
       ? new Date(b.startsAt).toISOString()

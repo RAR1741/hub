@@ -4,7 +4,7 @@ import { deleteEvent, parseEventInput } from "./events";
 describe("parseEventInput", () => {
   const base = {
     name: "Robot Demo",
-    periodId: "pd1",
+    periodId: "11111111-1111-1111-1111-111111111111",
     startsAt: "2027-03-01T18:00:00Z",
     endsAt: "2027-03-01T20:00:00Z",
   };
@@ -12,7 +12,7 @@ describe("parseEventInput", () => {
   // parseEventInput normalizes timestamps via toISOString()
   const normalized = {
     name: "Robot Demo",
-    periodId: "pd1",
+    periodId: "11111111-1111-1111-1111-111111111111",
     startsAt: new Date(base.startsAt).toISOString(),
     endsAt: new Date(base.endsAt).toISOString(),
   };

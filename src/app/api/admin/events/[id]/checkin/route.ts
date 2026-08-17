@@ -1,13 +1,13 @@
 import { withRole } from "@/lib/api";
 import { checkInPerson, uncheckIn } from "@/lib/event-signups";
-import { reqString, reqUuid } from "@/lib/validate";
+import { reqUuid } from "@/lib/validate";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 export const POST = withRole<Ctx>("mentor", async (viewer, request, context) => {
   const { id } = await context.params;
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
-  const personId = body ? reqString(body.personId, 64) : null;
+  const personId = body ? reqUuid(body.personId) : null;
   if (!personId) return Response.json({ error: "invalid" }, { status: 400 });
   const result = await checkInPerson(id, personId, viewer.person!.id);
   return result.ok
