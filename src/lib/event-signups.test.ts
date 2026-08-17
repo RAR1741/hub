@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { checkInPerson, listEventRoster, signUpForEvent } from "./event-signups";
+import { checkInPerson, listEventRoster, signUpForEvent, signedUpEventIds } from "./event-signups";
 
 describe("signUpForEvent", () => {
   function fakeDb(opts: { conflict?: boolean; fkViolation?: boolean }) {
@@ -125,5 +125,17 @@ describe("listEventRoster", () => {
       { personId: "p2", name: "Bo B", role: "mentor", signedUp: true, checkedIn: false, sessionId: null },
       { personId: "p3", name: "Cy C", role: "student", signedUp: false, checkedIn: true, sessionId: "s2" },
     ]);
+  });
+});
+
+describe("signedUpEventIds", () => {
+  test("returns only the ids the person signed up for", async () => {
+    const fakeDb = {
+      from(table: string) {
+        if (table !== "event_signup") throw new Error(`unexpected table ${table}`);
+        return { select: () => ({ eq: () => ({ in: async () => ({ data: [{ event_id: "e1" }] }) }) }) };
+      },
+    } as never;
+    expect(await signedUpEventIds("p1", ["e1", "e2"], fakeDb)).toEqual(new Set(["e1"]));
   });
 });

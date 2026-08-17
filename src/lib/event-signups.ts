@@ -123,3 +123,19 @@ export async function uncheckIn(sessionId: string, db?: SupabaseClient): Promise
   if (error) return { ok: false, status: 500 };
   return { ok: true, status: 200 };
 }
+
+/** Event ids the given person has signed up for, among the given event ids. */
+export async function signedUpEventIds(
+  personId: string,
+  eventIds: string[],
+  db?: SupabaseClient,
+): Promise<Set<string>> {
+  if (eventIds.length === 0) return new Set();
+  const client = db ?? (await import("./db")).getDb();
+  const { data } = await client
+    .from("event_signup")
+    .select("event_id")
+    .eq("person_id", personId)
+    .in("event_id", eventIds);
+  return new Set((data ?? []).map((r) => r.event_id as string));
+}
