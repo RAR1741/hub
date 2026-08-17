@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
@@ -25,11 +26,21 @@ export default async function TeamsPage() {
       ])
     : [new Set<string>(), new Set<string>()];
 
+  // Editing/managing a team is admin-only (see /admin/teams/[id] and its API),
+  // so only admins get a clickable name that links to the team edit page.
+  const canManageTeams = hasRole(viewer.role, "admin");
+
   function renderNode(n: TeamNode) {
     return (
       <>
         <div className="flex flex-wrap items-center gap-2">
-          <strong className="font-medium">{n.name}</strong>
+          {canManageTeams ? (
+            <Link href={`/admin/teams/${n.id}`} className="font-medium underline">
+              {n.name}
+            </Link>
+          ) : (
+            <strong className="font-medium">{n.name}</strong>
+          )}
           <span className="pill role">{counts.get(n.id) ?? 0} members</span>
         </div>
         {n.description ? (
