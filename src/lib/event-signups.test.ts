@@ -1,0 +1,129 @@
+import { describe, expect, test } from "vitest";
+import { checkInPerson, listEventRoster, signUpForEvent } from "./event-signups";
+
+describe("signUpForEvent", () => {
+  function fakeDb(opts: { conflict?: boolean; fkViolation?: boolean }) {
+    return {
+      from(table: string) {
+        if (table !== "event_signup") throw new Error(`unexpected table ${table}`);
+        return {
+          insert: async () => ({
+            error: opts.conflict
+              ? { code: "23505" }
+              : opts.fkViolation
+                ? { code: "23503" }
+                : null,
+          }),
+        };
+      },
+    } as never;
+  }
+
+  test("201 on a fresh sign-up", async () => {
+    expect(await signUpForEvent("e1", "p1", fakeDb({}))).toEqual({ ok: true, status: 201 });
+  });
+
+  test("409 when already signed up", async () => {
+    expect(await signUpForEvent("e1", "p1", fakeDb({ conflict: true })))
+      .toEqual({ ok: false, status: 409 });
+  });
+
+  test("400 on a bad event/person id", async () => {
+    expect(await signUpForEvent("e1", "p1", fakeDb({ fkViolation: true })))
+      .toEqual({ ok: false, status: 400 });
+  });
+});
+
+describe("checkInPerson", () => {
+  function fakeDb(opts: { eventExists: boolean; conflict?: boolean }) {
+    return {
+      from(table: string) {
+        if (table === "event") {
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: opts.eventExists
+                    ? {
+                        id: "e1", period_id: "pd1", name: "Demo", location: null,
+                        description: null, starts_at: "2027-03-01T18:00:00Z",
+                        ends_at: "2027-03-01T20:00:00Z", created_by: "m1",
+                        created_at: "2027-01-01T00:00:00Z",
+                      }
+                    : null,
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === "session") {
+          return {
+            insert: async () => ({ error: opts.conflict ? { code: "23505" } : null }),
+          };
+        }
+        throw new Error(`unexpected table ${table}`);
+      },
+    } as never;
+  }
+
+  test("404 when the event doesn't exist", async () => {
+    expect(await checkInPerson("e1", "p1", "m1", fakeDb({ eventExists: false })))
+      .toEqual({ ok: false, status: 404 });
+  });
+
+  test("201 on a fresh check-in", async () => {
+    expect(await checkInPerson("e1", "p1", "m1", fakeDb({ eventExists: true })))
+      .toEqual({ ok: true, status: 201 });
+  });
+
+  test("409 when already checked in to this event", async () => {
+    expect(await checkInPerson("e1", "p1", "m1", fakeDb({ eventExists: true, conflict: true })))
+      .toEqual({ ok: false, status: 409 });
+  });
+});
+
+describe("listEventRoster", () => {
+  function fakeDb() {
+    return {
+      from(table: string) {
+        if (table === "event_signup") {
+          return {
+            select: () => ({
+              eq: async () => ({
+                data: [
+                  { person_id: "p1", person: { id: "p1", first_name: "Ann", last_name: "A", display_name: null, role: "student" } },
+                  { person_id: "p2", person: { id: "p2", first_name: "Bo", last_name: "B", display_name: null, role: "mentor" } },
+                ],
+                error: null,
+              }),
+            }),
+          };
+        }
+        if (table === "session") {
+          return {
+            select: () => ({
+              eq: async () => ({
+                data: [
+                  // p1 signed up AND checked in; p3 checked in without signing up (manual add)
+                  { id: "s1", person_id: "p1", person: { id: "p1", first_name: "Ann", last_name: "A", display_name: null, role: "student" } },
+                  { id: "s2", person_id: "p3", person: { id: "p3", first_name: "Cy", last_name: "C", display_name: null, role: "student" } },
+                ],
+                error: null,
+              }),
+            }),
+          };
+        }
+        throw new Error(`unexpected table ${table}`);
+      },
+    } as never;
+  }
+
+  test("merges signups and check-ins, sorted by name", async () => {
+    expect(await listEventRoster("e1", fakeDb())).toEqual([
+      { personId: "p1", name: "Ann A", role: "student", signedUp: true, checkedIn: true, sessionId: "s1" },
+      { personId: "p2", name: "Bo B", role: "mentor", signedUp: true, checkedIn: false, sessionId: null },
+      { personId: "p3", name: "Cy C", role: "student", signedUp: false, checkedIn: true, sessionId: "s2" },
+    ]);
+  });
+});
