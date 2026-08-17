@@ -1,0 +1,28 @@
+# Root-level one-command local stack.
+#
+#   docker compose up          # build + start everything, streaming logs
+#   docker compose up -d       # …in the background
+#   docker compose down        # stop the app container AND local Supabase
+#
+# This builds/starts the dev container and runs scripts/dev-up.sh inside it, which
+# brings up local Supabase (sibling containers) and the Next.js dev server together.
+# App: http://localhost:3000 · Supabase Studio: http://localhost:54323
+#
+# The `app` service is reused from the devcontainer definition via `extends`, so this
+# file and VS Code "Reopen in Container" never drift. The only override is `command`:
+# the devcontainer runs `sleep infinity` (you attach and run things by hand); here we
+# run the startup script. Same project name + service means switching between the two
+# entry modes just recreates the container with the other command — expected.
+#
+# `./dev <cmd>` still works against whichever mode is running (it execs into the app
+# container). Run one-off commands like `./dev npm run test` that way.
+name: team-hub
+
+services:
+  app:
+    extends:
+      file: .devcontainer/docker-compose.yml
+      service: app
+    command: ["bash", "/workspaces/hub/scripts/dev-up.sh"]
+    # Give scripts/dev-up.sh's SIGTERM trap time to run `supabase stop` on `down`.
+    stop_grace_period: 60s

@@ -13,24 +13,37 @@ Attendance + roster web app for FRC Team 1741 (Red Alert Robotics).
 
 ## Development
 
-**Host requirements: Docker Desktop, VS Code (Dev Containers extension), a browser. Nothing else** —
-Node, npm, the Supabase CLI, and psql all live inside the dev container.
+**Host requirements: Docker Desktop, a browser. Nothing else** — Node, npm, the Supabase CLI,
+and psql all live inside the dev container. (VS Code with the Dev Containers extension is
+optional; see below.)
 
-Two ways to run commands inside the container — use whichever fits:
+### Quick start — one command
 
-- **`./dev` helper** (host shell, no editor needed): `./dev npm install`, `./dev npm run dev`,
-  `./dev bash` for an interactive shell. It starts the container if it isn't already running.
+From the repo root:
+
+    docker compose up
+
+That builds the dev container and runs [`scripts/dev-up.sh`](scripts/dev-up.sh) inside it, which
+installs npm deps (first run only), starts local Supabase (sibling containers), and starts the
+Next.js dev server — all together, with logs streaming. Add `-d` to run it in the background.
+
+- App: http://localhost:3000 · Supabase Studio: http://localhost:54323
+- `docker compose down` stops **both** the app container and local Supabase (the startup script
+  traps the shutdown signal and runs `supabase stop`; your DB data is preserved across restarts).
+- First run needs `.env.local` — `cp .env.example .env.local` and fill in the keys. The committed
+  local Supabase keys are stable demo JWTs, so the checked-in `.env.local` values just work.
+
+### Running one-off commands
+
+- **`./dev` helper** (host shell): `./dev npm run test`, `./dev npm run db:psql`, `./dev bash`
+  for an interactive shell. It execs into the running app container (starting it if needed).
 - **VS Code "Reopen in Container"**: Command Palette → **Dev Containers: Reopen in Container**,
-  then run commands directly in the integrated terminal (already inside the container).
+  then run commands in the integrated terminal (already inside the container).
 
-Setup:
-
-    ./dev npm install
-    ./dev npm run db:start            # starts local Supabase (sibling containers)
-    cp .env.example .env.local        # fill in keys printed by db:start
-    ./dev npm run dev
-
-Open http://localhost:3000 in your host browser. Supabase Studio is at http://localhost:54323.
+Note: `docker compose up` and VS Code "Reopen in Container" share the same container (project
+`team-hub`) but start it with different commands — the former runs the full stack, the latter
+just idles so you drive it by hand. Switching between the two recreates the container; that's
+expected. Use one mode at a time.
 
 Tests & checks: `./dev npm run test`, `./dev npm run lint`, `./dev npm run typecheck`, `./dev npm run build`.
 Database: `./dev npm run db:reset` (re-apply migrations + seed), `./dev npm run db:psql` (SQL shell),
