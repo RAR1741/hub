@@ -68,15 +68,20 @@ export async function SiteNav() {
             <ThemeToggle />
             {viewer.person ? (
               <span className="flex items-center gap-2 text-[13px] text-[var(--muted)]">
-                <span
-                  className="grid h-[27px] w-[27px] place-items-center rounded-full text-[12px] font-bold text-white"
-                  style={{ background: "var(--steel)" }}
-                  aria-hidden="true"
+                <Link
+                  href={`/people/${viewer.person.id}`}
+                  className="flex items-center gap-2 text-[var(--muted)] hover:text-[var(--ink)] hover:no-underline"
                 >
-                  {initials}
-                </span>
-                {viewer.person.firstName} {viewer.person.lastName} (
-                {viewer.role})
+                  <span
+                    className="grid h-[27px] w-[27px] place-items-center rounded-full text-[12px] font-bold text-white"
+                    style={{ background: "var(--steel)" }}
+                    aria-hidden="true"
+                  >
+                    {initials}
+                  </span>
+                  {viewer.person.firstName} {viewer.person.lastName} (
+                  {viewer.role})
+                </Link>
                 {/* Native POST so sign-out works without client JS; the route
                     clears the student-session + sb-* auth cookies server-side. */}
                 <form action="/api/auth/logout" method="post" className="contents">
