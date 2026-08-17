@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { RosterEntry } from "@/lib/event-signups";
 
 export function EventRosterActions({ eventId, entry }: { eventId: string; entry: RosterEntry }) {
@@ -57,6 +57,14 @@ export function ManualAddPerson({
   const router = useRouter();
   const [personId, setPersonId] = useState(people[0]?.id ?? "");
   const [busy, setBusy] = useState(false);
+
+  // `people` shrinks after a successful add (router.refresh()); if the
+  // selected id fell out of the list, fall back to the new first option.
+  useEffect(() => {
+    if (!people.some((p) => p.id === personId)) {
+      setPersonId(people[0]?.id ?? "");
+    }
+  }, [people, personId]);
 
   async function add() {
     if (!personId) return;
