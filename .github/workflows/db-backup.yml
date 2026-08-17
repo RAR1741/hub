@@ -25,12 +25,13 @@ jobs:
           BACKUP_GPG_PASSPHRASE: ${{ secrets.BACKUP_GPG_PASSPHRASE }}
         run: |
           set -euo pipefail
-          pg_dump --version # log the client version so a client/server mismatch is visible
+          PG_DUMP=/usr/lib/postgresql/17/bin/pg_dump
+          "$PG_DUMP" --version # log the client version so a client/server mismatch is visible
           STAMP="$(date -u +%Y-%m-%dT%H-%M-%SZ)"
           echo "BACKUP_STAMP=$STAMP" >> "$GITHUB_ENV"
           FILE="teamhub-backup-$STAMP.sql.gz.gpg"
           echo "BACKUP_FILE=$FILE" >> "$GITHUB_ENV"
-          pg_dump "$BACKUP_DATABASE_URL" --no-owner --no-privileges \
+          "$PG_DUMP" "$BACKUP_DATABASE_URL" --no-owner --no-privileges \
             | gzip -9 \
             | gpg --batch --yes --symmetric --cipher-algo AES256 \
                   --pinentry-mode loopback --passphrase "$BACKUP_GPG_PASSPHRASE" -o "$FILE"
