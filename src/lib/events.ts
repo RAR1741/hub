@@ -10,6 +10,7 @@ export type EventInput = {
   description: string | null;
   startsAt: string;
   endsAt: string;
+  gcalEventId: string | null;
 };
 
 /** Validate an event payload. PURE. Null = invalid. */
@@ -32,10 +33,50 @@ export function parseEventInput(body: unknown): EventInput | null {
   if (!location) return null;
   const description = optString(b.description, 1000);
   if (!description) return null;
-  return { name, periodId, startsAt, endsAt, location: location.value, description: description.value };
+  const gcalEventId = typeof b.gcalEventId === "string" && b.gcalEventId.trim() ? b.gcalEventId.trim() : null;
+  return {
+    name,
+    periodId,
+    startsAt,
+    endsAt,
+    location: location.value,
+    description: description.value,
+    gcalEventId,
+  };
 }
 
 const FOREIGN_KEY_VIOLATION = "23503";
+
+type LinkedMeeting = { title: string; starts_at: string; ends_at: string };
+
+/** The meeting a gcal_event_id points at, or null if it doesn't match one. */
+async function lookupMeetingByGcalId(
+  gcalEventId: string,
+  db: SupabaseClient,
+): Promise<LinkedMeeting | null> {
+  const { data } = await db
+    .from("meeting")
+    .select("title, starts_at, ends_at")
+    .eq("gcal_event_id", gcalEventId)
+    .maybeSingle();
+  return (data as LinkedMeeting | null) ?? null;
+}
+
+/**
+ * When `input.gcalEventId` is set, name/starts_at/ends_at come from the
+ * matching `meeting` row — never from client-submitted text — so a linked
+ * event can't be created or edited out of step with the calendar. Null =
+ * the id didn't match any meeting (caller should 400).
+ */
+async function resolveLinkedFields(
+  input: EventInput,
+  db: SupabaseClient,
+): Promise<{ name: string; startsAt: string; endsAt: string } | null> {
+  if (!input.gcalEventId) return { name: input.name, startsAt: input.startsAt, endsAt: input.endsAt };
+  const meeting = await lookupMeetingByGcalId(input.gcalEventId, db);
+  if (!meeting) return null;
+  return { name: meeting.title, startsAt: meeting.starts_at, endsAt: meeting.ends_at };
+}
 
 export async function createEvent(
   input: EventInput,
@@ -43,16 +84,19 @@ export async function createEvent(
   db?: SupabaseClient,
 ): Promise<{ ok: true; id: string } | { ok: false; status: number }> {
   const client = db ?? (await import("./db")).getDb();
+  const resolved = await resolveLinkedFields(input, client);
+  if (!resolved) return { ok: false, status: 400 };
   const { data, error } = await client
     .from("event")
     .insert({
-      name: input.name,
+      name: resolved.name,
       period_id: input.periodId,
       location: input.location,
       description: input.description,
-      starts_at: input.startsAt,
-      ends_at: input.endsAt,
+      starts_at: resolved.startsAt,
+      ends_at: resolved.endsAt,
       created_by: creatorId,
+      gcal_event_id: input.gcalEventId,
     })
     .select("id")
     .single();
@@ -89,15 +133,18 @@ export async function updateEvent(
   db?: SupabaseClient,
 ): Promise<{ ok: boolean; status: number }> {
   const client = db ?? (await import("./db")).getDb();
+  const resolved = await resolveLinkedFields(input, client);
+  if (!resolved) return { ok: false, status: 400 };
   const { data, error } = await client
     .from("event")
     .update({
-      name: input.name,
+      name: resolved.name,
       period_id: input.periodId,
       location: input.location,
       description: input.description,
-      starts_at: input.startsAt,
-      ends_at: input.endsAt,
+      starts_at: resolved.startsAt,
+      ends_at: resolved.endsAt,
+      gcal_event_id: input.gcalEventId,
     })
     .eq("id", id)
     .select("id")
@@ -124,5 +171,44 @@ export async function deleteEvent(
   if (sessions && sessions.length > 0) return { ok: false, status: 409 };
   const { error } = await client.from("event").delete().eq("id", id);
   if (error) return { ok: false, status: error.code === FOREIGN_KEY_VIOLATION ? 409 : 500 };
+  return { ok: true, status: 200 };
+}
+
+export type GcalCandidate = { id: string; title: string; startsAt: string; endsAt: string };
+
+type MeetingLite = { gcal_event_id: string; title: string; starts_at: string; ends_at: string };
+
+/**
+ * Upcoming synced calendar events not yet linked to any `event` row — the
+ * admin event form's "attach to a calendar event" picker. No live Google
+ * API call: `meeting` is already kept current by the calendar sync cron.
+ */
+export async function listGcalCandidates(db?: SupabaseClient): Promise<GcalCandidate[]> {
+  const client = db ?? (await import("./db")).getDb();
+  const [{ data: meetings }, { data: claimed }] = await Promise.all([
+    client
+      .from("meeting")
+      .select("gcal_event_id, title, starts_at, ends_at")
+      .gte("starts_at", new Date().toISOString())
+      .order("starts_at", { ascending: true }),
+    client.from("event").select("gcal_event_id").not("gcal_event_id", "is", null),
+  ]);
+  const claimedIds = new Set(((claimed ?? []) as { gcal_event_id: string }[]).map((c) => c.gcal_event_id));
+  return ((meetings ?? []) as MeetingLite[])
+    .filter((m) => !claimedIds.has(m.gcal_event_id))
+    .map((m) => ({ id: m.gcal_event_id, title: m.title, startsAt: m.starts_at, endsAt: m.ends_at }));
+}
+
+/** Clears a calendar link (and any missing-flag) without touching anything else on the event. */
+export async function unlinkEvent(id: string, db?: SupabaseClient): Promise<{ ok: boolean; status: number }> {
+  const client = db ?? (await import("./db")).getDb();
+  const { data, error } = await client
+    .from("event")
+    .update({ gcal_event_id: null, gcal_missing: false })
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
+  if (error) return { ok: false, status: 500 };
+  if (!data) return { ok: false, status: 404 };
   return { ok: true, status: 200 };
 }
