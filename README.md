@@ -14,8 +14,7 @@ Attendance + roster web app for FRC Team 1741 (Red Alert Robotics).
 ## Development
 
 **Host requirements: Docker Desktop, a browser. Nothing else** — Node, npm, the Supabase CLI,
-and psql all live inside the dev container. (VS Code with the Dev Containers extension is
-optional; see below.)
+and psql all live inside the dev container.
 
 ### Quick start — one command
 
@@ -35,15 +34,9 @@ Next.js dev server — all together, with logs streaming. Add `-d` to run it in 
 
 ### Running one-off commands
 
-- **`./dev` helper** (host shell): `./dev npm run test`, `./dev npm run db:psql`, `./dev bash`
-  for an interactive shell. It execs into the running app container (starting it if needed).
-- **VS Code "Reopen in Container"**: Command Palette → **Dev Containers: Reopen in Container**,
-  then run commands in the integrated terminal (already inside the container).
-
-Note: `docker compose up` and VS Code "Reopen in Container" share the same container (project
-`team-hub`) but start it with different commands — the former runs the full stack, the latter
-just idles so you drive it by hand. Switching between the two recreates the container; that's
-expected. Use one mode at a time.
+**`./dev` helper** (host shell): `./dev npm run test`, `./dev npm run db:psql`, `./dev bash` for
+an interactive shell. It joins the same stack as `docker compose up` — starting it if needed —
+so it's the one entrypoint for both bringing the stack up and running one-off commands.
 
 Tests & checks: `./dev npm run test`, `./dev npm run lint`, `./dev npm run typecheck`, `./dev npm run build`.
 Database: `./dev npm run db:reset` (re-apply migrations + seed), `./dev npm run db:psql` (SQL shell),

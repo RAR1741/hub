@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Run a command inside the dev container. Nothing but Docker is needed on the host.
+# Starting with no running stack brings up Next + local Supabase automatically
+# (via scripts/dev-up.sh, same as `docker compose up`) — this is the 1-click entrypoint.
 #
+#   ./dev             # starts the full stack (if not already up) + interactive shell
 #   ./dev npm install
 #   ./dev npm test
 #   ./dev bash -lc "npx supabase start"
-#   ./dev            # interactive shell
 #
 # Windows/Git Bash note: arguments containing absolute Linux paths (e.g.
 # /var/run/docker.sock, /etc/hosts) can get rewritten by MSYS path translation
@@ -14,7 +16,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
-COMPOSE_FILE="$ROOT_DIR/.devcontainer/docker-compose.yml"
+COMPOSE_FILE="$ROOT_DIR/compose.yaml"
 export LOCAL_WORKSPACE_FOLDER="${LOCAL_WORKSPACE_FOLDER:-$ROOT_DIR}"
 
 # Load per-worktree overrides (COMPOSE_PROJECT_NAME, APP_PORT, ...) if present.
@@ -30,11 +32,10 @@ if [ -f "$ROOT_DIR/.env" ]; then
 fi
 
 # Pin the compose project name so this script always joins the same stack
-# VS Code's Dev Containers extension starts (it reads the `name:` in
-# docker-compose.yml). Without this, a project name derived from the
-# invoking directory could drift from VS Code's, starting a second stack
-# that fights the first one for port 3000. Overridden per-worktree via
-# .env so parallel git worktrees don't collide.
+# `docker compose up` starts (it reads the `name:` in compose.yaml). Without
+# this, a project name derived from the invoking directory could drift,
+# starting a second stack that fights the first one for port 3000.
+# Overridden per-worktree via .env so parallel git worktrees don't collide.
 PROJECT_NAME="${COMPOSE_PROJECT_NAME:-team-hub}"
 
 # Start the service if it isn't already running.
