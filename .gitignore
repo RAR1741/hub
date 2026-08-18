@@ -14,3 +14,6 @@ next-env.d.ts
 
 # Graphify (local-only, regenerate with `graphify update .`)
 graphify-out/
+
+# Isolated per-branch worktrees (scripts/new-worktree.sh, WorktreeCreate hook)
+**/.claude/worktrees/
