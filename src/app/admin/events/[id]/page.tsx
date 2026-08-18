@@ -28,7 +28,7 @@ export default async function EventRosterPage({
   const [roster, allPeople, periods] = await Promise.all([listEventRoster(id), listPeople(), listPeriods()]);
   const rosterIds = new Set(roster.map((r) => r.personId));
   const addable = allPeople
-    .filter((p) => !rosterIds.has(p.id))
+    .filter((p) => p.is_active && !rosterIds.has(p.id))
     .map((p) => ({ id: p.id, name: displayName(p) }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
