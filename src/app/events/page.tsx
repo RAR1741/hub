@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
+import { hasRole } from "@/lib/authz";
 import { listUpcomingEvents } from "@/lib/events";
 import { signedUpEventIds } from "@/lib/event-signups";
 import { getViewer } from "@/lib/viewer";
@@ -7,6 +9,7 @@ import { EventSignupButton } from "@/components/EventSignupButton";
 export default async function EventsPage() {
   const viewer = await getViewer();
   if (!viewer.person) redirect("/login");
+  const canEdit = hasRole(viewer.role, "mentor");
 
   const events = await listUpcomingEvents();
   const signedUp = await signedUpEventIds(viewer.person.id, events.map((e) => e.id));
@@ -34,7 +37,12 @@ export default async function EventsPage() {
                 </div>
                 {e.description && <div className="text-sm text-[var(--muted)]">{e.description}</div>}
               </div>
-              <EventSignupButton eventId={e.id} initiallySignedUp={signedUp.has(e.id)} />
+              <div className="flex items-center gap-2">
+                {canEdit && (
+                  <Link href={`/admin/events/${e.id}?edit=1`} className="btn btn-secondary px-3 py-1">Edit</Link>
+                )}
+                <EventSignupButton eventId={e.id} initiallySignedUp={signedUp.has(e.id)} />
+              </div>
             </div>
           ))}
         </div>

@@ -4,19 +4,28 @@ import { getEvent } from "@/lib/events";
 import { listEventRoster } from "@/lib/event-signups";
 import { listPeople } from "@/lib/people";
 import { displayName } from "@/lib/people";
+import { listPeriods } from "@/lib/periods";
 import { getViewer } from "@/lib/viewer";
+import { EventForm } from "@/components/EventForm";
 import { EventRosterActions, ManualAddPerson } from "@/components/EventRosterActions";
 import { EventUnlinkBanner } from "@/components/EventUnlinkBanner";
 
-export default async function EventRosterPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EventRosterPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ edit?: string }>;
+}) {
   const viewer = await getViewer();
   if (!hasRole(viewer.role, "mentor")) redirect("/");
 
   const { id } = await params;
+  const { edit } = await searchParams;
   const event = await getEvent(id);
   if (!event) notFound();
 
-  const [roster, allPeople] = await Promise.all([listEventRoster(id), listPeople()]);
+  const [roster, allPeople, periods] = await Promise.all([listEventRoster(id), listPeople(), listPeriods()]);
   const rosterIds = new Set(roster.map((r) => r.personId));
   const addable = allPeople
     .filter((p) => !rosterIds.has(p.id))
@@ -36,6 +45,13 @@ export default async function EventRosterPage({ params }: { params: Promise<{ id
       </div>
 
       {event.gcalMissing && <EventUnlinkBanner eventId={id} />}
+
+      <details className="card" open={edit === "1"}>
+        <summary className="cursor-pointer font-semibold">Edit event</summary>
+        <div className="mt-4">
+          <EventForm periods={periods} event={event} />
+        </div>
+      </details>
 
       <ManualAddPerson eventId={id} people={addable} />
 

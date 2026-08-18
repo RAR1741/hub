@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { Period } from "@/lib/types";
+import type { Event, Period } from "@/lib/types";
 
 type GcalCandidate = { id: string; title: string; startsAt: string; endsAt: string };
 
@@ -12,26 +12,32 @@ function toDatetimeLocal(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export function EventForm({ periods }: { periods: Period[] }) {
+export function EventForm({ periods, event, onSaved }: { periods: Period[]; event?: Event; onSaved?: () => void }) {
   const router = useRouter();
-  const [name, setName] = useState("");
-  const [periodId, setPeriodId] = useState(periods[0]?.id ?? "");
-  const [location, setLocation] = useState("");
-  const [description, setDescription] = useState("");
-  const [startsAt, setStartsAt] = useState("");
-  const [endsAt, setEndsAt] = useState("");
+  const [name, setName] = useState(event?.name ?? "");
+  const [periodId, setPeriodId] = useState(event?.periodId ?? periods[0]?.id ?? "");
+  const [location, setLocation] = useState(event?.location ?? "");
+  const [description, setDescription] = useState(event?.description ?? "");
+  const [startsAt, setStartsAt] = useState(event ? toDatetimeLocal(event.startsAt) : "");
+  const [endsAt, setEndsAt] = useState(event ? toDatetimeLocal(event.endsAt) : "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [candidates, setCandidates] = useState<GcalCandidate[]>([]);
-  const [gcalEventId, setGcalEventId] = useState("");
+  const [gcalEventId, setGcalEventId] = useState(event?.gcalEventId ?? "");
 
   useEffect(() => {
-    fetch("/api/admin/events/gcal-candidates")
+    // Editing a linked event: exclude its OWN claim so the calendar event
+    // it's already linked to still shows up as a selectable candidate,
+    // instead of being filtered out as "claimed by another event."
+    const url = event
+      ? `/api/admin/events/gcal-candidates?excludeEventId=${event.id}`
+      : "/api/admin/events/gcal-candidates";
+    fetch(url)
       .then((res) => (res.ok ? res.json() : { candidates: [] }))
       .then((json) => setCandidates(json.candidates ?? []))
       .catch(() => setCandidates([]));
-  }, []);
+  }, [event]);
 
   function pickCandidate(id: string) {
     setGcalEventId(id);
@@ -53,8 +59,8 @@ export function EventForm({ periods }: { periods: Period[] }) {
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/events", {
-        method: "POST",
+      const res = await fetch(event ? `/api/admin/events/${event.id}` : "/api/admin/events", {
+        method: event ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name,
@@ -67,15 +73,18 @@ export function EventForm({ periods }: { periods: Period[] }) {
         }),
       });
       if (res.ok) {
-        setName("");
-        setLocation("");
-        setDescription("");
-        setStartsAt("");
-        setEndsAt("");
-        setGcalEventId("");
+        if (!event) {
+          setName("");
+          setLocation("");
+          setDescription("");
+          setStartsAt("");
+          setEndsAt("");
+          setGcalEventId("");
+        }
         router.refresh();
+        onSaved?.();
       } else {
-        setError("Could not create the event — check the dates and try again.");
+        setError(event ? "Could not save changes — check the dates and try again." : "Could not create the event — check the dates and try again.");
       }
     } finally {
       setBusy(false);
@@ -110,7 +119,9 @@ export function EventForm({ periods }: { periods: Period[] }) {
       <label className="label">Ends<input className="input" type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} required disabled={linked} /></label>
       {linked && <p className="text-sm text-[var(--muted)]">Name/dates are synced from Google Calendar and will update automatically.</p>}
       {error && <p className="text-sm text-[var(--red)]">{error}</p>}
-      <button type="submit" disabled={busy} className="btn btn-primary self-start">{busy ? "Saving…" : "Create event"}</button>
+      <button type="submit" disabled={busy} className="btn btn-primary self-start">
+        {busy ? "Saving…" : event ? "Save changes" : "Create event"}
+      </button>
     </form>
   );
 }

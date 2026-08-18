@@ -195,15 +195,23 @@ type MeetingLite = { gcal_event_id: string; title: string; starts_at: string; en
  * admin event form's "attach to a calendar event" picker. No live Google
  * API call: `meeting` is already kept current by the calendar sync cron.
  */
-export async function listGcalCandidates(db?: SupabaseClient): Promise<GcalCandidate[]> {
+export async function listGcalCandidates(
+  db?: SupabaseClient,
+  excludeEventId?: string,
+): Promise<GcalCandidate[]> {
   const client = db ?? (await import("./db")).getDb();
+  // Excluding excludeEventId's own claim lets the edit form re-show the
+  // calendar event an event is ALREADY linked to as a selectable candidate —
+  // otherwise editing a linked event would find its own link filtered out.
+  let claimedQuery = client.from("event").select("gcal_event_id").not("gcal_event_id", "is", null);
+  if (excludeEventId) claimedQuery = claimedQuery.neq("id", excludeEventId);
   const [{ data: meetings }, { data: claimed }] = await Promise.all([
     client
       .from("meeting")
       .select("gcal_event_id, title, starts_at, ends_at")
       .gte("starts_at", new Date().toISOString())
       .order("starts_at", { ascending: true }),
-    client.from("event").select("gcal_event_id").not("gcal_event_id", "is", null),
+    claimedQuery,
   ]);
   const claimedIds = new Set(((claimed ?? []) as { gcal_event_id: string }[]).map((c) => c.gcal_event_id));
   return ((meetings ?? []) as MeetingLite[])
