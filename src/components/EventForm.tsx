@@ -2,16 +2,22 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import type { Period } from "@/lib/types";
+import type { Event, Period } from "@/lib/types";
 
-export function EventForm({ periods }: { periods: Period[] }) {
+function toLocalInput(iso: string): string {
+  const d = new Date(iso);
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16);
+}
+
+export function EventForm({ periods, event, onSaved }: { periods: Period[]; event?: Event; onSaved?: () => void }) {
   const router = useRouter();
-  const [name, setName] = useState("");
-  const [periodId, setPeriodId] = useState(periods[0]?.id ?? "");
-  const [location, setLocation] = useState("");
-  const [description, setDescription] = useState("");
-  const [startsAt, setStartsAt] = useState("");
-  const [endsAt, setEndsAt] = useState("");
+  const [name, setName] = useState(event?.name ?? "");
+  const [periodId, setPeriodId] = useState(event?.periodId ?? periods[0]?.id ?? "");
+  const [location, setLocation] = useState(event?.location ?? "");
+  const [description, setDescription] = useState(event?.description ?? "");
+  const [startsAt, setStartsAt] = useState(event ? toLocalInput(event.startsAt) : "");
+  const [endsAt, setEndsAt] = useState(event ? toLocalInput(event.endsAt) : "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,8 +26,8 @@ export function EventForm({ periods }: { periods: Period[] }) {
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/events", {
-        method: "POST",
+      const res = await fetch(event ? `/api/admin/events/${event.id}` : "/api/admin/events", {
+        method: event ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name,
@@ -33,14 +39,17 @@ export function EventForm({ periods }: { periods: Period[] }) {
         }),
       });
       if (res.ok) {
-        setName("");
-        setLocation("");
-        setDescription("");
-        setStartsAt("");
-        setEndsAt("");
+        if (!event) {
+          setName("");
+          setLocation("");
+          setDescription("");
+          setStartsAt("");
+          setEndsAt("");
+        }
         router.refresh();
+        onSaved?.();
       } else {
-        setError("Could not create the event — check the dates and try again.");
+        setError(event ? "Could not save changes — check the dates and try again." : "Could not create the event — check the dates and try again.");
       }
     } finally {
       setBusy(false);
@@ -60,7 +69,9 @@ export function EventForm({ periods }: { periods: Period[] }) {
       <label className="label">Starts<input className="input" type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} required /></label>
       <label className="label">Ends<input className="input" type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} required /></label>
       {error && <p className="text-sm text-[var(--red)]">{error}</p>}
-      <button type="submit" disabled={busy} className="btn btn-primary self-start">{busy ? "Saving…" : "Create event"}</button>
+      <button type="submit" disabled={busy} className="btn btn-primary self-start">
+        {busy ? "Saving…" : event ? "Save changes" : "Create event"}
+      </button>
     </form>
   );
 }
