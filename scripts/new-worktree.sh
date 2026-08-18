@@ -86,6 +86,28 @@ sed -i.bak \
 rm -f "$CFG.bak"
 git -C "$TARGET" update-index --skip-worktree supabase/config.toml
 
+# .env.local is gitignored (never committed) but next dev/dev-up.sh needs it to
+# even boot — without it the app 500s on every request (server can't resolve a
+# Supabase URL). Derive this worktree's copy from the main checkout's, if
+# present, swapping in this worktree's ports. The anon/service-role keys are
+# stable demo JWTs baked into every local Supabase instance, so only the ports
+# differ between worktrees.
+MAIN_ENV_LOCAL="$ROOT/.env.local"
+if [ -f "$MAIN_ENV_LOCAL" ]; then
+  sed \
+    -e "s#://127\\.0\\.0\\.1:54321#://127.0.0.1:$API_PORT#g" \
+    -e "s#://host\\.docker\\.internal:54321#://host.docker.internal:$API_PORT#g" \
+    "$MAIN_ENV_LOCAL" >"$TARGET/.env.local"
+  # Give this worktree its own session-signing secret rather than reusing the
+  # main checkout's.
+  if grep -q '^STUDENT_SESSION_SECRET=' "$TARGET/.env.local"; then
+    sed -i.bak "s#^STUDENT_SESSION_SECRET=.*#STUDENT_SESSION_SECRET=$(openssl rand -hex 32)#" "$TARGET/.env.local"
+    rm -f "$TARGET/.env.local.bak"
+  fi
+else
+  echo "warning: no .env.local in $ROOT — copy .env.example to $TARGET/.env.local and fill it in, or the app won't boot" >&2
+fi
+
 echo "Worktree ready: $TARGET"
 echo "  App:              http://localhost:$APP_PORT"
 echo "  Supabase Studio:  http://localhost:$STUDIO_PORT"
