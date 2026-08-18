@@ -114,7 +114,7 @@ export function teamFromRow(row: TeamRow): Team {
 
 export type ApplicationStatus = "pending" | "approved" | "denied";
 
-export type SessionSource = "kiosk" | "manual" | "admin" | "import";
+export type SessionSource = "kiosk" | "manual" | "admin" | "import" | "event";
 
 export type PeriodRow = {
   id: string;
@@ -154,6 +154,7 @@ export type SessionRow = {
   edited_by: string | null;
   edited_at: string | null;
   flags_resolved_at: string | null;
+  event_id: string | null;
 };
 
 export type Session = {
@@ -168,6 +169,7 @@ export type Session = {
   editedBy: string | null;
   editedAt: string | null;
   flagsResolvedAt: string | null;
+  eventId: string | null;
 };
 
 export function sessionFromRow(row: SessionRow): Session {
@@ -183,6 +185,45 @@ export function sessionFromRow(row: SessionRow): Session {
     editedBy: row.edited_by,
     editedAt: row.edited_at,
     flagsResolvedAt: row.flags_resolved_at,
+    eventId: row.event_id,
+  };
+}
+
+export type EventRow = {
+  id: string;
+  period_id: string;
+  name: string;
+  location: string | null;
+  description: string | null;
+  starts_at: string;
+  ends_at: string;
+  created_by: string;
+  created_at: string;
+};
+
+export type Event = {
+  id: string;
+  periodId: string;
+  name: string;
+  location: string | null;
+  description: string | null;
+  startsAt: string;
+  endsAt: string;
+  createdBy: string;
+  createdAt: string;
+};
+
+export function eventFromRow(row: EventRow): Event {
+  return {
+    id: row.id,
+    periodId: row.period_id,
+    name: row.name,
+    location: row.location,
+    description: row.description,
+    startsAt: row.starts_at,
+    endsAt: row.ends_at,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
   };
 }
 

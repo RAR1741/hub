@@ -1,0 +1,26 @@
+import { withRole } from "@/lib/api";
+import { checkInPerson, uncheckIn } from "@/lib/event-signups";
+import { reqUuid } from "@/lib/validate";
+
+type Ctx = { params: Promise<{ id: string }> };
+
+export const POST = withRole<Ctx>("mentor", async (viewer, request, context) => {
+  const { id: rawId } = await context.params;
+  const id = reqUuid(rawId);
+  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+  const personId = body ? reqUuid(body.personId) : null;
+  if (!id || !personId) return Response.json({ error: "invalid" }, { status: 400 });
+  const result = await checkInPerson(id, personId, viewer.person!.id);
+  return result.ok
+    ? Response.json({ ok: true }, { status: 201 })
+    : Response.json({ error: "failed" }, { status: result.status });
+});
+
+export const DELETE = withRole<Ctx>("mentor", async (_viewer, request, context) => {
+  const { id: rawId } = await context.params;
+  const id = reqUuid(rawId);
+  const sessionId = reqUuid(new URL(request.url).searchParams.get("sessionId"));
+  if (!id || !sessionId) return Response.json({ error: "invalid" }, { status: 400 });
+  const result = await uncheckIn(id, sessionId);
+  return result.ok ? Response.json({ ok: true }) : Response.json({ error: "failed" }, { status: result.status });
+});

@@ -11,7 +11,7 @@ const base: Session = {
   id: "s", personId: "p1", periodId: "pd1",
   timeIn: "2026-09-01T18:00:00Z", timeOut: "2026-09-01T21:00:00Z",
   source: "kiosk", note: null, excludedFromTotals: false, editedBy: null, editedAt: null,
-  flagsResolvedAt: null,
+  flagsResolvedAt: null, eventId: null,
 };
 
 describe("sessionHours", () => {

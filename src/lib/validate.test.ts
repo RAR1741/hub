@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { optInt, optString, reqString } from "./validate";
+import { optInt, optString, reqString, reqUuid } from "./validate";
 
 describe("reqString", () => {
   test("trims and accepts within max", () => {
@@ -23,6 +23,18 @@ describe("optString", () => {
     expect(optString(42, 10)).toBeNull();
     expect(optString("x".repeat(11), 10)).toBeNull();
   });
+});
+
+describe("reqUuid", () => {
+  test("accepts a well-formed UUID", () => {
+    expect(reqUuid("4dcaf7ed-ae99-4cff-ab92-dad9c9167a66")).toBe(
+      "4dcaf7ed-ae99-4cff-ab92-dad9c9167a66",
+    );
+  });
+  test.each([[""], ["not-a-uuid"], ["4dcaf7ed-ae99-4cff-ab92"], [null], [undefined], [42]])(
+    "rejects %j",
+    (v) => expect(reqUuid(v)).toBeNull(),
+  );
 });
 
 describe("optInt", () => {
