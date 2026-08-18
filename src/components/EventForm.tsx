@@ -35,7 +35,12 @@ export function EventForm({ periods }: { periods: Period[] }) {
 
   function pickCandidate(id: string) {
     setGcalEventId(id);
-    if (!id) return;
+    if (!id) {
+      setName("");
+      setStartsAt("");
+      setEndsAt("");
+      return;
+    }
     const candidate = candidates.find((c) => c.id === id);
     if (!candidate) return;
     setName(candidate.title);
