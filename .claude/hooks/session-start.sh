@@ -61,6 +61,35 @@ if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
       [ -s "$PENDING" ] || rm -f "$PENDING"
     fi
 
+    # Orphan-stack sweep: a native worktree that's kept (not auto-removed,
+    # e.g. isolation:"worktree" subagents that finish with changes) never
+    # fires SessionEnd or WorktreeRemove for its stack. Reconcile running
+    # hub-* compose projects against `git worktree list` and down any whose
+    # worktree directory no longer exists.
+    ACTIVE_DIRS="$(git worktree list --porcelain | sed -n 's/^worktree //p')"
+    for PROJECT in $(docker compose ls --format json 2>/dev/null | node -e '
+      let d = "";
+      process.stdin.on("data", c => d += c);
+      process.stdin.on("end", () => {
+        try {
+          const list = JSON.parse(d || "[]");
+          (Array.isArray(list) ? list : [list]).forEach(p => {
+            if (p.Name && p.Name.startsWith("hub-")) console.log(p.Name);
+          });
+        } catch (e) {}
+      });
+    ' 2>/dev/null); do
+      FOUND=0
+      for D in $ACTIVE_DIRS; do
+        [ -f "$D/.env" ] || continue
+        grep -q "^COMPOSE_PROJECT_NAME=$PROJECT\$" "$D/.env" 2>/dev/null && FOUND=1 && break
+      done
+      if [ "$FOUND" -eq 0 ]; then
+        log "Orphaned stack '$PROJECT' has no matching worktree — tearing down."
+        docker compose -p "$PROJECT" down -v >"/tmp/compose-down-$PROJECT.log" 2>&1 || true
+      fi
+    done
+
     cat <<'EOF'
 You are in the hub repo's MAIN checkout (not an isolated worktree). Per
 standing user preference: before starting any new feature/bugfix work that
