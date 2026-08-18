@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
   buildServiceAccountJwt,
+  diffLinkedEvents,
   isRequiredEvent,
   pickCalendarId,
   syncCalendar,
@@ -57,14 +58,23 @@ type PeriodSeed = { id: string; starts_on: string; ends_on: string };
 // `seed.periods` feeds the season-calendar read; `seed.meetingDates` is the set
 // of starts_at ISO strings a meeting exists on, so periodHasMeetings can answer
 // range queries.
-function fakeDb(seed?: { periods?: PeriodSeed[]; meetingDates?: string[] }) {
+function fakeDb(seed?: {
+  periods?: PeriodSeed[];
+  meetingDates?: string[];
+  linkedEvents?: { id: string; gcal_event_id: string; name: string; starts_at: string; ends_at: string; gcal_missing: boolean }[];
+  meetingsByGcalId?: { gcal_event_id: string; title: string; starts_at: string; ends_at: string }[];
+}) {
   const calls: { table: string; rows: unknown; opts: unknown }[] = [];
   const deletes: { table: string; filters: { op: string; col: string; val: unknown }[] }[] = [];
+  const updates: { table: string; patch: unknown; id: string }[] = [];
   const periods = seed?.periods ?? [];
   const meetingDates = seed?.meetingDates ?? [];
+  const linkedEvents = seed?.linkedEvents ?? [];
+  const meetingsByGcalId = seed?.meetingsByGcalId ?? [];
   return {
     calls,
     deletes,
+    updates,
     client: {
       from(table: string) {
         return {
@@ -72,9 +82,19 @@ function fakeDb(seed?: { periods?: PeriodSeed[]; meetingDates?: string[] }) {
             calls.push({ table, rows, opts });
             return { error: null };
           },
+          update(patch: unknown) {
+            return {
+              eq: async (_col: string, id: string) => {
+                updates.push({ table, patch, id });
+                return { error: null };
+              },
+            };
+          },
           select(_cols: string) {
             let gteVal: string | undefined;
             let lteVal: string | undefined;
+            let notNullCol: string | undefined;
+            let inVal: string[] | undefined;
             const chain = {
               order() {
                 return chain;
@@ -90,12 +110,31 @@ function fakeDb(seed?: { periods?: PeriodSeed[]; meetingDates?: string[] }) {
               limit() {
                 return chain;
               },
+              not(col: string, _op: string, _val: unknown) {
+                notNullCol = col;
+                return chain;
+              },
+              in(_col: string, vals: string[]) {
+                inVal = vals;
+                return chain;
+              },
               then(resolve: (v: { data: unknown; error: null }) => void) {
                 if (table === "period") {
                   resolve({ data: periods, error: null });
                   return;
                 }
-                // meeting existence: any seeded meeting date within [gte, lte]?
+                if (table === "event" && notNullCol === "gcal_event_id") {
+                  // Linked events with ends_at >= gteVal.
+                  const hit = linkedEvents.filter((e) => !gteVal || e.ends_at >= gteVal);
+                  resolve({ data: hit, error: null });
+                  return;
+                }
+                if (table === "meeting" && inVal) {
+                  const hit = meetingsByGcalId.filter((m) => inVal!.includes(m.gcal_event_id));
+                  resolve({ data: hit, error: null });
+                  return;
+                }
+                // meeting existence (periodHasMeetings): any seeded meeting date within [gte, lte]?
                 const hit = meetingDates.filter(
                   (d) => (!gteVal || d >= gteVal) && (!lteVal || d <= lteVal),
                 );
@@ -213,7 +252,71 @@ describe("isRequiredEvent", () => {
   });
 });
 
+describe("diffLinkedEvents", () => {
+  test("no matching meeting and not yet flagged → flags gcal_missing", () => {
+    const linked = [{ id: "ev1", gcal_event_id: "evt-1", name: "Old Name", starts_at: "2027-01-01T00:00:00Z", ends_at: "2027-01-01T01:00:00Z", gcal_missing: false }];
+    expect(diffLinkedEvents(linked, new Map())).toEqual([{ id: "ev1", gcal_missing: true }]);
+  });
+
+  test("no matching meeting but already flagged → no redundant write", () => {
+    const linked = [{ id: "ev1", gcal_event_id: "evt-1", name: "Old Name", starts_at: "2027-01-01T00:00:00Z", ends_at: "2027-01-01T01:00:00Z", gcal_missing: true }];
+    expect(diffLinkedEvents(linked, new Map())).toEqual([]);
+  });
+
+  test("matching meeting with changed fields → updates name/starts_at/ends_at, clears gcal_missing", () => {
+    const linked = [{ id: "ev1", gcal_event_id: "evt-1", name: "Old Name", starts_at: "2027-01-01T00:00:00Z", ends_at: "2027-01-01T01:00:00Z", gcal_missing: true }];
+    const meetings = new Map([["evt-1", { gcal_event_id: "evt-1", title: "New Name", starts_at: "2027-02-01T00:00:00Z", ends_at: "2027-02-01T01:00:00Z" }]]);
+    expect(diffLinkedEvents(linked, meetings)).toEqual([
+      { id: "ev1", name: "New Name", starts_at: "2027-02-01T00:00:00Z", ends_at: "2027-02-01T01:00:00Z", gcal_missing: false },
+    ]);
+  });
+
+  test("matching meeting with no changes and not flagged → no write", () => {
+    const linked = [{ id: "ev1", gcal_event_id: "evt-1", name: "Same", starts_at: "2027-01-01T00:00:00Z", ends_at: "2027-01-01T01:00:00Z", gcal_missing: false }];
+    const meetings = new Map([["evt-1", { gcal_event_id: "evt-1", title: "Same", starts_at: "2027-01-01T00:00:00Z", ends_at: "2027-01-01T01:00:00Z" }]]);
+    expect(diffLinkedEvents(linked, meetings)).toEqual([]);
+  });
+
+  test("matching meeting with no changes but was flagged → clears the flag only", () => {
+    const linked = [{ id: "ev1", gcal_event_id: "evt-1", name: "Same", starts_at: "2027-01-01T00:00:00Z", ends_at: "2027-01-01T01:00:00Z", gcal_missing: true }];
+    const meetings = new Map([["evt-1", { gcal_event_id: "evt-1", title: "Same", starts_at: "2027-01-01T00:00:00Z", ends_at: "2027-01-01T01:00:00Z" }]]);
+    expect(diffLinkedEvents(linked, meetings)).toEqual([{ id: "ev1", gcal_missing: false }]);
+  });
+});
+
 describe("syncCalendar", () => {
+  test("reconciles a linked event against the freshly-synced meeting, and flags a deleted one", async () => {
+    const db = fakeDb({
+      linkedEvents: [
+        // Still matches a meeting, but with stale name/time — gets updated.
+        { id: "ev-stale", gcal_event_id: "evt-1", name: "Old Name", starts_at: "2026-08-01T00:00:00Z", ends_at: "2026-08-01T01:00:00Z", gcal_missing: false },
+        // No longer has a matching meeting — gets flagged.
+        { id: "ev-gone", gcal_event_id: "evt-missing", name: "Gone", starts_at: "2026-08-01T00:00:00Z", ends_at: "2026-08-01T01:00:00Z", gcal_missing: false },
+      ],
+      meetingsByGcalId: [
+        { gcal_event_id: "evt-1", title: "Build Session", starts_at: "2026-09-02T03:00:00.000Z", ends_at: "2026-09-02T05:00:00.000Z" },
+      ],
+    });
+    const events = [
+      { id: "evt-1", summary: "Build Session", start: { dateTime: "2026-09-02T03:00:00Z" }, end: { dateTime: "2026-09-02T05:00:00Z" } },
+    ];
+    const result = await syncCalendar({
+      fetch: fakeFetch(events),
+      db: db.client,
+      credentials: CREDS,
+      tz: TZ,
+      now: () => 1_700_000_000_000,
+    });
+
+    expect(result.linkedEventsUpdated).toBe(1);
+    expect(db.updates).toContainEqual({
+      table: "event",
+      patch: { name: "Build Session", starts_at: "2026-09-02T03:00:00.000Z", ends_at: "2026-09-02T05:00:00.000Z", gcal_missing: false },
+      id: "ev-stale",
+    });
+    expect(db.updates).toContainEqual({ table: "event", patch: { gcal_missing: true }, id: "ev-gone" });
+  });
+
   test("upserts meetings by gcal_event_id and marks build days (gcal, ignore existing)", async () => {
     const db = fakeDb();
     const events = [
@@ -236,7 +339,7 @@ describe("syncCalendar", () => {
       now: () => 1_700_000_000_000,
     });
 
-    expect(result).toEqual({ meetings: 1, buildDays: 1, backfilledPeriods: 0 });
+    expect(result).toEqual({ meetings: 1, buildDays: 1, backfilledPeriods: 0, linkedEventsUpdated: 0 });
 
     const meetingCall = db.calls.find((c) => c.table === "meeting")!;
     expect(meetingCall.opts).toEqual({ onConflict: "gcal_event_id" });
@@ -285,7 +388,7 @@ describe("syncCalendar", () => {
       now: () => 1_700_000_000_000,
     });
 
-    expect(result).toEqual({ meetings: 1, buildDays: 1, backfilledPeriods: 0 });
+    expect(result).toEqual({ meetings: 1, buildDays: 1, backfilledPeriods: 0, linkedEventsUpdated: 0 });
 
     const buildDayCall = db.calls.find((c) => c.table === "build_day")!;
     expect(buildDayCall.rows).toEqual([
@@ -314,7 +417,7 @@ describe("syncCalendar", () => {
       tz: "America/Indiana/Indianapolis",
       now: () => 1_700_000_000_000,
     });
-    expect(result).toEqual({ meetings: 3, buildDays: 2, backfilledPeriods: 0 });
+    expect(result).toEqual({ meetings: 3, buildDays: 2, backfilledPeriods: 0, linkedEventsUpdated: 0 });
 
     const buildDayCall = db.calls.find((c) => c.table === "build_day")!;
     expect(buildDayCall.rows).toEqual([
@@ -367,7 +470,7 @@ describe("syncCalendar", () => {
       now: () => 1_700_000_000_000,
     });
 
-    expect(result).toEqual({ meetings: 2, buildDays: 2, backfilledPeriods: 0 });
+    expect(result).toEqual({ meetings: 2, buildDays: 2, backfilledPeriods: 0, linkedEventsUpdated: 0 });
 
     const meetingCall = db.calls.find((c) => c.table === "meeting")!;
     expect(meetingCall.rows).toMatchObject([
@@ -396,7 +499,7 @@ describe("syncCalendar", () => {
       tz: "America/Indiana/Indianapolis",
       now: () => 1_700_000_000_000,
     });
-    expect(result).toEqual({ meetings: 0, buildDays: 0, backfilledPeriods: 0 });
+    expect(result).toEqual({ meetings: 0, buildDays: 0, backfilledPeriods: 0, linkedEventsUpdated: 0 });
     expect(db.calls).toHaveLength(0);
   });
 
