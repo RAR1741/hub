@@ -1197,3 +1197,29 @@
     cursor: default;
   }
 }
+
+/* =========================================================================
+   Print (issue #54 — event roster print page)
+   Hide site chrome and anything marked .no-print; let the roster's own
+   heading/table print plainly. Kept global (not scoped to one page's
+   className) so any future printable page gets the same chrome-hiding.
+   ========================================================================= */
+@media print {
+  nav,
+  .skip-link,
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  .table {
+    break-inside: auto;
+  }
+
+  .table tr {
+    break-inside: avoid;
+  }
+}
