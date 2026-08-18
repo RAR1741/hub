@@ -27,6 +27,31 @@ export default function LoginPage() {
           <h2 className="eyebrow">Mentors</h2>
           <GoogleSignInButton />
         </section>
+        {process.env.NODE_ENV !== "production" && (
+          <>
+            <hr style={{ border: 0, borderTop: "1px solid var(--hair)" }} />
+            <section className="flex flex-col gap-3">
+              <h2 className="eyebrow">Dev only</h2>
+              <div className="flex flex-col gap-2">
+                <form action="/api/auth/dev-login?role=student" method="POST">
+                  <button type="submit" className="btn w-full">
+                    Log in as Student
+                  </button>
+                </form>
+                <form action="/api/auth/dev-login?role=mentor" method="POST">
+                  <button type="submit" className="btn w-full">
+                    Log in as Mentor
+                  </button>
+                </form>
+                <form action="/api/auth/dev-login?role=admin" method="POST">
+                  <button type="submit" className="btn w-full">
+                    Log in as Admin
+                  </button>
+                </form>
+              </div>
+            </section>
+          </>
+        )}
       </div>
     </main>
   );
