@@ -199,6 +199,8 @@ export type EventRow = {
   ends_at: string;
   created_by: string;
   created_at: string;
+  gcal_event_id: string | null;
+  gcal_missing: boolean;
 };
 
 export type Event = {
@@ -211,6 +213,8 @@ export type Event = {
   endsAt: string;
   createdBy: string;
   createdAt: string;
+  gcalEventId: string | null;
+  gcalMissing: boolean;
 };
 
 export function eventFromRow(row: EventRow): Event {
@@ -224,6 +228,8 @@ export function eventFromRow(row: EventRow): Event {
     endsAt: row.ends_at,
     createdBy: row.created_by,
     createdAt: row.created_at,
+    gcalEventId: row.gcal_event_id,
+    gcalMissing: row.gcal_missing,
   };
 }
 

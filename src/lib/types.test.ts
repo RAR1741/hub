@@ -157,6 +157,8 @@ describe("eventFromRow", () => {
         ends_at: "2027-03-01T20:00:00Z",
         created_by: "m1",
         created_at: "2027-01-01T00:00:00Z",
+        gcal_event_id: null,
+        gcal_missing: false,
       }),
     ).toEqual({
       id: "e1",
@@ -168,6 +170,8 @@ describe("eventFromRow", () => {
       endsAt: "2027-03-01T20:00:00Z",
       createdBy: "m1",
       createdAt: "2027-01-01T00:00:00Z",
+      gcalEventId: null,
+      gcalMissing: false,
     });
   });
 });

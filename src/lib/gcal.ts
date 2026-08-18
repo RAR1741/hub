@@ -70,7 +70,7 @@ export type GcalDeps = {
   now?: () => number;
 };
 
-export type SyncResult = { meetings: number; buildDays: number; backfilledPeriods: number };
+export type SyncResult = { meetings: number; buildDays: number; backfilledPeriods: number; linkedEventsUpdated: number };
 
 /**
  * Does this period already have at least one meeting? Used to decide whether a
@@ -116,6 +116,59 @@ export function isRequiredEvent(
   return weekday === "Thu" && hour >= THURSDAY_NIGHT_HOUR;
 }
 
+export type LinkedEventRow = {
+  id: string;
+  gcal_event_id: string;
+  name: string;
+  starts_at: string;
+  ends_at: string;
+  gcal_missing: boolean;
+};
+
+export type MeetingLite = { gcal_event_id: string; title: string; starts_at: string; ends_at: string };
+
+export type LinkedEventWrite = {
+  id: string;
+  name?: string;
+  starts_at?: string;
+  ends_at?: string;
+  gcal_missing: boolean;
+};
+
+/**
+ * Diff `event` rows linked to a calendar event against the just-synced
+ * `meeting` table. PURE. Only returns rows that actually need a DB write —
+ * a linked event with nothing changed and no flag to clear produces no
+ * write, so a sync run doesn't touch every linked event every time.
+ */
+export function diffLinkedEvents(
+  linkedEvents: LinkedEventRow[],
+  meetingsByGcalId: Map<string, MeetingLite>,
+): LinkedEventWrite[] {
+  const writes: LinkedEventWrite[] = [];
+  for (const row of linkedEvents) {
+    const meeting = meetingsByGcalId.get(row.gcal_event_id);
+    if (!meeting) {
+      if (!row.gcal_missing) writes.push({ id: row.id, gcal_missing: true });
+      continue;
+    }
+    const changed =
+      meeting.title !== row.name || meeting.starts_at !== row.starts_at || meeting.ends_at !== row.ends_at;
+    if (changed) {
+      writes.push({
+        id: row.id,
+        name: meeting.title,
+        starts_at: meeting.starts_at,
+        ends_at: meeting.ends_at,
+        gcal_missing: false,
+      });
+    } else if (row.gcal_missing) {
+      writes.push({ id: row.id, gcal_missing: false });
+    }
+  }
+  return writes;
+}
+
 async function fetchAllEvents(
   deps: GcalDeps,
   token: string,
@@ -144,6 +197,37 @@ async function fetchAllEvents(
     pageToken = json.nextPageToken;
   } while (pageToken);
   return items;
+}
+
+/**
+ * Reconcile `event` rows linked to a calendar event against the meeting
+ * table this same sync run just refreshed. Only events that haven't ended
+ * yet are considered — matches the sync's own rolling-window philosophy, no
+ * point chasing an event already over. Returns the count of events whose
+ * name/starts_at/ends_at actually changed (not counting flag-only writes).
+ */
+async function syncLinkedEvents(db: SupabaseClient, nowIso: string): Promise<number> {
+  const { data: linkedData } = await db
+    .from("event")
+    .select("id, gcal_event_id, name, starts_at, ends_at, gcal_missing")
+    .not("gcal_event_id", "is", null)
+    .gte("ends_at", nowIso);
+  const linked = (linkedData ?? []) as LinkedEventRow[];
+  if (linked.length === 0) return 0;
+
+  const { data: meetingData } = await db
+    .from("meeting")
+    .select("gcal_event_id, title, starts_at, ends_at")
+    .in("gcal_event_id", linked.map((r) => r.gcal_event_id));
+  const meetingsByGcalId = new Map(
+    ((meetingData ?? []) as MeetingLite[]).map((m) => [m.gcal_event_id, m] as const),
+  );
+
+  const writes = diffLinkedEvents(linked, meetingsByGcalId);
+  for (const { id, ...patch } of writes) {
+    await db.from("event").update(patch).eq("id", id);
+  }
+  return writes.filter((w) => w.name !== undefined).length;
 }
 
 export async function syncCalendar(deps: GcalDeps): Promise<SyncResult> {
@@ -181,7 +265,10 @@ export async function syncCalendar(deps: GcalDeps): Promise<SyncResult> {
   const token = await fetchAccessToken(deps);
   const allItems = await fetchAllEvents(deps, token, fetchMinIso, timeMax);
   const events = allItems.filter((e) => e.id && (e.start?.dateTime || e.start?.date));
-  if (events.length === 0) return { meetings: 0, buildDays: 0, backfilledPeriods };
+  if (events.length === 0) {
+    const linkedEventsUpdated = await syncLinkedEvents(deps.db, new Date(nowMs).toISOString());
+    return { meetings: 0, buildDays: 0, backfilledPeriods, linkedEventsUpdated };
+  }
 
   const syncedAt = new Date(nowMs).toISOString();
   const meetingRows = events.map((e) => {
@@ -202,6 +289,21 @@ export async function syncCalendar(deps: GcalDeps): Promise<SyncResult> {
     .from("meeting")
     .upsert(meetingRows, { onConflict: "gcal_event_id" });
   if (meetingError) throw new Error(`meeting upsert failed: ${meetingError.message}`);
+
+  // Prune gcal-sourced meetings that fell out of the calendar entirely (deleted
+  // upstream) but sit within the window this run actually fetched — the upsert
+  // above only stamps synced_at for events still present, so any row in this
+  // range whose synced_at predates this run is stale and no longer exists on
+  // the calendar. Scoped to [fetchMinIso, timeMax) so it doesn't overlap the
+  // far-past/far-future prunes below (which use different bounds and don't
+  // need the synced_at check).
+  await deps.db
+    .from("meeting")
+    .delete()
+    .gte("starts_at", fetchMinIso)
+    .lt("starts_at", timeMax)
+    .not("gcal_event_id", "is", null)
+    .lt("synced_at", syncedAt);
 
   // Prune gcal-sourced meetings outside the calendar's coverage. The far-past
   // bound is the EARLIEST period's start (never fetchMin — see above), so
@@ -251,5 +353,6 @@ export async function syncCalendar(deps: GcalDeps): Promise<SyncResult> {
     .upsert(buildDayRows, { onConflict: "date", ignoreDuplicates: true });
   if (bdError) throw new Error(`build_day upsert failed: ${bdError.message}`);
 
-  return { meetings: meetingRows.length, buildDays: buildDayRows.length, backfilledPeriods };
+  const linkedEventsUpdated = await syncLinkedEvents(deps.db, new Date(nowMs).toISOString());
+  return { meetings: meetingRows.length, buildDays: buildDayRows.length, backfilledPeriods, linkedEventsUpdated };
 }

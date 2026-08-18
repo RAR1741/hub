@@ -8,6 +8,7 @@ import { listPeriods } from "@/lib/periods";
 import { getViewer } from "@/lib/viewer";
 import { EventForm } from "@/components/EventForm";
 import { EventRosterActions, ManualAddPerson } from "@/components/EventRosterActions";
+import { EventUnlinkBanner } from "@/components/EventUnlinkBanner";
 
 export default async function EventRosterPage({
   params,
@@ -42,6 +43,8 @@ export default async function EventRosterPage({
           </div>
         </div>
       </div>
+
+      {event.gcalMissing && <EventUnlinkBanner eventId={id} />}
 
       <details className="card" open={edit === "1"}>
         <summary className="cursor-pointer font-semibold">Edit event</summary>
