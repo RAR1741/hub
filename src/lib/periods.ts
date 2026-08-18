@@ -93,6 +93,56 @@ export async function deletePeriod(
   return { ok: true, status: 200 };
 }
 
+function ymd(y: number, m: number, d: number): string {
+  return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
+/** 3rd Tuesday of February for the given year, as an ISO date. */
+function thirdTuesdayOfFeb(year: number): { date: string; day: number } {
+  const firstDay = new Date(Date.UTC(year, 1, 1)).getUTCDay(); // 0=Sun..6=Sat
+  const firstTuesday = 1 + ((2 - firstDay + 7) % 7);
+  const day = firstTuesday + 14;
+  return { date: ymd(year, 2, day), day };
+}
+
+/** Generate the standard five-period season for a start year (e.g. 2026 -> "2026-2027"). PURE. */
+export function generateSeasonPeriods(startYear: number): PeriodInput[] {
+  const y = startYear + 1;
+  const build = thirdTuesdayOfFeb(y);
+  const compStart = ymd(y, 2, build.day + 1);
+  return [
+    { name: `${startYear} Off Season`, startsOn: ymd(startYear, 6, 1), endsOn: ymd(startYear, 12, 31) },
+    { name: `${y} Build Season`, startsOn: ymd(y, 1, 1), endsOn: build.date },
+    { name: `${y} Competition Season`, startsOn: compStart, endsOn: ymd(y, 5, 31) },
+    { name: `${y} Outreach`, startsOn: ymd(startYear, 6, 1), endsOn: ymd(y, 5, 31) },
+    { name: `${y} Training`, startsOn: ymd(startYear, 6, 1), endsOn: ymd(y, 5, 31) },
+  ];
+}
+
+/** Insert the standard season periods for a start year. Existing names are left untouched (no error). */
+export async function generateSeasonPeriodsForYear(
+  startYear: number,
+  db?: SupabaseClient,
+): Promise<{ created: string[]; skipped: string[] }> {
+  const client = db ?? (await import("./db")).getDb();
+  const created: string[] = [];
+  const skipped: string[] = [];
+  for (const input of generateSeasonPeriods(startYear)) {
+    const { error } = await client
+      .from("period")
+      .insert({ name: input.name, starts_on: input.startsOn, ends_on: input.endsOn });
+    if (error) {
+      if (error.code === UNIQUE_VIOLATION) {
+        skipped.push(input.name);
+        continue;
+      }
+      throw new Error(error.message);
+    }
+    created.push(input.name);
+  }
+  return { created, skipped };
+}
+
 /** Exactly one active period, enforced by the `one_active_period` partial unique index. */
 export async function setActivePeriod(
   id: string,

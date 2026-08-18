@@ -1,5 +1,18 @@
 import { describe, expect, test } from "vitest";
-import { deletePeriod, parsePeriodInput } from "./periods";
+import { deletePeriod, generateSeasonPeriods, parsePeriodInput } from "./periods";
+
+describe("generateSeasonPeriods", () => {
+  test("2026-2027 season", () => {
+    // Third Tuesday of Feb 2027 is Feb 16, 2027 (Feb 1, 2027 is a Monday).
+    expect(generateSeasonPeriods(2026)).toEqual([
+      { name: "2026 Off Season", startsOn: "2026-06-01", endsOn: "2026-12-31" },
+      { name: "2027 Build Season", startsOn: "2027-01-01", endsOn: "2027-02-16" },
+      { name: "2027 Competition Season", startsOn: "2027-02-17", endsOn: "2027-05-31" },
+      { name: "2027 Outreach", startsOn: "2026-06-01", endsOn: "2027-05-31" },
+      { name: "2027 Training", startsOn: "2026-06-01", endsOn: "2027-05-31" },
+    ]);
+  });
+});
 
 describe("parsePeriodInput", () => {
   test("accepts a valid period", () => {

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
 import { listPeriods } from "@/lib/periods";
+import Link from "next/link";
 import { PeriodForm } from "@/components/PeriodForm";
 import { ActivatePeriodButton } from "@/components/ActivatePeriodButton";
 import { DeletePeriodButton } from "@/components/DeletePeriodButton";
@@ -18,6 +19,7 @@ export default async function AdminPeriodsPage() {
           <h1>Periods</h1>
           <div className="sub">Seasons and the active period · {periods.length} total</div>
         </div>
+        <Link href="/admin/periods/generate" className="btn">Generate season</Link>
       </div>
       <details className="card">
         <summary className="cursor-pointer text-base font-semibold">Create period</summary>
