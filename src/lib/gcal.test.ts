@@ -425,8 +425,12 @@ describe("syncCalendar", () => {
       { date: "2026-01-02", kind: "optional", source: "gcal" },
     ]);
 
-    // The two meeting deletes prune rows below timeMin and at/after timeMax.
-    const meetingDeletes = db.deletes.filter((d) => d.table === "meeting");
+    // Three meeting deletes fire: the new stale-synced_at prune (scoped to the
+    // fetch window), plus the far-past/far-future prunes below timeMin and
+    // at/after timeMax. Exclude the synced_at prune to check the other two.
+    const meetingDeletes = db.deletes
+      .filter((d) => d.table === "meeting")
+      .filter((d) => !d.filters.some((f) => f.col === "synced_at"));
     expect(meetingDeletes.map((d) => d.filters[0].op).sort()).toEqual(["gte", "lt"]);
     // Each prune is scoped to gcal-sourced rows only, so a manual (null
     // gcal_event_id) meeting outside the window is never deleted by sync.
@@ -569,8 +573,50 @@ describe("syncCalendar", () => {
     expect(result.backfilledPeriods).toBe(0);
 
     // The far-past meeting prune uses the earliest period start, NOT rolling min.
-    const meetingDeletes = db.deletes.filter((d) => d.table === "meeting");
-    const ltPrune = meetingDeletes.find((d) => d.filters.some((f) => f.op === "lt"))!;
+    // Exclude the stale-synced_at prune (also an "lt" on starts_at, but scoped
+    // to the fetch window and additionally filtered on synced_at).
+    const meetingDeletes = db.deletes
+      .filter((d) => d.table === "meeting")
+      .filter((d) => !d.filters.some((f) => f.col === "synced_at"));
+    const ltPrune = meetingDeletes.find((d) => d.filters.some((f) => f.op === "lt" && f.col === "starts_at"))!;
     expect(ltPrune.filters).toContainEqual({ op: "lt", col: "starts_at", val: "2021-06-01T00:00:00Z" });
+  });
+
+  test("prunes a meeting deleted from the calendar within the fetch window (fix: deletion detection), and flags its linked event", async () => {
+    // A meeting inside the normal rolling window whose synced_at is from a
+    // PRIOR run — this run's fetch no longer returns it, so it must be pruned.
+    const db = fakeDb({
+      linkedEvents: [
+        { id: "ev-linked", gcal_event_id: "evt-deleted", name: "Old Meeting", starts_at: "2023-11-16T18:00:00Z", ends_at: "2023-11-16T20:00:00Z", gcal_missing: false },
+      ],
+      // Not present here — simulates the meeting row already being gone by the
+      // time syncLinkedEvents reads (i.e. the prune above already removed it).
+      meetingsByGcalId: [],
+    });
+    // The fetch returns some other, unrelated current event — "evt-deleted" is
+    // simply absent from the calendar's response now.
+    const events = [
+      { id: "evt-current", summary: "Still There", start: { dateTime: "2023-11-16T23:30:00Z" }, end: { dateTime: "2023-11-17T01:00:00Z" } },
+    ];
+    const result = await syncCalendar({
+      fetch: fakeFetch(events),
+      db: db.client,
+      credentials: CREDS,
+      tz: TZ,
+      now: () => NOW,
+    });
+
+    const syncedAtIso = new Date(NOW).toISOString();
+    const meetingDeletes = db.deletes.filter((d) => d.table === "meeting");
+    const staleDelete = meetingDeletes.find((d) => d.filters.some((f) => f.op === "lt" && f.col === "synced_at"));
+    expect(staleDelete).toBeDefined();
+    expect(staleDelete!.filters).toContainEqual({ op: "gte", col: "starts_at", val: ROLLING_MIN_ISO });
+    expect(staleDelete!.filters).toContainEqual({ op: "lt", col: "starts_at", val: ROLLING_MAX_ISO });
+    expect(staleDelete!.filters).toContainEqual({ op: "not.is", col: "gcal_event_id", val: null });
+    expect(staleDelete!.filters).toContainEqual({ op: "lt", col: "synced_at", val: syncedAtIso });
+
+    // With the meeting gone, diffLinkedEvents flags the linked event end-to-end.
+    expect(db.updates).toContainEqual({ table: "event", patch: { gcal_missing: true }, id: "ev-linked" });
+    expect(result.linkedEventsUpdated).toBe(0); // flag-only write doesn't count as a "changed" update
   });
 });

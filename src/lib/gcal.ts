@@ -290,6 +290,21 @@ export async function syncCalendar(deps: GcalDeps): Promise<SyncResult> {
     .upsert(meetingRows, { onConflict: "gcal_event_id" });
   if (meetingError) throw new Error(`meeting upsert failed: ${meetingError.message}`);
 
+  // Prune gcal-sourced meetings that fell out of the calendar entirely (deleted
+  // upstream) but sit within the window this run actually fetched — the upsert
+  // above only stamps synced_at for events still present, so any row in this
+  // range whose synced_at predates this run is stale and no longer exists on
+  // the calendar. Scoped to [fetchMinIso, timeMax) so it doesn't overlap the
+  // far-past/far-future prunes below (which use different bounds and don't
+  // need the synced_at check).
+  await deps.db
+    .from("meeting")
+    .delete()
+    .gte("starts_at", fetchMinIso)
+    .lt("starts_at", timeMax)
+    .not("gcal_event_id", "is", null)
+    .lt("synced_at", syncedAt);
+
   // Prune gcal-sourced meetings outside the calendar's coverage. The far-past
   // bound is the EARLIEST period's start (never fetchMin — see above), so
   // backfilled history survives a later, narrower run; the far-future bound is

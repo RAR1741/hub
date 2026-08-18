@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { createEvent, deleteEvent, listGcalCandidates, parseEventInput, unlinkEvent } from "./events";
+import { createEvent, deleteEvent, listGcalCandidates, parseEventInput, unlinkEvent, updateEvent } from "./events";
 
 describe("parseEventInput", () => {
   const base = {
@@ -134,6 +134,102 @@ describe("createEvent — linked to a calendar event", () => {
     const db = fakeDb({ meeting: null });
     const result = await createEvent(input, "creator-1", db);
     expect(result).toEqual({ ok: false, status: 400 });
+  });
+
+  test("409s on a unique-constraint violation (two people linking the same calendar event)", async () => {
+    const db = {
+      from(table: string) {
+        if (table === "meeting") {
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: { title: "Scouting Trip", starts_at: "2027-05-01T14:00:00.000Z", ends_at: "2027-05-01T18:00:00.000Z" },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === "event") {
+          return {
+            insert: () => ({
+              select: () => ({
+                single: async () => ({ data: null, error: { code: "23505" } }),
+              }),
+            }),
+          };
+        }
+        throw new Error(`unexpected table ${table}`);
+      },
+    } as never;
+    const result = await createEvent(input, "creator-1", db);
+    expect(result).toEqual({ ok: false, status: 409 });
+  });
+});
+
+describe("updateEvent", () => {
+  function fakeDb(opts: {
+    meeting?: { title: string; starts_at: string; ends_at: string } | null;
+    updateError?: { code: string } | null;
+    found?: boolean;
+    captured?: { patch?: Record<string, unknown> };
+  }) {
+    return {
+      from(table: string) {
+        if (table === "meeting") {
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({ data: opts.meeting ?? null, error: null }),
+              }),
+            }),
+          };
+        }
+        if (table === "event") {
+          return {
+            update: (patch: Record<string, unknown>) => {
+              if (opts.captured) opts.captured.patch = patch;
+              return {
+                eq: () => ({
+                  select: () => ({
+                    maybeSingle: async () =>
+                      opts.updateError
+                        ? { data: null, error: opts.updateError }
+                        : { data: opts.found === false ? null : { id: "ev1" }, error: null },
+                  }),
+                }),
+              };
+            },
+          };
+        }
+        throw new Error(`unexpected table ${table}`);
+      },
+    } as never;
+  }
+
+  const input = {
+    name: "Some Name",
+    periodId: "11111111-1111-1111-1111-111111111111",
+    location: null,
+    description: null,
+    startsAt: "2027-01-01T00:00:00.000Z",
+    endsAt: "2027-01-01T01:00:00.000Z",
+    gcalEventId: null,
+  };
+
+  test("always writes gcal_missing: false, resetting any stale flag", async () => {
+    const captured: { patch?: Record<string, unknown> } = {};
+    const db = fakeDb({ captured });
+    const result = await updateEvent("ev1", input, db);
+    expect(result).toEqual({ ok: true, status: 200 });
+    expect(captured.patch?.gcal_missing).toBe(false);
+  });
+
+  test("409s on a unique-constraint violation", async () => {
+    const db = fakeDb({ updateError: { code: "23505" } });
+    const result = await updateEvent("ev1", input, db);
+    expect(result).toEqual({ ok: false, status: 409 });
   });
 });
 

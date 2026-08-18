@@ -46,6 +46,13 @@ export function parseEventInput(body: unknown): EventInput | null {
 }
 
 const FOREIGN_KEY_VIOLATION = "23503";
+const UNIQUE_VIOLATION = "23505";
+
+function mapWriteError(code: string | undefined): number {
+  if (code === FOREIGN_KEY_VIOLATION) return 400;
+  if (code === UNIQUE_VIOLATION) return 409;
+  return 500;
+}
 
 type LinkedMeeting = { title: string; starts_at: string; ends_at: string };
 
@@ -100,7 +107,7 @@ export async function createEvent(
     })
     .select("id")
     .single();
-  if (error) return { ok: false, status: error.code === FOREIGN_KEY_VIOLATION ? 400 : 500 };
+  if (error) return { ok: false, status: mapWriteError(error.code) };
   return { ok: true, id: data.id as string };
 }
 
@@ -145,11 +152,16 @@ export async function updateEvent(
       starts_at: resolved.startsAt,
       ends_at: resolved.endsAt,
       gcal_event_id: input.gcalEventId,
+      // Any admin edit clears a stale missing-flag: unlinking (gcalEventId
+      // null) should stop showing the banner, and re-pointing a flagged event
+      // at a live meeting should too — the next sync run would eventually
+      // clear it, but there's no reason to make the admin wait for that.
+      gcal_missing: false,
     })
     .eq("id", id)
     .select("id")
     .maybeSingle();
-  if (error) return { ok: false, status: error.code === FOREIGN_KEY_VIOLATION ? 400 : 500 };
+  if (error) return { ok: false, status: mapWriteError(error.code) };
   if (!data) return { ok: false, status: 404 };
   return { ok: true, status: 200 };
 }
