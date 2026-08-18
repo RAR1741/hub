@@ -75,7 +75,10 @@ describe("parseEventInput — gcalEventId", () => {
 });
 
 describe("createEvent — linked to a calendar event", () => {
-  function fakeDb(opts: { meeting: { title: string; starts_at: string; ends_at: string } | null }) {
+  function fakeDb(opts: {
+    meeting: { title: string; starts_at: string; ends_at: string } | null;
+    captured?: { row?: Record<string, unknown> };
+  }) {
     return {
       from(table: string) {
         if (table === "meeting") {
@@ -89,11 +92,14 @@ describe("createEvent — linked to a calendar event", () => {
         }
         if (table === "event") {
           return {
-            insert: (row: Record<string, unknown>) => ({
-              select: () => ({
-                single: async () => ({ data: { id: "new-event", _row: row }, error: null }),
-              }),
-            }),
+            insert: (row: Record<string, unknown>) => {
+              if (opts.captured) opts.captured.row = row;
+              return {
+                select: () => ({
+                  single: async () => ({ data: { id: "new-event" }, error: null }),
+                }),
+              };
+            },
           };
         }
         throw new Error(`unexpected table ${table}`);
@@ -112,11 +118,16 @@ describe("createEvent — linked to a calendar event", () => {
   };
 
   test("resolves name/starts_at/ends_at from the matching meeting, ignoring client text", async () => {
+    const captured: { row?: Record<string, unknown> } = {};
     const db = fakeDb({
       meeting: { title: "Scouting Trip", starts_at: "2027-05-01T14:00:00.000Z", ends_at: "2027-05-01T18:00:00.000Z" },
+      captured,
     });
     const result = await createEvent(input, "creator-1", db);
     expect(result).toEqual({ ok: true, id: "new-event" });
+    expect(captured.row?.name).toBe("Scouting Trip");
+    expect(captured.row?.starts_at).toBe("2027-05-01T14:00:00.000Z");
+    expect(captured.row?.ends_at).toBe("2027-05-01T18:00:00.000Z");
   });
 
   test("400s when gcalEventId doesn't match any meeting", async () => {
