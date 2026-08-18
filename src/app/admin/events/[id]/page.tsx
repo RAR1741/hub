@@ -6,6 +6,7 @@ import { listPeople } from "@/lib/people";
 import { displayName } from "@/lib/people";
 import { getViewer } from "@/lib/viewer";
 import { EventRosterActions, ManualAddPerson } from "@/components/EventRosterActions";
+import { EventUnlinkBanner } from "@/components/EventUnlinkBanner";
 
 export default async function EventRosterPage({ params }: { params: Promise<{ id: string }> }) {
   const viewer = await getViewer();
@@ -33,6 +34,8 @@ export default async function EventRosterPage({ params }: { params: Promise<{ id
           </div>
         </div>
       </div>
+
+      {event.gcalMissing && <EventUnlinkBanner eventId={id} />}
 
       <ManualAddPerson eventId={id} people={addable} />
 
