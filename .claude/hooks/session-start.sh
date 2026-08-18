@@ -90,6 +90,51 @@ if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
       fi
     done
 
+    # Merged-worktree sweep: post-merge-cleanup.sh only fires on `gh pr merge`
+    # run from INSIDE the worktree, so PRs merged from the GitHub web UI (or gh
+    # elsewhere) leave the worktree + stack behind. A clean, merged, leftover
+    # worktree is exactly what Claude Code's launcher then recycles into an
+    # unrelated new session — inheriting a stale stack name. Reap any linked
+    # worktree whose branch is already merged into master. Non-force removal:
+    # a worktree with uncommitted work (git refuses) is left untouched.
+    # ponytail: uses local origin/master||master as the merge oracle — if both
+    #   are stale we simply don't reap (conservative, never reaps unmerged).
+    #   Add a `git fetch` here if leftovers linger after web-UI merges.
+    MASTER_REF=""
+    for ref in origin/master master; do
+      git rev-parse --verify "$ref" >/dev/null 2>&1 && { MASTER_REF="$ref"; break; }
+    done
+    if [ -n "$MASTER_REF" ]; then
+      git worktree list --porcelain | node -e '
+        let d = "";
+        process.stdin.on("data", c => d += c);
+        process.stdin.on("end", () => {
+          const wts = []; let wt = null;
+          for (const line of d.split("\n")) {
+            if (line.startsWith("worktree ")) { if (wt) wts.push(wt); wt = { path: line.slice(9), branch: "" }; }
+            else if (line.startsWith("branch ") && wt) wt.branch = line.slice(7).replace(/^refs\/heads\//, "");
+          }
+          if (wt) wts.push(wt);
+          // Skip index 0 (the main working tree); only linked worktrees on a branch.
+          process.stdout.write(wts.slice(1).filter(w => w.branch).map(w => w.path + "\t" + w.branch).join("\n"));
+        });
+      ' | while IFS="$(printf '\t')" read -r WT BR; do
+        [ -n "$WT" ] || continue
+        git merge-base --is-ancestor "$BR" "$MASTER_REF" 2>/dev/null || continue
+        if [ -f "$WT/.env" ] && grep -q '^COMPOSE_PROJECT_NAME=' "$WT/.env"; then
+          PROJ="$(sed -n 's/^COMPOSE_PROJECT_NAME=//p' "$WT/.env")"
+          log "Merged worktree '$BR' — tearing down stack '$PROJ'."
+          docker compose -p "$PROJ" down -v >"/tmp/compose-down-$PROJ.log" 2>&1 || true
+        fi
+        if git worktree remove "$WT" 2>/dev/null; then
+          git branch -D "$BR" 2>/dev/null || true
+          log "Removed merged worktree '$BR' (branch in $MASTER_REF)."
+        else
+          log "Merged worktree '$BR' has uncommitted work or is busy — left in place."
+        fi
+      done
+    fi
+
     cat <<'EOF'
 You are in the hub repo's MAIN checkout (not an isolated worktree). Per
 standing user preference: before starting any new feature/bugfix work that
