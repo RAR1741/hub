@@ -4,6 +4,7 @@ import {
   createStudentSessionToken,
   STUDENT_SESSION_COOKIE,
 } from "@/lib/student-session";
+import { clientUrl } from "@/lib/request-origin";
 
 // ponytail: fixed seeded ids, not a general "impersonate anyone" tool — dev/e2e convenience only.
 const SEEDED_MENTOR_ID = "00000000-0000-0000-0000-000000000009";
@@ -47,7 +48,7 @@ export async function POST(request: Request) {
     personId,
     process.env.STUDENT_SESSION_SECRET!,
   );
-  const response = NextResponse.redirect(new URL("/", request.url), 302);
+  const response = NextResponse.redirect(clientUrl(request, "/"), 302);
   response.cookies.set(STUDENT_SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
