@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import Link from "next/link";
 import { hasRole } from "@/lib/authz";
 import { getEvent } from "@/lib/events";
 import { listEventRoster } from "@/lib/event-signups";
@@ -42,6 +43,9 @@ export default async function EventRosterPage({
             {event.location ? ` · ${event.location}` : ""}
           </div>
         </div>
+        <Link href={`/admin/events/${id}/print`} className="btn btn-secondary">
+          Print roster
+        </Link>
       </div>
 
       {event.gcalMissing && <EventUnlinkBanner eventId={id} />}
