@@ -12,8 +12,10 @@ function toDatetimeLocal(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export function EventForm({ periods, event, onSaved }: { periods: Period[]; event?: Event; onSaved?: () => void }) {
+export function EventForm({ periods: allPeriods, event, onSaved }: { periods: Period[]; event?: Event; onSaved?: () => void }) {
   const router = useRouter();
+  const today = new Date().toISOString().slice(0, 10);
+  const periods = allPeriods.filter((p) => p.endsOn >= today || p.id === event?.periodId);
   const [name, setName] = useState(event?.name ?? "");
   const [periodId, setPeriodId] = useState(event?.periodId ?? periods[0]?.id ?? "");
   const [location, setLocation] = useState(event?.location ?? "");
