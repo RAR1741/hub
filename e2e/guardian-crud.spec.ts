@@ -71,7 +71,7 @@ test.describe("Admin guardian CRUD", () => {
     await btn.click();
 
     // Verify appears
-    await expect(page.locator(`text=${guardianName}`)).toBeVisible({ timeout: 5000 });
+    await expect(page.locator(`text=${guardianEmail}`)).toBeVisible({ timeout: 5000 });
   });
 
   test("admin can edit a guardian's contact fields", async ({ page }) => {
@@ -91,21 +91,25 @@ test.describe("Admin guardian CRUD", () => {
     await inputs.nth(4).fill("Test Company");
     await addDetails.locator("button:text('Add guardian')").click();
 
-    // Reload and edit - find row by email (unique and stable)
+    // Reload and find guardian by email, get stable data-testid
     await page.reload();
-    const guardianRow = page.locator(`li:has(text="${guardianEmail}")`);
+    const guardianRow = page
+      .locator('[data-testid^="guardian-"]')
+      .filter({ hasText: guardianEmail });
+    const testId = await guardianRow.getAttribute("data-testid");
+    const guardianByTestId = page.locator(`[data-testid="${testId}"]`);
 
-    // Click Edit button within the row
-    const editBtn = guardianRow.locator("button:has-text('Edit')").first();
+    // Click Edit button
+    const editBtn = guardianByTestId.locator("button:has-text('Edit')").first();
     await expect(editBtn).toBeVisible();
     await editBtn.click();
 
-    // Edit email field - now find by the input within the row
-    const emailInput = guardianRow.locator("input[type='email']");
+    // Edit email field using the stable testid (works in edit mode)
+    const emailInput = guardianByTestId.locator("input[type='email']");
     await emailInput.fill("updated@example.com");
 
     // Save
-    const saveBtn = guardianRow.locator("button:text('Save')").first();
+    const saveBtn = guardianByTestId.locator("button:text('Save')").first();
     await saveBtn.click();
 
     // Verify update
@@ -129,12 +133,16 @@ test.describe("Admin guardian CRUD", () => {
     await inputs.nth(4).fill("Test Company");
     await addDetails.locator("button:text('Add guardian')").click();
 
-    // Reload and unlink - find row by email (unique and stable)
+    // Reload and find guardian by email using stable data-testid
     await page.reload();
-    const guardianRow = page.locator(`li:has(text="${guardianEmail}")`);
+    const guardianRow = page
+      .locator('[data-testid^="guardian-"]')
+      .filter({ hasText: guardianEmail });
+    const testId = await guardianRow.getAttribute("data-testid");
+    const guardianByTestId = page.locator(`[data-testid="${testId}"]`);
 
     // Click Unlink
-    const unlinkBtn = guardianRow.locator("button[aria-label*='Unlink']").first();
+    const unlinkBtn = guardianByTestId.locator("button[aria-label*='Unlink']").first();
     await unlinkBtn.click();
 
     // Verify removed
@@ -158,9 +166,13 @@ test.describe("Admin guardian CRUD", () => {
     await inputs.nth(4).fill("Test Company");
     await addDetails.locator("button:text('Add guardian')").click();
 
-    // Reload and delete - find row by email
+    // Reload and find guardian by email using stable data-testid
     await page.reload();
-    const guardianRow = page.locator(`li:has(text="${guardianEmail}")`);
+    const guardianRow = page
+      .locator('[data-testid^="guardian-"]')
+      .filter({ hasText: guardianEmail });
+    const testId = await guardianRow.getAttribute("data-testid");
+    const guardianByTestId = page.locator(`[data-testid="${testId}"]`);
 
     // Register dialog handler BEFORE clicking delete
     page.once("dialog", async (dialog) => {
@@ -169,7 +181,7 @@ test.describe("Admin guardian CRUD", () => {
     });
 
     // Click Delete guardian
-    const deleteBtn = guardianRow.locator("button:text('Delete guardian')").first();
+    const deleteBtn = guardianByTestId.locator("button:text('Delete guardian')").first();
     await deleteBtn.click();
 
     // Verify deleted
