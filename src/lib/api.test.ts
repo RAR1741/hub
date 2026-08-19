@@ -59,4 +59,48 @@ describe("withRole", () => {
     });
     expect(await res.json()).toEqual({ id: "t9" });
   });
+
+  test("masquerade session blocks POST but allows GET", async () => {
+    const masqueradeViewer = {
+      person: {
+        id: "target1", firstName: "T", lastName: "S", displayName: null,
+        role: "student", gradYear: 2027, email: null, isActive: true,
+        studentIdNumber: "9999",
+        phone: null, shirtSize: null, dietaryRestrictions: null, bio: null,
+        dateOfBirth: null, streetAddress: null, city: null, zip: null,
+        homePhone: null, school: null, ethnicity: null, race: null,
+        interests: null, lastApplicationAt: null,
+      },
+      role: "student",
+      masquerade: {
+        adminPersonId: "admin1",
+        targetPersonId: "target1",
+        sessionId: "sess1",
+      },
+    } as const;
+
+    const handler = withRole(
+      "student",
+      async () => Response.json({ ok: true }),
+      async () => masqueradeViewer,
+    );
+
+    // GET should pass through
+    const getRes = await handler(new Request("http://test/api/student/profile", { method: "GET" }));
+    expect(getRes.status).toBe(200);
+
+    // POST should be blocked with 403 masquerade_read_only
+    const postRes = await handler(new Request("http://test/api/student/profile", { method: "POST" }));
+    expect(postRes.status).toBe(403);
+    expect(await postRes.json()).toEqual({ error: "masquerade_read_only" });
+
+    // HEAD should pass through
+    const headRes = await handler(new Request("http://test/api/student/data", { method: "HEAD" }));
+    expect(headRes.status).toBe(200);
+
+    // PATCH should be blocked
+    const patchRes = await handler(new Request("http://test/api/student/profile", { method: "PATCH" }));
+    expect(patchRes.status).toBe(403);
+    expect(await patchRes.json()).toEqual({ error: "masquerade_read_only" });
+  });
 });

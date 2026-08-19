@@ -4,7 +4,7 @@ import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
 import { listPeople, displayName } from "@/lib/people";
 import { PersonForm } from "@/components/PersonForm";
-import { DeletePersonButton } from "@/components/DeletePersonButton";
+import { ViewAsButton } from "@/components/ViewAsButton";
 import { Icon } from "@/components/Icon";
 
 function initials(name: string): string {
@@ -82,7 +82,7 @@ export default async function AdminPeoplePage() {
                         <Link href={`/admin/people/${r.id}`} className="btn icon" aria-label={`Edit ${name}`}>
                           <Icon name="edit" />
                         </Link>
-                        <DeletePersonButton personId={r.id} name={name} />
+                        <ViewAsButton personId={r.id} name={name} />
                       </div>
                     </td>
                   </tr>
