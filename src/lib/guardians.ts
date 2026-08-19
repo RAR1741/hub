@@ -72,7 +72,7 @@ export async function getGuardiansForPerson(
     .from("person_guardian")
     .select("relationship, guardian(*)")
     .eq("person_id", personId);
-  const rows = (data ?? []) as { relationship: string | null; guardian: GuardianRow }[];
+  const rows = (data ?? []) as unknown as { relationship: string | null; guardian: GuardianRow }[];
   return rows
     .map((row) => ({
       guardian: guardianFromRow(row.guardian),
