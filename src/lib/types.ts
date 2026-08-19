@@ -112,6 +112,73 @@ export function teamFromRow(row: TeamRow): Team {
   };
 }
 
+export type BadgeRow = {
+  id: string;
+  name: string;
+  category: string | null;
+  description: string | null;
+  color: string;
+  team_id: string | null;
+  allow_self_award: boolean;
+  created_by: string;
+  created_at: string;
+};
+
+export type Badge = {
+  id: string;
+  name: string;
+  category: string | null;
+  description: string | null;
+  color: string;
+  teamId: string | null;
+  allowSelfAward: boolean;
+  createdBy: string;
+  createdAt: string;
+};
+
+export function badgeFromRow(row: BadgeRow): Badge {
+  return {
+    id: row.id,
+    name: row.name,
+    category: row.category,
+    description: row.description,
+    color: row.color,
+    teamId: row.team_id,
+    allowSelfAward: row.allow_self_award,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+  };
+}
+
+export type BadgeAwardRow = {
+  id: string;
+  badge_id: string;
+  person_id: string;
+  awarded_by: string;
+  note: string | null;
+  awarded_at: string;
+};
+
+export type BadgeAward = {
+  id: string;
+  badgeId: string;
+  personId: string;
+  awardedBy: string;
+  note: string | null;
+  awardedAt: string;
+};
+
+export function badgeAwardFromRow(row: BadgeAwardRow): BadgeAward {
+  return {
+    id: row.id,
+    badgeId: row.badge_id,
+    personId: row.person_id,
+    awardedBy: row.awarded_by,
+    note: row.note,
+    awardedAt: row.awarded_at,
+  };
+}
+
 export type ApplicationStatus = "pending" | "approved" | "denied";
 
 export type SessionSource = "kiosk" | "manual" | "admin" | "import" | "event";
