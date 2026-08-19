@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
-  flaggedSessions, hoursReportForPeriod, leaderboard, listSessionsForPeriod, periodLeaderboard,
-  personPeriodHours, sessionsForPeriod,
+  dietaryRestrictionsReport, flaggedSessions, hoursReportForPeriod, leaderboard,
+  listSessionsForPeriod, periodLeaderboard, personPeriodHours, sessionsForPeriod,
 } from "./reports";
 import type { Session } from "./types";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -252,6 +252,34 @@ describe("hoursReportForPeriod", () => {
     expect(result).toEqual([
       { personId: "p1", name: "Ada Lovelace", studentId: "1001", hours: 2 },
       { personId: "p2", name: "Bo Jones", studentId: "1002", hours: 0 },
+    ]);
+  });
+});
+
+describe("dietaryRestrictionsReport", () => {
+  function fakeDb(personRows: Record<string, unknown>[]) {
+    return {
+      from() {
+        return { select: () => ({ order: async () => ({ data: personRows, error: null }) }) };
+      },
+    } as never;
+  }
+
+  test("includes only active people with a non-empty dietary restriction, sorted by name", async () => {
+    const personRows = [
+      { id: "p1", first_name: "Zed", last_name: "Zephyr", display_name: null, role: "student", grad_year: null, email: null, is_active: true, student_id_number: null, dietary_restrictions: "Peanut" },
+      { id: "p2", first_name: "Ada", last_name: "Lovelace", display_name: null, role: "mentor", grad_year: null, email: null, is_active: true, student_id_number: null, dietary_restrictions: "  " },
+      { id: "p3", first_name: "Bo", last_name: "Jones", display_name: null, role: "student", grad_year: null, email: null, is_active: true, student_id_number: null, dietary_restrictions: null },
+      { id: "p4", first_name: "Cy", last_name: "Inactive", display_name: null, role: "student", grad_year: null, email: null, is_active: false, student_id_number: null, dietary_restrictions: "Vegan" },
+      { id: "p5", first_name: "Amy", last_name: "Adams", display_name: null, role: "student", grad_year: null, email: null, is_active: true, student_id_number: null, dietary_restrictions: " Gluten-free " },
+    ];
+    const db = fakeDb(personRows);
+
+    const result = await dietaryRestrictionsReport(db);
+
+    expect(result).toEqual([
+      { personId: "p5", firstName: "Amy", lastName: "Adams", name: "Amy Adams", role: "student", dietaryRestrictions: "Gluten-free" },
+      { personId: "p1", firstName: "Zed", lastName: "Zephyr", name: "Zed Zephyr", role: "student", dietaryRestrictions: "Peanut" },
     ]);
   });
 });

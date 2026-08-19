@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { attendanceSummaryCsv, hoursReportCsv, toCsv } from "./reports-export";
+import { attendanceSummaryCsv, dietaryRestrictionsCsv, hoursReportCsv, toCsv } from "./reports-export";
 
 describe("toCsv", () => {
   test("header row first, then data rows, CRLF-terminated", () => {
@@ -71,6 +71,20 @@ describe("attendanceSummaryCsv", () => {
       "Name,Present,Excused,Absent,Required Days,Percent\r\n" +
         "Ada Lovelace,8,1,1,10,88.89\r\n" +
         "Bo Jones,0,0,0,0,\r\n",
+    );
+  });
+});
+
+describe("dietaryRestrictionsCsv", () => {
+  test("builds a Name/Role/Dietary Restriction CSV", () => {
+    const csv = dietaryRestrictionsCsv([
+      { name: "Ada Lovelace", role: "student", dietaryRestrictions: "Peanut, tree nut" },
+      { name: "Bo Jones", role: "mentor", dietaryRestrictions: "Vegetarian" },
+    ]);
+    expect(csv).toBe(
+      "Name,Role,Dietary Restriction\r\n" +
+        'Ada Lovelace,student,"Peanut, tree nut"\r\n' +
+        "Bo Jones,mentor,Vegetarian\r\n",
     );
   });
 });
