@@ -1,7 +1,16 @@
 import type { PersonRow, Person, Role } from "./types";
 import { personFromRow } from "./types";
 
-export type Viewer = { person: Person | null; role: Role };
+export type Viewer = {
+  person: Person | null;
+  role: Role;
+  /** If present, this viewer is masquerading as another person. The real admin's info is preserved here. */
+  masquerade?: {
+    adminPersonId: string;
+    targetPersonId: string;
+    sessionId: string;
+  };
+};
 
 const GUEST: Viewer = { person: null, role: "guest" };
 
@@ -39,6 +48,9 @@ export async function getViewer(): Promise<Viewer> {
 
   const { serverSupabaseUrl } = await import("./supabase-url");
   const { AUTH_COOKIE_NAME } = await import("./supabase-cookie");
+  const { MASQUERADE_COOKIE, findActiveMasquerade } = await import(
+    "./masquerade"
+  );
 
   const cookieStore = await cookies();
   const supabase = createServerClient(
@@ -68,7 +80,7 @@ export async function getViewer(): Promise<Viewer> {
     return data;
   };
 
-  return resolveViewer({
+  const realViewer = await resolveViewer({
     supabaseUserId: user?.id ?? null,
     studentToken: cookieStore.get(STUDENT_SESSION_COOKIE)?.value ?? null,
     verifyToken: (t) =>
@@ -84,4 +96,33 @@ export async function getViewer(): Promise<Viewer> {
     },
     findPersonById: (id) => findOne("id", id),
   });
+
+  // Check for active masquerade session. Only applies if:
+  // 1. Admin is logged in (not a guest)
+  // 2. A masquerade cookie exists
+  // 3. The session is still active in the DB
+  // 4. The admin in the session matches the real logged-in admin
+  if (realViewer.role === "admin" && realViewer.person?.id) {
+    const masqueradeSessionId = cookieStore.get(MASQUERADE_COOKIE)?.value;
+    if (masqueradeSessionId) {
+      const session = await findActiveMasquerade(masqueradeSessionId);
+      if (session && session.adminPersonId === realViewer.person.id) {
+        // Look up the target person and swap roles
+        const targetRow = await findOne("id", session.targetPersonId);
+        if (targetRow && targetRow.is_active && targetRow.role !== "admin") {
+          return {
+            person: personFromRow(targetRow),
+            role: targetRow.role,
+            masquerade: {
+              adminPersonId: realViewer.person.id,
+              targetPersonId: session.targetPersonId,
+              sessionId: masqueradeSessionId,
+            },
+          };
+        }
+      }
+    }
+  }
+
+  return realViewer;
 }

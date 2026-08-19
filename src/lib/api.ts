@@ -24,6 +24,17 @@ export function withRole<C = unknown>(
       }
       throw e;
     }
+    // Block mutations while masquerading for safety
+    if (
+      viewer.masquerade &&
+      request.method.toUpperCase() !== "GET" &&
+      request.method.toUpperCase() !== "HEAD"
+    ) {
+      return Response.json(
+        { error: "masquerade_read_only" },
+        { status: 403 },
+      );
+    }
     return handler(viewer, request, context as C);
   };
 }

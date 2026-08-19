@@ -876,6 +876,12 @@
     opacity: 0.8;
   }
 
+  /* Masquerade banner: admin viewing as another user */
+  .masquerade-banner {
+    background: var(--red);
+    color: var(--red-fg);
+  }
+
   /* Pit board / meeting-list cards: content supplies its own padding
      (.card-head / .pit-row / .meet), so the card itself goes flush. */
   .card.pit,

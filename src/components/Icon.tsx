@@ -8,8 +8,8 @@ type IconName =
   | "calendar"
   | "clock"
   | "users"
+  | "eye"
   | "chevron";
-
 const paths: Record<IconName, React.ReactNode> = {
   edit: <path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3z" />,
   trash: <path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13" />,
@@ -40,6 +40,12 @@ const paths: Record<IconName, React.ReactNode> = {
       <path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" />
       <circle cx="17" cy="9" r="2.4" />
       <path d="M21 20c0-2.6-1.7-4.8-4-5.6" />
+    </>
+  ),
+  eye: (
+    <>
+      <path d="M12 5C7 5 2.73 8.11 1 12.5c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 8.11 17 5 12 5z" />
+      <circle cx="12" cy="12" r="3" fill="currentColor" />
     </>
   ),
   chevron: <path d="M9 6l6 6-6 6" />,
