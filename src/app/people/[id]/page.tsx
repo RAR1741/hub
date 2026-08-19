@@ -4,6 +4,10 @@ import { canViewProfile, getPersonWithTeams } from "@/lib/people";
 import { getActivePeriod } from "@/lib/periods";
 import { personSessions } from "@/lib/reports";
 import { sessionHours, totalHours } from "@/lib/hours";
+import { listBadgesForPerson, listAwardableBadges } from "@/lib/badges";
+import { hasRole } from "@/lib/authz";
+import { BadgeAwardPanel } from "@/components/BadgeAwardPanel";
+import { RevokeBadgeButton } from "@/components/RevokeBadgeButton";
 
 export default async function PersonPage({
   params,
@@ -17,7 +21,11 @@ export default async function PersonPage({
   if (!result) notFound();
   const { person, teams } = result;
   const activePeriod = await getActivePeriod();
-  const sessions = activePeriod ? await personSessions(person.id, activePeriod.id) : [];
+  const [sessions, heldBadges, awardable] = await Promise.all([
+    activePeriod ? personSessions(person.id, activePeriod.id) : Promise.resolve([]),
+    listBadgesForPerson(person.id),
+    listAwardableBadges(person.id, viewer.role, viewer.person!.id),
+  ]);
 
   const name = `${person.firstName} ${person.lastName}`;
   const totalH = Math.round(totalHours(sessions) * 100) / 100;
@@ -87,6 +95,37 @@ export default async function PersonPage({
             ))}
           </ul>
         )}
+      </section>
+
+      <section className="card flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">Badges</h2>
+        {heldBadges.length === 0 ? (
+          <p className="text-sm text-[var(--muted)]">No badges yet.</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {heldBadges.map((b) => (
+              <li key={b.awardId} className="flex flex-wrap items-center gap-2">
+                <span
+                  className="inline-block h-3 w-3 rounded-full"
+                  style={{ backgroundColor: b.color }}
+                  aria-hidden="true"
+                />
+                <span className="font-medium">{b.name}</span>
+                {b.note && <span className="text-sm text-[var(--color-muted-fg)]">— {b.note}</span>}
+                <span className="text-sm text-[var(--color-muted-fg)]">
+                  Awarded by {b.awardedByName} on {new Date(b.awardedAt).toLocaleDateString()}
+                </span>
+                {hasRole(viewer.role, "mentor") && (
+                  <RevokeBadgeButton personId={person.id} badgeId={b.id} />
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+        <BadgeAwardPanel
+          personId={person.id}
+          awardable={awardable.map((b) => ({ id: b.id, name: b.name, color: b.color }))}
+        />
       </section>
 
       <section className="card flex flex-col gap-3">
