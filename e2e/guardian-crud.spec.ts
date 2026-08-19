@@ -191,8 +191,8 @@ test.describe("Admin guardian CRUD", () => {
     const linkDetails = guardianSection.locator("details:has(summary:text('Link existing'))");
     await linkDetails.locator("summary").click();
 
-    // Search for the guardian by name
-    const searchInput = linkDetails.locator("input[type='text']").first();
+    // Search for the guardian by name (no type attribute, use placeholder)
+    const searchInput = linkDetails.locator("input[placeholder*='typing']");
     await searchInput.fill(guardianName.substring(0, 5)); // partial search
 
     // Wait for results
@@ -202,8 +202,8 @@ test.describe("Admin guardian CRUD", () => {
     // Click result
     await guardianResult.click();
 
-    // Set relationship
-    const relationshipInput = linkDetails.locator("input[placeholder*='Relation']").first();
+    // Set relationship (matches placeholder "Mother, Father, Guardian…")
+    const relationshipInput = linkDetails.locator("input[placeholder*='Guardian']");
     await relationshipInput.fill("Sibling");
 
     // Link
