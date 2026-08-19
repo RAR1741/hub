@@ -31,10 +31,18 @@ const ROUTES = [
   "/admin/people",
   "/admin/settings",
   "/admin/reports",
+  "/admin/meetings",
   "/api/whos-here",
 ];
 
 export default async function globalSetup(): Promise<void> {
+  // CI builds + `next start`s a prod server before running the suite (see
+  // .github/workflows/ci.yml), so every route is already compiled — this
+  // warm-up has nothing to do there but cost ~15s of wall clock every run.
+  if (process.env.CI) {
+    return;
+  }
+
   // Mirrors the `use.baseURL` default in playwright.config.ts.
   const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3000";
   const ctx = await request.newContext({ baseURL });
