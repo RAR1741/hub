@@ -94,17 +94,19 @@ test.describe("Admin guardian CRUD", () => {
     // Wait for email to appear
     await expect(page.locator(`text=${guardianEmail}`)).toBeVisible({ timeout: 5000 });
 
-    // Reload and find guardian row using locator with li and getByText for email
+    // Reload and find guardian row using stable data-testid (won't break in edit mode)
     await page.reload();
-    const guardianRow = page
+    const guardianRowLocator = page
       .locator("li[data-testid^='guardian-']", { has: page.locator(`text=${guardianEmail}`) });
+    const testId = await guardianRowLocator.getAttribute("data-testid");
+    const guardianRow = page.locator(`[data-testid="${testId}"]`);
 
     // Click Edit button
     const editBtn = guardianRow.locator("button:has-text('Edit')").first();
     await expect(editBtn).toBeVisible();
     await editBtn.click();
 
-    // Edit email field within the row
+    // Edit email field using stable testid (works in edit mode)
     const emailInput = guardianRow.locator("input[type='email']");
     await emailInput.fill("updated@example.com");
 
@@ -169,14 +171,16 @@ test.describe("Admin guardian CRUD", () => {
     // Wait for email to appear
     await expect(page.locator(`text=${guardianEmail}`)).toBeVisible({ timeout: 5000 });
 
-    // Reload and find guardian row
+    // Reload and find guardian row using stable data-testid
     await page.reload();
-    const guardianRow = page
+    const guardianRowLocator = page
       .locator("li[data-testid^='guardian-']", { has: page.locator(`text=${guardianEmail}`) });
+    const testId = await guardianRowLocator.getAttribute("data-testid");
+    const guardianRow = page.locator(`[data-testid="${testId}"]`);
 
     // Register dialog handler BEFORE clicking delete
     page.once("dialog", async (dialog) => {
-      expect(dialog.message()).toContain("ALL linked students");
+      expect(dialog.message()).toContain("every linked student");
       await dialog.accept();
     });
 
