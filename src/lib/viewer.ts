@@ -109,7 +109,7 @@ export async function getViewer(): Promise<Viewer> {
       if (session && session.adminPersonId === realViewer.person.id) {
         // Look up the target person and swap roles
         const targetRow = await findOne("id", session.targetPersonId);
-        if (targetRow && targetRow.is_active) {
+        if (targetRow && targetRow.is_active && targetRow.role !== "admin") {
           return {
             person: personFromRow(targetRow),
             role: targetRow.role,

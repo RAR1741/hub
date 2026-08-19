@@ -36,11 +36,18 @@ export async function startMasquerade(
     .eq("id", targetPersonId)
     .maybeSingle();
 
-  if (targetError || !targetRow) {
+  if (targetError) {
+    // DB error — return 500 for debugging/monitoring
+    return { ok: false, status: 500 };
+  }
+
+  if (!targetRow) {
+    // Not found
     return { ok: false, status: 404 };
   }
 
   if (!targetRow.is_active || targetRow.role === "admin") {
+    // Target is inactive or admin — cannot masquerade
     return { ok: false, status: 409 };
   }
 

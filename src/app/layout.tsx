@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Archivo, Inter, JetBrains_Mono } from "next/font/google";
+import { SiteNav } from "@/components/SiteNav";
 import { MasqueradeBanner } from "@/components/MasqueradeBanner";
 import "./globals.css";
 
@@ -57,6 +58,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <a href="#main" className="skip-link">
           Skip to main content
         </a>
+        <SiteNav />
         <MasqueradeBanner />
         <div id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 flex flex-col">
           {children}

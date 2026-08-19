@@ -4,7 +4,7 @@ import { proxy } from "./proxy";
 import { MASQUERADE_COOKIE } from "./lib/masquerade";
 
 describe("proxy (masquerade read-only enforcement)", () => {
-  test("blocks POST /api/* when masquerade cookie present", () => {
+  test("blocks POST /api/* when masquerade cookie present", async () => {
     const request = new NextRequest(
       new URL("http://localhost/api/events/123/checkin", "http://localhost"),
       {
@@ -12,11 +12,11 @@ describe("proxy (masquerade read-only enforcement)", () => {
         headers: { cookie: `${MASQUERADE_COOKIE}=session-123` },
       },
     );
-    const response = proxy(request);
+    const response = await proxy(request);
     expect(response.status).toBe(403);
   });
 
-  test("allows GET /api/* when masquerade cookie present", () => {
+  test("allows GET /api/* when masquerade cookie present", async () => {
     const request = new NextRequest(
       new URL("http://localhost/api/events/123", "http://localhost"),
       {
@@ -24,11 +24,11 @@ describe("proxy (masquerade read-only enforcement)", () => {
         headers: { cookie: `${MASQUERADE_COOKIE}=session-123` },
       },
     );
-    const response = proxy(request);
+    const response = await proxy(request);
     expect(response.status).toBe(200); // NextResponse.next() doesn't set status; defaults to 200
   });
 
-  test("allows POST /api/admin/masquerade/exit when masquerade cookie present", () => {
+  test("allows POST /api/admin/masquerade/exit when masquerade cookie present", async () => {
     const request = new NextRequest(
       new URL("http://localhost/api/admin/masquerade/exit", "http://localhost"),
       {
@@ -36,22 +36,22 @@ describe("proxy (masquerade read-only enforcement)", () => {
         headers: { cookie: `${MASQUERADE_COOKIE}=session-123` },
       },
     );
-    const response = proxy(request);
+    const response = await proxy(request);
     expect(response.status).toBe(200); // NextResponse.next() allows the request through
   });
 
-  test("allows POST /api/* when no masquerade cookie", () => {
+  test("allows POST /api/* when no masquerade cookie", async () => {
     const request = new NextRequest(
       new URL("http://localhost/api/events/123/checkin", "http://localhost"),
       {
         method: "POST",
       },
     );
-    const response = proxy(request);
+    const response = await proxy(request);
     expect(response.status).toBe(200); // NextResponse.next() allows the request through
   });
 
-  test("allows HEAD /api/* when masquerade cookie present", () => {
+  test("allows HEAD /api/* when masquerade cookie present", async () => {
     const request = new NextRequest(
       new URL("http://localhost/api/events/123", "http://localhost"),
       {
@@ -59,11 +59,11 @@ describe("proxy (masquerade read-only enforcement)", () => {
         headers: { cookie: `${MASQUERADE_COOKIE}=session-123` },
       },
     );
-    const response = proxy(request);
+    const response = await proxy(request);
     expect(response.status).toBe(200); // NextResponse.next() allows the request through
   });
 
-  test("allows non-API routes even with masquerade cookie", () => {
+  test("allows non-API routes even with masquerade cookie", async () => {
     const request = new NextRequest(
       new URL("http://localhost/admin/people", "http://localhost"),
       {
@@ -71,7 +71,7 @@ describe("proxy (masquerade read-only enforcement)", () => {
         headers: { cookie: `${MASQUERADE_COOKIE}=session-123` },
       },
     );
-    const response = proxy(request);
+    const response = await proxy(request);
     expect(response.status).toBe(200); // NextResponse.next() allows non-API routes through
   });
 });

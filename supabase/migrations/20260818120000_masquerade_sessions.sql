@@ -14,7 +14,9 @@ create table masquerade_session (
 -- Fast lookup of "does this admin already have an active session" (used to
 -- auto-end a stale one before starting a new one) and of the active session
 -- referenced by the masquerade cookie.
-create index masquerade_session_admin_active
+-- Unique partial index to enforce single active session per admin;
+-- prevents race conditions from creating multiple concurrent sessions.
+create unique index masquerade_session_admin_active_unique
   on masquerade_session (admin_person_id) where ended_at is null;
 
 -- RLS zero-policy like every table: default-deny; service role bypasses.

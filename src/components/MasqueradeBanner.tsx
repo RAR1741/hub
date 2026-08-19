@@ -29,11 +29,11 @@ export async function MasqueradeBanner() {
     return null;
   }
 
-  // Get admin person name
+  // Get admin person name (select only needed columns to avoid excess PII)
   const db = getDb();
   const { data: adminRow } = await db
     .from("person")
-    .select("*")
+    .select("first_name, last_name")
     .eq("id", viewer.masquerade.adminPersonId)
     .maybeSingle();
 
@@ -51,7 +51,7 @@ export async function MasqueradeBanner() {
             Admin: {adminName} · Role: <span className={`pill ${viewer.role === "admin" ? "admin" : "role"}`}>{viewer.role}</span>
           </div>
         </div>
-        <ExitMasqueradeButton sessionId={viewer.masquerade.sessionId} />
+        <ExitMasqueradeButton />
       </div>
     </div>
   );

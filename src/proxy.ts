@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { updateSession } from "./lib/supabase-middleware";
 import { MASQUERADE_COOKIE } from "./lib/masquerade";
 
 /**
@@ -8,12 +9,15 @@ import { MASQUERADE_COOKIE } from "./lib/masquerade";
  *
  * Exemption: /api/admin/masquerade/exit (allows exiting masquerade session).
  */
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
+  // Refresh auth session cookies before checking masquerade
+  const response = await updateSession(request);
+
   const pathname = request.nextUrl.pathname;
 
   // Only check API routes
   if (!pathname.startsWith("/api/")) {
-    return NextResponse.next();
+    return response;
   }
 
   // Allow GET and HEAD requests always
@@ -21,12 +25,12 @@ export function proxy(request: NextRequest) {
     request.method.toUpperCase() === "GET" ||
     request.method.toUpperCase() === "HEAD"
   ) {
-    return NextResponse.next();
+    return response;
   }
 
   // Allow the exit route (needed to clear masquerade)
   if (pathname === "/api/admin/masquerade/exit") {
-    return NextResponse.next();
+    return response;
   }
 
   // Check for active masquerade session
@@ -39,7 +43,7 @@ export function proxy(request: NextRequest) {
     );
   }
 
-  return NextResponse.next();
+  return response;
 }
 
 // Apply proxy to all /api/* routes
