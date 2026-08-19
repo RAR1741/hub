@@ -17,3 +17,6 @@ graphify-out/
 
 # Isolated per-branch worktrees (scripts/new-worktree.sh, WorktreeCreate hook)
 **/.claude/worktrees/
+
+# Isolated per-branch worktrees (any `git worktree add`; see scripts/install-git-hooks.sh)
+/.worktrees/

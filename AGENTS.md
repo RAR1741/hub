@@ -16,9 +16,13 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Branch names: a few words, hyphenated, describing the change at a high level (e.g.
   `dietary-restrictions-report`, `fix-flaky-attendance-test`).
 - Every change starts in an isolated worktree — never commit directly on `master`/`main` in the
-  main checkout. Use a native worktree tool (e.g. `claude --worktree`/isolation:"worktree") if
-  available; otherwise run `scripts/new-worktree.sh <branch-name>`, which gives the worktree its
-  own Docker Compose stack and Supabase instance under `.claude/worktrees/<branch-name>`.
+  main checkout. Any way of making one works: a native worktree tool (`claude --worktree`,
+  isolation:"worktree"), `scripts/new-worktree.sh <branch-name>`, or a plain `git worktree add`.
+  A git `post-checkout` hook gives every new worktree its own Docker Compose stack and Supabase
+  instance on unused ports, whatever created it — see
+  [dev-notes](docs/dev-notes.md#worktree-lifecycle).
+- Merged worktrees clean themselves up (stack, directory, local branch) on the next `git pull` on
+  master or the next session start. Nothing to do by hand; `npm run worktrees:reap` forces it.
 - When a plan/implementation is complete, skip the `finishing-a-development-branch` skill's
   "which option?" menu — go straight to **push + create PR** (`gh pr create`), then report the
   URL. Test verification and base-branch confirmation from that skill still apply; the worktree is
