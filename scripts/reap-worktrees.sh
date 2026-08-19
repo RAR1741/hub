@@ -90,6 +90,15 @@ remove_worktree() {
 # bound). `|| [ -n "$dir" ]` keeps the last line when the file has no trailing
 # newline — the same read-drops-final-line trap that used to make the sweep
 # below skip the most recently created worktree, every time.
+# One-time migration: the queue used to live under .claude/ (agent-specific and
+# invisible to a plain-git checkout). Fold any leftovers into the git-dir queue.
+LEGACY_QUEUE="$MAIN_ROOT/.claude/worktrees/.pending-cleanup"
+if [ -f "$LEGACY_QUEUE" ]; then
+  cat "$LEGACY_QUEUE" >>"$QUEUE"
+  printf '\n' >>"$QUEUE"
+  rm -f "$LEGACY_QUEUE"
+fi
+
 if [ -s "$QUEUE" ]; then
   REMAINING="$(mktemp)"
   sort -u "$QUEUE" | while IFS=$'\t' read -r dir branch || [ -n "$dir" ]; do

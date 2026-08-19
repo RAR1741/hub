@@ -1,31 +1,29 @@
 #!/usr/bin/env bash
-# WorktreeCreate hook — fires for native worktree creation (Agent tool's
-# isolation:"worktree", `claude --worktree`, EnterWorktree) and replaces
-# Claude Code's default `git worktree add`, so those get the same isolated
-# Docker/Supabase stack as scripts/new-worktree.sh instead of an empty,
-# detached-HEAD checkout with no .env.
+# OPTIONAL Claude Code adapter for the WorktreeCreate hook (isolation:"worktree",
+# `claude --worktree`, EnterWorktree). It exists only because that hook replaces
+# Claude's own `git worktree add` and demands the worktree path on stdout.
+#
+# The lifecycle itself does NOT depend on this file: git's post-checkout hook
+# (scripts/install-git-hooks.sh) already sets up any worktree, including the one
+# Claude makes here, so this adapter just prints the path and lets the shared
+# scripts do the work. Deleting it degrades nothing.
 #
 # Contract (code.claude.com/docs/en/hooks#worktreecreate):
-#   - stdin: JSON. Field names have changed across doc/tool versions (seen:
-#     "name" alone in an older reference impl; "branch" + "worktree_path" as
-#     separate fields per current docs) — parse them independently rather
-#     than collapsing to one, and log the raw payload so the real shape is
-#     captured on first live run.
-#   - stdout: ONLY the absolute worktree path. Anything else breaks parsing.
-#   - any non-zero exit fails worktree creation outright — must be safe to
-#     retry (see setup_worktree's reuse-or-create handling).
-# All progress/diagnostic output must go anywhere but stdout.
-set -euo pipefail
+#   - stdin: JSON with a worktree path and/or branch name; field names have
+#     drifted across versions, so parse them independently.
+#   - stdout: ONLY the absolute worktree path.
+#   - non-zero exit fails worktree creation, so this must be safe to retry.
+set -uo pipefail
 
-ROOT="$CLAUDE_PROJECT_DIR"
-WORKTREES_DIR="$ROOT/.claude/worktrees"
-LOG="/tmp/worktree-hook.log"
+LOG="${TMPDIR:-/tmp}/worktree-hook.log"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="${CLAUDE_PROJECT_DIR:-$(cd "$HERE/.." && pwd)}"
 
 INPUT="$(cat)"
 echo "[$(date)] WorktreeCreate input: $INPUT" >>"$LOG"
 
-# Print worktree_path and branch/name on separate lines so a payload that
-# genuinely carries both (per current docs) doesn't get collapsed into one.
+# node is fine here (this file is agent-specific glue, not part of the git-hook
+# path, which stays dependency-free).
 PARSED="$(node -e '
 let d = "";
 process.stdin.on("data", c => d += c);
@@ -42,30 +40,24 @@ WORKTREE_PATH="$(echo "$PARSED" | sed -n 1p)"
 NAME_OR_BRANCH="$(echo "$PARSED" | sed -n 2p)"
 
 if [ -z "$WORKTREE_PATH" ] && [ -z "$NAME_OR_BRANCH" ]; then
-  echo "worktree-create-hook: could not parse name/branch/worktree_path from stdin (see $LOG)" >&2
+  echo "worktree-create-hook: could not parse stdin (see $LOG)" >&2
   exit 1
 fi
 
-# TARGET: prefer the explicit worktree_path Claude asked for; else derive one
-# under WORKTREES_DIR the same way new-worktree.sh does.
+# Prefer the path Claude asked for; else derive one the way new-worktree.sh does.
 if [ -n "$WORKTREE_PATH" ]; then
   TARGET="$WORKTREE_PATH"
 else
-  SLUG="${NAME_OR_BRANCH//\//-}"
-  TARGET="$WORKTREES_DIR/$SLUG"
+  TARGET="${WORKTREES_DIR:-$ROOT/.worktrees}/${NAME_OR_BRANCH//\//-}"
 fi
-
-# BRANCH: use the real branch/name field, never derived from the path — a
-# native worktree's directory is a random-suffixed slug, not the branch name.
-if [ -n "$NAME_OR_BRANCH" ]; then
-  BRANCH="$NAME_OR_BRANCH"
-else
-  BRANCH="$(basename "$TARGET")"
-fi
+# Branch comes from the payload, never from the path: a native worktree's
+# directory is a random-suffixed slug, not the branch name.
+BRANCH="${NAME_OR_BRANCH:-$(basename "$TARGET")}"
 
 {
-  source "$ROOT/scripts/lib/worktree-setup.sh"
-  setup_worktree "$BRANCH" "$TARGET"
+  # shellcheck source=lib/worktree-setup.sh
+  source "$HERE/lib/worktree-setup.sh"
+  setup_worktree "$TARGET" "$BRANCH"
 } >>"$LOG" 2>&1
 
 # THE ONLY THING ON STDOUT.
