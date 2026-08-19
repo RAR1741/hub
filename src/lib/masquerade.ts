@@ -38,6 +38,7 @@ export async function startMasquerade(
 
   if (targetError) {
     // DB error — return 500 for debugging/monitoring
+    console.error("[masquerade] target lookup error:", targetError);
     return { ok: false, status: 500 };
   }
 
@@ -69,6 +70,7 @@ export async function startMasquerade(
     .single();
 
   if (insertError || !session) {
+    console.error("[masquerade] insert error:", insertError);
     return { ok: false, status: 500 };
   }
 
