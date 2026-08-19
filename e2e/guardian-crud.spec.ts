@@ -84,9 +84,9 @@ test.describe("Admin guardian CRUD", () => {
     await inputs.nth(4).fill("Test Company");
     await addDetails.locator("button:text('Add guardian')").click();
 
-    // Reload and edit
+    // Reload and edit - scope to the li containing this guardian
     await page.reload();
-    const guardianRow = guardianSection.locator(`text=${guardianName}`).first().locator("..");
+    const guardianRow = page.locator("li", { hasText: guardianName });
 
     // Click Edit
     const editBtn = guardianRow.locator("button:has-text('Edit')").first();
@@ -121,9 +121,9 @@ test.describe("Admin guardian CRUD", () => {
     await inputs.nth(4).fill("Test Company");
     await addDetails.locator("button:text('Add guardian')").click();
 
-    // Reload and unlink
+    // Reload and unlink - scope to the li containing this guardian
     await page.reload();
-    const guardianRow = guardianSection.locator(`text=${guardianName}`).first().locator("..");
+    const guardianRow = page.locator("li", { hasText: guardianName });
 
     // Click Unlink
     const unlinkBtn = guardianRow.locator("button[aria-label*='Unlink']").first();
@@ -149,9 +149,9 @@ test.describe("Admin guardian CRUD", () => {
     await inputs.nth(4).fill("Test Company");
     await addDetails.locator("button:text('Add guardian')").click();
 
-    // Reload and delete
+    // Reload and delete - scope to the li containing this guardian
     await page.reload();
-    const guardianRow = guardianSection.locator(`text=${guardianName}`).first().locator("..");
+    const guardianRow = page.locator("li", { hasText: guardianName });
 
     // Register dialog handler BEFORE clicking delete
     page.once("dialog", async (dialog) => {
