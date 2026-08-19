@@ -178,7 +178,7 @@ export function PersonGuardians({
             const isEditing = editingId === g.id;
             const name = `${g.firstName} ${g.lastName}`;
             return (
-              <li key={g.id} className="flex flex-col gap-2 border-b border-[var(--border)] pb-3 last:border-b-0 last:pb-0">
+              <li key={g.id} data-testid={`guardian-${g.id}`} className="flex flex-col gap-2 border-b border-[var(--border)] pb-3 last:border-b-0 last:pb-0">
                 {isEditing && editValues ? (
                   <div className="flex flex-col gap-2">
                     <label className="label">First name <input className="input" value={editValues.firstName} onChange={(e) => setEditField("firstName", e.target.value)} /></label>

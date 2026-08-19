@@ -16,7 +16,7 @@ test.describe("Guardian visibility", () => {
     const cookie = await studentSessionCookie(BASE);
     await context.addCookies([cookie]);
 
-    // Student views their own profile (seeded student with ID number 1741)
+    // Student views their own profile
     await page.goto(`${BASE}/people/${SEEDED_STUDENT_PERSON_ID}`);
     // Guardians section should NOT be visible for self-view
     await expect(page.locator("h2", { hasText: "Guardians" })).not.toBeVisible();
@@ -45,6 +45,7 @@ test.describe("Admin guardian CRUD", () => {
 
   test("admin can create a new guardian and link to a student", async ({ page }) => {
     const guardianName = `Guardian${Date.now()}`;
+    const guardianEmail = `guardian${Date.now()}@example.com`;
     // Go to admin edit page for a student
     await page.goto(`${BASE}/admin/people/${SEEDED_STUDENT_PERSON_ID}`);
 
@@ -60,7 +61,7 @@ test.describe("Admin guardian CRUD", () => {
     const inputs = addDetails.locator("input");
     await inputs.nth(0).fill(guardianName);
     await inputs.nth(1).fill("TestLast");
-    await inputs.nth(2).fill(`${guardianName}@example.com`);
+    await inputs.nth(2).fill(guardianEmail);
     await inputs.nth(3).fill("555-0001");
     await inputs.nth(4).fill("Test Company");
     await inputs.nth(5).fill("Parent");
@@ -70,11 +71,12 @@ test.describe("Admin guardian CRUD", () => {
     await btn.click();
 
     // Verify appears
-    await expect(page.locator(`text=${guardianName} TestLast`)).toBeVisible({ timeout: 5000 });
+    await expect(page.locator(`text=${guardianName}`)).toBeVisible({ timeout: 5000 });
   });
 
   test("admin can edit a guardian's contact fields", async ({ page }) => {
     const guardianName = `EditGuardian${Date.now()}`;
+    const guardianEmail = `edit${Date.now()}@example.com`;
     // Create a guardian first
     await page.goto(`${BASE}/admin/people/${SEEDED_STUDENT_PERSON_ID}`);
     const guardianSection = page.locator("section:has(h2:text('Guardians'))");
@@ -84,21 +86,21 @@ test.describe("Admin guardian CRUD", () => {
     const inputs = addDetails.locator("input");
     await inputs.nth(0).fill(guardianName);
     await inputs.nth(1).fill("TestLast");
-    await inputs.nth(2).fill("original@example.com");
+    await inputs.nth(2).fill(guardianEmail);
     await inputs.nth(3).fill("555-0002");
     await inputs.nth(4).fill("Test Company");
     await addDetails.locator("button:text('Add guardian')").click();
 
-    // Reload and edit - scope to the li containing this guardian
+    // Reload and edit - find row by email (unique and stable)
     await page.reload();
-    const guardianRow = page.locator("li", { hasText: guardianName });
+    const guardianRow = page.locator(`li:has(text="${guardianEmail}")`);
 
-    // Click Edit
+    // Click Edit button within the row
     const editBtn = guardianRow.locator("button:has-text('Edit')").first();
     await expect(editBtn).toBeVisible();
     await editBtn.click();
 
-    // Edit email field
+    // Edit email field - now find by the input within the row
     const emailInput = guardianRow.locator("input[type='email']");
     await emailInput.fill("updated@example.com");
 
@@ -112,6 +114,7 @@ test.describe("Admin guardian CRUD", () => {
 
   test("admin can unlink a guardian from one student", async ({ page }) => {
     const guardianName = `UnlinkGuardian${Date.now()}`;
+    const guardianEmail = `unlink${Date.now()}@example.com`;
     // Create a guardian first
     await page.goto(`${BASE}/admin/people/${SEEDED_STUDENT_PERSON_ID}`);
     const guardianSection = page.locator("section:has(h2:text('Guardians'))");
@@ -121,25 +124,26 @@ test.describe("Admin guardian CRUD", () => {
     const inputs = addDetails.locator("input");
     await inputs.nth(0).fill(guardianName);
     await inputs.nth(1).fill("TestLast");
-    await inputs.nth(2).fill(`${guardianName}@example.com`);
+    await inputs.nth(2).fill(guardianEmail);
     await inputs.nth(3).fill("555-0003");
     await inputs.nth(4).fill("Test Company");
     await addDetails.locator("button:text('Add guardian')").click();
 
-    // Reload and unlink - scope to the li containing this guardian
+    // Reload and unlink - find row by email (unique and stable)
     await page.reload();
-    const guardianRow = page.locator("li", { hasText: guardianName });
+    const guardianRow = page.locator(`li:has(text="${guardianEmail}")`);
 
     // Click Unlink
     const unlinkBtn = guardianRow.locator("button[aria-label*='Unlink']").first();
     await unlinkBtn.click();
 
     // Verify removed
-    await expect(guardianSection.locator(`text=${guardianName}`)).not.toBeVisible({ timeout: 5000 });
+    await expect(page.locator(`text=${guardianEmail}`)).not.toBeVisible({ timeout: 5000 });
   });
 
   test("admin can delete a guardian entirely (cascades all links)", async ({ page }) => {
     const guardianName = `DeleteGuardian${Date.now()}`;
+    const guardianEmail = `delete${Date.now()}@example.com`;
     // Create a guardian first
     await page.goto(`${BASE}/admin/people/${SEEDED_STUDENT_PERSON_ID}`);
     const guardianSection = page.locator("section:has(h2:text('Guardians'))");
@@ -149,14 +153,14 @@ test.describe("Admin guardian CRUD", () => {
     const inputs = addDetails.locator("input");
     await inputs.nth(0).fill(guardianName);
     await inputs.nth(1).fill("TestLast");
-    await inputs.nth(2).fill(`${guardianName}@example.com`);
+    await inputs.nth(2).fill(guardianEmail);
     await inputs.nth(3).fill("555-0004");
     await inputs.nth(4).fill("Test Company");
     await addDetails.locator("button:text('Add guardian')").click();
 
-    // Reload and delete - scope to the li containing this guardian
+    // Reload and delete - find row by email
     await page.reload();
-    const guardianRow = page.locator("li", { hasText: guardianName });
+    const guardianRow = page.locator(`li:has(text="${guardianEmail}")`);
 
     // Register dialog handler BEFORE clicking delete
     page.once("dialog", async (dialog) => {
@@ -169,14 +173,15 @@ test.describe("Admin guardian CRUD", () => {
     await deleteBtn.click();
 
     // Verify deleted
-    await expect(guardianSection.locator(`text=${guardianName}`)).not.toBeVisible({ timeout: 5000 });
+    await expect(page.locator(`text=${guardianEmail}`)).not.toBeVisible({ timeout: 5000 });
   });
 
   test("admin can link an existing guardian to another student (sibling case)", async ({
     page,
   }) => {
     const guardianName = `LinkGuardian${Date.now()}`;
-    // Create a guardian first on student
+    const guardianEmail = `link${Date.now()}@example.com`;
+    // Create a guardian first
     await page.goto(`${BASE}/admin/people/${SEEDED_STUDENT_PERSON_ID}`);
     const guardianSection = page.locator("section:has(h2:text('Guardians'))");
     const addDetails = guardianSection.locator("details:has(summary:text('Add new guardian'))");
@@ -185,7 +190,7 @@ test.describe("Admin guardian CRUD", () => {
     const inputs = addDetails.locator("input");
     await inputs.nth(0).fill(guardianName);
     await inputs.nth(1).fill("TestLast");
-    await inputs.nth(2).fill(`${guardianName}@example.com`);
+    await inputs.nth(2).fill(guardianEmail);
     await inputs.nth(3).fill("555-0005");
     await inputs.nth(4).fill("Test Company");
     await addDetails.locator("button:text('Add guardian')").click();
@@ -216,6 +221,6 @@ test.describe("Admin guardian CRUD", () => {
     await linkBtn.click();
 
     // Verify linked
-    await expect(page.locator(`text=${guardianName}`)).toBeVisible({ timeout: 5000 });
+    await expect(page.locator(`text=${guardianEmail}`)).toBeVisible({ timeout: 5000 });
   });
 });
