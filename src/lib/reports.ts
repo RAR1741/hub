@@ -3,6 +3,7 @@ import type { Session, SessionRow, Role } from "./types";
 import { sessionFromRow } from "./types";
 import { totalHours, overlappingSessionIds, sessionFlags, type FlagKind } from "./hours";
 import { displayName, listPeople } from "./people";
+import { sortByName } from "./name-sort";
 import { getSetting } from "./settings";
 import { fetchAllRows } from "./paginate";
 
@@ -146,6 +147,37 @@ export async function hoursReportForPeriod(
       hours: hoursByPerson.get(p.id) ?? 0,
     }))
     .sort((a, b) => b.hours - a.hours || a.name.localeCompare(b.name));
+}
+
+export type DietaryRestrictionRow = {
+  personId: string;
+  firstName: string;
+  lastName: string;
+  name: string;
+  role: Exclude<Role, "guest">;
+  dietaryRestrictions: string;
+};
+
+/**
+ * Active members (any role) with a non-empty dietary restriction on file,
+ * sorted by name. Whitespace-only values count as "none on file".
+ */
+export async function dietaryRestrictionsReport(
+  db?: SupabaseClient,
+): Promise<DietaryRestrictionRow[]> {
+  const client = db ?? (await import("./db")).getDb();
+  const rows = await listPeople(undefined, client);
+  const filtered = rows
+    .filter((p) => p.is_active && (p.dietary_restrictions ?? "").trim() !== "")
+    .map((p) => ({
+      personId: p.id,
+      firstName: p.first_name,
+      lastName: p.last_name,
+      name: displayName(p),
+      role: p.role,
+      dietaryRestrictions: (p.dietary_restrictions ?? "").trim(),
+    }));
+  return sortByName(filtered);
 }
 
 export type FlaggedSession = {

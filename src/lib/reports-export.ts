@@ -47,3 +47,13 @@ export function attendanceSummaryCsv(rows: AttendanceSummaryCsvRow[]): string {
     rows.map((r) => [r.name, r.present, r.excused, r.absent, r.requiredDays, r.pct]),
   );
 }
+
+export type DietaryRestrictionCsvRow = { name: string; role: string; dietaryRestrictions: string };
+
+/** PURE. */
+export function dietaryRestrictionsCsv(rows: DietaryRestrictionCsvRow[]): string {
+  return toCsv(
+    ["Name", "Role", "Dietary Restriction"],
+    rows.map((r) => [r.name, r.role, r.dietaryRestrictions]),
+  );
+}

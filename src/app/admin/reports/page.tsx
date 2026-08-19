@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
 import { getActivePeriod, listPeriods } from "@/lib/periods";
-import { hoursReportForPeriod } from "@/lib/reports";
+import { hoursReportForPeriod, dietaryRestrictionsReport } from "@/lib/reports";
 import { attendanceSummaryForPeriod } from "@/lib/attendance";
 
 export default async function AdminReportsPage({
@@ -10,8 +10,8 @@ export default async function AdminReportsPage({
 }: {
   searchParams: Promise<{ period?: string }>;
 }) {
-  const [{ period }, viewer, periods] = await Promise.all([
-    searchParams, getViewer(), listPeriods(),
+  const [{ period }, viewer, periods, dietaryRows] = await Promise.all([
+    searchParams, getViewer(), listPeriods(), dietaryRestrictionsReport(),
   ]);
   if (!hasRole(viewer.role, "mentor")) redirect("/");
 
@@ -27,7 +27,7 @@ export default async function AdminReportsPage({
       <div className="page-head">
         <div>
           <h1>Reports</h1>
-          <div className="sub">Hours and attendance, exportable as CSV.</div>
+          <div className="sub">Hours, attendance, and dietary restrictions, exportable as CSV.</div>
         </div>
       </div>
 
@@ -54,6 +54,41 @@ export default async function AdminReportsPage({
           View
         </button>
       </form>
+
+      <section className="card flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold">Dietary restrictions ({dietaryRows.length})</h2>
+          <a className="btn" href="/api/admin/reports/dietary">
+            Export CSV
+          </a>
+        </div>
+        {dietaryRows.length === 0 ? (
+          <p className="text-sm" style={{ color: "var(--muted)" }}>
+            No active members have dietary restrictions on file.
+          </p>
+        ) : (
+          <div className="tablewrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Role</th>
+                  <th>Dietary restriction</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dietaryRows.map((r) => (
+                  <tr key={r.personId}>
+                    <td>{r.name}</td>
+                    <td>{r.role}</td>
+                    <td>{r.dietaryRestrictions}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       {!periodId ? (
         <p className="card text-[var(--muted)]">No periods yet — create one in Admin → Periods.</p>
