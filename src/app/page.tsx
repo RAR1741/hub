@@ -80,6 +80,9 @@ export default async function HomePage() {
                 <Link href="/teams" className="text-sm font-medium text-[var(--color-brand)]">
                   Teams
                 </Link>
+                <Link href={`/people/${viewer.person.id}`} className="text-sm font-medium text-[var(--color-brand)]">
+                  My profile
+                </Link>
               </nav>
             </div>
           </div>
