@@ -1,5 +1,10 @@
 import { test, expect } from "@playwright/test";
-import { adminSessionCookie, mentorSessionCookie, studentSessionCookie } from "./helpers/session";
+import {
+  adminSessionCookie,
+  mentorSessionCookie,
+  studentSessionCookie,
+  SEEDED_STUDENT_PERSON_ID,
+} from "./helpers/session";
 
 const BASE = process.env.E2E_BASE_URL ?? "http://localhost:3000";
 
@@ -11,8 +16,8 @@ test.describe("Guardian visibility", () => {
     const cookie = await studentSessionCookie(BASE);
     await context.addCookies([cookie]);
 
-    // Student views their own profile (seeded student 1741)
-    await page.goto(`${BASE}/people/1741`);
+    // Student views their own profile (seeded student with ID number 1741)
+    await page.goto(`${BASE}/people/${SEEDED_STUDENT_PERSON_ID}`);
     // Guardians section should NOT be visible for self-view
     await expect(page.locator("h2", { hasText: "Guardians" })).not.toBeVisible();
   });
@@ -25,7 +30,7 @@ test.describe("Guardian visibility", () => {
     await context.addCookies([cookie]);
 
     // Mentor views a student's profile
-    await page.goto(`${BASE}/people/1741`);
+    await page.goto(`${BASE}/people/${SEEDED_STUDENT_PERSON_ID}`);
     // Guardians section should be visible
     await expect(page.locator("h2", { hasText: "Guardians" })).toBeVisible();
   });
@@ -41,7 +46,7 @@ test.describe("Admin guardian CRUD", () => {
   test("admin can create a new guardian and link to a student", async ({ page }) => {
     const guardianName = `Guardian${Date.now()}`;
     // Go to admin edit page for a student
-    await page.goto(`${BASE}/admin/people/1741`);
+    await page.goto(`${BASE}/admin/people/${SEEDED_STUDENT_PERSON_ID}`);
 
     // Find the Guardians section
     const guardianSection = page.locator("section:has(h2:text('Guardians'))");
@@ -71,7 +76,7 @@ test.describe("Admin guardian CRUD", () => {
   test("admin can edit a guardian's contact fields", async ({ page }) => {
     const guardianName = `EditGuardian${Date.now()}`;
     // Create a guardian first
-    await page.goto(`${BASE}/admin/people/1741`);
+    await page.goto(`${BASE}/admin/people/${SEEDED_STUDENT_PERSON_ID}`);
     const guardianSection = page.locator("section:has(h2:text('Guardians'))");
     const addDetails = guardianSection.locator("details:has(summary:text('Add new guardian'))");
     await addDetails.locator("summary").click();
@@ -108,7 +113,7 @@ test.describe("Admin guardian CRUD", () => {
   test("admin can unlink a guardian from one student", async ({ page }) => {
     const guardianName = `UnlinkGuardian${Date.now()}`;
     // Create a guardian first
-    await page.goto(`${BASE}/admin/people/1741`);
+    await page.goto(`${BASE}/admin/people/${SEEDED_STUDENT_PERSON_ID}`);
     const guardianSection = page.locator("section:has(h2:text('Guardians'))");
     const addDetails = guardianSection.locator("details:has(summary:text('Add new guardian'))");
     await addDetails.locator("summary").click();
@@ -136,7 +141,7 @@ test.describe("Admin guardian CRUD", () => {
   test("admin can delete a guardian entirely (cascades all links)", async ({ page }) => {
     const guardianName = `DeleteGuardian${Date.now()}`;
     // Create a guardian first
-    await page.goto(`${BASE}/admin/people/1741`);
+    await page.goto(`${BASE}/admin/people/${SEEDED_STUDENT_PERSON_ID}`);
     const guardianSection = page.locator("section:has(h2:text('Guardians'))");
     const addDetails = guardianSection.locator("details:has(summary:text('Add new guardian'))");
     await addDetails.locator("summary").click();
@@ -171,8 +176,8 @@ test.describe("Admin guardian CRUD", () => {
     page,
   }) => {
     const guardianName = `LinkGuardian${Date.now()}`;
-    // Create a guardian first on student 1741
-    await page.goto(`${BASE}/admin/people/1741`);
+    // Create a guardian first on student
+    await page.goto(`${BASE}/admin/people/${SEEDED_STUDENT_PERSON_ID}`);
     const guardianSection = page.locator("section:has(h2:text('Guardians'))");
     const addDetails = guardianSection.locator("details:has(summary:text('Add new guardian'))");
     await addDetails.locator("summary").click();
@@ -185,13 +190,13 @@ test.describe("Admin guardian CRUD", () => {
     await inputs.nth(4).fill("Test Company");
     await addDetails.locator("button:text('Add guardian')").click();
 
-    // Now link the same guardian to student 1741 again (simulate sibling case)
+    // Now link the same guardian again (simulate sibling case)
     // by using the search/link feature
     await page.reload();
     const linkDetails = guardianSection.locator("details:has(summary:text('Link existing'))");
     await linkDetails.locator("summary").click();
 
-    // Search for the guardian by name (no type attribute, use placeholder)
+    // Search for the guardian by name
     const searchInput = linkDetails.locator("input[placeholder*='typing']");
     await searchInput.fill(guardianName.substring(0, 5)); // partial search
 
@@ -202,7 +207,7 @@ test.describe("Admin guardian CRUD", () => {
     // Click result
     await guardianResult.click();
 
-    // Set relationship (matches placeholder "Mother, Father, Guardian…")
+    // Set relationship
     const relationshipInput = linkDetails.locator("input[placeholder*='Guardian']");
     await relationshipInput.fill("Sibling");
 
@@ -210,7 +215,7 @@ test.describe("Admin guardian CRUD", () => {
     const linkBtn = linkDetails.locator("button:text('Link')").first();
     await linkBtn.click();
 
-    // Verify linked (may show duplicate or updated relationship)
+    // Verify linked
     await expect(page.locator(`text=${guardianName}`)).toBeVisible({ timeout: 5000 });
   });
 });
