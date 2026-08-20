@@ -27,6 +27,9 @@ jobs:
       # without them resolvable. Dummy values are fine — E2E uses no real OAuth.
       GOOGLE_OAUTH_CLIENT_ID: dummy
       GOOGLE_OAUTH_CLIENT_SECRET: dummy
+      # Suppress interactive prompts during apt-get (needrestart, service restarts)
+      NEEDRESTART_MODE: a
+      DEBIAN_FRONTEND: noninteractive
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

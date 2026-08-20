@@ -1,9 +1,11 @@
 import { notFound } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { canViewProfile, getPersonWithTeams } from "@/lib/people";
+import { hasRole } from "@/lib/authz";
 import { getActivePeriod } from "@/lib/periods";
 import { personSessions } from "@/lib/reports";
 import { sessionHours, totalHours } from "@/lib/hours";
+import { getGuardiansForPerson } from "@/lib/guardians";
 
 export default async function PersonPage({
   params,
@@ -12,11 +14,15 @@ export default async function PersonPage({
 }) {
   const [{ id }, viewer] = await Promise.all([params, getViewer()]);
   if (!canViewProfile(viewer, id)) notFound();
+  const canViewGuardians = hasRole(viewer.role, "mentor");
 
-  const result = await getPersonWithTeams(id);
+  const [result, activePeriod, guardians] = await Promise.all([
+    getPersonWithTeams(id),
+    getActivePeriod(),
+    canViewGuardians ? getGuardiansForPerson(id) : Promise.resolve([]),
+  ]);
   if (!result) notFound();
   const { person, teams } = result;
-  const activePeriod = await getActivePeriod();
   const sessions = activePeriod ? await personSessions(person.id, activePeriod.id) : [];
 
   const name = `${person.firstName} ${person.lastName}`;
@@ -88,6 +94,35 @@ export default async function PersonPage({
           </ul>
         )}
       </section>
+
+      {canViewGuardians && (
+        <section className="card flex flex-col gap-3">
+          <h2 className="text-lg font-semibold">Guardians</h2>
+          {guardians.length === 0 ? (
+            <p className="text-sm text-[var(--muted)]">No guardians on file.</p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {guardians.map(({ guardian, relationship }) => (
+                <li key={guardian.id} className="flex flex-col gap-1 text-sm">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">
+                      {guardian.firstName} {guardian.lastName}
+                    </span>
+                    {relationship && <span className="pill">{relationship}</span>}
+                  </div>
+                  {(guardian.email || guardian.phone || guardian.employer) && (
+                    <ul className="flex flex-wrap gap-x-4 text-[var(--muted)]">
+                      {guardian.email && <li>{guardian.email}</li>}
+                      {guardian.phone && <li>{guardian.phone}</li>}
+                      {guardian.employer && <li>{guardian.employer}</li>}
+                    </ul>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
 
       <section className="card flex flex-col gap-3">
         <h2 className="text-lg font-semibold">
