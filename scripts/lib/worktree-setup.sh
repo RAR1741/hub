@@ -115,6 +115,19 @@ setup_worktree() {
     fi
   fi
 
+  # Seed the graphify knowledge graph from the main checkout. graphify-out/ is
+  # gitignored (never committed), so a fresh worktree starts without one — copy
+  # the whole folder from main so the branch opens with the current graph instead
+  # of an expensive rebuild from scratch. Skip the path-specific sidecars
+  # (.graphify_root/.graphify_python) so this worktree's tooling targets itself,
+  # not main. graphify's own post-checkout hook refreshes graph.json from this
+  # worktree's code afterward.
+  if [ -d "$MAIN_ROOT/graphify-out" ] && ! [ "$TARGET/graphify-out" -ef "$MAIN_ROOT/graphify-out" ]; then
+    mkdir -p "$TARGET/graphify-out"
+    cp -R "$MAIN_ROOT/graphify-out/." "$TARGET/graphify-out/" 2>/dev/null || true
+    rm -f "$TARGET/graphify-out/.graphify_root" "$TARGET/graphify-out/.graphify_python" 2>/dev/null || true
+  fi
+
   # .env: inherit the main checkout's (OAuth secrets, service accounts — both
   # the app and `supabase start` need them) and override only our own keys.
   {
