@@ -1,37 +1,37 @@
 #!/usr/bin/env bash
-# Spin up an isolated git worktree with its own Docker Compose stack and local
-# Supabase instance, so several branches can run side by side (each `./dev up`
-# gets its own containers, network, and ports — no collisions).
+# Create a worktree with its own Docker Compose stack and local Supabase
+# instance, so several branches run side by side without port collisions.
 #
 #   scripts/new-worktree.sh <branch-name>
+#   cd .worktrees/<branch-name> && ./dev
 #
-# Then, from the new worktree directory:
-#   ./dev            # or: docker compose up
+# You don't strictly need this script: with the git hooks installed
+# (scripts/install-git-hooks.sh, run automatically by `npm install`), a plain
+# `git worktree add` gets the same isolated stack. This is just the convenient
+# front door — it picks the directory and prints where things ended up.
 #
-# The actual setup lives in scripts/lib/worktree-setup.sh, shared with the
-# WorktreeCreate hook (scripts/worktree-create-hook.sh) so worktrees made via
-# `claude --worktree` / isolation:"worktree" get the same isolation as ones
-# made by hand here.
+# Override the parent directory with WORKTREES_DIR=/some/path.
 set -euo pipefail
 
 BRANCH="${1:?usage: scripts/new-worktree.sh <branch-name>}"
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-WORKTREES_DIR="$ROOT/.claude/worktrees"
-# Branch names often contain "/" (e.g. "feat/foo"); git is fine with that, but
-# it would otherwise create nested directories under WORKTREES_DIR, breaking
-# the offset scan below. Keep the on-disk dir a flat slug; the branch itself
-# still gets the name as given.
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# shellcheck source=lib/worktree-setup.sh
+source "$HERE/lib/worktree-setup.sh"
+
+MAIN_ROOT="$(wt_main_root "$HERE")"
+# Branch names contain "/" (feat/foo); git is fine with that but it would nest
+# directories, so the on-disk name is a flat slug while the branch keeps its "/".
 SLUG="${BRANCH//\//-}"
-TARGET="$WORKTREES_DIR/$SLUG"
+TARGET="${WORKTREES_DIR:-$MAIN_ROOT/.worktrees}/$SLUG"
 
 if [ -e "$TARGET" ]; then
   echo "error: $TARGET already exists" >&2
   exit 1
 fi
 
-# shellcheck source=lib/worktree-setup.sh
-source "$ROOT/scripts/lib/worktree-setup.sh"
-setup_worktree "$BRANCH" "$TARGET"
+mkdir -p "$(dirname "$TARGET")"
+setup_worktree "$TARGET" "$BRANCH"
 
 echo
 echo "cd \"$TARGET\" && ./dev"

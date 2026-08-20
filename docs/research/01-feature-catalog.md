@@ -126,19 +126,19 @@ Members sign in at a shared device at the shop door.
 
 ### 3.1 Structured part numbering
 Canonical numbers like `PREFIX-A-0100`/`PREFIX-P-0101` (project prefix + assembly/part letter + zero-padded number) intended as CAD filenames; auto-allocation: assemblies get +100 blocks, parts increment within their parent's block (`models/part.rb` `generate_number_and_create`).
-- **Decision:** Nice (later)
+- **Decision:** ✅ Done — shipped in [PR #74](https://github.com/RAR1741/hub/pull/74) (issues #8–#11). Ported to `src/lib/parts.ts`. Deviation from CP: **parts must belong to a parent assembly** (no loose top-level parts) so the per-project unique number can't collide between a top-level part and an assembly's first child.
 
 ### 3.2 Assembly hierarchy
 Parts nest under assemblies (self-referential tree), breadcrumb chain, sortable listings (`views/part_tree.erb`).
-- **Decision:** Nice (later)
+- **Decision:** ✅ Done — [PR #74](https://github.com/RAR1741/hub/pull/74). `part.parent_part_id` self-FK (CP's `0` sentinel → real `NULL`); breadcrumb + children list on the part detail page.
 
 ### 3.3 Manufacturing status pipeline
 20 color-coded statuses (designing → material → ordered → drawing → ready → cnc/laser/lathe/mill/… → done), inline AJAX status change from any list (`models/part.rb` `STATUS_MAP`).
-- **Decision:** Nice (later)
+- **Decision:** ✅ Done — [PR #74](https://github.com/RAR1741/hub/pull/74). 20-status pipeline in `src/lib/types.ts` (`STATUS_MAP`/`STATUS_TONE`); inline status change via a `PATCH /api/admin/parts/[id]` cell (replaces CP's jQuery AJAX).
 
 ### 3.4 Shop dashboard (kanban)
 Live board grouping parts by status, priority-ordered and priority-colored tiles, status filter, 10-second auto-refresh; per-project enable flag (`views/dashboard.erb`).
-- **Decision:** Nice (later)
+- **Decision:** ✅ Done — [PR #74](https://github.com/RAR1741/hub/pull/74). Board at `/shop/[projectId]` (`ShopBoard`): status-grouped, priority-colored tiles, URL-persisted status filter, 10s poll. Deviations from CP: parts are grouped under a standalone **`project`** table (not period/season-linked), and the board is **student-gated, not public/kiosk** (guests can't view it). Purchasing (§3.5–3.6) remains "later" (issues #12/#13, untouched).
 
 ### 3.5 Purchasing: order items → vendor orders
 Line items auto-group into per-vendor open orders (typing a vendor finds-or-creates the order; blank vendor = "unclassified" bucket), vendor autocomplete, inline editing, Open → Ordered → Received lifecycle with tax/shipping/notes (`post /projects/:id/order_items`, `models/order.rb`).
