@@ -14,6 +14,7 @@ import { listKioskDevices } from "@/lib/kiosk";
 import { listPendingAccountRequests, listPendingApplications } from "@/lib/requests";
 import { listPendingExcusalRequests } from "@/lib/excusal-requests";
 import { listEvents } from "@/lib/events";
+import { listProjects } from "@/lib/parts";
 
 type IconName = Parameters<typeof Icon>[0]["name"];
 
@@ -86,6 +87,7 @@ export default async function AdminHubPage() {
     applications,
     excusalRequests,
     events,
+    projects,
   ] = await Promise.all([
     // Admin-only rows skip their query for mentors (they can't see those
     // cards); the rest (excusal requests, events) run for every viewer.
@@ -101,6 +103,7 @@ export default async function AdminHubPage() {
     isAdmin ? listPendingApplications() : Promise.resolve([]),
     listPendingExcusalRequests(),
     listEvents(),
+    listProjects(),
   ]);
 
   // Requests queue, scoped to what the viewer can actually act on:
@@ -161,6 +164,7 @@ export default async function AdminHubPage() {
         <Card href="/admin/build-days" icon="calendar" title="Build days" count={buildDays.length} hint="Required/optional days for the active period." />
         <Card href="/admin/sessions" icon="clock" title="Sessions" count={sessions.length} hint="All attendance sessions, browse and edit." />
         <Card href="/admin/events" icon="calendar" title="Events" count={events.length} hint="Outreach, demos, training — sign-up + check-in." />
+        <Card href="/admin/projects" icon="chevron" title="Parts" count={projects.length} hint="Part numbering, assemblies, shop dashboard." />
         {isAdmin && (
           <Card href="/admin/periods" icon="calendar" title="Periods" count={periods.length} hint="Seasons and the active period." />
         )}
