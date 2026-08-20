@@ -16,13 +16,20 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Branch names: a few words, hyphenated, describing the change at a high level (e.g.
   `dietary-restrictions-report`, `fix-flaky-attendance-test`).
 - Every change starts in an isolated worktree — never commit directly on `master`/`main` in the
-  main checkout. Any way of making one works: a native worktree tool (`claude --worktree`,
-  isolation:"worktree"), `scripts/new-worktree.sh <branch-name>`, or a plain `git worktree add`.
-  A git `post-checkout` hook gives every new worktree its own Docker Compose stack and Supabase
-  instance on unused ports, whatever created it — see
-  [dev-notes](docs/dev-notes.md#worktree-lifecycle).
-- Merged worktrees clean themselves up (stack, directory, local branch) on the next `git pull` on
-  master or the next session start. Nothing to do by hand; `npm run worktrees:reap` forces it.
+  main checkout. **Create one with `scripts/new-worktree.sh <branch-name>`** — this is the
+  standard path; it lands the worktree under `.worktrees/` and starts its isolated stack. A plain
+  `git worktree add` also works (the harness-agnostic `post-checkout` hook gives any new worktree
+  its own Docker Compose stack + Supabase instance on unused ports). Prefer the script; don't rely
+  on editor/agent-native worktree tooling (`claude --worktree` and friends) — it's flaky on this
+  repo's Windows/WSL2 + Docker setup. See [dev-notes](docs/dev-notes.md#worktree-lifecycle).
+- **Tearing a worktree down: run `docker compose down` from inside it first, then
+  `git worktree remove <path>`.** The `down` lets the app container's SIGTERM trap run
+  `supabase stop` (cleaning all sibling containers) and releases the bind-mount file handles, so
+  the directory deletes cleanly. **Never hard-kill the Docker engine to "reset"** — on Windows/WSL2
+  that SIGKILLs every container (Exit 137), transiently breaks in-container `supabase start`, and
+  leaves WSL-locked empty directory husks that only a reboot clears. Merged worktrees also clean
+  themselves up (stack, directory, local branch) on the next `git pull` on master or the next
+  session start; `npm run worktrees:reap` forces it.
 - When a plan/implementation is complete, skip the `finishing-a-development-branch` skill's
   "which option?" menu — go straight to **push + create PR** (`gh pr create`), then report the
   URL. Test verification and base-branch confirmation from that skill still apply; the worktree is
