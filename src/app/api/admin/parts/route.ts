@@ -1,7 +1,7 @@
 import { withRole } from "@/lib/api";
 import { createPart, parsePartInput } from "@/lib/parts";
 
-export const POST = withRole("mentor", async (_viewer, request) => {
+export const POST = withRole("student", async (_viewer, request) => {
   const input = parsePartInput(await request.json().catch(() => null));
   if (!input) return Response.json({ error: "invalid" }, { status: 400 });
   const result = await createPart(input);

@@ -16,7 +16,7 @@ export default async function PartDetailPage({
   searchParams: Promise<{ edit?: string }>;
 }) {
   const viewer = await getViewer();
-  if (!hasRole(viewer.role, "mentor")) redirect("/");
+  if (!hasRole(viewer.role, "student")) redirect("/");
 
   const { id } = await params;
   const { edit } = await searchParams;

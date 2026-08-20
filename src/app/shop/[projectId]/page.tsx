@@ -1,15 +1,20 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { hasRole } from "@/lib/authz";
 import { getProject, listParts } from "@/lib/parts";
 import { fullPartNumber } from "@/lib/types";
+import { getViewer } from "@/lib/viewer";
 import { ShopBoard } from "@/components/ShopBoard";
 
 type Params = { params: Promise<{ projectId: string }> };
 
-// Public: server shell (name + back link) renders the initial parts list
+// Student+: server shell (name + back link) renders the initial parts list
 // server-side (matches the WhosHere pattern) — the client board then polls
-// the public /api/shop/[projectId] route for refreshes.
+// the student+ /api/shop/[projectId] route for refreshes.
 export default async function ShopBoardPage({ params }: Params) {
+  const viewer = await getViewer();
+  if (!hasRole(viewer.role, "student")) redirect("/login");
+
   const { projectId } = await params;
   const project = await getProject(projectId);
   if (!project) notFound();
@@ -24,6 +29,9 @@ export default async function ShopBoardPage({ params }: Params) {
           </Link>
           <h1>{project.name}</h1>
         </div>
+        <Link href={`/admin/projects/${project.id}`} className="btn btn-secondary">
+          Manage / add parts
+        </Link>
       </div>
       <ShopBoard
         projectId={project.id}

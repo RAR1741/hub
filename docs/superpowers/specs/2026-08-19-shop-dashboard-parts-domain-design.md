@@ -14,9 +14,10 @@ Locked product decisions (do not revisit during implementation):
 
 1. **Grouping is a standalone `project` table** (name + unique `part_number_prefix`).
    Deliberately NOT linked to `period` — one robot ≈ one project, exactly like cheesy-parts.
-2. **The dashboard is public / kiosk-style.** A shop-floor TV can't OAuth, so *viewing*
-   `/shop` and its data endpoint must work for guests (no login). All create/edit/delete
-   stays behind mentor+ auth.
+2. **The dashboard is student+.** `/shop` and its data endpoint require a logged-in
+   student+ viewer (guests are redirected to `/login`). Students get full parts CRUD
+   (create/edit/delete parts, change status) via the Shop area; projects (create/edit/
+   delete) remain mentor+.
 3. **Faithful port, YAGNI-trimmed.** Dropped from cheesy-parts: WordPress SSO, all
    email/notifications, `hide_unused_fields`/simplified-mode config, per-project
    `hide_dashboards`, and the whole purchasing/orders subsystem (§3.5–3.6, "later").
@@ -33,11 +34,12 @@ Repo constraints this design obeys:
   `parseXInput(body): Input | null` validators built on `src/lib/validate.ts`; async
   mutators returning `{ok, status, ...}`; error mapping 23503→400, 23505→409
   (see `src/lib/events.ts`).
-- Mutation routes wrapped in `withRole("mentor", ...)` from `src/lib/api.ts`
-  (which also blocks writes while masquerading). Public reads follow
-  `src/app/api/whos-here/route.ts`: `await getViewer()` only, no role check.
+- Shop routes/pages (dashboard + parts CRUD) wrapped in `withRole("student", ...)` /
+  self-gated with `hasRole(viewer.role, "student")`; project routes/pages stay
+  `withRole("mentor", ...)` (`src/lib/api.ts`, which also blocks writes while
+  masquerading).
 - No middleware gates pages; each page self-gates (admin pages
-  `redirect("/")` for < mentor; public pages just render).
+  `redirect("/")` or `redirect("/login")` for viewers below the required role).
 - Everything runs in Docker via `./dev`; schema applies via `./dev npm run db:reset`.
 
 ## 1. Data model
@@ -241,11 +243,11 @@ root and the admin index groups by noun-cards); part detail flat at
 
 | Path | Auth | Behavior |
 |---|---|---|
-| `/shop` | public | Dashboard index: list all projects as links to their board. Server component; renders for guests (no redirect). |
-| `/shop/[projectId]` | public | The kanban board. Server component shell (project name, back link) + `<ShopBoard>` client component (see below). 404 via `notFound()` for unknown id. |
-| `/admin/projects` | mentor+ | Project list (name, prefix, part count) + collapsed "New project" form (`details`/`summary`, like `/admin/events`). Rows link to `/admin/projects/[id]`; also link each row to its `/shop/[id]` board. |
-| `/admin/projects/[id]` | mentor+ | Project detail: header with Edit (`?edit=1` swaps in the form, events-page pattern) and Delete (guard below); sortable parts table; collapsed "New part" form. |
-| `/admin/parts/[id]` | mentor+ | Part detail: breadcrumb ancestor chain (project › assembly › … › part), attribute table (full number, type, name, status, notes; for `type='part'` also source material, have material, quantity, cut length, drawing created, priority), Edit (`?edit=1`), Delete. If the part is an assembly, list its children (same table component as the project page). |
+| `/shop` | student+ | Dashboard index: list all projects as links to their board. Server component; redirects guests to `/login`. |
+| `/shop/[projectId]` | student+ | The kanban board. Server component shell (project name, back link, "Manage / add parts" link to `/admin/projects/[id]`) + `<ShopBoard>` client component (see below). 404 via `notFound()` for unknown id. |
+| `/admin/projects` | mentor+ | Project list (name, prefix, part count) + collapsed "New project" form (`details`/`summary`, like `/admin/events`). Rows link to `/admin/projects/[id]`; also link each row to its `/shop/[id]` board. Students reach parts management via Shop, not this list page. |
+| `/admin/projects/[id]` | student+ (project Edit/Delete are mentor+ only) | Project detail: sortable parts table and "New part" form are available to students. Edit (`?edit=1` form) and the Delete button render only for mentor+ (`isMentor` check) — a student hitting `?edit=1` simply doesn't see the project edit form. |
+| `/admin/parts/[id]` | student+ | Part detail: breadcrumb ancestor chain (project › assembly › … › part), attribute table (full number, type, name, status, notes; for `type='part'` also source material, have material, quantity, cut length, drawing created, priority), Edit (`?edit=1`), Delete — all part-level, so available to students. If the part is an assembly, list its children (same table component as the project page). |
 
 Parts table (project page + assembly children): columns Number (rendered
 `fullPartNumber`, `mono` class, links to `/admin/parts/[id]`), Type, Name, Parent
@@ -268,9 +270,9 @@ updates in place via `router.refresh()`. This replaces cheesy's jQuery
   **skipping empty statuses**, **hiding `done` entirely** unless it's the selected
   filter. Within a status, order by `priority` asc (High first), then `part_number`.
 - Tiles show `fullPartNumber` + name, colored by priority (tone table above),
-  `title` attribute = name (hover tooltip). **Tiles do not link anywhere** — part
-  detail is mentor-only, and a guest board must not render dead links (same
-  principle as the leaderboard's `canLink`).
+  `title` attribute = name (hover tooltip). **Tiles link to `/admin/parts/[id]`** —
+  now that the board itself is student+, every viewer who can see a tile can also
+  see the part detail page behind it.
 - **Status filter**: a `<select>` of all 20 statuses + "All". The choice is written
   to the URL (`?status=cnc`) with `router.replace`, and read on load — so it
   survives both the 10 s refresh *and* a full page reload / TV power cycle
@@ -280,13 +282,13 @@ updates in place via `router.refresh()`. This replaces cheesy's jQuery
 
 | Route | Method | Auth | Behavior |
 |---|---|---|---|
-| `/api/shop/[projectId]` | GET | public (`await getViewer()` only, whos-here pattern) | `{ project: { id, name }, parts: [{ id, fullPartNumber, type, name, status, priority }] }`. One flat array per refresh; grouping happens client-side. (Replaces cheesy's 20-queries-per-refresh partial.) `fullPartNumber` is computed server-side so the prefix never ships separately. 404 for unknown project. No notes/material fields — the public payload carries only what tiles render. |
+| `/api/shop/[projectId]` | GET | student+ (`withRole("student", ...)`) | `{ project: { id, name }, parts: [{ id, fullPartNumber, type, name, status, priority }] }`. One flat array per refresh; grouping happens client-side. (Replaces cheesy's 20-queries-per-refresh partial.) `fullPartNumber` is computed server-side so the prefix never ships separately. 404 for unknown project; 403 for guests. |
 | `/api/admin/projects` | POST | mentor | `parseProjectInput` → 400; `createProject` → 201 `{id}`; duplicate name/prefix → 409. |
 | `/api/admin/projects/[id]` | PUT | mentor | Full-input update (name + prefix). 400/404/409 per lib result. |
 | `/api/admin/projects/[id]` | DELETE | mentor | Refuses when the project has any parts: explicit check → 409 (FK restrict is the backstop). 404 unknown. |
-| `/api/admin/parts` | POST | mentor | `parsePartInput` → 400; validates parent (exists, same project, `type='assembly'`) → 400; allocates number (retry-once) → 201 `{id, partNumber}` or 409. |
-| `/api/admin/parts/[id]` | PATCH | mentor | Partial update via `parsePartPatch` (below). Serves both the full edit form and the one-field inline status change. 400 invalid, 404 unknown. |
-| `/api/admin/parts/[id]` | DELETE | mentor | Refuses when the part has children: explicit check → 409 ("Can't delete assembly with existing children" semantics). 404 unknown. |
+| `/api/admin/parts` | POST | student+ | `parsePartInput` → 400; validates parent (exists, same project, `type='assembly'`) → 400; allocates number (retry-once) → 201 `{id, partNumber}` or 409. |
+| `/api/admin/parts/[id]` | PATCH | student+ | Partial update via `parsePartPatch` (below). Serves both the full edit form and the one-field inline status change. 400 invalid, 404 unknown. |
+| `/api/admin/parts/[id]` | DELETE | student+ | Refuses when the part has children: explicit check → 409 ("Can't delete assembly with existing children" semantics). 404 unknown. |
 
 **Why PATCH, not the repo's usual full-input PUT** (one deliberate deviation):
 the inline status change fires from a list row that doesn't have the full record;
@@ -363,8 +365,9 @@ Types in `src/lib/types.ts`: `ProjectRow`/`Project`/`projectFromRow`,
   redirect; clone the existing `DeleteTeamButton` shape).
 
 **Wiring**
-- `src/components/SiteNav.tsx` — modify: add public `Shop` link (`/shop`,
-  unguarded, next to Leaderboard).
+- `src/components/SiteNav.tsx` — modify: add student+-gated `Shop` link (`/shop`,
+  `hasRole(viewer.role, "student")`, next to Leaderboard) — Shop is the student
+  entry point into parts management, alongside the mentor-only `/admin` link.
 - `src/app/admin/page.tsx` — modify: add a `Card` for `/admin/projects`
   (icon "chevron" or similar, title "Parts", count = project count via
   `listProjects()`, hint "Part numbering, assemblies, shop dashboard.") in a new
@@ -405,18 +408,21 @@ buttons for the mentor role):
 
 1. As mentor: create a project, an assembly, a part under the assembly →
    assert numbers render as `PREFIX-A-0000` and `PREFIX-P-0001`
-   (first assembly = 0, its first child = 1). Change the child's status to `cnc`
-   via the inline cell.
-2. **As guest (no login)**: load `/shop/<projectId>` → the board renders, the
-   `cnc` group shows the part tile, empty statuses are absent, no `done` group,
-   tiles contain no links.
-3. Select the `cnc` filter → URL carries `?status=cnc`; **reload the page** →
-   filter still applied (persistence proof).
-4. Auto-refresh: with the board open, PATCH the part to `done` via API (as
-   mentor context) → within ~12 s the tile disappears from the board without a
-   reload (proves the 10 s poll).
-5. Guards: DELETE the assembly → 409; DELETE the project → 409; delete child
-   then assembly then project → all succeed.
+   (first assembly = 0, its first child = 1).
+2. As student: change the part's status via the inline cell, and create a part —
+   both succeed (parts CRUD is student+). POST `/api/admin/projects` as student → 403
+   (projects stay mentor+).
+3. **As guest (no login)**: `GET /api/shop/<projectId>` → 403; loading
+   `/shop/<projectId>` redirects to `/login` instead of rendering the board.
+4. As student: load `/shop/<projectId>` → the board renders, the `cnc` group shows
+   the part tile with a link to `/admin/parts/[id]`, empty statuses are absent, no
+   `done` group. Select the `cnc` filter → URL carries `?status=cnc`; **reload the
+   page** → filter still applied (persistence proof).
+5. Auto-refresh: with the board open, PATCH the part to `done` via API (as mentor
+   context) → within ~12 s the tile disappears from the board without a reload
+   (proves the 10 s poll).
+6. Guards: DELETE the assembly → 409; DELETE the project → 409; delete child
+   (student), assembly (student), then project (mentor) → all succeed.
 
 Manual check (UI change → browser at `http://localhost:$APP_PORT`): open `/shop`
 logged out, confirm tone colors read on the dark theme, and eyeball the admin
@@ -442,11 +448,13 @@ tables.
 
 ## Trade-offs & risks
 
-- **Public data exposure**: part names/numbers/statuses are world-readable by
-  design (kiosk TV). The payload deliberately excludes notes and material fields;
-  keep it that way if fields are added later.
-- **Numbering race** is retry-once, not transactional — acceptable for mentor-only
-  writes; the unique constraint guarantees no duplicates ever persist.
+- **Shop is student+, not public**: `/shop` and its data endpoint require a
+  logged-in student+ viewer (no more world-readable kiosk board). The payload
+  still deliberately excludes notes and material fields; keep it that way if
+  fields are added later.
+- **Numbering race** is retry-once, not transactional — acceptable for
+  student+/mentor-only writes; the unique constraint guarantees no duplicates
+  ever persist.
 - **>99 parts per assembly** collides with the next assembly block (inherited
   ceiling, §2). Symptom is a 409 on create; remedy is a new assembly.
 - **In-memory sorting/breadcrumbs** assume a project's parts fit in one query

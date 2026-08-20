@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PART_STATUSES, PRIORITY_MAP, STATUS_MAP, STATUS_TONE } from "@/lib/types";
@@ -21,10 +22,11 @@ function priorityClass(priority: PartPriority): string {
   return `priority-${priority === 0 ? "high" : priority === 1 ? "normal" : "low"}`;
 }
 
-/** Public kiosk board (issue #11): server-rendered initial parts (matches the
+/** Student+ shop board (issue #11): server-rendered initial parts (matches the
  * WhosHere pattern), then polls /api/shop/[projectId] every 10s — no
  * websockets, no visibility pause, it's a TV. Keeps last good data on a
- * failed refresh instead of blanking mid-shift. */
+ * failed refresh instead of blanking mid-shift. Tiles link to the part
+ * detail page (now that only student+ viewers ever see them). */
 export function ShopBoard({ projectId, initial }: { projectId: string; initial: ShopPart[] }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -102,11 +104,16 @@ export function ShopBoard({ projectId, initial }: { projectId: string; initial: 
               </div>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                 {rows.map((p) => (
-                  <div key={p.id} title={p.name} className={`shop-tile ${priorityClass(p.priority)}`}>
+                  <Link
+                    key={p.id}
+                    href={`/admin/parts/${p.id}`}
+                    title={p.name}
+                    className={`shop-tile ${priorityClass(p.priority)}`}
+                  >
                     <div className="mono font-semibold">{p.fullPartNumber}</div>
                     <div className="shop-tile-name">{p.name}</div>
                     <div className="shop-tile-priority">{PRIORITY_MAP[p.priority]}</div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             </section>

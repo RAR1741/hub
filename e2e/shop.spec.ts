@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { mentorSessionCookie } from "./helpers/session";
+import { mentorSessionCookie, studentSessionCookie } from "./helpers/session";
 
 const BASE = process.env.E2E_BASE_URL ?? "http://localhost:3000";
 
@@ -7,10 +7,15 @@ test.beforeEach(async ({ context }) => {
   await context.addCookies([await mentorSessionCookie(BASE)]);
 });
 
-test("shop dashboard: numbering, inline status, guest board polling + filter persistence, delete guards", async ({
+test("shop dashboard: student+ gating, parts CRUD, linking tiles, polling + filter persistence, delete guards", async ({
   page,
   browser,
 }) => {
+  // More round trips than the original single-role test (mentor + student +
+  // guest contexts, extra CRUD) plus the 15s poll wait — default 30s budget
+  // is too tight.
+  test.setTimeout(75_000);
+
   const stamp = Date.now();
   const projectName = `E2E Shop Project ${stamp}`;
   const prefix = `E2E${stamp}`.toUpperCase();
@@ -52,63 +57,96 @@ test("shop dashboard: numbering, inline status, guest board polling + filter per
     await expect(page.getByText(assemblyNumber).first()).toBeVisible();
     await expect(page.getByText(partNumber).first()).toBeVisible();
 
-    // Inline status change on the child part -> a manufacturing status.
-    const partRow = page.locator("tr", { hasText: partNumber });
+    // --- Student context: parts CRUD is allowed, project CRUD is not ---
+    const studentContext = await browser.newContext();
+    await studentContext.addCookies([await studentSessionCookie(BASE)]);
+    const studentPage = await studentContext.newPage();
+
+    // Student CAN change a part's status via the inline cell.
+    await studentPage.goto(`/admin/projects/${projectId}`);
+    const partRow = studentPage.locator("tr", { hasText: partNumber });
     await partRow.getByLabel("Status").selectOption("cnc");
     await expect(partRow.getByLabel("Status")).toHaveValue("cnc");
 
-    // --- Guest (no login): the public board ---
-    const guestContext = await browser.newContext();
-    const guestPage = await guestContext.newPage();
-    await guestPage.goto(`/shop/${projectId}`);
+    // Student CAN create a part.
+    const studentPartRes = await studentPage.request.post("/api/admin/parts", {
+      data: { projectId, type: "part", name: "Bumper mount", parentPartId: assemblyId },
+    });
+    expect(studentPartRes.status()).toBe(201);
+    const studentPartBody = (await studentPartRes.json()) as { id: string };
+    const studentPartId = studentPartBody.id;
 
-    await expect(guestPage.getByRole("heading", { name: "Ready for CNC" })).toBeVisible();
-    const cncTile = guestPage.locator(".shop-tile", { hasText: partNumber });
+    // Student CANNOT create a project — mentor-only.
+    const studentProjectRes = await studentPage.request.post("/api/admin/projects", {
+      data: { name: `${projectName} student`, partNumberPrefix: `${prefix}S` },
+    });
+    expect(studentProjectRes.status()).toBe(403);
+
+    // --- Student CAN view the board; tiles link to part detail ---
+    await studentPage.goto(`/shop/${projectId}`);
+    await expect(studentPage.getByRole("heading", { name: "Ready for CNC" })).toBeVisible();
+    const cncTile = studentPage.locator(".shop-tile", { hasText: partNumber });
     await expect(cncTile).toBeVisible();
-    await expect(cncTile.locator("a")).toHaveCount(0); // tiles never link anywhere
+    await expect(cncTile).toHaveAttribute("href", `/admin/parts/${partId}`);
 
     // Empty statuses are skipped entirely (welding has no parts in this project).
-    await expect(guestPage.getByRole("heading", { name: "Waiting for welding" })).not.toBeVisible();
+    await expect(studentPage.getByRole("heading", { name: "Waiting for welding" })).not.toBeVisible();
     // `done` is never shown unless it's the selected filter.
-    await expect(guestPage.getByRole("heading", { name: "Done", exact: true })).not.toBeVisible();
+    await expect(studentPage.getByRole("heading", { name: "Done", exact: true })).not.toBeVisible();
 
     // --- Filter persists across a reload (URL param, not in-memory state) ---
-    await guestPage.selectOption("#shop-status-filter", "cnc");
-    await expect(guestPage).toHaveURL(/[?&]status=cnc/);
-    await guestPage.reload();
-    await expect(guestPage).toHaveURL(/[?&]status=cnc/);
-    await expect(guestPage.locator("#shop-status-filter")).toHaveValue("cnc");
-    await expect(guestPage.locator(".shop-tile", { hasText: partNumber })).toBeVisible();
+    await studentPage.selectOption("#shop-status-filter", "cnc");
+    await expect(studentPage).toHaveURL(/[?&]status=cnc/);
+    await studentPage.reload();
+    await expect(studentPage).toHaveURL(/[?&]status=cnc/);
+    await expect(studentPage.locator("#shop-status-filter")).toHaveValue("cnc");
+    await expect(studentPage.locator(".shop-tile", { hasText: partNumber })).toBeVisible();
 
     // Back to the unfiltered default board for the poll assertion below.
-    await guestPage.selectOption("#shop-status-filter", "");
-    await expect(guestPage).not.toHaveURL(/status=/);
+    await studentPage.selectOption("#shop-status-filter", "");
+    await expect(studentPage).not.toHaveURL(/status=/);
 
     // --- Auto-refresh: mentor flips the part to `done`; board drops the
-    // tile within one 10s poll cycle, with no reload on the guest page. ---
+    // tile within one 10s poll cycle, with no reload on the student page. ---
     const patchRes = await page.request.patch(`/api/admin/parts/${partId}`, {
       data: { status: "done" },
     });
     expect(patchRes.status()).toBe(200);
-    await expect(guestPage.locator(".shop-tile", { hasText: partNumber })).not.toBeVisible({
+    await expect(studentPage.locator(".shop-tile", { hasText: partNumber })).not.toBeVisible({
       timeout: 15_000,
     });
 
+    // --- Guest is blocked: no board render, and the API 403s ---
+    const guestContext = await browser.newContext();
+    const guestPage = await guestContext.newPage();
+    await guestPage.goto(`/shop/${projectId}`);
+    await expect(guestPage).toHaveURL(/\/login/);
+    await expect(guestPage.locator(".shop-tile")).toHaveCount(0);
+
+    const guestApiRes = await guestPage.request.get(`/api/shop/${projectId}`);
+    expect(guestApiRes.status()).toBe(403);
+
     await guestContext.close();
 
-    // --- Delete guards: children/parts block their parent, then unwind cleanly ---
-    const delAssemblyBlocked = await page.request.delete(`/api/admin/parts/${assemblyId}`);
+    // --- Delete guards: children/parts block their parent, then unwind
+    // cleanly. Part deletes are student-allowed; project delete is mentor-only. ---
+    const delAssemblyBlocked = await studentPage.request.delete(`/api/admin/parts/${assemblyId}`);
     expect(delAssemblyBlocked.status()).toBe(409);
     const delProjectBlocked = await page.request.delete(`/api/admin/projects/${projectId}`);
     expect(delProjectBlocked.status()).toBe(409);
 
-    const delPart = await page.request.delete(`/api/admin/parts/${partId}`);
+    const delStudentPart = await studentPage.request.delete(`/api/admin/parts/${studentPartId}`);
+    expect(delStudentPart.status()).toBe(200);
+
+    const delPart = await studentPage.request.delete(`/api/admin/parts/${partId}`);
     expect(delPart.status()).toBe(200);
     partId = "";
 
-    const delAssembly = await page.request.delete(`/api/admin/parts/${assemblyId}`);
+    const delAssembly = await studentPage.request.delete(`/api/admin/parts/${assemblyId}`);
     expect(delAssembly.status()).toBe(200);
     assemblyId = "";
+
+    await studentContext.close();
 
     const delProject = await page.request.delete(`/api/admin/projects/${projectId}`);
     expect(delProject.status()).toBe(200);

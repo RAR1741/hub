@@ -19,7 +19,8 @@ export default async function ProjectDetailPage({
   searchParams: Promise<{ edit?: string; sort?: string }>;
 }) {
   const viewer = await getViewer();
-  if (!hasRole(viewer.role, "mentor")) redirect("/");
+  if (!hasRole(viewer.role, "student")) redirect("/");
+  const isMentor = hasRole(viewer.role, "mentor");
 
   const { id } = await params;
   const { edit, sort } = await searchParams;
@@ -39,16 +40,20 @@ export default async function ProjectDetailPage({
         </div>
         <div className="flex gap-2">
           <Link href={`/shop/${id}`} className="btn btn-secondary">Board</Link>
-          <Link href={`/admin/projects/${id}?edit=1`} className="btn btn-secondary">Edit</Link>
+          {isMentor && (
+            <Link href={`/admin/projects/${id}?edit=1`} className="btn btn-secondary">Edit</Link>
+          )}
         </div>
       </div>
 
-      <details className="card" open={edit === "1"}>
-        <summary className="cursor-pointer font-semibold">Edit project</summary>
-        <div className="mt-4">
-          <ProjectForm project={project} />
-        </div>
-      </details>
+      {isMentor && (
+        <details className="card" open={edit === "1"}>
+          <summary className="cursor-pointer font-semibold">Edit project</summary>
+          <div className="mt-4">
+            <ProjectForm project={project} />
+          </div>
+        </details>
+      )}
 
       <div className="flex gap-3 text-sm">
         <span className="text-[var(--muted)]">Sort:</span>
@@ -72,7 +77,7 @@ export default async function ProjectDetailPage({
         </div>
       </details>
 
-      <DeleteProjectButton projectId={id} />
+      {isMentor && <DeleteProjectButton projectId={id} />}
     </main>
   );
 }

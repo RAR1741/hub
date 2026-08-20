@@ -1,13 +1,11 @@
-import { getViewer } from "@/lib/viewer";
+import { withRole } from "@/lib/api";
 import { getProject, listParts } from "@/lib/parts";
 import { fullPartNumber } from "@/lib/types";
 import { reqUuid } from "@/lib/validate";
 
 type Ctx = { params: Promise<{ projectId: string }> };
 
-export async function GET(_request: Request, context: Ctx) {
-  // Public: shop-floor TV can't OAuth. No role check (whos-here pattern).
-  await getViewer();
+export const GET = withRole<Ctx>("student", async (_viewer, _request, context) => {
   const { projectId: rawProjectId } = await context.params;
   const projectId = reqUuid(rawProjectId);
   if (!projectId) return Response.json({ error: "not_found" }, { status: 404 });
@@ -26,4 +24,4 @@ export async function GET(_request: Request, context: Ctx) {
       priority: p.priority,
     })),
   });
-}
+});

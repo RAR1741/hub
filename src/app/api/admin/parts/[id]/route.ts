@@ -4,7 +4,7 @@ import { reqUuid } from "@/lib/validate";
 
 type Ctx = { params: Promise<{ id: string }> };
 
-export const PATCH = withRole<Ctx>("mentor", async (_viewer, request, context) => {
+export const PATCH = withRole<Ctx>("student", async (_viewer, request, context) => {
   const { id: rawId } = await context.params;
   const id = reqUuid(rawId);
   if (!id) return Response.json({ error: "invalid" }, { status: 400 });
@@ -14,7 +14,7 @@ export const PATCH = withRole<Ctx>("mentor", async (_viewer, request, context) =
   return result.ok ? Response.json({ ok: true }) : Response.json({ error: "failed" }, { status: result.status });
 });
 
-export const DELETE = withRole<Ctx>("mentor", async (_viewer, _request, context) => {
+export const DELETE = withRole<Ctx>("student", async (_viewer, _request, context) => {
   const { id: rawId } = await context.params;
   const id = reqUuid(rawId);
   if (!id) return Response.json({ error: "invalid" }, { status: 400 });

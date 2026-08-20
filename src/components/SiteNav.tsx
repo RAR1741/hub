@@ -63,9 +63,11 @@ export async function SiteNav() {
             <Link href="/leaderboard" className={navLinkClass}>
               Leaderboard
             </Link>{" "}
-            <Link href="/shop" className={navLinkClass}>
-              Shop
-            </Link>{" "}
+            {hasRole(viewer.role, "student") && (
+              <Link href="/shop" className={navLinkClass}>
+                Shop
+              </Link>
+            )}{" "}
             {hasRole(viewer.role, "mentor") && (
               <Link href="/admin" className={navLinkClass}>
                 Admin

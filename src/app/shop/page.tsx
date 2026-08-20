@@ -1,8 +1,13 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { hasRole } from "@/lib/authz";
 import { listProjects } from "@/lib/parts";
+import { getViewer } from "@/lib/viewer";
 
-// Public kiosk landing: no auth gate at all (guests + shop-floor TVs).
 export default async function ShopIndexPage() {
+  const viewer = await getViewer();
+  if (!hasRole(viewer.role, "student")) redirect("/login");
+
   const projects = await listProjects();
 
   return (
