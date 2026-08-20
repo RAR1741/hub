@@ -55,8 +55,11 @@ That appends two marker-delimited blocks to `.git/hooks/`, alongside whatever el
 | `post-merge` | `git pull`/`git merge` lands on master in the **main** checkout | `scripts/reap-worktrees.sh` in the background |
 
 `scripts/install-git-hooks.sh --uninstall` removes only those blocks. Nothing else in the repo
-depends on them being there; agent-specific hooks under `.claude/hooks/` are thin wrappers that
-call the same two scripts sooner, and deleting them costs only promptness.
+depends on them being there. These two git hooks are the whole worktree lifecycle — there are no
+agent-specific worktree adapters any more (the Claude `WorktreeCreate`/`WorktreeRemove`/post-merge
+adapters were removed; `claude --worktree` and `isolation:"worktree"` run `git worktree add`, which
+fires `post-checkout` like anything else). Claude's remaining `SessionStart`/`SessionEnd` hooks only
+keep the git hooks installed, resume/stop the stack between sessions, and reap in the main checkout.
 
 ### Ports
 

@@ -1,8 +1,9 @@
 #!/bin/bash
 # SessionEnd hook: stop this worktree's isolated Docker stack when a session
 # closes, so containers don't pile up between sessions. Only stops containers
-# (cheap to resume via SessionStart) — full removal happens on PR merge, see
-# .claude/hooks/post-merge-cleanup.sh.
+# (cheap to resume via SessionStart) — full removal of a merged worktree's
+# stack happens when it's reaped: git's post-merge hook on the next `git pull`
+# on master, or the next main-checkout SessionStart (scripts/reap-worktrees.sh).
 set -euo pipefail
 
 [ "${CLAUDE_CODE_REMOTE:-}" = "true" ] && exit 0
