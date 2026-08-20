@@ -125,11 +125,17 @@ Lives in `createPart()` in `src/lib/parts.ts`. Exact semantics:
 
 - **Assembly:** next number = (max `part_number` among the project's rows with
   `type = 'assembly'`, or **-100** if none) **+ 100**. First assembly of a project
-  is therefore **0**, then 100, 200, …
-- **Part:** next number = (max `part_number` among rows with the same `project_id`,
-  the same parent, and `type = 'part'`, or — if no such sibling — the **parent's own
-  `part_number`**, or **0** when creating top-level with no parent) **+ 1**.
-  So assembly 100 owns parts 101, 102, …; top-level parts are 1, 2, …
+  is therefore **0**, then 100, 200, … Assemblies may be top-level or nested under
+  another assembly.
+- **Part:** parts **require** a parent assembly — `parsePartInput` rejects a
+  `type: "part"` payload with no `parentPartId` (400), so there is no top-level-part
+  branch to number. Next number = (max `part_number` among rows with the same
+  `project_id`, the same parent, and `type = 'part'`, or — if no such sibling — the
+  **parent's own `part_number`**) **+ 1**. So assembly 100 owns parts 101, 102, …
+  This is what makes the block scheme collision-free: without a mandatory parent, a
+  loose top-level part and the first child of assembly 0 would both compute
+  `part_number = 1` and permanently collide on the unique constraint (23505, retry
+  recomputes the same number).
 
 Supabase-js has no `max()`; use order-desc-limit-1:
 
@@ -305,8 +311,11 @@ provided field is invalid*. Immutable via PATCH: `project_id`, `parent_part_id`,
   `/^[A-Za-z0-9]{1,20}$/` then uppercased (it becomes a CAD-filename prefix —
   hyphens would break the `PREFIX-A-0100` shape; cheesy allowed anything, we don't).
 - `parsePartInput` (create): `projectId` reqUuid; `type` ∈ `part`|`assembly`;
-  `name` reqString 120; `parentPartId` optional uuid (absent/null = top-level).
-  Creation sets nothing else — details are added via edit, like cheesy.
+  `name` reqString 120; `parentPartId` is **required** (reqUuid) when
+  `type = "part"` — a part with no parent is rejected (null), since parts must
+  belong to an assembly (see §2). `parentPartId` stays optional for
+  `type = "assembly"` (absent/null = top-level). Creation sets nothing else —
+  details are added via edit, like cheesy.
 - `parsePartPatch`: optional fields — `name` reqString 120; `status` ∈
   `PART_STATUSES`; `priority` ∈ {0,1,2}; `notes` optString 2000;
   `sourceMaterial` optString 200; `quantity` optString 50; `cutLength` optString 50;

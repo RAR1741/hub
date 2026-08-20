@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { PART_STATUSES, PRIORITY_MAP, STATUS_MAP } from "@/lib/types";
 import type { Part, PartPriority, PartStatus } from "@/lib/types";
 
+const PRIORITIES = [0, 1, 2] as const satisfies readonly PartPriority[];
+
 /**
  * Full edit form for a part's detail-page fields. Assemblies have no
  * material/quantity/cut-length fields in cheesy-parts, so those are only
@@ -65,7 +67,7 @@ export function PartEditForm({ part, onSaved }: { part: Part; onSaved?: () => vo
       </label>
       <label className="label">Priority
         <select className="input" value={priority} onChange={(e) => setPriority(Number(e.target.value) as PartPriority)}>
-          {(Object.keys(PRIORITY_MAP) as unknown as PartPriority[]).map((p) => (
+          {PRIORITIES.map((p) => (
             <option key={p} value={p}>{PRIORITY_MAP[p]}</option>
           ))}
         </select>

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { hasRole } from "@/lib/authz";
-import { listParts, listProjects } from "@/lib/parts";
+import { countPartsByProject, listProjects } from "@/lib/parts";
 import { getViewer } from "@/lib/viewer";
 import { ProjectForm } from "@/components/ProjectForm";
 
@@ -10,7 +10,7 @@ export default async function AdminProjectsPage() {
   if (!hasRole(viewer.role, "mentor")) redirect("/");
 
   const projects = await listProjects();
-  const counts = await Promise.all(projects.map((p) => listParts(p.id)));
+  const counts = await countPartsByProject();
 
   return (
     <main className="flex flex-col gap-6">
@@ -38,11 +38,11 @@ export default async function AdminProjectsPage() {
                 <tr><th>Name</th><th>Prefix</th><th>Parts</th><th></th></tr>
               </thead>
               <tbody>
-                {projects.map((p, i) => (
+                {projects.map((p) => (
                   <tr key={p.id}>
                     <td><Link href={`/admin/projects/${p.id}`}>{p.name}</Link></td>
                     <td className="mono">{p.partNumberPrefix}</td>
-                    <td>{counts[i].length}</td>
+                    <td>{counts[p.id] ?? 0}</td>
                     <td className="flex gap-2">
                       <Link href={`/shop/${p.id}`} className="btn btn-secondary px-3 py-1">Board</Link>
                     </td>

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import type { Part } from "./types";
 import {
+  countPartsByProject,
   createPart,
   deletePart,
   deleteProject,
@@ -104,11 +105,22 @@ describe("parseProjectInput", () => {
 });
 
 describe("parsePartInput", () => {
-  test("accepts a valid top-level part", () => {
-    expect(parsePartInput({ projectId: PROJECT_ID, type: "part", name: "Bracket" })).toEqual({
+  test("accepts a valid part with a parent assembly", () => {
+    expect(
+      parsePartInput({ projectId: PROJECT_ID, type: "part", name: "Bracket", parentPartId: ASSEMBLY_ID }),
+    ).toEqual({
       projectId: PROJECT_ID,
       type: "part",
       name: "Bracket",
+      parentPartId: ASSEMBLY_ID,
+    });
+  });
+
+  test("accepts a valid top-level assembly (no parent)", () => {
+    expect(parsePartInput({ projectId: PROJECT_ID, type: "assembly", name: "Frame" })).toEqual({
+      projectId: PROJECT_ID,
+      type: "assembly",
+      name: "Frame",
       parentPartId: null,
     });
   });
@@ -125,11 +137,14 @@ describe("parsePartInput", () => {
   });
 
   test.each([
-    [{ projectId: "not-a-uuid", type: "part", name: "Bracket" }],
+    [{ projectId: "not-a-uuid", type: "part", name: "Bracket", parentPartId: ASSEMBLY_ID }],
     [{ projectId: PROJECT_ID, type: "widget", name: "Bracket" }], // invalid type
-    [{ projectId: PROJECT_ID, type: "part", name: "" }],
-    [{ projectId: PROJECT_ID, type: "part", name: "x".repeat(121) }],
+    [{ projectId: PROJECT_ID, type: "part", name: "", parentPartId: ASSEMBLY_ID }],
+    [{ projectId: PROJECT_ID, type: "part", name: "x".repeat(121), parentPartId: ASSEMBLY_ID }],
     [{ projectId: PROJECT_ID, type: "part", name: "Bracket", parentPartId: "not-a-uuid" }],
+    // A part with no parent is rejected — parts must belong to an assembly.
+    [{ projectId: PROJECT_ID, type: "part", name: "Bracket" }],
+    [{ projectId: PROJECT_ID, type: "part", name: "Bracket", parentPartId: null }],
     [null],
   ])("rejects %j", (body) => {
     expect(parsePartInput(body)).toBeNull();
@@ -167,7 +182,7 @@ function partInput(overrides: Partial<Parameters<typeof createPart>[0]> = {}) {
     projectId: PROJECT_ID,
     type: "part" as const,
     name: "Bracket",
-    parentPartId: null,
+    parentPartId: ASSEMBLY_ID,
     ...overrides,
   };
 }
@@ -208,22 +223,24 @@ describe("createPart — numbering", () => {
     expect(result).toEqual({ ok: true, id: "part-3", partNumber: 101 });
   });
 
-  test("a top-level part with no siblings and no parent is numbered 1", async () => {
+  test("sibling parts under the same assembly increment from the max sibling", async () => {
     const { db, stubs } = fakeDb({
       part: [
-        { data: null, error: null }, // no top-level siblings
-        { data: { id: "part-4" }, error: null },
+        { data: { project_id: PROJECT_ID, type: "assembly" }, error: null }, // parent validation
+        { data: { part_number: 101 }, error: null }, // existing sibling under this assembly
+        { data: { id: "part-4" }, error: null }, // insert
       ],
     });
-    const result = await createPart(partInput({ parentPartId: null }), db);
-    expect(result).toEqual({ ok: true, id: "part-4", partNumber: 1 });
+    const result = await createPart(partInput({ parentPartId: ASSEMBLY_ID }), db);
+    expect(result).toEqual({ ok: true, id: "part-4", partNumber: 102 });
 
-    // NULL parent must use .is("parent_part_id", null), not .eq(...)
-    const siblingQueryCalls = stubs.part[0].calls;
-    expect(siblingQueryCalls.some((c) => c.method === "is" && c.args[0] === "parent_part_id" && c.args[1] === null)).toBe(
-      true,
-    );
-    expect(siblingQueryCalls.some((c) => c.method === "eq" && c.args[0] === "parent_part_id")).toBe(false);
+    // A part's sibling query always filters on the parent id (parts are never
+    // top-level), never .is("parent_part_id", null).
+    const siblingQueryCalls = stubs.part[1].calls;
+    expect(
+      siblingQueryCalls.some((c) => c.method === "eq" && c.args[0] === "parent_part_id" && c.args[1] === ASSEMBLY_ID),
+    ).toBe(true);
+    expect(siblingQueryCalls.some((c) => c.method === "is")).toBe(false);
   });
 
   test("a 23505 collision recomputes and retries once, then succeeds", async () => {
@@ -302,6 +319,29 @@ describe("deletePart", () => {
       ],
     });
     expect(await deletePart("part-1", db)).toEqual({ ok: true, status: 200 });
+  });
+});
+
+describe("countPartsByProject", () => {
+  test("tallies part rows by project_id in one query", async () => {
+    const { db } = fakeDb({
+      part: [
+        {
+          data: [
+            { project_id: "proj-a" },
+            { project_id: "proj-a" },
+            { project_id: "proj-b" },
+          ],
+          error: null,
+        },
+      ],
+    });
+    expect(await countPartsByProject(db)).toEqual({ "proj-a": 2, "proj-b": 1 });
+  });
+
+  test("empty table yields an empty record", async () => {
+    const { db } = fakeDb({ part: [{ data: [], error: null }] });
+    expect(await countPartsByProject(db)).toEqual({});
   });
 });
 

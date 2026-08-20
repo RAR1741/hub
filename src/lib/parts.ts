@@ -35,13 +35,21 @@ export function parsePartInput(body: unknown): PartInput | null {
   const name = reqString(b.name, 120);
   if (!projectId || !name) return null;
   if (b.type !== "part" && b.type !== "assembly") return null;
+  // Parts must belong to an assembly (see nextPartNumber): a loose top-level
+  // part and the first child of assembly #0 would both compute part_number 1
+  // and permanently collide. Assemblies may still be top-level or nested.
+  if (b.type === "part") {
+    const id = reqUuid(b.parentPartId);
+    if (!id) return null;
+    return { projectId, type: "part", name, parentPartId: id };
+  }
   let parentPartId: string | null = null;
   if (b.parentPartId !== undefined && b.parentPartId !== null) {
     const id = reqUuid(b.parentPartId);
     if (!id) return null;
     parentPartId = id;
   }
-  return { projectId, type: b.type, name, parentPartId };
+  return { projectId, type: "assembly", name, parentPartId };
 }
 
 export type PartPatch = Partial<{
@@ -209,19 +217,21 @@ async function nextPartNumber(
     return { ok: true, number: (max ?? -100) + 100 };
   }
 
-  let siblingQuery = client
+  // Parts always have a parent assembly (enforced by parsePartInput / the
+  // parent validation in createPart), so this is always an .eq(), never the
+  // top-level/.is(null) branch — that's what keeps a part's number seeded
+  // from its parent's block instead of colliding with the top of the range.
+  const { data: sibling } = await client
     .from("part")
     .select("part_number")
     .eq("project_id", input.projectId)
-    .eq("type", "part");
-  siblingQuery = input.parentPartId
-    ? siblingQuery.eq("parent_part_id", input.parentPartId)
-    : siblingQuery.is("parent_part_id", null);
-  const { data: sibling } = await siblingQuery.order("part_number", { ascending: false }).limit(1).maybeSingle();
+    .eq("type", "part")
+    .eq("parent_part_id", input.parentPartId)
+    .order("part_number", { ascending: false })
+    .limit(1)
+    .maybeSingle();
   const siblingMax = (sibling as { part_number: number } | null)?.part_number;
   if (siblingMax !== undefined && siblingMax !== null) return { ok: true, number: siblingMax + 1 };
-
-  if (!input.parentPartId) return { ok: true, number: 1 };
 
   const { data: parent } = await client
     .from("part")
@@ -283,6 +293,17 @@ export async function listParts(projectId: string, db?: SupabaseClient): Promise
   const client = db ?? (await import("./db")).getDb();
   const { data } = await client.from("part").select("*").eq("project_id", projectId);
   return ((data ?? []) as PartRow[]).map(partFromRow);
+}
+
+/** Part count per project, one query for the whole table (avoids an N+1 of `listParts` per project). */
+export async function countPartsByProject(db?: SupabaseClient): Promise<Record<string, number>> {
+  const client = db ?? (await import("./db")).getDb();
+  const { data } = await client.from("part").select("project_id");
+  const counts: Record<string, number> = {};
+  for (const row of (data ?? []) as { project_id: string }[]) {
+    counts[row.project_id] = (counts[row.project_id] ?? 0) + 1;
+  }
+  return counts;
 }
 
 export async function getPart(id: string, db?: SupabaseClient): Promise<Part | null> {

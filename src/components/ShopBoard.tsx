@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PART_STATUSES, PRIORITY_MAP, STATUS_MAP, STATUS_TONE } from "@/lib/types";
 import type { PartPriority, PartStatus } from "@/lib/types";
@@ -30,11 +30,12 @@ function priorityClass(priority: PartPriority): string {
 export function ShopBoard({ projectId, initial }: { projectId: string; initial: ShopPart[] }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const statusFilter = searchParams.get("status") as PartStatus | null;
+  const rawStatus = searchParams.get("status");
+  const statusFilter = (PART_STATUSES as readonly string[]).includes(rawStatus ?? "")
+    ? (rawStatus as PartStatus)
+    : null;
 
   const [parts, setParts] = useState<ShopPart[]>(initial);
-  const [error, setError] = useState(false);
-  const loadedOnce = useRef(true);
 
   useEffect(() => {
     const id = setInterval(async () => {
@@ -43,12 +44,8 @@ export function ShopBoard({ projectId, initial }: { projectId: string; initial: 
         if (!res.ok) throw new Error(String(res.status));
         const json = (await res.json()) as { parts: ShopPart[] };
         setParts(json.parts);
-        setError(false);
-        loadedOnce.current = true;
       } catch {
-        // Only surface an error before the first successful load; otherwise
-        // keep showing the last good data — a blip shouldn't blank the TV.
-        if (!loadedOnce.current) setError(true);
+        // A blip shouldn't blank the TV — keep showing the last good data.
       }
     }, POLL_MS);
     return () => clearInterval(id);
@@ -65,11 +62,6 @@ export function ShopBoard({ projectId, initial }: { projectId: string; initial: 
 
   return (
     <div className="flex flex-col gap-5">
-      {error && (
-        <p className="card text-sm text-[var(--muted)]">
-          Couldn&apos;t refresh the board — showing the last known data.
-        </p>
-      )}
       <div className="card flex flex-wrap items-center gap-3">
         <label className="label" htmlFor="shop-status-filter" style={{ marginBottom: 0 }}>
           Status
