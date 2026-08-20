@@ -8,6 +8,7 @@ import type { PartPriority, PartStatus } from "@/lib/types";
 export type ShopPart = {
   id: string;
   fullPartNumber: string;
+  partNumber: number;
   type: "part" | "assembly";
   name: string;
   status: PartStatus;
@@ -91,7 +92,7 @@ export function ShopBoard({ projectId, initial }: { projectId: string; initial: 
         statuses.map((status) => {
           const rows = parts
             .filter((p) => p.status === status)
-            .sort((a, b) => a.priority - b.priority || a.fullPartNumber.localeCompare(b.fullPartNumber));
+            .sort((a, b) => a.priority - b.priority || a.partNumber - b.partNumber);
           if (rows.length === 0) return null;
           return (
             <section key={status} className="card">

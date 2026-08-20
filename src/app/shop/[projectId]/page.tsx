@@ -30,6 +30,7 @@ export default async function ShopBoardPage({ params }: Params) {
         initial={parts.map((p) => ({
           id: p.id,
           fullPartNumber: fullPartNumber(project.partNumberPrefix, p.type, p.partNumber),
+          partNumber: p.partNumber,
           type: p.type,
           name: p.name,
           status: p.status,
