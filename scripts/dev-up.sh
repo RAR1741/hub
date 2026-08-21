@@ -26,17 +26,35 @@ fi
 #    `supabase start` is idempotent: it no-ops if the stack is already up and
 #    applies migrations + seed on a fresh stack. It does NOT wipe existing data —
 #    run `./dev npm run db:reset` explicitly if you want a clean slate.
+# 2a. Loopback bridge for `supabase start`. On a *fresh* volume the CLI runs
+#     migrations + seed over a hardcoded 127.0.0.1:<db-port> connection, which
+#     inside this container is our own loopback rather than the host's published
+#     DB port. First-boot init then dies with ECONNREFUSED, leaves a half-made
+#     volume, and every later start "restores from backup" into an EMPTY database
+#     (0 tables → dev-login 404s). Forward that loopback to the host so the native
+#     init path (with its seed) actually runs. --ignore-health-check already
+#     covers the REST readiness probe; only the DB port needs bridging.
+#     ponytail: DB port only — add another port here only if a start log shows it dialed on 127.0.0.1.
+DB_PORT="${SUPABASE_DB_PORT:-54322}"
+log "Bridging 127.0.0.1:${DB_PORT} → host.docker.internal:${DB_PORT} for supabase start…"
+socat "TCP-LISTEN:${DB_PORT},bind=127.0.0.1,reuseaddr,fork" "TCP:host.docker.internal:${DB_PORT}" &
+socat_pid=$!
+
 log "Starting local Supabase…"
 npm run db:start
 
-# 2b. Ensure the dev-auth seed rows exist. `supabase start` only seeds a
-#     brand-new volume, so a stack whose volume predates a seed change (or a
-#     recycled leftover worktree stack) can be missing the mentor/admin person
-#     rows the /login dev-login buttons resolve by fixed id. Probe one sentinel
-#     row and re-apply the (idempotent, on-conflict-do-nothing) seed only when
-#     it's absent — running it every boot would stomp manual period is_active edits.
+# 2b. Ensure the dev-auth seed rows exist. Two-tier heal:
+#     - person table absent (a pre-existing broken/empty volume, or an old husk
+#       from before the 2a bridge): full `db:reset` to apply migrations + seed.
+#     - table present but the admin sentinel row missing (volume predates a seed
+#       change, or a recycled leftover stack): re-apply the idempotent
+#       (on-conflict-do-nothing) seed, preserving existing dev data. Running it
+#       every boot would stomp manual period is_active edits, so probe first.
 DB_URL="postgresql://postgres:postgres@host.docker.internal:${SUPABASE_DB_PORT:-54322}/postgres?sslmode=disable"
-if [ "$(psql "$DB_URL" -tAc "select 1 from person where id = '00000000-0000-0000-0000-00000000000a'" 2>/dev/null)" = "1" ]; then
+if [ "$(psql "$DB_URL" -tAc "select to_regclass('public.person') is not null" 2>/dev/null)" != "t" ]; then
+  log "person table missing — running full db reset (migrations + seed)…"
+  npm run db:reset
+elif [ "$(psql "$DB_URL" -tAc "select 1 from person where id = '00000000-0000-0000-0000-00000000000a'" 2>/dev/null)" = "1" ]; then
   log "Dev-auth seed rows present — skipping seed."
 else
   log "Dev-auth seed rows missing — applying supabase/seed.sql…"
@@ -51,6 +69,7 @@ dev_pid=""
 shutdown() {
   log "Received shutdown signal — stopping dev server and Supabase…"
   [ -n "$dev_pid" ] && kill "$dev_pid" 2>/dev/null || true
+  [ -n "${socat_pid:-}" ] && kill "$socat_pid" 2>/dev/null || true
   npm run db:stop || true
   exit 0
 }
