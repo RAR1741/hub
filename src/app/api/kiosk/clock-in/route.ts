@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyKioskToken } from "@/lib/kiosk";
-import { kioskTokenFromRequest } from "@/lib/kiosk-request";
+import { kioskActionAllowed } from "@/lib/kiosk";
 import { clockIn } from "@/lib/sessions";
 import { reqString } from "@/lib/validate";
 import { createRateLimiter, clientIp } from "@/lib/rate-limit";
@@ -11,7 +10,7 @@ export async function POST(request: Request) {
   if (!clockLimiter.check(clientIp(request))) {
     return NextResponse.json({ ok: false }, { status: 429 });
   }
-  if (!(await verifyKioskToken(kioskTokenFromRequest(request)))) {
+  if (!(await kioskActionAllowed(request))) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }
   const body = (await request.json().catch(() => null)) as { personId?: unknown } | null;

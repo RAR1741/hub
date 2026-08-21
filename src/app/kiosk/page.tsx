@@ -3,10 +3,13 @@ import { cookies } from "next/headers";
 import { KIOSK_COOKIE, verifyKioskToken } from "@/lib/kiosk";
 import { activeMembersForKiosk, listWhosHere } from "@/lib/sessions";
 import { KioskBoard } from "@/components/KioskBoard";
+import { getViewer } from "@/lib/viewer";
+import { hasRole } from "@/lib/authz";
 
 export default async function KioskPage() {
   const token = (await cookies()).get(KIOSK_COOKIE)?.value;
-  if (!(await verifyKioskToken(token))) {
+  const [registered, viewer] = await Promise.all([verifyKioskToken(token), getViewer()]);
+  if (!registered && !hasRole(viewer.role, "mentor")) {
     return (
       <main className="flex min-h-full flex-col items-center justify-center gap-4 p-8 text-center">
         <div className="hazard w-full max-w-md rounded-t-xl" />
@@ -27,9 +30,10 @@ export default async function KioskPage() {
     activeMembersForKiosk(),
     listWhosHere(),
   ]);
+  const canAct = registered || viewer.role === "admin";
   return (
     <main className="flex min-h-full flex-col p-4 sm:p-6 lg:p-8">
-      <KioskBoard students={students} mentors={mentors} here={here} />
+      <KioskBoard students={students} mentors={mentors} here={here} canAct={canAct} />
     </main>
   );
 }
