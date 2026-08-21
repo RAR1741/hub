@@ -3,10 +3,14 @@ import { cookies } from "next/headers";
 import { KIOSK_COOKIE, verifyKioskToken } from "@/lib/kiosk";
 import { activeMembersForKiosk, listWhosHere } from "@/lib/sessions";
 import { KioskBoard } from "@/components/KioskBoard";
+import { getViewer } from "@/lib/viewer";
+import { hasRole } from "@/lib/authz";
 
 export default async function KioskPage() {
   const token = (await cookies()).get(KIOSK_COOKIE)?.value;
-  if (!(await verifyKioskToken(token))) {
+  const authorized =
+    hasRole((await getViewer()).role, "mentor") || (await verifyKioskToken(token));
+  if (!authorized) {
     return (
       <main className="flex min-h-full flex-col items-center justify-center gap-4 p-8 text-center">
         <div className="hazard w-full max-w-md rounded-t-xl" />
