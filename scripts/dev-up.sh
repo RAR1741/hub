@@ -43,24 +43,6 @@ socat_pid=$!
 log "Starting local Supabase…"
 npm run db:start
 
-# 2b. Ensure the dev-auth seed rows exist. Two-tier heal:
-#     - person table absent (a pre-existing broken/empty volume, or an old husk
-#       from before the 2a bridge): full `db:reset` to apply migrations + seed.
-#     - table present but the admin sentinel row missing (volume predates a seed
-#       change, or a recycled leftover stack): re-apply the idempotent
-#       (on-conflict-do-nothing) seed, preserving existing dev data. Running it
-#       every boot would stomp manual period is_active edits, so probe first.
-DB_URL="postgresql://postgres:postgres@host.docker.internal:${SUPABASE_DB_PORT:-54322}/postgres?sslmode=disable"
-if [ "$(psql "$DB_URL" -tAc "select to_regclass('public.person') is not null" 2>/dev/null)" != "t" ]; then
-  log "person table missing — running full db reset (migrations + seed)…"
-  npm run db:reset
-elif [ "$(psql "$DB_URL" -tAc "select 1 from person where id = '00000000-0000-0000-0000-00000000000a'" 2>/dev/null)" = "1" ]; then
-  log "Dev-auth seed rows present — skipping seed."
-else
-  log "Dev-auth seed rows missing — applying supabase/seed.sql…"
-  psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/seed.sql
-fi
-
 # 3. Teardown symmetry. `docker compose down` / `stop` sends SIGTERM here; stop the
 #    Supabase sibling containers too so "up" and "down" mirror each other. `supabase
 #    stop` preserves data by default (it backs up and restores on the next start),
