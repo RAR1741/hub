@@ -8,8 +8,11 @@ import { hasRole } from "@/lib/authz";
 
 export default async function KioskPage() {
   const token = (await cookies()).get(KIOSK_COOKIE)?.value;
-  const authorized =
-    hasRole((await getViewer()).role, "mentor") || (await verifyKioskToken(token));
+  const [viewer, tokenOk] = await Promise.all([
+    getViewer(),
+    verifyKioskToken(token),
+  ]);
+  const authorized = hasRole(viewer.role, "mentor") || tokenOk;
   if (!authorized) {
     return (
       <main className="flex min-h-full flex-col items-center justify-center gap-4 p-8 text-center">
