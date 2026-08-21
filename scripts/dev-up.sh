@@ -29,6 +29,20 @@ fi
 log "Starting local Supabase…"
 npm run db:start
 
+# 2b. Ensure the dev-auth seed rows exist. `supabase start` only seeds a
+#     brand-new volume, so a stack whose volume predates a seed change (or a
+#     recycled leftover worktree stack) can be missing the mentor/admin person
+#     rows the /login dev-login buttons resolve by fixed id. Probe one sentinel
+#     row and re-apply the (idempotent, on-conflict-do-nothing) seed only when
+#     it's absent — running it every boot would stomp manual period is_active edits.
+DB_URL="postgresql://postgres:postgres@host.docker.internal:${SUPABASE_DB_PORT:-54322}/postgres?sslmode=disable"
+if [ "$(psql "$DB_URL" -tAc "select 1 from person where id = '00000000-0000-0000-0000-00000000000a'" 2>/dev/null)" = "1" ]; then
+  log "Dev-auth seed rows present — skipping seed."
+else
+  log "Dev-auth seed rows missing — applying supabase/seed.sql…"
+  psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/seed.sql
+fi
+
 # 3. Teardown symmetry. `docker compose down` / `stop` sends SIGTERM here; stop the
 #    Supabase sibling containers too so "up" and "down" mirror each other. `supabase
 #    stop` preserves data by default (it backs up and restores on the next start),
