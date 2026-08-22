@@ -1,5 +1,8 @@
 # Source Index — Long-Tail Discoveries (Expansion Round)
 
+> **Superseded by round 3.** Most of the repos below now have full feature surveys, and the exhaustive round-3 sweep lives in [../03-exhaustive-index.md](../03-exhaustive-index.md). This file is kept for history.
+
+
 **Date:** 2026-08-22
 **What this is:** One-paragraph index entries for sources discovered in the expansion round that
 did **not** warrant a full survey file. Full surveys live as sibling files in this directory; the
