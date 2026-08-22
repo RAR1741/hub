@@ -297,14 +297,14 @@ describe("firstExperienceFromRow", () => {
 
 describe("fullPartNumber", () => {
   test("renders an assembly number, zero-padded", () => {
-    expect(fullPartNumber("RA2026", "assembly", 0)).toBe("RA2026-A-0000");
+    expect(fullPartNumber("RA2026", "assembly", 0)).toBe("RA2026-A-00000");
   });
 
   test("renders a larger assembly number", () => {
-    expect(fullPartNumber("RA2026", "assembly", 100)).toBe("RA2026-A-0100");
+    expect(fullPartNumber("RA2026", "assembly", 1000)).toBe("RA2026-A-01000");
   });
 
   test("renders a part number", () => {
-    expect(fullPartNumber("RA2026", "part", 101)).toBe("RA2026-P-0101");
+    expect(fullPartNumber("RA2026", "part", 1001)).toBe("RA2026-P-01001");
   });
 });

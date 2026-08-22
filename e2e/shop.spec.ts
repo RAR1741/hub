@@ -48,8 +48,8 @@ test("shop dashboard: student+ gating, parts CRUD, linking tiles, polling + filt
     partId = partBody.id;
     expect(partBody.partNumber).toBe(1); // first child of assembly 0 = 1
 
-    const assemblyNumber = `${prefix}-A-0000`;
-    const partNumber = `${prefix}-P-0001`;
+    const assemblyNumber = `${prefix}-A-00000`;
+    const partNumber = `${prefix}-P-00001`;
 
     await page.goto(`/admin/projects/${projectId}`);
     // The assembly number also appears as the child row's "Parent" link, so
