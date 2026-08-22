@@ -5,7 +5,7 @@
 -- place); dropped here by its verified auto-generated name and re-added
 -- with an explicit name so future changes don't need name archaeology.
 
-alter table part drop constraint part_status_check;
+alter table part drop constraint if exists part_status_check;
 
 alter table part add constraint part_status_check check (status in (
   'designing', 'material', 'ordered', 'drawing', 'drawing_done',
