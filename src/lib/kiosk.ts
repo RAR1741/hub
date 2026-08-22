@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Role } from "./types";
 
 export const KIOSK_COOKIE = "hub_kiosk_token";
 
@@ -87,4 +88,15 @@ export async function verifyKioskToken(
     .update({ last_seen_at: new Date().toISOString() })
     .eq("id", data.id);
   return true;
+}
+
+/** True when the request may perform kiosk clock actions: a registered kiosk, or an admin viewer. */
+export async function kioskActionAllowed(
+  request: Request,
+  deps?: { role?: Role; db?: SupabaseClient },
+): Promise<boolean> {
+  const { kioskTokenFromRequest } = await import("./kiosk-request");
+  if (await verifyKioskToken(kioskTokenFromRequest(request), deps?.db)) return true;
+  const role = deps?.role ?? (await (await import("./viewer")).getViewer()).role;
+  return role === "admin";
 }

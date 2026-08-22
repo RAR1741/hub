@@ -1,5 +1,11 @@
 import { describe, expect, test } from "vitest";
-import { generateKioskToken, hashKioskToken, renameKioskDevice } from "./kiosk";
+import {
+  KIOSK_COOKIE,
+  generateKioskToken,
+  hashKioskToken,
+  kioskActionAllowed,
+  renameKioskDevice,
+} from "./kiosk";
 
 describe("hashKioskToken", () => {
   test("is deterministic sha256 hex (64 chars)", () => {
@@ -45,5 +51,46 @@ describe("renameKioskDevice", () => {
     expect(await renameKioskDevice("k1", "Front Desk", fakeDb(true))).toEqual({
       ok: true, status: 200,
     });
+  });
+});
+
+describe("kioskActionAllowed", () => {
+  function fakeDb(validToken: boolean) {
+    return {
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            maybeSingle: async () => ({ data: validToken ? { id: "k1" } : null, error: null }),
+          }),
+        }),
+        update: () => ({ eq: async () => ({ data: null, error: null }) }),
+      }),
+    } as never;
+  }
+
+  function requestWithToken(token?: string) {
+    return new Request("http://kiosk.local/api/kiosk/clock-in", {
+      headers: token ? { cookie: `${KIOSK_COOKIE}=${token}` } : {},
+    });
+  }
+
+  test("valid kiosk token allows action regardless of role", async () => {
+    const request = requestWithToken("tok");
+    expect(await kioskActionAllowed(request, { role: "guest", db: fakeDb(true) })).toBe(true);
+  });
+
+  test("invalid token + admin role allows action", async () => {
+    const request = requestWithToken("tok");
+    expect(await kioskActionAllowed(request, { role: "admin", db: fakeDb(false) })).toBe(true);
+  });
+
+  test("invalid token + mentor role denies action", async () => {
+    const request = requestWithToken("tok");
+    expect(await kioskActionAllowed(request, { role: "mentor", db: fakeDb(false) })).toBe(false);
+  });
+
+  test("invalid token + guest role denies action", async () => {
+    const request = requestWithToken();
+    expect(await kioskActionAllowed(request, { role: "guest", db: fakeDb(false) })).toBe(false);
   });
 });
