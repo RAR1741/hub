@@ -214,7 +214,7 @@ async function nextPartNumber(
       .limit(1)
       .maybeSingle();
     const max = (data as { part_number: number } | null)?.part_number;
-    return { ok: true, number: (max ?? -100) + 100 };
+    return { ok: true, number: (max ?? -1000) + 1000 };
   }
 
   // Parts always have a parent assembly (enforced by parsePartInput / the

@@ -199,7 +199,7 @@ describe("createPart — numbering", () => {
     expect(result).toEqual({ ok: true, id: "part-1", partNumber: 0 });
   });
 
-  test("second assembly is numbered 100", async () => {
+  test("second assembly is numbered 1000", async () => {
     const { db } = fakeDb({
       part: [
         { data: { part_number: 0 }, error: null }, // existing assembly 0
@@ -207,32 +207,32 @@ describe("createPart — numbering", () => {
       ],
     });
     const result = await createPart(partInput({ type: "assembly", name: "Intake", parentPartId: null }), db);
-    expect(result).toEqual({ ok: true, id: "part-2", partNumber: 100 });
+    expect(result).toEqual({ ok: true, id: "part-2", partNumber: 1000 });
   });
 
-  test("first part under an assembly seeds from the parent's own number (100 -> 101)", async () => {
+  test("first part under an assembly seeds from the parent's own number (1000 -> 1001)", async () => {
     const { db } = fakeDb({
       part: [
         { data: { project_id: PROJECT_ID, type: "assembly" }, error: null }, // parent validation
         { data: null, error: null }, // no sibling parts under this assembly
-        { data: { part_number: 100, project_id: PROJECT_ID, type: "assembly" }, error: null }, // parent's own number
+        { data: { part_number: 1000, project_id: PROJECT_ID, type: "assembly" }, error: null }, // parent's own number
         { data: { id: "part-3" }, error: null }, // insert
       ],
     });
     const result = await createPart(partInput({ parentPartId: ASSEMBLY_ID }), db);
-    expect(result).toEqual({ ok: true, id: "part-3", partNumber: 101 });
+    expect(result).toEqual({ ok: true, id: "part-3", partNumber: 1001 });
   });
 
   test("sibling parts under the same assembly increment from the max sibling", async () => {
     const { db, stubs } = fakeDb({
       part: [
         { data: { project_id: PROJECT_ID, type: "assembly" }, error: null }, // parent validation
-        { data: { part_number: 101 }, error: null }, // existing sibling under this assembly
+        { data: { part_number: 1001 }, error: null }, // existing sibling under this assembly
         { data: { id: "part-4" }, error: null }, // insert
       ],
     });
     const result = await createPart(partInput({ parentPartId: ASSEMBLY_ID }), db);
-    expect(result).toEqual({ ok: true, id: "part-4", partNumber: 102 });
+    expect(result).toEqual({ ok: true, id: "part-4", partNumber: 1002 });
 
     // A part's sibling query always filters on the parent id (parts are never
     // top-level), never .is("parent_part_id", null).
@@ -248,12 +248,12 @@ describe("createPart — numbering", () => {
       part: [
         { data: null, error: null }, // assembly select, attempt 1 -> next 0
         { data: null, error: { code: "23505" } }, // insert attempt 1 fails (raced)
-        { data: { part_number: 0 }, error: null }, // assembly select, attempt 2 -> next 100
+        { data: { part_number: 0 }, error: null }, // assembly select, attempt 2 -> next 1000
         { data: { id: "part-5" }, error: null }, // insert attempt 2 succeeds
       ],
     });
     const result = await createPart(partInput({ type: "assembly", name: "Retry", parentPartId: null }), db);
-    expect(result).toEqual({ ok: true, id: "part-5", partNumber: 100 });
+    expect(result).toEqual({ ok: true, id: "part-5", partNumber: 1000 });
   });
 
   test("a second consecutive 23505 gives up with 409", async () => {
