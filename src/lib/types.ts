@@ -415,19 +415,21 @@ export type PartType = "part" | "assembly";
 export type PartPriority = 0 | 1 | 2;
 
 export const PART_STATUSES = [
-  "designing", "material", "ordered", "drawing", "ready",
+  "designing", "material", "ordered", "drawing", "drawing_done", "mentor_approved", "ready",
   "cnc", "laser", "lathe", "mill", "printer", "router",
   "manufacturing", "outsourced", "welding", "scotchbrite",
   "anodize", "powder", "coating", "assembly", "done",
 ] as const;
 export type PartStatus = (typeof PART_STATUSES)[number];
 
-/** Verbatim labels from cheesy-parts `models/part.rb` STATUS_MAP (commit 034ef59). */
+/** Labels from cheesy-parts `models/part.rb` STATUS_MAP (commit 034ef59), plus two local additions: drawing_done, mentor_approved. */
 export const STATUS_MAP: Record<PartStatus, string> = {
   designing: "Design in progress",
   material: "Material needs to be ordered",
   ordered: "Waiting for materials",
   drawing: "Needs drawing",
+  drawing_done: "Drawing done",
+  mentor_approved: "Mentor approved",
   ready: "Ready to manufacture",
   cnc: "Ready for CNC",
   laser: "Ready for laser",
@@ -453,6 +455,8 @@ export const STATUS_TONE: Record<PartStatus, StatusTone> = {
   material: "blocked",
   ordered: "blocked",
   drawing: "design",
+  drawing_done: "design",
+  mentor_approved: "design",
   ready: "ready",
   cnc: "ready",
   laser: "ready",
@@ -473,9 +477,9 @@ export const STATUS_TONE: Record<PartStatus, StatusTone> = {
 
 export const PRIORITY_MAP: Record<PartPriority, string> = { 0: "High", 1: "Normal", 2: "Low" };
 
-/** e.g. fullPartNumber("RA2026", "assembly", 100) === "RA2026-A-0100" */
+/** e.g. fullPartNumber("RA2026", "assembly", 100) === "RA2026-A-100" */
 export function fullPartNumber(prefix: string, type: PartType, n: number): string {
-  return `${prefix}-${type === "assembly" ? "A" : "P"}-${String(n).padStart(4, "0")}`;
+  return `${prefix}-${type === "assembly" ? "A" : "P"}-${String(n).padStart(3, "0")}`;
 }
 
 export type ProjectRow = {
