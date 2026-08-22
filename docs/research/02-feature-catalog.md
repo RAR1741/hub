@@ -496,7 +496,7 @@ A few notes on the stack choice:
 
 ### Alternatives (one sentence each)
 - **Self-host on a $5–10/mo VPS (Coolify/Dokku) with Docker Postgres** — wins if you want zero vendor coupling and don't mind being the sysadmin; loses on bus-factor (you're the only operator) for a student org.
-- **Cloudflare Pages + Workers + D1/Hyperdrive** — cheapest at scale and great cron, but SQLite (D1) is a worse fit for this relational domain and the ecosystem is fiddlier for students to contribute to. (FO runs happily on Workers + external Postgres, for what it's worth.)
+- **Cloudflare Pages + Workers + D1/Hyperdrive** — cheapest at scale and great cron, but SQLite (D1) is a worse fit for this relational domain and the ecosystem is fiddlier for students to contribute to.
 - **Keep AT-style on-prem kiosk box + cloud app hybrid** — only needed if you adopt Wi-Fi presence detection (feature 1.3); the on-site agent can be a Raspberry Pi posting to the cloud API.
 
 ### Things that don't port to serverless (plan around them)
@@ -509,7 +509,7 @@ A few notes on the stack choice:
 
 ## Appendix: per-source one-liners
 
-*(v1 entries carried verbatim; new sources appended.)*
+*(v1 entries carried verbatim — except Den, rewritten for the now-located source; new sources appended.)*
 
 - **GatherPack** — the feature superset; steal its domain model (Person/Team tree/Membership, periods+punches, events+checkins) and its feature-toggle discipline. MIT.
 - **AdvantageTrack** — the best kiosk UX thinking (presence detection, offline resilience, status lights); Google-Sheets-as-DB is a dead end for us but sheet *export* is a good idea. MIT.
