@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { canViewProfile, getPersonWithTeams } from "@/lib/people";
@@ -15,6 +16,7 @@ export default async function PersonPage({
   const [{ id }, viewer] = await Promise.all([params, getViewer()]);
   if (!canViewProfile(viewer, id)) notFound();
   const canViewGuardians = hasRole(viewer.role, "mentor");
+  const canEdit = hasRole(viewer.role, "admin");
 
   const [result, activePeriod, guardians] = await Promise.all([
     getPersonWithTeams(id),
@@ -50,6 +52,11 @@ export default async function PersonPage({
             {person.isActive ? "Active" : "Inactive"}
           </span>
           {person.studentIdNumber && <span className="sid">{person.studentIdNumber}</span>}
+          {canEdit && (
+            <Link href={`/admin/people/${person.id}`} className="btn ml-auto">
+              Edit
+            </Link>
+          )}
         </div>
         <dl className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
           <div>
