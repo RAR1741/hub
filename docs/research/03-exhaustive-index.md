@@ -4,17 +4,17 @@
 
 This is the round-3 exhaustive sweep: the goal was a record of *basically any* FRC (or comparable robotics-team) repo that has implemented internal-ops features in our six areas — time/attendance, people/rosters, third-party integrations, communication, parts ordering/POs, and part design/manufacturing tracking. It extends [02-feature-catalog.md](02-feature-catalog.md) and absorbs/supersedes the round-2 long-tail list in [sources/99-index.md](sources/99-index.md) (kept for history).
 
-**How this round was run:** 118 sonnet subagents in one orchestrated workflow — 9 mined the Chief Delphi threads for linked tools, 13 fanned out `gh search repos` / `gh search code` / topic enumeration / fork-tracing across every area, a triage pass deduped everything against the 55 repos already known and classified the rest, and 90 survey agents wrote full feature-index files. Raw funnel: **377 candidates found → 177 new unique repos** after dedup → 90 fully surveyed, 74 index-only, 13 substantive-but-deferred, 25 dropped as out-of-scope, plus 48 non-repo tools/services surfaced from the threads.
+**How this round was run:** 118 sonnet subagents in one orchestrated workflow — 9 mined the Chief Delphi threads for linked tools, 13 fanned out `gh search repos` / `gh search code` / topic enumeration / fork-tracing across every area, a triage pass deduped everything against the 55 repos already known and classified the rest, and 90 survey agents wrote full feature-index files. Raw funnel: **377 candidates found → 177 new unique repos** after dedup → 90 fully surveyed, 74 index-only, 13 substantive-but-deferred, 25 dropped as out-of-scope, plus 48 non-repo tools/services surfaced from the threads. _(Post-run correction: three round-3 surveys were lost to filename collisions during the workflow and recovered afterward — two re-surveyed under owner-prefixed names (`legoguy1000/FRC-Inventory`, `Weymuth/Inventory`), one 2012 Android prototype (`edmundnoble/FRC-Inventory`) downgraded to index-only. The section counts below reflect the recovered state.)_
 
 **License ground rule (unchanged):** we recreate features, never copy code. No LICENSE file = all rights reserved (ideas only). GPL/AGPL = copyleft (ideas only). Ambiguous licenses are flagged per source file. Each full survey states its license explicitly.
 
-**Totals:** 111 full feature surveys in [sources/](sources/) (+1 excluded-by-license record) · 74 index-only repos · 13 deferred (worth surveying next) · 46 non-repo tools/services · 25 dropped (out of scope) + 1 license-excluded.
+**Totals:** 113 full feature surveys in [sources/](sources/) (+1 excluded-by-license record) · 75 index-only repos · 13 deferred (worth surveying next) · 46 non-repo tools/services · 25 dropped (out of scope) + 1 license-excluded.
 
 ---
 
 ## A. Full feature surveys
 
-Every repo below has a full feature-index survey file in [sources/](sources/). 111 repos, grouped by the area each touches most (many span several — see the file). Ordered alphabetically within each group. (A 112th survey file exists for `bc3tech/frc-discord-bot` but is an **exclusion record** — see section E — because that repo's license forbids LLM referencing.)
+Every repo below has a full feature-index survey file in [sources/](sources/). 113 repos, grouped by the area each touches most (many span several — see the file). Ordered alphabetically within each group. (A 114th survey file exists for `bc3tech/frc-discord-bot` but is an **exclusion record** — see section E — because that repo's license forbids LLM referencing.)
 
 ### Attendance & hours (48)
 
@@ -150,7 +150,7 @@ Every repo below has a full feature-index survey file in [sources/](sources/). 1
 - **[thelab-ms/profile](https://github.com/thelab-ms/profile)** ([survey](sources/profile.md)) — _MIT (`LICENSE` present) — safe to look at for ideas/patterns, standard MIT terms apply if code were ever reused verbatim (we don't) · last activity 2025-02-23 (`pushed_at`)_
   Substantive and directly relevant to people/rosters: a real, production-shaped membership system (signup, waiver, dues payment with migration, keyfob/building-access grant, visit-based auto-deactivation, Discord sync) for a comparable vo...
 
-### Parts / inventory / purchasing (10)
+### Parts / inventory / purchasing (12)
 
 - **[8793PartBot](https://github.com/pureh2oo/8793PartBot)** ([survey](sources/8793partbot.md))
   8793PartBot is a Discord-bot-plus-Google-Sheets purchasing/parts-request pipeline built by FRC
@@ -158,6 +158,8 @@ Every repo below has a full feature-index survey file in [sources/](sources/). 1
   Thin-to-moderate: a single-team, single-maintainer 2019 Discord bot with real but small/single-file features; the two ideas worth stealing are the **Trello-card-attachment → mentor-email → email-reply-moves-card order-request loop** and ...
 - **[FRC Parts Exchange](https://github.com/FRC3184/partexchange)** ([survey](sources/partexchange.md)) — _none (no LICENSE file; `license: null` via GitHub API) — all rights reserved, ideas only · last activity 2018-02-05 (pushed_at); repo otherwise dormant since ~2017-2018_
   Substantive and directly relevant despite small code size: a complete small feature set for an inter-team surplus-parts marketplace (post/browse/search/fulfill/moderate + regional & distance search + email digest). Worth stealing the *id...
+- **[FRC-Inventory (legoguy1000)](https://github.com/legoguy1000/FRC-Inventory)** ([survey](sources/legoguy1000-frc-inventory.md)) — _none — no LICENSE file in the tree (`license: null`); `server/package.json` sets ISC for npm metadata only, which is not a repo grant. Ideas only. · last activity 2025-02-05 (pushed_at); dormant since_
+  Thin, early-stage/abandoned prototype (Express + Prisma + PostgreSQL backend, React/Vite MUI-template frontend, Docker Compose deploy) — auth stubbed, UI still template boilerplate. The one reusable idea is its catalog-vs-instance inventory split (Part = SKU, Inventory = physical unit with purchase/retire dates and project checkout). _(Recovered after a round-3 filename collision; re-surveyed under an owner-prefixed name.)_
 - **[inventoryftc6559](https://github.com/yangwu0/inventoryftc6559)** ([survey](sources/inventoryftc6559.md)) — _none (no LICENSE file) · last activity 2024-02-24 (single commit, repo creation)_
   Thin/out-of-scope in practice: despite the promising name and description ("inventory system for FTC 6559"), the repo contains zero application logic — it's an unmodified Expo starter template with one commit. Nothing is worth recreating...
 - **[order-procrastinator](https://github.com/plusparth/order-procrastinator)** ([survey](sources/order-procrastinator.md)) — _MIT (LICENSE file present, Copyright 2019 Parth Oza) — free to reuse/adapt with attribution · last activity 2019-09-27 (single-shot project, no subsequent commits)_
@@ -170,6 +172,8 @@ Every repo below has a full feature-index survey file in [sources/](sources/). 1
   Tiger Den (repo name "FRC Shop Inventory") is a self-hosted internal-operations app for FRC Team
 - **[voltec-inv](https://github.com/pacoito123/voltec-inv)** ([survey](sources/voltec-inv.md)) — _GPL-3.0 (COPYING file present) — copyleft, ideas only · last activity 2023-01-07_
   Substantive small full-stack CRUD app (MERN) worth reviewing for its simple checkout/"grab" ledger pattern (append-only per-item usage log) and photo-based storage-location convention, but it is inventory-tracking only — no purchasing/PO...
+- **[Weymuth/Inventory](https://github.com/Weymuth/Inventory)** ([survey](sources/weymuth-inventory.md)) — _none — no LICENSE file anywhere in the tree; ideas only, do not copy code. VEX/RoboCup (Mercersburg Academy), not FRC — comparable youth-robotics tool. · last activity 2026-08-19 (pushed_at; actively worked, ~30 same-day commits)_
+  Substantive, actively developed VEX parts-catalog + inventory-state + student-request/teacher-approval system on a GitHub Pages + Google Apps Script + Sheets stack. Worth catalog attention for patterns (single-action-gate Apps Script backend, nonce-confirmed state transitions, transaction ledger) rather than direct code reuse. _(Recovered after a round-3 filename collision; re-surveyed under an owner-prefixed name.)_
 - **[yeti-procurementbot](https://github.com/yeti-robotics/procurementbot)** ([survey](sources/yeti-procurementbot.md))
   Procurementbot is described as "an all in one procurement manager for opening, updating, and closing orders, alongside ensuring the total weight of selected closed orders is within the limit," with a planned feature to accept an input CA...
 
@@ -282,6 +286,7 @@ Judged not to need a full survey — a stub, a tiny app, an undiverged fork, an 
 - [davidmasin/onshapebom](https://github.com/davidmasin/onshapebom) — Verified via tree listing: a single ad-hoc test.py script plus data dumps, not a real application; no license. _(area: parts ordering/POs)_
 - [dphil/onshape-bom](https://github.com/dphil/onshape-bom) — Old (2017) Onshape BOM export script of unclear FRC affiliation; MIT-licensed but superseded by more current Onshape-BOM entries already surveyed. _(area: parts ordering/POs)_
 - [drdab/trcattendance-android](https://github.com/drdab/trcattendance-android) — MIT Android port of the TRC Attendance app -- real but a thin derivative/port, not original feature work. _(area: time/attendance)_
+- [edmundnoble/FRC-Inventory](https://github.com/edmundnoble/FRC-Inventory) — 2012-era single-device Android app for one FRC team to keep a local, unshared list of parts (add/edit/filter/sign-out) with no backend; no license. Thin, dead, single-device. _(area: parts/manufacturing)_ _(Recovered after a round-3 filename collision; too thin for a full survey, so recorded here.)_
 - [elijah-santos/cheesy-hours](https://github.com/elijah-santos/cheesy-hours) — cheesy-hours fork, dead since Dec 2023. _(area: time/attendance)_
 - [frc4904/cheesy-parts](https://github.com/frc4904/cheesy-parts) — cheesy-parts fork, actually dead since Feb 2018 despite listing description -- stale duplicate. _(area: parts ordering/POs)_
 - [frc5183/beeapiold](https://github.com/frc5183/beeapiold) — Archived inventory backend API (name signals it's the superseded 'old' version), MIT licensed — index-only. _(area: parts ordering/POs)_
