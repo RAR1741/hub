@@ -477,9 +477,9 @@ export const STATUS_TONE: Record<PartStatus, StatusTone> = {
 
 export const PRIORITY_MAP: Record<PartPriority, string> = { 0: "High", 1: "Normal", 2: "Low" };
 
-/** e.g. fullPartNumber("RA2026", "assembly", 100) === "RA2026-A-100" */
+/** e.g. fullPartNumber("RA2026", "assembly", 1000) === "RA2026-A-01000" */
 export function fullPartNumber(prefix: string, type: PartType, n: number): string {
-  return `${prefix}-${type === "assembly" ? "A" : "P"}-${String(n).padStart(3, "0")}`;
+  return `${prefix}-${type === "assembly" ? "A" : "P"}-${String(n).padStart(5, "0")}`;
 }
 
 export type ProjectRow = {

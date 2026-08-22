@@ -43,7 +43,7 @@ export function ProjectForm({ project, onSaved }: { project?: Project; onSaved?:
       <label className="label">Name<input className="input" value={name} onChange={(e) => setName(e.target.value)} required /></label>
       <label className="label">Part number prefix
         <input className="input" value={partNumberPrefix} onChange={(e) => setPartNumberPrefix(e.target.value)} required maxLength={20} />
-        <span className="text-sm text-[var(--color-muted-fg)]">Letters/numbers only, e.g. RA2026 → RA2026-A-100.</span>
+        <span className="text-sm text-[var(--color-muted-fg)]">Letters/numbers only, e.g. RA2026 → RA2026-A-01000.</span>
       </label>
       {error && <p className="text-sm text-[var(--red)]">{error}</p>}
       <button type="submit" disabled={busy} className="btn btn-primary self-start">
