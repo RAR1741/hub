@@ -247,4 +247,18 @@ describe("listElementParts", () => {
     const result = await listElementParts("p1", ctx, fetchFn as unknown as typeof fetch, db);
     expect(result).toEqual({ needsReconnect: true });
   });
+
+  test("500 is a transient error, not needsReconnect", async () => {
+    const db = stubDb(freshRow);
+    const fetchFn = vi.fn(async () => jsonResponse(500, { error: "server_error" }));
+    const result = await listElementParts("p1", ctx, fetchFn as unknown as typeof fetch, db);
+    expect(result).toEqual({ error: "fetch_failed" });
+  });
+
+  test("429 is a transient error, not needsReconnect", async () => {
+    const db = stubDb(freshRow);
+    const fetchFn = vi.fn(async () => jsonResponse(429, { error: "rate_limited" }));
+    const result = await listElementParts("p1", ctx, fetchFn as unknown as typeof fetch, db);
+    expect(result).toEqual({ error: "fetch_failed" });
+  });
 });

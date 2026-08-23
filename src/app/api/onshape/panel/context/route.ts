@@ -28,6 +28,10 @@ export const GET = withRole("student", async (viewer, request) => {
 
   const rawProjects = await listProjects();
   const prefixByProjectId = new Map(rawProjects.map((p) => [p.id, p.partNumberPrefix]));
+  // ponytail: one listParts(p.id) call per project, and Onshape reloads this
+  // panel on every CAD selection change — an N+1 on every reload. Fine at
+  // team scale (a handful of projects); revisit with a single batched query
+  // if project count grows enough to matter.
   const projects = await Promise.all(
     rawProjects.map(async (p) => {
       const parts = await listParts(p.id);
@@ -57,6 +61,9 @@ export const GET = withRole("student", async (viewer, request) => {
   });
   if ("needsReconnect" in result) {
     return Response.json({ connectionState: "needs_reconnect", parts: [], projects });
+  }
+  if ("error" in result) {
+    return Response.json({ connectionState: "fetch_failed", parts: [], projects });
   }
 
   const parts = await Promise.all(

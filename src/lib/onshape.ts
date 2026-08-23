@@ -99,9 +99,9 @@ async function postTokenRequest(
     throw new Error(`Onshape token request failed: ${res.status}`);
   }
   const json = (await res.json()) as TokenResponse;
-  // Subtract a 60s safety margin so getFreshAccessToken refreshes slightly
-  // before the token actually expires.
-  const expiresAt = new Date(Date.now() + (json.expires_in - 60) * 1000);
+  // Store the true expiry — the 60s safety margin is applied once, at read
+  // time, in getFreshAccessToken.
+  const expiresAt = new Date(Date.now() + json.expires_in * 1000);
   return {
     accessToken: json.access_token,
     refreshToken: json.refresh_token,
@@ -249,11 +249,16 @@ export async function listElementParts(
   ctx: ListElementPartsContext,
   fetchFn: typeof fetch = fetch,
   db?: SupabaseClient,
-): Promise<{ needsReconnect: true } | { parts: ElementPart[] }> {
+): Promise<{ needsReconnect: true } | { error: "fetch_failed" } | { parts: ElementPart[] }> {
   const accessToken = await getFreshAccessToken(personId, fetchFn, db);
   if (!accessToken) return { needsReconnect: true };
 
-  let res = await fetchElementParts(accessToken, ctx, fetchFn);
+  let res: Response;
+  try {
+    res = await fetchElementParts(accessToken, ctx, fetchFn);
+  } catch {
+    return { error: "fetch_failed" };
+  }
   if (res.status === 401 || res.status === 403) {
     // One refresh-and-retry: the stored token may have been revoked
     // server-side even though our local expiry hadn't yet elapsed, so force
@@ -268,10 +273,16 @@ export async function listElementParts(
     } catch {
       return { needsReconnect: true };
     }
-    res = await fetchElementParts(retryToken, ctx, fetchFn);
+    try {
+      res = await fetchElementParts(retryToken, ctx, fetchFn);
+    } catch {
+      return { error: "fetch_failed" };
+    }
     if (res.status === 401 || res.status === 403) return { needsReconnect: true };
   }
-  if (!res.ok) return { needsReconnect: true };
+  // Any other non-2xx (5xx, 429, ...) is a transient/unexpected failure, not
+  // a reason to send the user through OAuth again.
+  if (!res.ok) return { error: "fetch_failed" };
 
   const json = (await res.json()) as OnshapeApiPart[];
   return { parts: json.map(mapApiPart) };

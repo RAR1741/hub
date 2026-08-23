@@ -25,7 +25,7 @@ type PanelPart = {
 };
 type Assembly = { id: string; name: string; fullPartNumber: string };
 type PanelProject = { id: string; name: string; assemblies: Assembly[] };
-type ConnectionState = "connected" | "needs_connect" | "needs_reconnect";
+type ConnectionState = "connected" | "needs_connect" | "needs_reconnect" | "fetch_failed";
 type ContextResponse = { connectionState: ConnectionState; parts: PanelPart[]; projects: PanelProject[] };
 
 function hasFullContextOf(context: PanelContext): boolean {
@@ -368,6 +368,21 @@ export function OnshapePanel({ context }: { context: PanelContext }) {
             Retry
           </button>
         )}
+      </div>
+    );
+  }
+
+  if (data.connectionState === "fetch_failed") {
+    return (
+      <div className="card flex flex-col gap-3">
+        {errorBanner}
+        <h1 className="text-lg font-bold">Couldn&apos;t load parts</h1>
+        <p className="text-sm text-[var(--muted)]">
+          Onshape didn&apos;t respond — try again.
+        </p>
+        <button type="button" className="btn btn-primary self-start" onClick={() => fetchContext(token)}>
+          Retry
+        </button>
       </div>
     );
   }
