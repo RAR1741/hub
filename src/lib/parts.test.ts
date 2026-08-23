@@ -385,6 +385,10 @@ function mkPart(overrides: Partial<Part>): Part {
     cutLength: null,
     drawingCreated: false,
     createdAt: "2026-01-01T00:00:00.000Z",
+    onshapeDocumentId: null,
+    onshapeElementId: null,
+    onshapePartId: null,
+    onshapeUrl: null,
     ...overrides,
   };
 }

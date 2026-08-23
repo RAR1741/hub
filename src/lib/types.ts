@@ -521,6 +521,10 @@ export type PartRow = {
   cut_length: string | null;
   drawing_created: boolean;
   created_at: string;
+  onshape_document_id: string | null;
+  onshape_element_id: string | null;
+  onshape_part_id: string | null;
+  onshape_url: string | null;
 };
 
 export type Part = {
@@ -539,6 +543,10 @@ export type Part = {
   cutLength: string | null;
   drawingCreated: boolean;
   createdAt: string;
+  onshapeDocumentId: string | null;
+  onshapeElementId: string | null;
+  onshapePartId: string | null;
+  onshapeUrl: string | null;
 };
 
 export function partFromRow(row: PartRow): Part {
@@ -558,5 +566,41 @@ export function partFromRow(row: PartRow): Part {
     cutLength: row.cut_length,
     drawingCreated: row.drawing_created,
     createdAt: row.created_at,
+    onshapeDocumentId: row.onshape_document_id,
+    onshapeElementId: row.onshape_element_id,
+    onshapePartId: row.onshape_part_id,
+    onshapeUrl: row.onshape_url,
+  };
+}
+
+export type OnshapeConnectionRow = {
+  id: string;
+  person_id: string;
+  access_token: string;
+  refresh_token: string;
+  expires_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type OnshapeConnection = {
+  id: string;
+  personId: string;
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export function onshapeConnectionFromRow(row: OnshapeConnectionRow): OnshapeConnection {
+  return {
+    id: row.id,
+    personId: row.person_id,
+    accessToken: row.access_token,
+    refreshToken: row.refresh_token,
+    expiresAt: row.expires_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }
