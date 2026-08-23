@@ -1295,6 +1295,58 @@
     opacity: 0.6;
     cursor: default;
   }
+
+  /* -----------------------------------------------------------------------
+     Onshape right-panel (issue #95) — narrow (~320-400px) CAD side panel,
+     so no page max-width and tighter spacing than the main site's cards.
+     ----------------------------------------------------------------------- */
+  .onshape-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    max-width: 100%;
+  }
+
+  .onshape-part-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    border: 1px solid var(--hair);
+    border-radius: 8px;
+  }
+
+  .onshape-part-row .onshape-part-name {
+    font-weight: 600;
+    font-size: 0.875rem;
+    word-break: break-word;
+  }
+
+  .onshape-part-row .onshape-part-meta {
+    font-size: 0.8125rem;
+    color: var(--muted);
+  }
+
+  .skeleton-line {
+    border-radius: 6px;
+    background: linear-gradient(
+      90deg,
+      var(--surface-2) 25%,
+      var(--surface) 37%,
+      var(--surface-2) 63%
+    );
+    background-size: 400% 100%;
+    animation: skeleton-shimmer 1.4s ease infinite;
+  }
+
+  @keyframes skeleton-shimmer {
+    0% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0 50%;
+    }
+  }
 }
 
 /* =========================================================================
