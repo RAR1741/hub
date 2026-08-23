@@ -261,4 +261,13 @@ describe("listElementParts", () => {
     const result = await listElementParts("p1", ctx, fetchFn as unknown as typeof fetch, db);
     expect(result).toEqual({ error: "fetch_failed" });
   });
+
+  test("a thrown fetch is caught and mapped to fetch_failed, not left to bubble", async () => {
+    const db = stubDb(freshRow);
+    const fetchFn = vi.fn(async () => {
+      throw new Error("network down");
+    });
+    const result = await listElementParts("p1", ctx, fetchFn as unknown as typeof fetch, db);
+    expect(result).toEqual({ error: "fetch_failed" });
+  });
 });

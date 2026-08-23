@@ -188,7 +188,8 @@ export async function getFreshAccessToken(
     const tokens = await refreshTokens(connection.refreshToken, fetchFn);
     await upsertConnection(personId, tokens, db);
     return tokens.accessToken;
-  } catch {
+  } catch (error) {
+    console.error("[onshape] token refresh failed", error);
     return null;
   }
 }
@@ -224,23 +225,44 @@ function mapApiPart(p: OnshapeApiPart): ElementPart {
   };
 }
 
-async function fetchElementParts(
-  accessToken: string,
-  ctx: ListElementPartsContext,
-  fetchFn: typeof fetch,
-): Promise<Response> {
+function buildPartsUrl(ctx: ListElementPartsContext): string {
   const base = normalizeServer(ctx.server);
   const params = new URLSearchParams({
     elementId: ctx.elementId,
     includePropertyDefaults: "false",
     withThumbnails: "false",
   });
-  const url = `${base}/v6/parts/d/${ctx.documentId}/${ctx.wvm}/${ctx.wvmId}?${params.toString()}`;
+  return `${base}/v6/parts/d/${ctx.documentId}/${ctx.wvm}/${ctx.wvmId}?${params.toString()}`;
+}
+
+async function fetchElementParts(
+  accessToken: string,
+  ctx: ListElementPartsContext,
+  fetchFn: typeof fetch,
+): Promise<Response> {
+  const url = buildPartsUrl(ctx);
   return fetchFn(url, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
       Accept: "application/json",
     },
+  });
+}
+
+/** Logs a non-ok parts-fetch response's status + body so `fetch_failed` is diagnosable. */
+async function logPartsFetchFailure(
+  label: "initial" | "after refresh-retry",
+  ctx: ListElementPartsContext,
+  res: Response,
+): Promise<void> {
+  const body = await res.text().catch((error: unknown) => `<failed to read body: ${String(error)}>`);
+  console.error("[onshape] parts fetch failed", {
+    attempt: label,
+    method: "GET",
+    url: buildPartsUrl(ctx),
+    status: res.status,
+    statusText: res.statusText,
+    body,
   });
 }
 
@@ -254,12 +276,23 @@ export async function listElementParts(
   if (!accessToken) return { needsReconnect: true };
 
   let res: Response;
+  let wasRetried = false;
   try {
     res = await fetchElementParts(accessToken, ctx, fetchFn);
-  } catch {
+  } catch (error) {
+    console.error("[onshape] parts fetch threw", {
+      attempt: "initial",
+      error: error instanceof Error ? error.message : String(error),
+      documentId: ctx.documentId,
+      wvm: ctx.wvm,
+      wvmId: ctx.wvmId,
+      elementId: ctx.elementId,
+      base: normalizeServer(ctx.server),
+    });
     return { error: "fetch_failed" };
   }
   if (res.status === 401 || res.status === 403) {
+    await logPartsFetchFailure("initial", ctx, res);
     // One refresh-and-retry: the stored token may have been revoked
     // server-side even though our local expiry hadn't yet elapsed, so force
     // a refresh rather than reusing the (still locally-fresh) cached token.
@@ -270,19 +303,36 @@ export async function listElementParts(
       const tokens = await refreshTokens(connection.refreshToken, fetchFn);
       await upsertConnection(personId, tokens, db);
       retryToken = tokens.accessToken;
-    } catch {
+    } catch (error) {
+      console.error("[onshape] token refresh failed", error);
       return { needsReconnect: true };
     }
     try {
       res = await fetchElementParts(retryToken, ctx, fetchFn);
-    } catch {
+      wasRetried = true;
+    } catch (error) {
+      console.error("[onshape] parts fetch threw", {
+        attempt: "after refresh-retry",
+        error: error instanceof Error ? error.message : String(error),
+        documentId: ctx.documentId,
+        wvm: ctx.wvm,
+        wvmId: ctx.wvmId,
+        elementId: ctx.elementId,
+        base: normalizeServer(ctx.server),
+      });
       return { error: "fetch_failed" };
     }
-    if (res.status === 401 || res.status === 403) return { needsReconnect: true };
+    if (res.status === 401 || res.status === 403) {
+      await logPartsFetchFailure("after refresh-retry", ctx, res);
+      return { needsReconnect: true };
+    }
   }
   // Any other non-2xx (5xx, 429, ...) is a transient/unexpected failure, not
   // a reason to send the user through OAuth again.
-  if (!res.ok) return { error: "fetch_failed" };
+  if (!res.ok) {
+    await logPartsFetchFailure(wasRetried ? "after refresh-retry" : "initial", ctx, res);
+    return { error: "fetch_failed" };
+  }
 
   const json = (await res.json()) as OnshapeApiPart[];
   return { parts: json.map(mapApiPart) };
