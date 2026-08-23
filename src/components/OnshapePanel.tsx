@@ -152,6 +152,11 @@ function AddPartForm({
     setBusy(true);
     setError(null);
     try {
+      const serverBase = context.server && /^https:\/\/[^/]*\.onshape\.com$/.test(context.server)
+        ? context.server
+        : "https://cad.onshape.com";
+      const onshapeUrl =
+        `${serverBase}/documents/${context.documentId}/${context.workspaceOrVersion}/${context.workspaceOrVersionId}/e/${context.elementId}?partId=${part.partId}`;
       const res = await fetch("/api/onshape/panel/parts", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -163,6 +168,7 @@ function AddPartForm({
           onshapeDocumentId: context.documentId,
           onshapeElementId: context.elementId,
           onshapePartId: part.partId,
+          onshapeUrl,
           sourceMaterial: part.material ?? undefined,
           notes: notes || undefined,
         }),
