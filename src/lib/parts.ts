@@ -25,6 +25,14 @@ export type PartInput = {
   type: "part" | "assembly";
   name: string;
   parentPartId: string | null;
+  // Optional Onshape linkage (panel create path, spec §3/§4 task 4). Absent
+  // for the plain admin-parts create path.
+  onshapeDocumentId?: string;
+  onshapeElementId?: string;
+  onshapePartId?: string;
+  onshapeUrl?: string;
+  sourceMaterial?: string | null;
+  notes?: string | null;
 };
 
 /** Validate a part-creation payload. PURE. Null = invalid. */
@@ -50,6 +58,54 @@ export function parsePartInput(body: unknown): PartInput | null {
     parentPartId = id;
   }
   return { projectId, type: "assembly", name, parentPartId };
+}
+
+export type OnshapePartInput = PartInput;
+
+/**
+ * Validate a panel part-creation payload (Onshape-linked). PURE. Null =
+ * invalid. Same shape/rules as `parsePartInput` plus the required identity
+ * triple and optional linkage/material/notes fields (spec §3 task 4).
+ */
+export function parseOnshapePartInput(body: unknown): OnshapePartInput | null {
+  if (typeof body !== "object" || body === null) return null;
+  const b = body as Record<string, unknown>;
+  const projectId = reqUuid(b.projectId);
+  const name = reqString(b.name, 120);
+  const onshapeDocumentId = reqString(b.onshapeDocumentId, 200);
+  const onshapeElementId = reqString(b.onshapeElementId, 200);
+  const onshapePartId = reqString(b.onshapePartId, 200);
+  if (!projectId || !name || !onshapeDocumentId || !onshapeElementId || !onshapePartId) return null;
+  if (b.type !== "part" && b.type !== "assembly") return null;
+
+  const onshapeUrl = optString(b.onshapeUrl, 2000);
+  const sourceMaterial = optString(b.sourceMaterial, 200);
+  const notes = optString(b.notes, 2000);
+  if (!onshapeUrl || !sourceMaterial || !notes) return null;
+
+  const base = {
+    projectId,
+    name,
+    onshapeDocumentId,
+    onshapeElementId,
+    onshapePartId,
+    onshapeUrl: onshapeUrl.value ?? undefined,
+    sourceMaterial: sourceMaterial.value,
+    notes: notes.value,
+  };
+
+  if (b.type === "part") {
+    const parentPartId = reqUuid(b.parentPartId);
+    if (!parentPartId) return null;
+    return { ...base, type: "part", parentPartId };
+  }
+  let parentPartId: string | null = null;
+  if (b.parentPartId !== undefined && b.parentPartId !== null) {
+    const id = reqUuid(b.parentPartId);
+    if (!id) return null;
+    parentPartId = id;
+  }
+  return { ...base, type: "assembly", parentPartId };
 }
 
 export type PartPatch = Partial<{
@@ -279,14 +335,42 @@ export async function createPart(
         part_number: numbered.number,
         type: input.type,
         name: input.name,
+        onshape_document_id: input.onshapeDocumentId ?? null,
+        onshape_element_id: input.onshapeElementId ?? null,
+        onshape_part_id: input.onshapePartId ?? null,
+        onshape_url: input.onshapeUrl ?? null,
+        source_material: input.sourceMaterial ?? null,
+        notes: input.notes ?? null,
       })
       .select("id")
       .single();
     if (!error) return { ok: true, id: data.id as string, partNumber: numbered.number };
+    // Duplicate Onshape linkage (part_onshape_identity_unique) surfaces here
+    // as the same 23505 as a numbering race — mapWriteError sends both to
+    // the caller-appropriate code (409); only a bare numbering race retries.
     if (error.code !== UNIQUE_VIOLATION) return { ok: false, status: mapWriteError(error.code) };
+    if (input.onshapePartId) return { ok: false, status: 409 };
     // retry once on 23505; fall through to loop
   }
   return { ok: false, status: 409 };
+}
+
+/** Hub part already linked to this exact CAD part (identity triple), or null. */
+export async function findPartByOnshapeIdentity(
+  documentId: string,
+  elementId: string,
+  partId: string,
+  db?: SupabaseClient,
+): Promise<Part | null> {
+  const client = db ?? (await import("./db")).getDb();
+  const { data } = await client
+    .from("part")
+    .select("*")
+    .eq("onshape_document_id", documentId)
+    .eq("onshape_element_id", elementId)
+    .eq("onshape_part_id", partId)
+    .maybeSingle();
+  return data ? partFromRow(data as PartRow) : null;
 }
 
 export async function listParts(projectId: string, db?: SupabaseClient): Promise<Part[]> {

@@ -20,6 +20,9 @@ type ResolveDeps = {
   verifyToken: (token: string) => Promise<{ personId: string } | null>;
   findPersonByAuthUserId: (authUserId: string) => Promise<PersonRow | null>;
   findPersonById: (id: string) => Promise<PersonRow | null>;
+  /** Onshape panel bearer token (Authorization header), if any. */
+  panelToken: string | null;
+  verifyPanelToken: (token: string) => Promise<{ personId: string } | null>;
 };
 
 export async function resolveViewer(deps: ResolveDeps): Promise<Viewer> {
@@ -34,17 +37,27 @@ export async function resolveViewer(deps: ResolveDeps): Promise<Viewer> {
       if (row?.is_active) return { person: personFromRow(row), role: row.role };
     }
   }
+  if (deps.panelToken) {
+    const claims = await deps.verifyPanelToken(deps.panelToken);
+    if (claims) {
+      // Fresh is_active/role lookup per request (not trusted from the token)
+      // so removing someone from the roster instantly revokes panel access.
+      const row = await deps.findPersonById(claims.personId);
+      if (row?.is_active) return { person: personFromRow(row), role: row.role };
+    }
+  }
   return GUEST;
 }
 
 /** Next.js wrapper: reads both session types from cookies. Server-only. */
 export async function getViewer(): Promise<Viewer> {
-  const { cookies } = await import("next/headers");
+  const { cookies, headers } = await import("next/headers");
   const { createServerClient } = await import("@supabase/ssr");
   const { getDb } = await import("./db");
   const { STUDENT_SESSION_COOKIE, verifyStudentSessionToken } = await import(
     "./student-session"
   );
+  const { verifyPanelToken } = await import("./onshape-panel-token");
 
   const { serverSupabaseUrl } = await import("./supabase-url");
   const { AUTH_COOKIE_NAME } = await import("./supabase-cookie");
@@ -53,6 +66,11 @@ export async function getViewer(): Promise<Viewer> {
   );
 
   const cookieStore = await cookies();
+  const headerStore = await headers();
+  const authHeader = headerStore.get("authorization");
+  const bearerMatch = authHeader?.match(/^Bearer (.+)$/i);
+  const panelToken = bearerMatch?.[1]?.trim() || null;
+
   const supabase = createServerClient(
     serverSupabaseUrl(),
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -95,6 +113,9 @@ export async function getViewer(): Promise<Viewer> {
       return (Array.isArray(person) ? person[0] : person) ?? null;
     },
     findPersonById: (id) => findOne("id", id),
+    panelToken,
+    verifyPanelToken: (t) =>
+      verifyPanelToken(t, process.env.STUDENT_SESSION_SECRET!),
   });
 
   // Check for active masquerade session. Only applies if:

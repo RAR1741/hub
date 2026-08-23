@@ -15,6 +15,11 @@ const student: PersonRow = {
 };
 
 describe("resolveViewer", () => {
+  const noPanelToken = {
+    panelToken: null,
+    verifyPanelToken: async () => null,
+  };
+
   test("supabase auth user resolves via findPersonByAuthUserId", async () => {
     const mentorRow = { ...student, id: "p2", role: "mentor" as const };
     const viewer = await resolveViewer({
@@ -23,6 +28,7 @@ describe("resolveViewer", () => {
       verifyToken: async () => null,
       findPersonByAuthUserId: async (id) => (id === "u9" ? mentorRow : null),
       findPersonById: async () => null,
+      ...noPanelToken,
     });
     expect(viewer.role).toBe("mentor");
     expect(viewer.person?.id).toBe("p2");
@@ -35,6 +41,7 @@ describe("resolveViewer", () => {
       verifyToken: async (t) => (t === "tok" ? { personId: "p1" } : null),
       findPersonByAuthUserId: async () => null,
       findPersonById: async (id) => (id === "p1" ? student : null),
+      ...noPanelToken,
     });
     expect(viewer.role).toBe("student");
     expect(viewer.person?.firstName).toBe("Test");
@@ -47,6 +54,7 @@ describe("resolveViewer", () => {
       verifyToken: async () => ({ personId: "p1" }),
       findPersonByAuthUserId: async () => null,
       findPersonById: async () => ({ ...student, is_active: false }),
+      ...noPanelToken,
     });
     expect(viewer).toEqual({ person: null, role: "guest" });
   });
@@ -58,8 +66,81 @@ describe("resolveViewer", () => {
       verifyToken: async () => null,
       findPersonByAuthUserId: async () => null,
       findPersonById: async () => null,
+      ...noPanelToken,
     });
     expect(viewer).toEqual({ person: null, role: "guest" });
+  });
+});
+
+describe("resolveViewer with onshape panel token", () => {
+  test("panel token resolves an active person to their role", async () => {
+    const viewer = await resolveViewer({
+      supabaseUserId: null,
+      studentToken: null,
+      verifyToken: async () => null,
+      findPersonByAuthUserId: async () => null,
+      findPersonById: async (id) => (id === "p1" ? student : null),
+      panelToken: "panel-tok",
+      verifyPanelToken: async (t) =>
+        t === "panel-tok" ? { personId: "p1" } : null,
+    });
+    expect(viewer.role).toBe("student");
+    expect(viewer.person?.id).toBe("p1");
+  });
+
+  test("panel token for an inactive person falls through to guest", async () => {
+    const viewer = await resolveViewer({
+      supabaseUserId: null,
+      studentToken: null,
+      verifyToken: async () => null,
+      findPersonByAuthUserId: async () => null,
+      findPersonById: async () => ({ ...student, is_active: false }),
+      panelToken: "panel-tok",
+      verifyPanelToken: async () => ({ personId: "p1" }),
+    });
+    expect(viewer).toEqual({ person: null, role: "guest" });
+  });
+
+  test("invalid panel token falls through to guest", async () => {
+    const viewer = await resolveViewer({
+      supabaseUserId: null,
+      studentToken: null,
+      verifyToken: async () => null,
+      findPersonByAuthUserId: async () => null,
+      findPersonById: async () => student,
+      panelToken: "bad-tok",
+      verifyPanelToken: async () => null,
+    });
+    expect(viewer).toEqual({ person: null, role: "guest" });
+  });
+
+  test("a valid panel token does not override an already-resolved supabase viewer", async () => {
+    const mentorRow = { ...student, id: "p2", role: "mentor" as const };
+    const viewer = await resolveViewer({
+      supabaseUserId: "u9",
+      studentToken: null,
+      verifyToken: async () => null,
+      findPersonByAuthUserId: async (id) => (id === "u9" ? mentorRow : null),
+      findPersonById: async (id) => (id === "p1" ? student : null),
+      panelToken: "panel-tok",
+      verifyPanelToken: async () => ({ personId: "p1" }),
+    });
+    expect(viewer.role).toBe("mentor");
+    expect(viewer.person?.id).toBe("p2");
+  });
+
+  test("a valid panel token does not override an already-resolved student viewer", async () => {
+    const viewer = await resolveViewer({
+      supabaseUserId: null,
+      studentToken: "tok",
+      verifyToken: async (t) => (t === "tok" ? { personId: "p1" } : null),
+      findPersonByAuthUserId: async () => null,
+      findPersonById: async (id) => (id === "p1" ? student : null),
+      panelToken: "panel-tok",
+      verifyPanelToken: async () => ({ personId: "p1" }),
+    });
+    expect(viewer.role).toBe("student");
+    expect(viewer.person?.id).toBe("p1");
   });
 });
 
@@ -106,6 +187,8 @@ describe("resolveViewer with masquerade", () => {
       verifyToken: async () => null,
       findPersonByAuthUserId: async (id) => (id === "u_admin" ? admin : null),
       findPersonById: async () => null,
+      panelToken: null,
+      verifyPanelToken: async () => null,
     });
 
     expect(viewer.role).toBe("admin");

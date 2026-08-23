@@ -6,7 +6,8 @@ any deploy step, and the Vercel MCP tools are not used. Every command here you r
 This mirrors the credential-gated precedent set by `docs/setup/google-oauth.md` and
 `docs/setup/google-calendar.md`: the code and migrations are already wired, but creating hosted
 accounts, registering OAuth clients, and provisioning infrastructure needs a human with access to
-those accounts.
+those accounts. The Onshape right-panel integration follows the same pattern — see
+`docs/setup/onshape.md` for registering the Onshape OAuth app + extension.
 
 ## Overview
 
@@ -105,6 +106,9 @@ Set these in **Vercel → Project → Settings → Environment Variables** (Prod
 | `GOOGLE_SA_CLIENT_EMAIL` | `team-hub-calendar-sync@....iam.gserviceaccount.com` | Calendar service account, per `docs/setup/google-calendar.md`. |
 | `GOOGLE_SA_PRIVATE_KEY` | `"-----BEGIN PRIVATE KEY-----\nMIIE...\n-----END PRIVATE KEY-----\n"` | Same service account. Paste with literal `\n` escapes on one line, exactly as `docs/setup/google-calendar.md` describes — `gcalCredentialsFromEnv` restores real newlines before parsing the PEM. |
 | `GOOGLE_CALENDAR_ID` | `your-calendar-id@group.calendar.google.com` | Optional — the calendar to sync. When set it **overrides** the `gcal_calendar_id` app setting, so you can configure the whole calendar integration from env alone. Leave unset to manage it from Admin → Settings instead. |
+| `ONSHAPE_CLIENT_ID` | `abc123...` | Onshape OAuth app client id — see `docs/setup/onshape.md`. |
+| `ONSHAPE_CLIENT_SECRET` | `xyz789...` | Same Onshape OAuth app. |
+| `ONSHAPE_REDIRECT_URI` | `https://hub.redalert1741.org/api/onshape/oauth/callback` | Must exactly match the redirect URL registered with Onshape. |
 
 ### Config (not secret, but must be exact)
 

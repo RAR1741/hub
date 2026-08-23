@@ -127,6 +127,43 @@ export async function deletePersonByName(firstName: string, lastName: string): P
   }
 }
 
+/**
+ * Upsert a fake onshape_connection row for a person (onshape-panel.spec.ts).
+ * Values are dummy — expires_at is far in the future so `getFreshAccessToken`
+ * never attempts a real refresh, and the dev mock's parts-list endpoint
+ * accepts any bearer token — so this seeds a "connected" panel state without
+ * driving the real Onshape OAuth authorize screen.
+ */
+export async function seedOnshapeConnection(personId: string): Promise<void> {
+  const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+  const res = await fetch(`${restBaseUrl()}/onshape_connection?on_conflict=person_id`, {
+    method: "POST",
+    headers: authHeaders({ Prefer: "resolution=merge-duplicates" }),
+    body: JSON.stringify({
+      person_id: personId,
+      access_token: "e2e-mock-access-token",
+      refresh_token: "e2e-mock-refresh-token",
+      expires_at: expiresAt,
+    }),
+  });
+  if (![200, 201, 409].includes(res.status)) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`seedOnshapeConnection failed: ${res.status} ${body}`);
+  }
+}
+
+/** Delete a person's onshape_connection row, if any. Idempotent. */
+export async function deleteOnshapeConnection(personId: string): Promise<void> {
+  const res = await fetch(`${restBaseUrl()}/onshape_connection?person_id=eq.${personId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`deleteOnshapeConnection failed: ${res.status} ${body}`);
+  }
+}
+
 /** Delete the excusal row for a person+date, if any. Idempotent. */
 export async function deleteExcusal(personId: string, date: string): Promise<void> {
   const res = await fetch(
