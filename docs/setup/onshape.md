@@ -61,9 +61,13 @@ sign the panel's bearer token — nothing extra to configure there.
 ## Local dev / testing without a real Onshape app
 
 You don't need a real Onshape OAuth app to develop or run the e2e suite locally. A dev-gated mock
-(`src/app/api/dev/onshape-mock/*`, 404s in production — same guard as `dev-login`) stands in for
-both the token endpoint and the parts-list endpoint. Point the two URL env vars at it in
-`.env.local`:
+(`src/app/api/dev/onshape-mock/*`) stands in for both the token endpoint and the parts-list
+endpoint. Unlike `dev-login`, its token endpoint mints a token with no credential check at all, so
+its gate (`src/app/api/dev/onshape-mock/gate.ts`) is stricter: it 404s on **any** Vercel deployment
+(production or preview), guarded by the Vercel-injected `VERCEL_ENV` — which can't be overridden by
+adding an env var. It's reachable locally under `next dev`, and in non-Vercel production-mode
+`next start` (CI e2e) only when `ALLOW_ONSHAPE_MOCK=1` is explicitly set. Point the two URL env vars
+at it in `.env.local`:
 
 ```bash
 ONSHAPE_TOKEN_URL=http://localhost:3000/api/dev/onshape-mock/oauth/token

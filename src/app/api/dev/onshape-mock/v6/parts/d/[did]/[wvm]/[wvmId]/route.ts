@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
+import { onshapeMockBlocked } from "../../../../../../gate";
 
 /**
  * Dev-gated stand-in for Onshape's `GET /v6/parts/d/{did}/{wvm}/{wvmId}`.
  * Fixed fixture, stable partIds so e2e can assert on them.
  */
 export async function GET(request: Request) {
-  if (process.env.NODE_ENV === "production" && process.env.ALLOW_ONSHAPE_MOCK !== "1") {
+  if (onshapeMockBlocked()) {
     return NextResponse.json({ ok: false }, { status: 404 });
   }
 

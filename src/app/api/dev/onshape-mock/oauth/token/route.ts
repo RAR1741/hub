@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { onshapeMockBlocked } from "../../gate";
 
 // ponytail: in-memory counter, fine for a dev-only mock (no persistence needed).
 let callCount = 0;
@@ -9,7 +10,7 @@ let callCount = 0;
  * so the local connect/refresh flow can run with zero real Onshape dependency.
  */
 export async function POST(request: Request) {
-  if (process.env.NODE_ENV === "production" && process.env.ALLOW_ONSHAPE_MOCK !== "1") {
+  if (onshapeMockBlocked()) {
     return NextResponse.json({ ok: false }, { status: 404 });
   }
 
