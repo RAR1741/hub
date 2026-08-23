@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { PART_STATUSES, STATUS_MAP, STATUS_TONE } from "@/lib/types";
 import type { PartStatus } from "@/lib/types";
+import { resolveParentPartId } from "@/lib/onshape-panel-form";
 
 const TOKEN_KEY = "hub:onshape-panel-token";
 const CACHE_TTL_MS = 30 * 60 * 1000;
@@ -134,18 +135,25 @@ function AddPartForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Parent-assembly choices depend on the selected project — reset inline
-  // on the project select's onChange rather than an effect (no setState
-  // needed on every other render).
+  // The select's displayed value must always match the value used on
+  // submit. `parentPartId` state can go stale (assemblies loaded after
+  // mount, project change, etc.) and land on an id that isn't a valid
+  // <option> — the browser then silently displays the first option while
+  // state stays on the invalid value, a controlled-select phantom
+  // selection. Derive the actual value through the pure resolver every
+  // render instead of syncing it back into state (idempotent, so `value`
+  // and submit always agree without an effect/setState round-trip).
+  const resolvedParent = resolveParentPartId(assemblies, parentPartId, type);
+
   function changeProject(id: string) {
     setProjectId(id);
     const next = projects.find((p) => p.id === id);
-    setParentPartId(next?.assemblies[0]?.id ?? "");
+    setParentPartId(resolveParentPartId(next?.assemblies ?? [], "", type));
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (type === "part" && !parentPartId) {
+    if (type === "part" && !resolvedParent) {
       setError("Choose a parent assembly.");
       return;
     }
@@ -164,7 +172,7 @@ function AddPartForm({
           projectId,
           type,
           name,
-          parentPartId: parentPartId || undefined,
+          parentPartId: resolvedParent || undefined,
           onshapeDocumentId: context.documentId,
           onshapeElementId: context.elementId,
           onshapePartId: part.partId,
@@ -209,14 +217,14 @@ function AddPartForm({
       </label>
       {type === "part" ? (
         <label className="label">Parent assembly
-          <select className="input" value={parentPartId} onChange={(e) => setParentPartId(e.target.value)} required>
+          <select className="input" value={resolvedParent} onChange={(e) => setParentPartId(e.target.value)} required>
             {assemblies.length === 0 && <option value="">— create an assembly first —</option>}
             {assemblies.map((a) => <option key={a.id} value={a.id}>{a.fullPartNumber} {a.name}</option>)}
           </select>
         </label>
       ) : (
         <label className="label">Parent assembly (optional)
-          <select className="input" value={parentPartId} onChange={(e) => setParentPartId(e.target.value)}>
+          <select className="input" value={resolvedParent} onChange={(e) => setParentPartId(e.target.value)}>
             <option value="">— Top level —</option>
             {assemblies.map((a) => <option key={a.id} value={a.id}>{a.fullPartNumber} {a.name}</option>)}
           </select>
