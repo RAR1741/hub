@@ -18,11 +18,7 @@ export async function GET(request: Request) {
   const error = url.searchParams.get("error");
   const state = url.searchParams.get("state");
 
-  const toErrorRedirect = (response?: NextResponse) => {
-    const err = NextResponse.redirect(clientUrl(request, "/onshape/connect?onshape=error"));
-    response?.cookies.getAll().forEach((c) => err.cookies.set(c));
-    return err;
-  };
+  const toErrorRedirect = () => NextResponse.redirect(clientUrl(request, "/onshape/connect?onshape=error"));
 
   if (error || !code) return toErrorRedirect();
 

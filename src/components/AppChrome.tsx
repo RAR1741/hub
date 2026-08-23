@@ -10,7 +10,7 @@ import { usePathname } from "next/navigation";
  */
 export function AppChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  if (pathname?.startsWith("/onshape")) return null;
+  if (pathname === "/onshape" || pathname?.startsWith("/onshape/")) return null;
   return <>{children}</>;
 }
 
@@ -18,7 +18,7 @@ export function AppChrome({ children }: { children: React.ReactNode }) {
  * panel wants full narrow width, not the hub's centered max-width column. */
 export function MainWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isPanel = pathname?.startsWith("/onshape");
+  const isPanel = pathname === "/onshape" || pathname?.startsWith("/onshape/");
   return (
     <div id="main" className={isPanel ? "flex-1 flex flex-col" : "mx-auto w-full max-w-6xl flex-1 px-4 py-6 flex flex-col"}>
       {children}
