@@ -27,6 +27,12 @@ jobs:
       # without them resolvable. Dummy values are fine — E2E uses no real OAuth.
       GOOGLE_OAUTH_CLIENT_ID: dummy
       GOOGLE_OAUTH_CLIENT_SECRET: dummy
+      # Onshape dev mock: opt-in flag lets the mock run under production-mode
+      # `next start` here (real prod never sets it), and point the app's Onshape
+      # token/API URLs at the in-app mock so the panel e2e runs with no real Onshape.
+      ALLOW_ONSHAPE_MOCK: "1"
+      ONSHAPE_TOKEN_URL: http://localhost:3000/api/dev/onshape-mock/oauth/token
+      ONSHAPE_API_BASE_URL: http://localhost:3000/api/dev/onshape-mock
       # Suppress interactive prompts during apt-get (needrestart, service restarts)
       NEEDRESTART_MODE: a
       DEBIAN_FRONTEND: noninteractive

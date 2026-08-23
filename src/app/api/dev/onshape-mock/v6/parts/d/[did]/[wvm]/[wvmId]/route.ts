@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
  * Fixed fixture, stable partIds so e2e can assert on them.
  */
 export async function GET(request: Request) {
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.NODE_ENV === "production" && process.env.ALLOW_ONSHAPE_MOCK !== "1") {
     return NextResponse.json({ ok: false }, { status: 404 });
   }
 
