@@ -56,7 +56,10 @@ export function normalizeServer(v: string | undefined): string {
   } catch {
     return fallback;
   }
-  if (host === "onshape.com" || host.endsWith(".onshape.com")) return withScheme;
+  // The panel passes the CAD app origin (e.g. https://cad.onshape.com), not
+  // an API base — rebuild from the validated host only (dropping any
+  // attacker-supplied path/query) so the result is always `https://<host>/api`.
+  if (host === "onshape.com" || host.endsWith(".onshape.com")) return `https://${host}/api`;
   return fallback;
 }
 
@@ -334,6 +337,21 @@ export async function listElementParts(
     return { error: "fetch_failed" };
   }
 
-  const json = (await res.json()) as OnshapeApiPart[];
+  // A 200 with a non-JSON body (e.g. Onshape's SPA HTML shell, when a
+  // misconfigured base URL points at the app origin instead of /api) must
+  // degrade gracefully rather than throw an unhandled 500.
+  const bodyText = await res.text();
+  let json: OnshapeApiPart[];
+  try {
+    json = JSON.parse(bodyText) as OnshapeApiPart[];
+  } catch (error) {
+    console.error("[onshape] parts response was not JSON", {
+      url: buildPartsUrl(ctx),
+      status: res.status,
+      error: error instanceof Error ? error.message : String(error),
+      bodySnippet: bodyText.slice(0, 200),
+    });
+    return { error: "fetch_failed" };
+  }
   return { parts: json.map(mapApiPart) };
 }
