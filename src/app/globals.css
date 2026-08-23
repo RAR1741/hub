@@ -1328,7 +1328,7 @@
   }
 
   .skeleton-line {
-    border-radius: 6px;
+    border-radius: 8px;
     background: linear-gradient(
       90deg,
       var(--surface-2) 25%,
