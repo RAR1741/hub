@@ -5,6 +5,8 @@ import {
   createPart,
   deletePart,
   deleteProject,
+  findPartByOnshapeIdentity,
+  parseOnshapePartInput,
   parsePartInput,
   parsePartPatch,
   parseProjectInput,
@@ -151,6 +153,95 @@ describe("parsePartInput", () => {
   });
 });
 
+describe("parseOnshapePartInput", () => {
+  const validPart = {
+    projectId: PROJECT_ID,
+    type: "part",
+    name: "Bracket",
+    parentPartId: ASSEMBLY_ID,
+    onshapeDocumentId: "doc-1",
+    onshapeElementId: "elem-1",
+    onshapePartId: "part-1",
+  };
+
+  test("accepts a valid onshape-linked part", () => {
+    expect(parseOnshapePartInput(validPart)).toEqual({
+      projectId: PROJECT_ID,
+      type: "part",
+      name: "Bracket",
+      parentPartId: ASSEMBLY_ID,
+      onshapeDocumentId: "doc-1",
+      onshapeElementId: "elem-1",
+      onshapePartId: "part-1",
+      onshapeUrl: undefined,
+      sourceMaterial: null,
+      notes: null,
+    });
+  });
+
+  test("accepts optional onshapeUrl, sourceMaterial, notes", () => {
+    expect(
+      parseOnshapePartInput({
+        ...validPart,
+        onshapeUrl: "https://cad.onshape.com/documents/doc-1",
+        sourceMaterial: "6061-T6",
+        notes: "from panel",
+      }),
+    ).toEqual({
+      projectId: PROJECT_ID,
+      type: "part",
+      name: "Bracket",
+      parentPartId: ASSEMBLY_ID,
+      onshapeDocumentId: "doc-1",
+      onshapeElementId: "elem-1",
+      onshapePartId: "part-1",
+      onshapeUrl: "https://cad.onshape.com/documents/doc-1",
+      sourceMaterial: "6061-T6",
+      notes: "from panel",
+    });
+  });
+
+  test("accepts a valid onshape-linked top-level assembly (no parent)", () => {
+    expect(
+      parseOnshapePartInput({
+        projectId: PROJECT_ID,
+        type: "assembly",
+        name: "Frame",
+        onshapeDocumentId: "doc-1",
+        onshapeElementId: "elem-1",
+        onshapePartId: "part-1",
+      }),
+    ).toEqual({
+      projectId: PROJECT_ID,
+      type: "assembly",
+      name: "Frame",
+      parentPartId: null,
+      onshapeDocumentId: "doc-1",
+      onshapeElementId: "elem-1",
+      onshapePartId: "part-1",
+      onshapeUrl: undefined,
+      sourceMaterial: null,
+      notes: null,
+    });
+  });
+
+  test.each([
+    [{ ...validPart, projectId: "not-a-uuid" }],
+    [{ ...validPart, type: "widget" }],
+    [{ ...validPart, name: "" }],
+    [{ ...validPart, parentPartId: undefined }], // part requires a parent assembly
+    [{ ...validPart, parentPartId: null }],
+    [{ ...validPart, onshapeDocumentId: undefined }],
+    [{ ...validPart, onshapeElementId: "" }],
+    [{ ...validPart, onshapePartId: 123 }],
+    [{ ...validPart, sourceMaterial: "x".repeat(201) }],
+    [{ ...validPart, notes: "x".repeat(2001) }],
+    [null],
+  ])("rejects %j", (body) => {
+    expect(parseOnshapePartInput(body)).toBeNull();
+  });
+});
+
 describe("parsePartPatch", () => {
   test("returns only provided fields", () => {
     expect(parsePartPatch({ status: "cnc" })).toEqual({ status: "cnc" });
@@ -291,6 +382,95 @@ describe("createPart — numbering", () => {
     });
     const result = await createPart(partInput({ parentPartId: ASSEMBLY_ID }), db);
     expect(result).toEqual({ ok: false, status: 400 });
+  });
+});
+
+describe("createPart — Onshape linkage", () => {
+  test("writes linkage columns and returns the allocated number", async () => {
+    const { db, stubs } = fakeDb({
+      part: [
+        { data: { project_id: PROJECT_ID, type: "assembly" }, error: null }, // parent validation
+        { data: null, error: null }, // no sibling parts under this assembly
+        { data: { part_number: 1000, project_id: PROJECT_ID, type: "assembly" }, error: null }, // parent's own number
+        { data: { id: "part-6" }, error: null }, // insert
+      ],
+    });
+    const result = await createPart(
+      partInput({
+        onshapeDocumentId: "doc-1",
+        onshapeElementId: "elem-1",
+        onshapePartId: "part-1",
+        onshapeUrl: "https://cad.onshape.com/documents/doc-1",
+      }),
+      db,
+    );
+    expect(result).toEqual({ ok: true, id: "part-6", partNumber: 1001 });
+
+    const insertCall = stubs.part[3].calls.find((c) => c.method === "insert");
+    expect(insertCall?.args[0]).toMatchObject({
+      onshape_document_id: "doc-1",
+      onshape_element_id: "elem-1",
+      onshape_part_id: "part-1",
+      onshape_url: "https://cad.onshape.com/documents/doc-1",
+    });
+  });
+
+  test("duplicate identity (23505) surfaces as 409 without retrying", async () => {
+    const { db } = fakeDb({
+      part: [
+        { data: { project_id: PROJECT_ID, type: "assembly" }, error: null }, // parent validation
+        { data: null, error: null }, // no sibling parts
+        { data: { part_number: 1000, project_id: PROJECT_ID, type: "assembly" }, error: null },
+        { data: null, error: { code: "23505" } }, // insert collides on the unique identity index
+      ],
+    });
+    const result = await createPart(
+      partInput({ onshapeDocumentId: "doc-1", onshapeElementId: "elem-1", onshapePartId: "part-1" }),
+      db,
+    );
+    expect(result).toEqual({ ok: false, status: 409 });
+  });
+});
+
+describe("findPartByOnshapeIdentity", () => {
+  test("returns the matching hub part", async () => {
+    const { db } = fakeDb({
+      part: [
+        {
+          data: {
+            id: "part-1",
+            project_id: PROJECT_ID,
+            parent_part_id: null,
+            part_number: 1,
+            type: "part",
+            name: "Bracket",
+            status: "designing",
+            priority: 1,
+            notes: null,
+            source_material: null,
+            have_material: false,
+            quantity: null,
+            cut_length: null,
+            drawing_created: false,
+            created_at: "2026-01-01T00:00:00.000Z",
+            onshape_document_id: "doc-1",
+            onshape_element_id: "elem-1",
+            onshape_part_id: "part-1",
+            onshape_url: null,
+          },
+          error: null,
+        },
+      ],
+    });
+    const result = await findPartByOnshapeIdentity("doc-1", "elem-1", "part-1", db);
+    expect(result?.id).toBe("part-1");
+    expect(result?.onshapePartId).toBe("part-1");
+  });
+
+  test("returns null when no match", async () => {
+    const { db } = fakeDb({ part: [{ data: null, error: null }] });
+    const result = await findPartByOnshapeIdentity("doc-1", "elem-1", "part-1", db);
+    expect(result).toBeNull();
   });
 });
 
