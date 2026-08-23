@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/app/globals.css"
+        ],
+        "createdAt": "2026-08-23T00:00:00.000Z",
+        "reason": "Deliberate design-system accent: .shop-tile uses a left-border to encode part priority (red=High) per the approved shop-dashboard spec (#11); pre-existing, applies to the design tokens layer only."
+      }
+    ]
+  }
+}
