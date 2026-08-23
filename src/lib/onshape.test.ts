@@ -66,8 +66,8 @@ describe("normalizeServer", () => {
     expect(normalizeServer("https://cad.onshape.com/api")).toBe("https://cad.onshape.com/api");
   });
 
-  test("accepts a bare onshape.com host, adding a scheme", () => {
-    expect(normalizeServer("onshape.com")).toBe("https://onshape.com");
+  test("accepts a bare onshape.com host, adding a scheme and the /api segment", () => {
+    expect(normalizeServer("onshape.com")).toBe("https://onshape.com/api");
   });
 
   test("rejects an unrelated host, falling back to the default", () => {
@@ -80,6 +80,14 @@ describe("normalizeServer", () => {
 
   test("falls back to the default when undefined", () => {
     expect(normalizeServer(undefined)).toBe("https://cad.onshape.com/api");
+  });
+
+  test("adds /api to the CAD app origin the Onshape right panel actually sends", () => {
+    expect(normalizeServer("https://cad.onshape.com")).toBe("https://cad.onshape.com/api");
+  });
+
+  test("drops any attacker-supplied path/query, keeping only the validated host", () => {
+    expect(normalizeServer("https://cad.onshape.com/evil?x=1")).toBe("https://cad.onshape.com/api");
   });
 });
 
@@ -258,6 +266,44 @@ describe("listElementParts", () => {
   test("429 is a transient error, not needsReconnect", async () => {
     const db = stubDb(freshRow);
     const fetchFn = vi.fn(async () => jsonResponse(429, { error: "rate_limited" }));
+    const result = await listElementParts("p1", ctx, fetchFn as unknown as typeof fetch, db);
+    expect(result).toEqual({ error: "fetch_failed" });
+  });
+
+  test("a thrown fetch is caught and mapped to fetch_failed, not left to bubble", async () => {
+    const db = stubDb(freshRow);
+    const fetchFn = vi.fn(async () => {
+      throw new Error("network down");
+    });
+    const result = await listElementParts("p1", ctx, fetchFn as unknown as typeof fetch, db);
+    expect(result).toEqual({ error: "fetch_failed" });
+  });
+
+  test("a server=CAD-app-origin context builds the /api/v6/parts URL (regression: was missing /api)", async () => {
+    const db = stubDb(freshRow);
+    let calledUrl = "";
+    const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
+      calledUrl = String(input);
+      return jsonResponse(200, []);
+    });
+    await listElementParts(
+      "p1",
+      { ...ctx, server: "https://cad.onshape.com" },
+      fetchFn as unknown as typeof fetch,
+      db,
+    );
+    expect(calledUrl.startsWith("https://cad.onshape.com/api/v6/parts/d/")).toBe(true);
+  });
+
+  test("a 200 response with an HTML body (SPA shell, not JSON) degrades to fetch_failed instead of throwing", async () => {
+    const db = stubDb(freshRow);
+    const fetchFn = vi.fn(
+      async () =>
+        new Response("<!doctype html><html><body>app shell</body></html>", {
+          status: 200,
+          headers: { "Content-Type": "text/html" },
+        }),
+    );
     const result = await listElementParts("p1", ctx, fetchFn as unknown as typeof fetch, db);
     expect(result).toEqual({ error: "fetch_failed" });
   });
