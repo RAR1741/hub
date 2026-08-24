@@ -42,3 +42,5 @@ export function clientIp(request: Request): string {
 // Shared instances for the public endpoints.
 export const studentLoginLimiter = createRateLimiter({ limit: 10, windowMs: 60_000 });
 export const accountRequestLimiter = createRateLimiter({ limit: 5, windowMs: 60_000 });
+export const otpRequestLimiter = createRateLimiter({ limit: 5, windowMs: 60_000 });
+export const otpVerifyLimiter = createRateLimiter({ limit: 10, windowMs: 60_000 });

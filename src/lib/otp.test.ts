@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { describe, expect, test } from "vitest";
 import {
+  evaluateOtpVerify,
   formatOtpCode,
   generateOtpCode,
   hashOtpCode,
@@ -66,5 +67,25 @@ describe("constants", () => {
   test("ttl and max attempts", () => {
     expect(OTP_TTL_MINUTES).toBe(10);
     expect(OTP_MAX_ATTEMPTS).toBe(5);
+  });
+});
+
+describe("evaluateOtpVerify", () => {
+  const hash = hashOtpCode("12345678");
+
+  test("match when hashes are equal and under the attempt cap", () => {
+    expect(evaluateOtpVerify({ code_hash: hash, attempts: 1 }, hash)).toBe("match");
+  });
+
+  test("mismatch when hashes differ", () => {
+    expect(
+      evaluateOtpVerify({ code_hash: hash, attempts: 1 }, hashOtpCode("00000000")),
+    ).toBe("mismatch");
+  });
+
+  test("blocked once attempts reach the cap, even with the right code", () => {
+    expect(
+      evaluateOtpVerify({ code_hash: hash, attempts: OTP_MAX_ATTEMPTS }, hash),
+    ).toBe("blocked");
   });
 });
