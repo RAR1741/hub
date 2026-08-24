@@ -3,7 +3,7 @@ import { getDb } from "@/lib/db";
 import { gmailCredentialsFromEnv, sendMail } from "@/lib/gmail";
 import { formatOtpCode, generateOtpCode, hashOtpCode, OTP_TTL_MINUTES } from "@/lib/otp";
 import { reqString } from "@/lib/validate";
-import { clientIp, otpRequestLimiter } from "@/lib/rate-limit";
+import { clientIp, otpEmailLimiter, otpRequestLimiter } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
   if (!otpRequestLimiter.check(clientIp(request))) {
@@ -15,9 +15,14 @@ export async function POST(request: Request) {
   if (!email) {
     return NextResponse.json({ ok: false }, { status: 400 });
   }
+  // Checked for every submitted email string, known or not, so this can't be
+  // used as an enumeration oracle.
+  if (!otpEmailLimiter.check(email)) {
+    return NextResponse.json({ ok: false }, { status: 429 });
+  }
 
-  // Always 200 below, regardless of whether the email is known, to avoid
-  // account enumeration.
+  // Success is always 200 below, regardless of whether the email is known, to
+  // avoid account enumeration (429/500 are unrelated to whether it's known).
   const db = getDb();
   const { data: identity, error } = await db
     .from("person_identity")
@@ -33,12 +38,24 @@ export async function POST(request: Request) {
     const code = generateOtpCode();
     const expiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60_000).toISOString();
 
-    await db.from("login_otp").delete().eq("person_id", personRow.id).is("consumed_at", null);
-    await db.from("login_otp").insert({
+    const { error: deleteError } = await db
+      .from("login_otp")
+      .delete()
+      .eq("person_id", personRow.id)
+      .is("consumed_at", null);
+    if (deleteError) {
+      console.error("otp delete failed", deleteError);
+      return NextResponse.json({ ok: false }, { status: 500 });
+    }
+    const { error: insertError } = await db.from("login_otp").insert({
       person_id: personRow.id,
       code_hash: hashOtpCode(code),
       expires_at: expiresAt,
     });
+    if (insertError) {
+      console.error("otp insert failed", insertError);
+      return NextResponse.json({ ok: false }, { status: 500 });
+    }
 
     if (process.env.NODE_ENV !== "production") {
       console.log(`[otp] code for ${email}: ${formatOtpCode(code)}`);

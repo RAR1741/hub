@@ -51,12 +51,33 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }
   // Persisted regardless of match, so aborted/failed guesses still count.
-  await db.from("login_otp").update({ attempts: otpRow.attempts + 1 }).eq("id", otpRow.id);
+  // Compare-and-swap on attempts: if a concurrent request already bumped it,
+  // this row won't match and we lose the race (401) instead of both requests
+  // proceeding past the 5-attempt cap.
+  const { data: attemptRow, error: attemptError } = await db
+    .from("login_otp")
+    .update({ attempts: otpRow.attempts + 1 })
+    .eq("id", otpRow.id)
+    .eq("attempts", otpRow.attempts)
+    .select("id");
+  if (attemptError || !attemptRow?.length) {
+    return NextResponse.json({ ok: false }, { status: 401 });
+  }
   if (decision === "mismatch") {
     return NextResponse.json({ ok: false }, { status: 401 });
   }
 
-  await db.from("login_otp").update({ consumed_at: new Date().toISOString() }).eq("id", otpRow.id);
+  // Single-winner consumption: only the request that flips consumed_at from
+  // null wins and gets a session; a concurrent duplicate loses the race.
+  const { data: consumeRow, error: consumeError } = await db
+    .from("login_otp")
+    .update({ consumed_at: new Date().toISOString() })
+    .eq("id", otpRow.id)
+    .is("consumed_at", null)
+    .select("id");
+  if (consumeError || !consumeRow?.length) {
+    return NextResponse.json({ ok: false }, { status: 401 });
+  }
 
   const token = await createOtpSessionToken(personRow.id, process.env.STUDENT_SESSION_SECRET!);
   const response = NextResponse.json({ ok: true });

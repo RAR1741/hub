@@ -44,3 +44,7 @@ export const studentLoginLimiter = createRateLimiter({ limit: 10, windowMs: 60_0
 export const accountRequestLimiter = createRateLimiter({ limit: 5, windowMs: 60_000 });
 export const otpRequestLimiter = createRateLimiter({ limit: 5, windowMs: 60_000 });
 export const otpVerifyLimiter = createRateLimiter({ limit: 10, windowMs: 60_000 });
+// Per-email throttle (on top of the per-IP otpRequestLimiter above): caps how
+// often a single address can be sent/invalidated a code, so an attacker can't
+// email-bomb a victim or keep resetting their in-flight code from another IP.
+export const otpEmailLimiter = createRateLimiter({ limit: 3, windowMs: 5 * 60_000 });

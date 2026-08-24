@@ -14,6 +14,7 @@ export function EmailOtpForm() {
   const [resendBusy, setResendBusy] = useState(false);
   const router = useRouter();
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const verifyAbortRef = useRef<AbortController | null>(null);
 
   async function requestCode(e?: React.FormEvent) {
     e?.preventDefault();
@@ -39,6 +40,9 @@ export function EmailOtpForm() {
   }
 
   async function verify(code: string) {
+    verifyAbortRef.current?.abort();
+    const controller = new AbortController();
+    verifyAbortRef.current = controller;
     setError(null);
     setBusy(true);
     try {
@@ -46,6 +50,7 @@ export function EmailOtpForm() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, code }),
+        signal: controller.signal,
       });
       if (res.ok) {
         router.push("/");
@@ -57,12 +62,17 @@ export function EmailOtpForm() {
         setDigits(Array(CODE_LENGTH).fill(""));
         inputRefs.current[0]?.focus();
       }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      setError("That code didn't work. Check it or request a new one.");
     } finally {
-      setBusy(false);
+      // Don't clear busy for a call a newer verify() already superseded.
+      if (verifyAbortRef.current === controller) setBusy(false);
     }
   }
 
   function setDigit(index: number, value: string) {
+    if (busy) return;
     const next = [...digits];
     next[index] = value;
     setDigits(next);
@@ -146,6 +156,7 @@ export function EmailOtpForm() {
             maxLength={1}
             aria-label={`Code digit ${i + 1}`}
             value={d}
+            disabled={busy}
             onChange={(e) => handleDigitChange(i, e.target.value)}
             onKeyDown={(e) => handleKeyDown(i, e)}
             onPaste={handlePaste}
@@ -164,6 +175,7 @@ export function EmailOtpForm() {
             maxLength={1}
             aria-label={`Code digit ${i + 5}`}
             value={d}
+            disabled={busy}
             onChange={(e) => handleDigitChange(i + 4, e.target.value)}
             onKeyDown={(e) => handleKeyDown(i + 4, e)}
             onPaste={handlePaste}
@@ -183,6 +195,7 @@ export function EmailOtpForm() {
           type="button"
           className="underline"
           onClick={() => {
+            verifyAbortRef.current?.abort();
             setPhase("email");
             setError(null);
           }}
