@@ -237,3 +237,48 @@ export async function deleteExcusal(personId: string, date: string): Promise<voi
     throw new Error(`deleteExcusal failed: ${res.status} ${body}`);
   }
 }
+
+/** The id of a badge row by exact name (case-sensitive), or null if none exists. */
+export async function findBadgeIdByName(name: string): Promise<string | null> {
+  const res = await fetch(
+    `${restBaseUrl()}/badge?name=eq.${encodeURIComponent(name)}&select=id`,
+    { headers: authHeaders() },
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`findBadgeIdByName lookup failed: ${res.status} ${body}`);
+  }
+  const rows = (await res.json()) as { id: string }[];
+  return rows[0]?.id ?? null;
+}
+
+/**
+ * Delete any badge row with the given name (cascades to badge_award rows via
+ * FK — no need to delete awards separately). Idempotent. Used to make specs
+ * that create badges by a fixed name re-run-safe against the unique
+ * `badge_name_unique_idx` constraint.
+ */
+export async function deleteBadgeByName(name: string): Promise<void> {
+  const res = await fetch(
+    `${restBaseUrl()}/badge?name=eq.${encodeURIComponent(name)}`,
+    { method: "DELETE", headers: authHeaders() },
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`deleteBadgeByName failed: ${res.status} ${body}`);
+  }
+}
+
+/** True if a badge_award row exists for the given badge+person. */
+export async function badgeAwardExists(badgeId: string, personId: string): Promise<boolean> {
+  const res = await fetch(
+    `${restBaseUrl()}/badge_award?badge_id=eq.${badgeId}&person_id=eq.${personId}&select=id`,
+    { headers: authHeaders() },
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`badgeAwardExists lookup failed: ${res.status} ${body}`);
+  }
+  const rows = (await res.json()) as unknown[];
+  return rows.length > 0;
+}
