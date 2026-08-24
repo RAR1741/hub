@@ -1,6 +1,7 @@
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 import { StudentLoginForm } from "@/components/StudentLoginForm";
 import { AccountRequestForm } from "@/components/AccountRequestForm";
+import { EmailOtpForm } from "@/components/EmailOtpForm";
 
 export default function LoginPage() {
   return (
@@ -10,6 +11,11 @@ export default function LoginPage() {
         <h1 className="mt-1 text-2xl font-bold tracking-tight">Sign in</h1>
       </div>
       <div className="card flex flex-col gap-6">
+        <section className="flex flex-col gap-3">
+          <h2 className="eyebrow">Email</h2>
+          <EmailOtpForm />
+        </section>
+        <hr style={{ border: 0, borderTop: "1px solid var(--hair)" }} />
         <section className="flex flex-col gap-3">
           <h2 className="eyebrow">Students</h2>
           <StudentLoginForm />
