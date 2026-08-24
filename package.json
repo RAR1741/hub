@@ -11,12 +11,17 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "e2e": "playwright test",
+    "//worktrees": "Installs git post-checkout/post-merge hooks so any `git worktree add` gets its own isolated Docker/Supabase stack, and merged worktrees clean themselves up. Harness-agnostic; see scripts/install-git-hooks.sh.",
+    "worktrees:install": "bash scripts/install-git-hooks.sh",
+    "worktrees:reap": "bash scripts/reap-worktrees.sh",
+    "test:worktrees": "bash scripts/test-worktree-lifecycle.sh",
     "backup:db": "tsx scripts/backup-db-to-drive.ts",
     "//db-scripts": "Flags below are required for running the CLI inside the dev container — see supabase/README.md before changing.",
     "db:start": "supabase start --ignore-health-check",
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset --db-url postgresql://postgres:postgres@host.docker.internal:${SUPABASE_DB_PORT:-54322}/postgres?sslmode=disable --yes",
-    "db:psql": "psql postgresql://postgres:postgres@host.docker.internal:${SUPABASE_DB_PORT:-54322}/postgres"
+    "db:psql": "psql postgresql://postgres:postgres@host.docker.internal:${SUPABASE_DB_PORT:-54322}/postgres",
+    "prepare": "bash scripts/install-git-hooks.sh"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",

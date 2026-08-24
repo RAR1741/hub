@@ -11,6 +11,7 @@ import {
   type FirstExperienceRow, type GuardianRow,
 } from "./types";
 import { eventFromRow } from "./types";
+import { fullPartNumber } from "./types";
 
 describe("teamFromRow", () => {
   test("maps snake_case to camelCase", () => {
@@ -291,5 +292,19 @@ describe("firstExperienceFromRow", () => {
     expect(firstExperienceFromRow(row)).toEqual({
       id: "fe2", personId: "p1", level: "fll_challenge", year: 2022, name: null,
     });
+  });
+});
+
+describe("fullPartNumber", () => {
+  test("renders an assembly number, zero-padded", () => {
+    expect(fullPartNumber("RA2026", "assembly", 0)).toBe("RA2026-A-00000");
+  });
+
+  test("renders a larger assembly number", () => {
+    expect(fullPartNumber("RA2026", "assembly", 1000)).toBe("RA2026-A-01000");
+  });
+
+  test("renders a part number", () => {
+    expect(fullPartNumber("RA2026", "part", 1001)).toBe("RA2026-P-01001");
   });
 });

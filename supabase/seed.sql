@@ -1,5 +1,5 @@
-insert into person (first_name, last_name, role, student_id_number, grad_year)
-values ('Test', 'Student', 'student', '1741', 2028);
+insert into person (id, first_name, last_name, role, student_id_number, grad_year)
+values ('00000000-0000-0000-0000-000000001741', 'Test', 'Student', 'student', '1741', 2028);
 
 -- Teams are seeded from their own file now: supabase/seeds/teams.sql
 -- (loaded after this file — see config.toml [db.seed].sql_paths).

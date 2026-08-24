@@ -3,9 +3,11 @@ import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
 import { getPersonWithTeams } from "@/lib/people";
 import { listPersonIdentities } from "@/lib/identities";
+import { getGuardiansForPerson } from "@/lib/guardians";
 import { PersonForm } from "@/components/PersonForm";
 import { DeletePersonButton } from "@/components/DeletePersonButton";
 import { PersonEmails } from "@/components/PersonEmails";
+import { PersonGuardians } from "@/components/PersonGuardians";
 
 export default async function AdminEditPersonPage({
   params,
@@ -15,9 +17,10 @@ export default async function AdminEditPersonPage({
   const [{ id }, viewer] = await Promise.all([params, getViewer()]);
   if (!hasRole(viewer.role, "admin")) redirect("/");
 
-  const [result, identities] = await Promise.all([
+  const [result, identities, guardians] = await Promise.all([
     getPersonWithTeams(id),
     listPersonIdentities(id),
+    getGuardiansForPerson(id),
   ]);
   if (!result) notFound();
   const p = result.person;
@@ -75,6 +78,11 @@ export default async function AdminEditPersonPage({
             linked: i.auth_user_id !== null,
           }))}
         />
+      </section>
+
+      <section className="card flex flex-col gap-4">
+        <h2 className="text-base font-semibold">Guardians</h2>
+        <PersonGuardians personId={p.id} guardians={guardians} />
       </section>
     </main>
   );

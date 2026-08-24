@@ -1,13 +1,15 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { canViewProfile, getPersonWithTeams } from "@/lib/people";
+import { hasRole } from "@/lib/authz";
 import { getActivePeriod } from "@/lib/periods";
 import { personSessions } from "@/lib/reports";
 import { sessionHours, totalHours } from "@/lib/hours";
 import { listBadgesForPerson, listAwardableBadges } from "@/lib/badges";
-import { hasRole } from "@/lib/authz";
 import { BadgeAwardPanel } from "@/components/BadgeAwardPanel";
 import { RevokeBadgeButton } from "@/components/RevokeBadgeButton";
+import { getGuardiansForPerson } from "@/lib/guardians";
 
 export default async function PersonPage({
   params,
@@ -16,11 +18,16 @@ export default async function PersonPage({
 }) {
   const [{ id }, viewer] = await Promise.all([params, getViewer()]);
   if (!canViewProfile(viewer, id)) notFound();
+  const canViewGuardians = hasRole(viewer.role, "mentor");
+  const canEdit = hasRole(viewer.role, "admin");
 
-  const result = await getPersonWithTeams(id);
+  const [result, activePeriod, guardians] = await Promise.all([
+    getPersonWithTeams(id),
+    getActivePeriod(),
+    canViewGuardians ? getGuardiansForPerson(id) : Promise.resolve([]),
+  ]);
   if (!result) notFound();
   const { person, teams } = result;
-  const activePeriod = await getActivePeriod();
   const [sessions, heldBadges, awardable] = await Promise.all([
     activePeriod ? personSessions(person.id, activePeriod.id) : Promise.resolve([]),
     listBadgesForPerson(person.id),
@@ -52,6 +59,11 @@ export default async function PersonPage({
             {person.isActive ? "Active" : "Inactive"}
           </span>
           {person.studentIdNumber && <span className="sid">{person.studentIdNumber}</span>}
+          {canEdit && (
+            <Link href={`/admin/people/${person.id}`} className="btn ml-auto">
+              Edit
+            </Link>
+          )}
         </div>
         <dl className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
           <div>
@@ -96,6 +108,35 @@ export default async function PersonPage({
           </ul>
         )}
       </section>
+
+      {canViewGuardians && (
+        <section className="card flex flex-col gap-3">
+          <h2 className="text-lg font-semibold">Guardians</h2>
+          {guardians.length === 0 ? (
+            <p className="text-sm text-[var(--muted)]">No guardians on file.</p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {guardians.map(({ guardian, relationship }) => (
+                <li key={guardian.id} className="flex flex-col gap-1 text-sm">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">
+                      {guardian.firstName} {guardian.lastName}
+                    </span>
+                    {relationship && <span className="pill">{relationship}</span>}
+                  </div>
+                  {(guardian.email || guardian.phone || guardian.employer) && (
+                    <ul className="flex flex-wrap gap-x-4 text-[var(--muted)]">
+                      {guardian.email && <li>{guardian.email}</li>}
+                      {guardian.phone && <li>{guardian.phone}</li>}
+                      {guardian.employer && <li>{guardian.employer}</li>}
+                    </ul>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
 
       <section className="card flex flex-col gap-3">
         <h2 className="text-lg font-semibold">Badges</h2>

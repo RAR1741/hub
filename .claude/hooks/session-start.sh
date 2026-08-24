@@ -38,102 +38,15 @@ if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
     fi
     log "Isolated worktree stack: app http://localhost:${APP_PORT:-3000}, Supabase Studio http://localhost:${SUPABASE_STUDIO_PORT:-54323}"
   elif [ -d .git ] && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    # Only nudge from the MAIN checkout, not other/older worktrees that
-    # predate this scheme (.git here is a real dir; a linked worktree's .git
-    # is a gitdir-pointer file).
-
-    # Finish removals queued by post-merge-cleanup.sh: it can't rmdir a
-    # worktree that was still its own cwd, so it defers to here — a fresh,
-    # unrelated process that holds no handle on that directory.
-    PENDING=".claude/worktrees/.pending-cleanup"
-    if [ -s "$PENDING" ]; then
-      REMAINING="$(mktemp)"
-      while IFS="$(printf '\t')" read -r DIR BR; do
-        [ -n "$DIR" ] || continue
-        if git worktree remove "$DIR" --force 2>/dev/null; then
-          git branch -D "$BR" 2>/dev/null || true
-          log "Cleaned up merged worktree '$BR'."
-        else
-          echo -e "$DIR\t$BR" >> "$REMAINING"
-        fi
-      done < "$PENDING"
-      mv "$REMAINING" "$PENDING"
-      [ -s "$PENDING" ] || rm -f "$PENDING"
-    fi
-
-    # Orphan-stack sweep: a native worktree that's kept (not auto-removed,
-    # e.g. isolation:"worktree" subagents that finish with changes) never
-    # fires SessionEnd or WorktreeRemove for its stack. Reconcile running
-    # hub-* compose projects against `git worktree list` and down any whose
-    # worktree directory no longer exists.
-    ACTIVE_DIRS="$(git worktree list --porcelain | sed -n 's/^worktree //p')"
-    for PROJECT in $(docker compose ls --format json 2>/dev/null | node -e '
-      let d = "";
-      process.stdin.on("data", c => d += c);
-      process.stdin.on("end", () => {
-        try {
-          const list = JSON.parse(d || "[]");
-          (Array.isArray(list) ? list : [list]).forEach(p => {
-            if (p.Name && p.Name.startsWith("hub-")) console.log(p.Name);
-          });
-        } catch (e) {}
-      });
-    ' 2>/dev/null); do
-      FOUND=0
-      for D in $ACTIVE_DIRS; do
-        [ -f "$D/.env" ] || continue
-        grep -q "^COMPOSE_PROJECT_NAME=$PROJECT\$" "$D/.env" 2>/dev/null && FOUND=1 && break
-      done
-      if [ "$FOUND" -eq 0 ]; then
-        log "Orphaned stack '$PROJECT' has no matching worktree — tearing down."
-        docker compose -p "$PROJECT" down -v >"/tmp/compose-down-$PROJECT.log" 2>&1 || true
-      fi
-    done
-
-    # Merged-worktree sweep: post-merge-cleanup.sh only fires on `gh pr merge`
-    # run from INSIDE the worktree, so PRs merged from the GitHub web UI (or gh
-    # elsewhere) leave the worktree + stack behind. A clean, merged, leftover
-    # worktree is exactly what Claude Code's launcher then recycles into an
-    # unrelated new session — inheriting a stale stack name. Reap any linked
-    # worktree whose branch is already merged into master. Non-force removal:
-    # a worktree with uncommitted work (git refuses) is left untouched.
-    # ponytail: uses local origin/master||master as the merge oracle — if both
-    #   are stale we simply don't reap (conservative, never reaps unmerged).
-    #   Add a `git fetch` here if leftovers linger after web-UI merges.
-    MASTER_REF=""
-    for ref in origin/master master; do
-      git rev-parse --verify "$ref" >/dev/null 2>&1 && { MASTER_REF="$ref"; break; }
-    done
-    if [ -n "$MASTER_REF" ]; then
-      git worktree list --porcelain | node -e '
-        let d = "";
-        process.stdin.on("data", c => d += c);
-        process.stdin.on("end", () => {
-          const wts = []; let wt = null;
-          for (const line of d.split("\n")) {
-            if (line.startsWith("worktree ")) { if (wt) wts.push(wt); wt = { path: line.slice(9), branch: "" }; }
-            else if (line.startsWith("branch ") && wt) wt.branch = line.slice(7).replace(/^refs\/heads\//, "");
-          }
-          if (wt) wts.push(wt);
-          // Skip index 0 (the main working tree); only linked worktrees on a branch.
-          process.stdout.write(wts.slice(1).filter(w => w.branch).map(w => w.path + "\t" + w.branch).join("\n"));
-        });
-      ' | while IFS="$(printf '\t')" read -r WT BR; do
-        [ -n "$WT" ] || continue
-        git merge-base --is-ancestor "$BR" "$MASTER_REF" 2>/dev/null || continue
-        if [ -f "$WT/.env" ] && grep -q '^COMPOSE_PROJECT_NAME=' "$WT/.env"; then
-          PROJ="$(sed -n 's/^COMPOSE_PROJECT_NAME=//p' "$WT/.env")"
-          log "Merged worktree '$BR' — tearing down stack '$PROJ'."
-          docker compose -p "$PROJ" down -v >"/tmp/compose-down-$PROJ.log" 2>&1 || true
-        fi
-        if git worktree remove "$WT" 2>/dev/null; then
-          git branch -D "$BR" 2>/dev/null || true
-          log "Removed merged worktree '$BR' (branch in $MASTER_REF)."
-        else
-          log "Merged worktree '$BR' has uncommitted work or is busy — left in place."
-        fi
-      done
-    fi
+    # MAIN checkout only (.git is a real directory here; a linked worktree's
+    # .git is a gitdir-pointer file). Two jobs, both delegated to the
+    # harness-agnostic scripts so this hook stays optional:
+    #   1. keep git's own post-checkout/post-merge hooks installed, so the
+    #      lifecycle survives a fresh clone and works without any agent
+    #   2. reap worktrees whose PR has merged, tear down their stacks, and
+    #      drain removals deferred from inside a worktree
+    bash scripts/install-git-hooks.sh >/dev/null 2>&1 || true
+    bash scripts/reap-worktrees.sh 2>&1 | sed 's/^\[reap\] /[session-start] /' || true
 
     cat <<'EOF'
 You are in the hub repo's MAIN checkout (not an isolated worktree). Per
@@ -142,7 +55,7 @@ involves writing code, create an isolated worktree with its own Docker/
 Supabase stack and do the work there instead of in this checkout:
 
     scripts/new-worktree.sh <branch-name>
-    cd .claude/worktrees/<branch-name> && ./dev
+    cd .worktrees/<branch-name> && ./dev
 
 Do this automatically, without asking — the stack starts itself in the
 background. Only skip it if already inside a worktree, or the user

@@ -477,3 +477,197 @@ export function firstExperienceFromRow(row: FirstExperienceRow): FirstExperience
     name: row.name,
   };
 }
+
+export type PartType = "part" | "assembly";
+export type PartPriority = 0 | 1 | 2;
+
+export const PART_STATUSES = [
+  "designing", "material", "ordered", "drawing", "drawing_done", "mentor_approved", "ready",
+  "cnc", "laser", "lathe", "mill", "printer", "router",
+  "manufacturing", "outsourced", "welding", "scotchbrite",
+  "anodize", "powder", "coating", "assembly", "done",
+] as const;
+export type PartStatus = (typeof PART_STATUSES)[number];
+
+/** Labels from cheesy-parts `models/part.rb` STATUS_MAP (commit 034ef59), plus two local additions: drawing_done, mentor_approved. */
+export const STATUS_MAP: Record<PartStatus, string> = {
+  designing: "Design in progress",
+  material: "Material needs to be ordered",
+  ordered: "Waiting for materials",
+  drawing: "Needs drawing",
+  drawing_done: "Drawing done",
+  mentor_approved: "Mentor approved",
+  ready: "Ready to manufacture",
+  cnc: "Ready for CNC",
+  laser: "Ready for laser",
+  lathe: "Ready for lathe",
+  mill: "Ready for mill",
+  printer: "Ready for 3D printer",
+  router: "Ready for router",
+  manufacturing: "Manufacturing in progress",
+  outsourced: "Waiting for outsourced manufacturing",
+  welding: "Waiting for welding",
+  scotchbrite: "Waiting for Scotch-Brite",
+  anodize: "Ready for anodize",
+  powder: "Ready for powder coating",
+  coating: "Waiting for coating",
+  assembly: "Waiting for assembly",
+  done: "Done",
+};
+
+export type StatusTone = "design" | "blocked" | "ready" | "working" | "done";
+
+export const STATUS_TONE: Record<PartStatus, StatusTone> = {
+  designing: "design",
+  material: "blocked",
+  ordered: "blocked",
+  drawing: "design",
+  drawing_done: "design",
+  mentor_approved: "design",
+  ready: "ready",
+  cnc: "ready",
+  laser: "ready",
+  lathe: "ready",
+  mill: "ready",
+  printer: "ready",
+  router: "ready",
+  manufacturing: "working",
+  outsourced: "working",
+  welding: "working",
+  scotchbrite: "working",
+  anodize: "working",
+  powder: "working",
+  coating: "working",
+  assembly: "working",
+  done: "done",
+};
+
+export const PRIORITY_MAP: Record<PartPriority, string> = { 0: "High", 1: "Normal", 2: "Low" };
+
+/** e.g. fullPartNumber("RA2026", "assembly", 1000) === "RA2026-A-01000" */
+export function fullPartNumber(prefix: string, type: PartType, n: number): string {
+  return `${prefix}-${type === "assembly" ? "A" : "P"}-${String(n).padStart(5, "0")}`;
+}
+
+export type ProjectRow = {
+  id: string;
+  name: string;
+  part_number_prefix: string;
+  created_at: string;
+};
+
+export type Project = {
+  id: string;
+  name: string;
+  partNumberPrefix: string;
+  createdAt: string;
+};
+
+export function projectFromRow(row: ProjectRow): Project {
+  return {
+    id: row.id,
+    name: row.name,
+    partNumberPrefix: row.part_number_prefix,
+    createdAt: row.created_at,
+  };
+}
+
+export type PartRow = {
+  id: string;
+  project_id: string;
+  parent_part_id: string | null;
+  part_number: number;
+  type: PartType;
+  name: string;
+  status: PartStatus;
+  priority: PartPriority;
+  notes: string | null;
+  source_material: string | null;
+  have_material: boolean;
+  quantity: string | null;
+  cut_length: string | null;
+  drawing_created: boolean;
+  created_at: string;
+  onshape_document_id: string | null;
+  onshape_element_id: string | null;
+  onshape_part_id: string | null;
+  onshape_url: string | null;
+};
+
+export type Part = {
+  id: string;
+  projectId: string;
+  parentPartId: string | null;
+  partNumber: number;
+  type: PartType;
+  name: string;
+  status: PartStatus;
+  priority: PartPriority;
+  notes: string | null;
+  sourceMaterial: string | null;
+  haveMaterial: boolean;
+  quantity: string | null;
+  cutLength: string | null;
+  drawingCreated: boolean;
+  createdAt: string;
+  onshapeDocumentId: string | null;
+  onshapeElementId: string | null;
+  onshapePartId: string | null;
+  onshapeUrl: string | null;
+};
+
+export function partFromRow(row: PartRow): Part {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    parentPartId: row.parent_part_id,
+    partNumber: row.part_number,
+    type: row.type,
+    name: row.name,
+    status: row.status,
+    priority: row.priority,
+    notes: row.notes,
+    sourceMaterial: row.source_material,
+    haveMaterial: row.have_material,
+    quantity: row.quantity,
+    cutLength: row.cut_length,
+    drawingCreated: row.drawing_created,
+    createdAt: row.created_at,
+    onshapeDocumentId: row.onshape_document_id,
+    onshapeElementId: row.onshape_element_id,
+    onshapePartId: row.onshape_part_id,
+    onshapeUrl: row.onshape_url,
+  };
+}
+
+export type OnshapeConnectionRow = {
+  id: string;
+  person_id: string;
+  access_token: string;
+  refresh_token: string;
+  expires_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type OnshapeConnection = {
+  id: string;
+  personId: string;
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export function onshapeConnectionFromRow(row: OnshapeConnectionRow): OnshapeConnection {
+  return {
+    id: row.id,
+    personId: row.person_id,
+    accessToken: row.access_token,
+    refreshToken: row.refresh_token,
+    expiresAt: row.expires_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}

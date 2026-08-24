@@ -32,6 +32,13 @@ const ROUTES = [
   "/admin/settings",
   "/admin/reports",
   "/api/whos-here",
+  "/onshape",
+  "/onshape/connect",
+  "/api/onshape/panel/context",
+  "/api/onshape/panel/parts",
+  // Onshape panel's inline status control PATCHes this dynamic route — not
+  // otherwise warmed by any GET-only route above.
+  "/api/admin/parts/00000000-0000-0000-0000-000000000000",
 ];
 
 export default async function globalSetup(): Promise<void> {

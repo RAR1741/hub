@@ -127,6 +127,105 @@ export async function deletePersonByName(firstName: string, lastName: string): P
   }
 }
 
+/**
+ * Upsert a fake onshape_connection row for a person (onshape-panel.spec.ts).
+ * Values are dummy — expires_at is far in the future so `getFreshAccessToken`
+ * never attempts a real refresh, and the dev mock's parts-list endpoint
+ * accepts any bearer token — so this seeds a "connected" panel state without
+ * driving the real Onshape OAuth authorize screen.
+ */
+export async function seedOnshapeConnection(personId: string): Promise<void> {
+  const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+  const res = await fetch(`${restBaseUrl()}/onshape_connection?on_conflict=person_id`, {
+    method: "POST",
+    headers: authHeaders({ Prefer: "resolution=merge-duplicates" }),
+    body: JSON.stringify({
+      person_id: personId,
+      access_token: "e2e-mock-access-token",
+      refresh_token: "e2e-mock-refresh-token",
+      expires_at: expiresAt,
+    }),
+  });
+  if (![200, 201, 409].includes(res.status)) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`seedOnshapeConnection failed: ${res.status} ${body}`);
+  }
+}
+
+/** Delete a person's onshape_connection row, if any. Idempotent. */
+export async function deleteOnshapeConnection(personId: string): Promise<void> {
+  const res = await fetch(`${restBaseUrl()}/onshape_connection?person_id=eq.${personId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`deleteOnshapeConnection failed: ${res.status} ${body}`);
+  }
+}
+
+/**
+ * Create an active student person with the given (already-lowercase) email.
+ * person.email is the primary-identity control knob (see
+ * 20260815230000_person_identities.sql), so this also creates the matching
+ * person_identity row via trigger — no separate insert needed. Returns the
+ * new person's id. Caller should pass a unique email (e.g. suffixed with
+ * Date.now()) so re-runs don't collide with the `person.email` unique index.
+ */
+export async function seedOtpPerson(email: string): Promise<string> {
+  const res = await fetch(`${restBaseUrl()}/person`, {
+    method: "POST",
+    headers: authHeaders({ Prefer: "return=representation" }),
+    body: JSON.stringify({
+      first_name: "OtpTest",
+      last_name: "User",
+      role: "student",
+      is_active: true,
+      email,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`seedOtpPerson failed: ${res.status} ${body}`);
+  }
+  const rows = (await res.json()) as { id: string }[];
+  return rows[0].id;
+}
+
+/**
+ * Delete all login_otp rows for a person (used by otp-login.spec.ts to clear
+ * the row the real /api/auth/otp/request route just created, so a
+ * known-code row inserted right after is the newest one — verify picks the
+ * latest by created_at).
+ */
+export async function deleteLoginOtpRows(personId: string): Promise<void> {
+  const res = await fetch(`${restBaseUrl()}/login_otp?person_id=eq.${personId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`deleteLoginOtpRows failed: ${res.status} ${body}`);
+  }
+}
+
+/** Insert a login_otp row with a known code hash (already-hashed), for e2e verify tests. */
+export async function seedLoginOtpCode(
+  personId: string,
+  codeHash: string,
+  expiresAt: string,
+): Promise<void> {
+  const res = await fetch(`${restBaseUrl()}/login_otp`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({ person_id: personId, code_hash: codeHash, expires_at: expiresAt }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`seedLoginOtpCode failed: ${res.status} ${body}`);
+  }
+}
+
 /** Delete the excusal row for a person+date, if any. Idempotent. */
 export async function deleteExcusal(personId: string, date: string): Promise<void> {
   const res = await fetch(

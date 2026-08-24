@@ -50,10 +50,12 @@ export function KioskBoard({
   students,
   mentors,
   here,
+  canAct,
 }: {
   students: Member[];
   mentors: Member[];
   here: Here[];
+  canAct: boolean;
 }) {
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
@@ -69,7 +71,7 @@ export function KioskBoard({
   }, []);
 
   async function call(path: string, personId: string, name: string, verb: string) {
-    if (busy) return;
+    if (busy || !canAct) return;
     setBusy(true);
     setFlash(null);
     const res = await fetch(path, {
@@ -130,6 +132,11 @@ export function KioskBoard({
           {nowDate.toLocaleDateString(undefined, { weekday: "short" }).toUpperCase()} ·{" "}
           {nowDate.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })} ·{" "}
           {here.length} here
+          {!canAct && (
+            <span className="ml-2" style={{ color: "#8b919a" }}>
+              · View only
+            </span>
+          )}
         </div>
       </div>
 
@@ -176,7 +183,7 @@ export function KioskBoard({
                 <button
                   key={m.id}
                   type="button"
-                  disabled={busy}
+                  disabled={busy || !canAct}
                   onClick={() => call("/api/kiosk/clock-in", m.id, m.name, "Signed in")}
                   className="k-name"
                 >
@@ -201,7 +208,7 @@ export function KioskBoard({
               <button
                 key={h.personId}
                 type="button"
-                disabled={busy}
+                disabled={busy || !canAct}
                 onClick={() => call("/api/kiosk/clock-out", h.personId, h.name, "Signed out")}
                 className="k-out"
                 data-role={h.role}
@@ -229,7 +236,7 @@ export function KioskBoard({
                 <button
                   key={m.id}
                   type="button"
-                  disabled={busy}
+                  disabled={busy || !canAct}
                   onClick={() => call("/api/kiosk/clock-in", m.id, m.name, "Signed in")}
                   className="k-name"
                 >
