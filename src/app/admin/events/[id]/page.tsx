@@ -122,7 +122,9 @@ export default async function EventRosterPage({
                     <tr key={r.personId}>
                       <td>{r.name}</td>
                       {formData.fields.map((f) => (
-                        <td key={f.id}>{answerLabel(f, r.answers.find((a) => a.fieldId === f.id)?.value)}</td>
+                        <td key={f.id}>
+                          {r.answers.filter((a) => a.fieldId === f.id).map((a) => answerLabel(f, a.value)).join(", ")}
+                        </td>
                       ))}
                     </tr>
                   ))}
