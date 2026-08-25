@@ -3,6 +3,8 @@ import Link from "next/link";
 import { hasRole } from "@/lib/authz";
 import { getEvent } from "@/lib/events";
 import { listEventRoster } from "@/lib/event-signups";
+import { listEventResponses } from "@/lib/form-responses";
+import { getFormWithFields } from "@/lib/forms";
 import { listPeople } from "@/lib/people";
 import { displayName } from "@/lib/people";
 import { listPeriods } from "@/lib/periods";
@@ -32,6 +34,26 @@ export default async function EventRosterPage({
     .filter((p) => p.is_active && !rosterIds.has(p.id))
     .map((p) => ({ id: p.id, name: displayName(p) }))
     .sort((a, b) => a.name.localeCompare(b.name));
+
+  const formData = event.formId ? await getFormWithFields(event.formId) : null;
+  const responses = event.formId ? await listEventResponses(event.id) : [];
+  const attendingField = formData?.fields.find((f) => f.semanticKey === "attending") ?? null;
+  const attendingRank = new Map(attendingField?.options.map((o) => [o.value, o.position]) ?? []);
+  const sortedResponses = attendingField
+    ? [...responses].sort((a, b) => {
+        const av = a.answers.find((ans) => ans.fieldId === attendingField.id)?.value;
+        const bv = b.answers.find((ans) => ans.fieldId === attendingField.id)?.value;
+        const ar = av !== undefined ? (attendingRank.get(av) ?? Infinity) : Infinity;
+        const br = bv !== undefined ? (attendingRank.get(bv) ?? Infinity) : Infinity;
+        return ar - br;
+      })
+    : responses;
+  const answerLabel = (field: NonNullable<typeof formData>["fields"][number], value: string | undefined): string => {
+    if (value === undefined) return "";
+    if (field.type === "boolean") return value === "true" ? "Yes" : "No";
+    const option = field.options.find((o) => o.value === value);
+    return option ? option.label : value;
+  };
 
   return (
     <main className="flex flex-col gap-6">
@@ -82,6 +104,37 @@ export default async function EventRosterPage({
           </table>
         </div>
       </div>
+
+      {formData && (
+        <div className="card">
+          <h2>Responses</h2>
+          <div className="tablewrap">
+            <div style={{ overflowX: "auto" }}>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    {formData.fields.map((f) => <th key={f.id}>{f.label}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedResponses.map((r) => (
+                    <tr key={r.personId}>
+                      <td>{r.name}</td>
+                      {formData.fields.map((f) => (
+                        <td key={f.id}>{answerLabel(f, r.answers.find((a) => a.fieldId === f.id)?.value)}</td>
+                      ))}
+                    </tr>
+                  ))}
+                  {sortedResponses.length === 0 && (
+                    <tr><td colSpan={formData.fields.length + 1} className="text-sm text-[var(--muted)]">No responses yet.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
