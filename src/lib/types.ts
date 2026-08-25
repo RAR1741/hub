@@ -201,6 +201,7 @@ export type EventRow = {
   created_at: string;
   gcal_event_id: string | null;
   gcal_missing: boolean;
+  form_id: string | null;
 };
 
 export type Event = {
@@ -215,6 +216,7 @@ export type Event = {
   createdAt: string;
   gcalEventId: string | null;
   gcalMissing: boolean;
+  formId: string | null;
 };
 
 export function eventFromRow(row: EventRow): Event {
@@ -230,7 +232,70 @@ export function eventFromRow(row: EventRow): Event {
     createdAt: row.created_at,
     gcalEventId: row.gcal_event_id,
     gcalMissing: row.gcal_missing,
+    formId: row.form_id ?? null,
   };
+}
+
+export type FormFieldType =
+  | "single_select" | "multi_select" | "boolean" | "short_text" | "long_text" | "scale";
+
+export type SemanticKey = "attending" | "can_transport" | "notes";
+
+export type FormRow = {
+  id: string;
+  title: string;
+  description: string | null;
+  kind: string;
+  status: string;
+  created_by: string;
+  created_at: string;
+};
+export type Form = {
+  id: string; title: string; description: string | null;
+  kind: string; status: string; createdBy: string; createdAt: string;
+};
+export function formFromRow(r: FormRow): Form {
+  return {
+    id: r.id, title: r.title, description: r.description, kind: r.kind,
+    status: r.status, createdBy: r.created_by, createdAt: r.created_at,
+  };
+}
+
+export type FormFieldRow = {
+  id: string; form_id: string; label: string; help_text: string | null;
+  type: FormFieldType; required: boolean; position: number; semantic_key: string | null;
+};
+export type FormField = {
+  id: string; formId: string; label: string; helpText: string | null;
+  type: FormFieldType; required: boolean; position: number; semanticKey: string | null;
+};
+export function formFieldFromRow(r: FormFieldRow): FormField {
+  return {
+    id: r.id, formId: r.form_id, label: r.label, helpText: r.help_text,
+    type: r.type, required: r.required, position: r.position, semanticKey: r.semantic_key,
+  };
+}
+
+export type FormFieldOptionRow = { id: string; field_id: string; value: string; label: string; position: number };
+export type FormFieldOption = { id: string; fieldId: string; value: string; label: string; position: number };
+export function formFieldOptionFromRow(r: FormFieldOptionRow): FormFieldOption {
+  return { id: r.id, fieldId: r.field_id, value: r.value, label: r.label, position: r.position };
+}
+
+export type FormResponseRow = {
+  id: string; form_id: string; person_id: string; event_id: string | null; submitted_at: string;
+};
+export type FormResponse = {
+  id: string; formId: string; personId: string; eventId: string | null; submittedAt: string;
+};
+export function formResponseFromRow(r: FormResponseRow): FormResponse {
+  return { id: r.id, formId: r.form_id, personId: r.person_id, eventId: r.event_id, submittedAt: r.submitted_at };
+}
+
+export type FormAnswerRow = { id: string; response_id: string; field_id: string; value: string | null };
+export type FormAnswer = { id: string; responseId: string; fieldId: string; value: string | null };
+export function formAnswerFromRow(r: FormAnswerRow): FormAnswer {
+  return { id: r.id, responseId: r.response_id, fieldId: r.field_id, value: r.value };
 }
 
 export type BuildDayKind = "required" | "optional";

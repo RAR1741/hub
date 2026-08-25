@@ -12,6 +12,7 @@ import {
 } from "./types";
 import { eventFromRow } from "./types";
 import { fullPartNumber } from "./types";
+import { formFieldFromRow } from "./types";
 
 describe("teamFromRow", () => {
   test("maps snake_case to camelCase", () => {
@@ -160,6 +161,7 @@ describe("eventFromRow", () => {
         created_at: "2027-01-01T00:00:00Z",
         gcal_event_id: null,
         gcal_missing: false,
+        form_id: null,
       }),
     ).toEqual({
       id: "e1",
@@ -173,6 +175,7 @@ describe("eventFromRow", () => {
       createdAt: "2027-01-01T00:00:00Z",
       gcalEventId: null,
       gcalMissing: false,
+      formId: null,
     });
   });
 });
@@ -292,6 +295,31 @@ describe("firstExperienceFromRow", () => {
     expect(firstExperienceFromRow(row)).toEqual({
       id: "fe2", personId: "p1", level: "fll_challenge", year: 2022, name: null,
     });
+  });
+});
+
+describe("formFieldFromRow", () => {
+  test("maps snake_case row to camelCase domain", () => {
+    const field = formFieldFromRow({
+      id: "f1", form_id: "form1", label: "Attending?", help_text: null,
+      type: "single_select", required: true, position: 0, semantic_key: "attending",
+    });
+    expect(field).toEqual({
+      id: "f1", formId: "form1", label: "Attending?", helpText: null,
+      type: "single_select", required: true, position: 0, semanticKey: "attending",
+    });
+  });
+});
+
+describe("eventFromRow form_id", () => {
+  test("maps form_id -> formId", () => {
+    const row = {
+      id: "e1", period_id: "pd1", name: "Demo", location: null, description: null,
+      starts_at: "2099-01-01T18:00:00Z", ends_at: "2099-01-01T20:00:00Z",
+      created_by: "m1", created_at: "2020-01-01T00:00:00Z", gcal_event_id: null,
+      gcal_missing: false, form_id: "form1",
+    };
+    expect(eventFromRow(row as never).formId).toBe("form1");
   });
 });
 
