@@ -155,3 +155,43 @@ else
 fi
 
 log "Stack ready. Run 'npm run dev' → http://localhost:3000 (Supabase Studio → :54323)."
+
+# --- 5. Cloudflare tunnels ---------------------------------------------------
+# Punch public URLs through to the app (:3000) and Supabase Studio (:54323) so
+# they're reachable from a browser without any local port forwarding. Runs only
+# in remote Claude Code sessions (CLAUDE_CODE_REMOTE=true is set by the
+# harness); never runs locally or in production.
+#
+# The app tunnel starts before `npm run dev` — cloudflared retries the upstream
+# connection so the URL is valid as soon as the dev server comes up.
+CLOUDFLARED=/usr/local/bin/cloudflared
+if [ ! -x "$CLOUDFLARED" ]; then
+  log "Installing cloudflared…"
+  curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 \
+    -o "$CLOUDFLARED" && chmod +x "$CLOUDFLARED"
+fi
+
+if [ -x "$CLOUDFLARED" ]; then
+  log "Starting Cloudflare tunnels…"
+  "$CLOUDFLARED" tunnel --url http://localhost:3000   --no-autoupdate > /tmp/tunnel-app.log    2>&1 &
+  "$CLOUDFLARED" tunnel --url http://localhost:54323  --no-autoupdate > /tmp/tunnel-studio.log 2>&1 &
+
+  # Wait up to 20s for both URLs to appear
+  for _ in $(seq 1 20); do
+    APP_URL=$(grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' /tmp/tunnel-app.log    2>/dev/null | head -1)
+    STU_URL=$(grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' /tmp/tunnel-studio.log 2>/dev/null | head -1)
+    [ -n "$APP_URL" ] && [ -n "$STU_URL" ] && break
+    sleep 1
+  done
+
+  if [ -n "$APP_URL" ] && [ -n "$STU_URL" ]; then
+    log "Tunnel ready — App (start with 'npm run dev'): $APP_URL"
+    log "Tunnel ready — Supabase Studio:                $STU_URL"
+  else
+    log "WARNING: Tunnel URL(s) did not appear within 20s — check /tmp/tunnel-app.log and /tmp/tunnel-studio.log"
+    [ -z "$APP_URL" ]    && log "  App tunnel log:" && tail -5 /tmp/tunnel-app.log    || true
+    [ -z "$STU_URL" ]    && log "  Studio tunnel log:" && tail -5 /tmp/tunnel-studio.log || true
+  fi
+else
+  log "WARNING: cloudflared install failed — skipping tunnels."
+fi
