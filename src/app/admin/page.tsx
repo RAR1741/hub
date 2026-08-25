@@ -14,6 +14,7 @@ import { listKioskDevices } from "@/lib/kiosk";
 import { listPendingAccountRequests, listPendingApplications } from "@/lib/requests";
 import { listPendingExcusalRequests } from "@/lib/excusal-requests";
 import { listEvents } from "@/lib/events";
+import { listBadges } from "@/lib/badges";
 import { listProjects } from "@/lib/parts";
 
 type IconName = Parameters<typeof Icon>[0]["name"];
@@ -77,6 +78,7 @@ export default async function AdminHubPage() {
   const [
     people,
     teams,
+    badges,
     periods,
     meetings,
     buildDays,
@@ -93,6 +95,7 @@ export default async function AdminHubPage() {
     // cards); the rest (excusal requests, events) run for every viewer.
     isAdmin ? listPeople() : Promise.resolve([]),
     isAdmin ? listTeams() : Promise.resolve([]),
+    isAdmin ? listBadges() : Promise.resolve([]),
     isAdmin ? listPeriods() : Promise.resolve([]),
     isAdmin ? listAllMeetings() : Promise.resolve([]),
     activePeriod ? listBuildDays({ from: activePeriod.startsOn, to: activePeriod.endsOn }) : Promise.resolve([]),
@@ -152,6 +155,7 @@ export default async function AdminHubPage() {
         <Section label="Roster">
           <Card href="/admin/people" icon="users" title="People" count={people.length} hint="Roster, roles, and student IDs." />
           <Card href="/admin/teams" icon="users" title="Teams" count={teams.length} hint="Sub-teams, join modes, membership." />
+          <Card href="/admin/badges" icon="check" title="Badges" count={badges.length} hint="Credentials and training badges." />
           <Card href="/admin/time-import" icon="clock" title="Time import" hint="Import a season's attendance from a Google-Sheets CSV." />
           <Card href="/admin/application-import" icon="users" title="Application import" hint="Import a season's student applications from a Google-Forms CSV." />
         </Section>
