@@ -120,13 +120,36 @@ if [ ! -f .env.local ]; then
   log "Writing .env.local…"
   # `supabase status -o env` exposes ANON_KEY / SERVICE_ROLE_KEY for the running stack.
   eval "$(npx supabase status -o env)"
+  # Generate a fresh signing secret; safe because this is a local-only stack.
+  SESSION_SECRET="$(openssl rand -hex 32)"
   cat > .env.local <<ENV
+# --- Supabase (auto-wired to the local stack) ---
 NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
 NEXT_PUBLIC_SUPABASE_ANON_KEY=${ANON_KEY}
 SUPABASE_INTERNAL_URL=http://127.0.0.1:54321
 SUPABASE_SERVICE_ROLE_KEY=${SERVICE_ROLE_KEY}
-STUDENT_SESSION_SECRET=$(openssl rand -hex 32)
+
+# --- Session signing (auto-generated for this environment) ---
+STUDENT_SESSION_SECRET=${SESSION_SECRET}
+
+# --- Onshape integration (mock mode for local/remote dev) ---
+# These point at the built-in dev mock so Onshape-related routes work without
+# real OAuth credentials. To use real Onshape, replace with actual values from
+# your Onshape OAuth app and remove ALLOW_ONSHAPE_MOCK.
+ONSHAPE_CLIENT_ID=dev-mock-client
+ONSHAPE_CLIENT_SECRET=dev-mock-secret
+ONSHAPE_REDIRECT_URI=http://localhost:3000/api/onshape/oauth/callback
+ONSHAPE_AUTHORIZATION_URL=http://localhost:3000/api/dev/onshape-mock/oauth/authorize
+ONSHAPE_TOKEN_URL=http://localhost:3000/api/dev/onshape-mock/oauth/token
+ONSHAPE_API_BASE_URL=http://localhost:3000/api/dev/onshape-mock
+ONSHAPE_SCOPES=OAuth2Read
+ALLOW_ONSHAPE_MOCK=1
+
+# --- Outbound email (leave blank — sending is disabled in dev) ---
+# Set to a real delegated Workspace mailbox to test email sending locally.
+HUB_MAIL_SENDER=
 ENV
+  log ".env.local written."
 else
   log ".env.local present — leaving it untouched."
 fi
