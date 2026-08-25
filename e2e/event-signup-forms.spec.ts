@@ -24,32 +24,13 @@ test("mentor builds a form, student submits it, mentor sees the response", async
   await mentorContext.addCookies([await mentorSessionCookie()]);
   const mentorApi = mentorContext.request;
 
+  // The attendance question and (via notesEnabled) the notes field are added
+  // automatically by createForm — the mentor never creates them by hand.
   const formRes = await mentorApi.post("/api/admin/forms", {
-    data: { title: `E2E sign-up form ${Date.now()}`, kind: "event_signup", status: "published" },
+    data: { title: `E2E sign-up form ${Date.now()}`, kind: "event_signup", status: "published", notesEnabled: true, notesLabel: "Notes" },
   });
   expect(formRes.status()).toBe(201);
   const { id: formId } = (await formRes.json()) as { id: string };
-
-  const attendingRes = await mentorApi.post(`/api/admin/forms/${formId}/fields`, {
-    data: {
-      label: "Attending?",
-      type: "single_select",
-      required: true,
-      position: 0,
-      semanticKey: "attending",
-      options: [
-        { value: "yes", label: "Yes" },
-        { value: "maybe", label: "Maybe" },
-        { value: "no", label: "No" },
-      ],
-    },
-  });
-  expect(attendingRes.status()).toBe(201);
-
-  const notesRes = await mentorApi.post(`/api/admin/forms/${formId}/fields`, {
-    data: { label: "Notes", type: "long_text", required: false, position: 1 },
-  });
-  expect(notesRes.status()).toBe(201);
 
   const eventRes = await mentorApi.post("/api/admin/events", {
     data: {
@@ -94,7 +75,7 @@ test("mentor builds a form, student submits it, mentor sees the response", async
     // Scope to the Responses table specifically — the roster table above it
     // also has a "Test Student" row (signed up, no answers), so a bare
     // page-wide "tr" locator matches both.
-    const responsesTable = mentorPage.locator("table", { has: mentorPage.locator("th", { hasText: "Attending?" }) });
+    const responsesTable = mentorPage.locator("table", { has: mentorPage.locator("th", { hasText: "Will you be attending?" }) });
     const responseRow = responsesTable.locator("tr", { hasText: "Test Student" });
     await expect(responseRow).toBeVisible();
     await expect(responseRow.getByText("Yes", { exact: true })).toBeVisible();

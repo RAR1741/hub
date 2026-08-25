@@ -6,13 +6,32 @@ import { optInt, optString, reqString } from "./validate";
 export type FieldWithOptions = FormField & { options: FormFieldOption[] };
 export type SubmittedAnswer = { fieldId: string; values: string[] };
 export type AnswerRow = { field_id: string; value: string };
+export type FieldInput = {
+  label: string; helpText: string | null; type: FormFieldType; required: boolean;
+  position: number; semanticKey: SemanticKey | null;
+  options: { value: string; label: string; position: number }[];
+};
 
 const FIELD_TYPES: readonly FormFieldType[] = [
   "single_select", "multi_select", "boolean", "short_text", "long_text", "scale",
 ];
-const SEMANTIC_KEYS: readonly SemanticKey[] = ["attending", "can_transport", "notes"];
 const CHOICE_TYPES: readonly FormFieldType[] = ["single_select", "multi_select", "scale"];
 const TEXT_MAX = 2000;
+
+/** The attendance question auto-added as the first field of every event-signup form. */
+const ATTENDANCE_FIELD: FieldInput = {
+  label: "Will you be attending?",
+  helpText: null,
+  type: "single_select",
+  required: true,
+  position: 0,
+  semanticKey: "attending",
+  options: [
+    { value: "yes", label: "Yes", position: 0 },
+    { value: "maybe", label: "Maybe", position: 1 },
+    { value: "no", label: "No", position: 2 },
+  ],
+};
 
 /** PURE. Validates a submission against a form's fields; returns flat answer rows for the DB. */
 export function validateAnswers(
@@ -55,7 +74,7 @@ export function validateAnswers(
 /** PURE. Null = invalid. */
 export function parseFormInput(
   body: unknown,
-): { title: string; description: string | null; kind: string; status: string } | null {
+): { title: string; description: string | null; kind: string; status: string; notesEnabled: boolean; notesLabel: string | null } | null {
   if (typeof body !== "object" || body === null) return null;
   const b = body as Record<string, unknown>;
   const title = reqString(b.title, 200);
@@ -66,14 +85,16 @@ export function parseFormInput(
   if (kind !== "event_signup") return null;
   const status = typeof b.status === "string" ? b.status : "draft";
   if (!["draft", "published", "closed"].includes(status)) return null;
-  return { title, description: description.value, kind, status };
+  const notesEnabled = b.notesEnabled === true;
+  const notesLabelRaw = optString(b.notesLabel, 300);
+  if (!notesLabelRaw) return null;
+  // A blank label with notes enabled falls back to a sensible default.
+  const notesLabel = notesEnabled ? notesLabelRaw.value ?? "Anything else we should know?" : null;
+  return { title, description: description.value, kind, status, notesEnabled, notesLabel };
 }
 
-/** PURE. Null = invalid. */
-export function parseFieldInput(body: unknown): {
-  label: string; helpText: string | null; type: FormFieldType; required: boolean;
-  position: number; semanticKey: string | null; options: { value: string; label: string; position: number }[];
-} | null {
+/** PURE. Null = invalid. Mentor-added fields never carry a semantic key. */
+export function parseFieldInput(body: unknown): FieldInput | null {
   if (typeof body !== "object" || body === null) return null;
   const b = body as Record<string, unknown>;
   const label = reqString(b.label, 300);
@@ -85,11 +106,6 @@ export function parseFieldInput(body: unknown): {
   const required = b.required === true;
   const pos = optInt(b.position, 0, 1000);
   if (!pos || pos.value === null) return null;
-  let semanticKey: string | null = null;
-  if (b.semanticKey !== undefined && b.semanticKey !== null) {
-    if (typeof b.semanticKey !== "string" || !SEMANTIC_KEYS.includes(b.semanticKey as SemanticKey)) return null;
-    semanticKey = b.semanticKey;
-  }
   const isChoice = CHOICE_TYPES.includes(type as FormFieldType);
   const options: { value: string; label: string; position: number }[] = [];
   if (isChoice) {
@@ -102,7 +118,7 @@ export function parseFieldInput(body: unknown): {
       options.push({ value, label: optLabel, position: i });
     }
   }
-  return { label, helpText: helpText.value, type: type as FormFieldType, required, position: pos.value, semanticKey, options };
+  return { label, helpText: helpText.value, type: type as FormFieldType, required, position: pos.value, semanticKey: null, options };
 }
 
 const FOREIGN_KEY_VIOLATION = "23503";
@@ -114,7 +130,7 @@ function mapWriteError(code: string | undefined): number {
 }
 
 export async function createForm(
-  input: { title: string; description: string | null; kind: string; status: string },
+  input: { title: string; description: string | null; kind: string; status: string; notesEnabled: boolean; notesLabel: string | null },
   creatorId: string,
   db?: SupabaseClient,
 ): Promise<{ ok: true; id: string } | { ok: false; status: number }> {
@@ -125,7 +141,24 @@ export async function createForm(
     .select("id")
     .single();
   if (error) return { ok: false, status: mapWriteError(error.code) };
-  return { ok: true, id: data.id as string };
+  const formId = data.id as string;
+
+  // Every event-signup form always opens with the attendance question, and
+  // optionally closes with a free-text notes field. Both are created here so
+  // mentors never have to (and can't misconfigure the attendance one).
+  // ponytail: not wrapped in a txn — admin-only, and a partial failure just
+  // means the mentor re-creates; upgrade to an RPC if that ever bites.
+  const attendance = await addField(formId, ATTENDANCE_FIELD, client);
+  if (!attendance.ok) return attendance;
+  if (input.notesEnabled) {
+    const notes = await addField(
+      formId,
+      { label: input.notesLabel ?? "Anything else we should know?", helpText: null, type: "long_text", required: false, position: 1, semanticKey: null, options: [] },
+      client,
+    );
+    if (!notes.ok) return notes;
+  }
+  return { ok: true, id: formId };
 }
 
 export async function listForms(db?: SupabaseClient): Promise<Form[]> {
@@ -190,7 +223,7 @@ export async function deleteForm(id: string, db?: SupabaseClient): Promise<{ ok:
 
 export async function addField(
   formId: string,
-  input: NonNullable<ReturnType<typeof parseFieldInput>>,
+  input: FieldInput,
   db?: SupabaseClient,
 ): Promise<{ ok: true; id: string } | { ok: false; status: number }> {
   const client = db ?? (await import("./db")).getDb();

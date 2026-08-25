@@ -306,7 +306,10 @@ export function eventFromRow(row: EventRow): Event {
 export type FormFieldType =
   | "single_select" | "multi_select" | "boolean" | "short_text" | "long_text" | "scale";
 
-export type SemanticKey = "attending" | "can_transport" | "notes";
+// Internal marker for system-created fields. Set programmatically (the
+// attendance question is auto-added to every event-signup form); never
+// mentor-facing. Only "attending" exists today.
+export type SemanticKey = "attending";
 
 export type FormRow = {
   id: string;

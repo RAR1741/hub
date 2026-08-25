@@ -11,7 +11,7 @@ const attending: FieldWithOptions = {
 };
 const transport: FieldWithOptions = {
   id: "f_tr", formId: "form1", label: "Can transport?", helpText: null,
-  type: "boolean", required: false, position: 1, semanticKey: "can_transport", options: [],
+  type: "boolean", required: false, position: 1, semanticKey: null, options: [],
 };
 const comps: FieldWithOptions = {
   id: "f_c", formId: "form1", label: "Which comps?", helpText: null,
@@ -72,7 +72,11 @@ describe("validateAnswers", () => {
 describe("parseFormInput", () => {
   test("valid", () => {
     expect(parseFormInput({ title: "Outreach", kind: "event_signup", status: "draft" }))
-      .toEqual({ title: "Outreach", description: null, kind: "event_signup", status: "draft" });
+      .toEqual({ title: "Outreach", description: null, kind: "event_signup", status: "draft", notesEnabled: false, notesLabel: null });
+  });
+  test("carries the notes field config through", () => {
+    expect(parseFormInput({ title: "Outreach", kind: "event_signup", status: "draft", notesEnabled: true, notesLabel: "Dietary needs?" }))
+      .toEqual({ title: "Outreach", description: null, kind: "event_signup", status: "draft", notesEnabled: true, notesLabel: "Dietary needs?" });
   });
   test("rejects unknown kind/status", () => {
     expect(parseFormInput({ title: "x", kind: "quiz", status: "draft" })).toBeNull();
@@ -91,33 +95,52 @@ describe("parseFieldInput", () => {
     expect(parseFieldInput({ label: "Q", type: "boolean", required: false, position: 1 }))
       .toEqual({ label: "Q", helpText: null, type: "boolean", required: false, position: 1, semanticKey: null, options: [] });
   });
-  test("rejects unknown type and unknown semantic key", () => {
+  test("rejects unknown type", () => {
     expect(parseFieldInput({ label: "Q", type: "date", required: false, position: 0 })).toBeNull();
-    expect(parseFieldInput({ label: "Q", type: "short_text", required: false, position: 0, semanticKey: "bogus" })).toBeNull();
+  });
+  test("ignores any semanticKey in the request — mentor fields never carry one", () => {
+    expect(parseFieldInput({ label: "Q", type: "short_text", required: false, position: 0, semanticKey: "attending" }))
+      .toEqual({ label: "Q", helpText: null, type: "short_text", required: false, position: 0, semanticKey: null, options: [] });
   });
 });
 
 describe("createForm", () => {
+  // createForm inserts the form, then auto-adds the attendance field (a
+  // form_field + its form_field_option rows), then optionally a notes field.
   function fakeDb(insertError?: { code: string }) {
-    return {
+    const inserts: Record<string, number> = {};
+    const db = {
       from(table: string) {
-        if (table !== "form") throw new Error(`unexpected table ${table}`);
-        return {
-          insert: () => ({
-            select: () => ({
-              single: async () => (insertError ? { data: null, error: insertError } : { data: { id: "form1" }, error: null }),
-            }),
-          }),
+        inserts[table] = (inserts[table] ?? 0) + 1;
+        if (table === "form") return {
+          insert: () => ({ select: () => ({ single: async () => (insertError ? { data: null, error: insertError } : { data: { id: "form1" }, error: null }) }) }),
         };
+        if (table === "form_field") return {
+          insert: () => ({ select: () => ({ single: async () => ({ data: { id: `field${inserts[table]}` }, error: null }) }) }),
+        };
+        if (table === "form_field_option") return { insert: async () => ({ error: null }) };
+        throw new Error(`unexpected table ${table}`);
       },
-    } as never;
+      inserts,
+    };
+    return db as never;
   }
-  test("201 returns new id", async () => {
-    expect(await createForm({ title: "Outreach", description: null, kind: "event_signup", status: "draft" }, "m1", fakeDb()))
+  test("201 returns new id and auto-adds the attendance field", async () => {
+    const db = fakeDb();
+    expect(await createForm({ title: "Outreach", description: null, kind: "event_signup", status: "draft", notesEnabled: false, notesLabel: null }, "m1", db))
       .toEqual({ ok: true, id: "form1" });
+    // one attendance field, with its options; no notes field
+    expect((db as unknown as { inserts: Record<string, number> }).inserts.form_field).toBe(1);
+    expect((db as unknown as { inserts: Record<string, number> }).inserts.form_field_option).toBe(1);
+  });
+  test("adds a notes field when enabled", async () => {
+    const db = fakeDb();
+    await createForm({ title: "Outreach", description: null, kind: "event_signup", status: "draft", notesEnabled: true, notesLabel: "Notes" }, "m1", db);
+    // attendance + notes
+    expect((db as unknown as { inserts: Record<string, number> }).inserts.form_field).toBe(2);
   });
   test("maps FK violation to 400", async () => {
-    expect(await createForm({ title: "x", description: null, kind: "event_signup", status: "draft" }, "m1", fakeDb({ code: "23503" })))
+    expect(await createForm({ title: "x", description: null, kind: "event_signup", status: "draft", notesEnabled: false, notesLabel: null }, "m1", fakeDb({ code: "23503" })))
       .toEqual({ ok: false, status: 400 });
   });
 });

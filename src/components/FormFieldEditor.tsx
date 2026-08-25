@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { FieldWithOptions } from "@/lib/forms";
-import type { FormFieldType, SemanticKey } from "@/lib/types";
+import type { FormFieldType } from "@/lib/types";
 
 const FIELD_TYPES: { value: FormFieldType; label: string }[] = [
   { value: "single_select", label: "Single select" },
@@ -14,11 +14,6 @@ const FIELD_TYPES: { value: FormFieldType; label: string }[] = [
   { value: "scale", label: "Scale" },
 ];
 const CHOICE_TYPES: readonly FormFieldType[] = ["single_select", "multi_select", "scale"];
-const SEMANTIC_KEYS: { value: SemanticKey; label: string }[] = [
-  { value: "attending", label: "Attending" },
-  { value: "can_transport", label: "Can transport" },
-  { value: "notes", label: "Notes" },
-];
 
 /** Create-form form for the /admin/forms list page. */
 export function CreateFormForm() {
@@ -26,6 +21,8 @@ export function CreateFormForm() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState("draft");
+  const [notesEnabled, setNotesEnabled] = useState(false);
+  const [notesLabel, setNotesLabel] = useState("Anything else we should know?");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,7 +34,14 @@ export function CreateFormForm() {
       const res = await fetch("/api/admin/forms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, description: description || null, kind: "event_signup", status }),
+        body: JSON.stringify({
+          title,
+          description: description || null,
+          kind: "event_signup",
+          status,
+          notesEnabled,
+          notesLabel: notesEnabled ? notesLabel : null,
+        }),
       });
       if (res.ok) {
         const { id } = await res.json();
@@ -61,6 +65,17 @@ export function CreateFormForm() {
           <option value="closed">Closed</option>
         </select>
       </label>
+      <p className="text-sm text-[var(--muted)]">
+        An <strong>attendance question</strong> (Yes / Maybe / No) is added automatically as the first question.
+      </p>
+      <label className="label flex-row items-center gap-2">
+        <input type="checkbox" checked={notesEnabled} onChange={(e) => setNotesEnabled(e.target.checked)} /> Add a notes field
+      </label>
+      {notesEnabled && (
+        <label className="label">Notes label
+          <input className="input" value={notesLabel} onChange={(e) => setNotesLabel(e.target.value)} />
+        </label>
+      )}
       {error && <p className="text-sm text-[var(--red)]">{error}</p>}
       <button type="submit" disabled={busy} className="btn btn-primary self-start">
         {busy ? "Creating…" : "Create form"}
@@ -128,7 +143,6 @@ export function FormFieldEditor({ formId, fields }: { formId: string; fields: Fi
   const [helpText, setHelpText] = useState("");
   const [type, setType] = useState<FormFieldType>("short_text");
   const [required, setRequired] = useState(false);
-  const [semanticKey, setSemanticKey] = useState<"" | SemanticKey>("");
   const [options, setOptions] = useState<OptionDraft[]>([{ value: "", label: "" }]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -151,7 +165,6 @@ export function FormFieldEditor({ formId, fields }: { formId: string; fields: Fi
         type,
         required,
         position,
-        semanticKey: semanticKey || null,
         options: isChoice ? options.filter((o) => o.value.trim() && o.label.trim()) : [],
       };
       if (isChoice && body.options.length === 0) {
@@ -167,7 +180,6 @@ export function FormFieldEditor({ formId, fields }: { formId: string; fields: Fi
         setLabel("");
         setHelpText("");
         setRequired(false);
-        setSemanticKey("");
         setOptions([{ value: "", label: "" }]);
         router.refresh();
       } else {
@@ -189,20 +201,23 @@ export function FormFieldEditor({ formId, fields }: { formId: string; fields: Fi
         <div style={{ overflowX: "auto" }}>
           <table className="table">
             <thead>
-              <tr><th>Label</th><th>Type</th><th>Required</th><th>Semantic key</th><th></th></tr>
+              <tr><th>Label</th><th>Type</th><th>Required</th><th></th></tr>
             </thead>
             <tbody>
               {fields.map((f) => (
                 <tr key={f.id}>
-                  <td>{f.label}</td>
+                  <td>{f.label}{f.semanticKey === "attending" ? <span className="text-sm text-[var(--muted)]"> (automatic)</span> : null}</td>
                   <td className="mono">{f.type}</td>
                   <td>{f.required ? "Yes" : ""}</td>
-                  <td className="mono">{f.semanticKey ?? ""}</td>
-                  <td><button type="button" className="btn btn-secondary px-3 py-1" onClick={() => removeField(f.id)}>Delete</button></td>
+                  <td>
+                    {f.semanticKey === "attending" ? null : (
+                      <button type="button" className="btn btn-secondary px-3 py-1" onClick={() => removeField(f.id)}>Delete</button>
+                    )}
+                  </td>
                 </tr>
               ))}
               {fields.length === 0 && (
-                <tr><td colSpan={5} className="text-sm text-[var(--muted)]">No fields yet.</td></tr>
+                <tr><td colSpan={4} className="text-sm text-[var(--muted)]">No fields yet.</td></tr>
               )}
             </tbody>
           </table>
@@ -220,12 +235,6 @@ export function FormFieldEditor({ formId, fields }: { formId: string; fields: Fi
         </label>
         <label className="label flex-row items-center gap-2">
           <input type="checkbox" checked={required} onChange={(e) => setRequired(e.target.checked)} /> Required
-        </label>
-        <label className="label">Semantic key (optional)
-          <select className="input" value={semanticKey} onChange={(e) => setSemanticKey(e.target.value as "" | SemanticKey)}>
-            <option value="">— None —</option>
-            {SEMANTIC_KEYS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-          </select>
         </label>
 
         {isChoice && (
