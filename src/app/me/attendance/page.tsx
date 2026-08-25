@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { getActivePeriod } from "@/lib/periods";
@@ -12,13 +11,10 @@ import { getSetting } from "@/lib/settings";
 import { attendanceForDate, attendanceSummary, localDateOf } from "@/lib/attendance";
 import { ExcusalRequestForm } from "@/components/ExcusalRequestForm";
 import { ExcusalRequestList } from "@/components/ExcusalRequestList";
+import { MissedDaysExcusal } from "@/components/MissedDaysExcusal";
 
-export default async function MyAttendancePage({
-  searchParams,
-}: {
-  searchParams: Promise<{ date?: string }>;
-}) {
-  const [{ date: defaultDate }, viewer] = await Promise.all([searchParams, getViewer()]);
+export default async function MyAttendancePage() {
+  const viewer = await getViewer();
   if (!viewer.person) {
     redirect("/login");
   }
@@ -33,7 +29,7 @@ export default async function MyAttendancePage({
         <p className="card text-[var(--muted)]">No active period yet.</p>
         <section className="card flex flex-col gap-3">
           <h2 className="text-lg font-semibold">Request excusal</h2>
-          <ExcusalRequestForm defaultDate={defaultDate} />
+          <ExcusalRequestForm />
         </section>
         <section className="card flex flex-col gap-3">
           <h2 className="text-lg font-semibold">My excusal requests</h2>
@@ -66,6 +62,7 @@ export default async function MyAttendancePage({
     .filter((d) => d.kind === "required" && d.date < today)
     .filter((d) => attendanceForDate(personId, d.date, d.kind, sessions, excusals, tz) === "absent")
     .map((d) => d.date);
+  const pendingDates = myRequests.filter((r) => r.status === "pending").map((r) => r.date);
 
   return (
     <main className="flex flex-col gap-6">
@@ -113,19 +110,7 @@ export default async function MyAttendancePage({
             No missed required days — nice.
           </p>
         ) : (
-          <ul className="flex flex-col gap-2">
-            {missedRequiredDates.map((date) => (
-              <li key={date} className="flex items-center justify-between gap-3">
-                <span className="mono">{date}</span>
-                <Link
-                  href={`/me/attendance?date=${date}`}
-                  className="text-sm font-medium text-[var(--color-brand)]"
-                >
-                  Request excusal
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <MissedDaysExcusal missedDates={missedRequiredDates} pendingDates={pendingDates} />
         )}
       </section>
       <div className="tablewrap">
@@ -155,7 +140,7 @@ export default async function MyAttendancePage({
       </div>
       <section className="card flex flex-col gap-3">
         <h2 className="text-lg font-semibold">Request excusal</h2>
-        <ExcusalRequestForm defaultDate={defaultDate} />
+        <ExcusalRequestForm />
       </section>
       <section className="card flex flex-col gap-3">
         <h2 className="text-lg font-semibold">My excusal requests</h2>

@@ -91,7 +91,7 @@ export default async function HomePage() {
             <WhosHere initial={here.map((h) => ({ name: h.name, since: h.since }))} />
 
             {activePeriod && (
-              <div className="card stat">
+              <Link href="/me/attendance" className="card stat">
                 <p className="eyebrow">{activePeriod.name} · your hours</p>
                 <div className="num" style={{ marginTop: 6 }}>
                   {myHours}
@@ -107,7 +107,7 @@ export default async function HomePage() {
                     </p>
                   </>
                 )}
-              </div>
+              </Link>
             )}
           </div>
         </>
