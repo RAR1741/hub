@@ -12,7 +12,7 @@ function toDatetimeLocal(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export function EventForm({ periods: allPeriods, event, onSaved }: { periods: Period[]; event?: Event; onSaved?: () => void }) {
+export function EventForm({ periods: allPeriods, forms, event, onSaved }: { periods: Period[]; forms: { id: string; title: string }[]; event?: Event; onSaved?: () => void }) {
   const router = useRouter();
   const today = new Date().toISOString().slice(0, 10);
   const periods = allPeriods.filter((p) => p.endsOn >= today || p.id === event?.periodId);
@@ -22,6 +22,7 @@ export function EventForm({ periods: allPeriods, event, onSaved }: { periods: Pe
   const [description, setDescription] = useState(event?.description ?? "");
   const [startsAt, setStartsAt] = useState(event ? toDatetimeLocal(event.startsAt) : "");
   const [endsAt, setEndsAt] = useState(event ? toDatetimeLocal(event.endsAt) : "");
+  const [formId, setFormId] = useState(event?.formId ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -72,6 +73,7 @@ export function EventForm({ periods: allPeriods, event, onSaved }: { periods: Pe
           startsAt: startsAt ? new Date(startsAt).toISOString() : "",
           endsAt: endsAt ? new Date(endsAt).toISOString() : "",
           gcalEventId: gcalEventId || null,
+          formId: formId || null,
         }),
       });
       if (res.ok) {
@@ -119,6 +121,12 @@ export function EventForm({ periods: allPeriods, event, onSaved }: { periods: Pe
       <label className="label">Description (optional)<input className="input" value={description} onChange={(e) => setDescription(e.target.value)} /></label>
       <label className="label">Starts<input className="input" type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} required disabled={linked} /></label>
       <label className="label">Ends<input className="input" type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} required disabled={linked} /></label>
+      <label className="label">Sign-up form (optional)
+        <select className="input" value={formId} onChange={(e) => setFormId(e.target.value)}>
+          <option value="">— No form —</option>
+          {forms.map((f) => <option key={f.id} value={f.id}>{f.title}</option>)}
+        </select>
+      </label>
       {linked && <p className="text-sm text-[var(--muted)]">Name/dates are synced from Google Calendar and will update automatically.</p>}
       {error && <p className="text-sm text-[var(--red)]">{error}</p>}
       <button type="submit" disabled={busy} className="btn btn-primary self-start">

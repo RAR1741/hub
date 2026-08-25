@@ -4,7 +4,7 @@ import { hasRole } from "@/lib/authz";
 import { getEvent } from "@/lib/events";
 import { listEventRoster } from "@/lib/event-signups";
 import { listEventResponses } from "@/lib/form-responses";
-import { getFormWithFields } from "@/lib/forms";
+import { getFormWithFields, listForms } from "@/lib/forms";
 import { listPeople } from "@/lib/people";
 import { displayName } from "@/lib/people";
 import { listPeriods } from "@/lib/periods";
@@ -28,7 +28,7 @@ export default async function EventRosterPage({
   const event = await getEvent(id);
   if (!event) notFound();
 
-  const [roster, allPeople, periods] = await Promise.all([listEventRoster(id), listPeople(), listPeriods()]);
+  const [roster, allPeople, periods, forms] = await Promise.all([listEventRoster(id), listPeople(), listPeriods(), listForms()]);
   const rosterIds = new Set(roster.map((r) => r.personId));
   const addable = allPeople
     .filter((p) => p.is_active && !rosterIds.has(p.id))
@@ -75,7 +75,7 @@ export default async function EventRosterPage({
       <details className="card" open={edit === "1"}>
         <summary className="cursor-pointer font-semibold">Edit event</summary>
         <div className="mt-4">
-          <EventForm periods={periods} event={event} />
+          <EventForm periods={periods} forms={forms.map((f) => ({ id: f.id, title: f.title }))} event={event} />
         </div>
       </details>
 
