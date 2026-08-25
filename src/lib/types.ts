@@ -263,11 +263,11 @@ export function formFromRow(r: FormRow): Form {
 
 export type FormFieldRow = {
   id: string; form_id: string; label: string; help_text: string | null;
-  type: FormFieldType; required: boolean; position: number; semantic_key: string | null;
+  type: FormFieldType; required: boolean; position: number; semantic_key: SemanticKey | null;
 };
 export type FormField = {
   id: string; formId: string; label: string; helpText: string | null;
-  type: FormFieldType; required: boolean; position: number; semanticKey: string | null;
+  type: FormFieldType; required: boolean; position: number; semanticKey: SemanticKey | null;
 };
 export function formFieldFromRow(r: FormFieldRow): FormField {
   return {
