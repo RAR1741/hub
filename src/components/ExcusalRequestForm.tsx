@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 
 const REASON_MAX = 500;
 
-export function ExcusalRequestForm({ defaultDate }: { defaultDate?: string }) {
-  const [date, setDate] = useState(defaultDate ?? "");
+export function ExcusalRequestForm() {
+  const [date, setDate] = useState("");
   const [reason, setReason] = useState("");
   const [state, setState] = useState<"idle" | "sending" | "sent" | "error" | "duplicate">("idle");
   const router = useRouter();
