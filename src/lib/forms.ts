@@ -46,7 +46,8 @@ export function validateAnswers(
       // short_text / long_text
       if (values.length !== 1 || values[0].length > TEXT_MAX) return { ok: false };
     }
-    for (const v of values) answers.push({ field_id: field.id, value: v });
+    const dedupedValues = field.type === "multi_select" ? [...new Set(values)] : values;
+    for (const v of dedupedValues) answers.push({ field_id: field.id, value: v });
   }
   return { ok: true, answers };
 }
@@ -129,7 +130,8 @@ export async function createForm(
 
 export async function listForms(db?: SupabaseClient): Promise<Form[]> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client.from("form").select("*").order("created_at", { ascending: false });
+  const { data, error } = await client.from("form").select("*").order("created_at", { ascending: false });
+  if (error) { console.error("listForms failed", error); return []; }
   return ((data ?? []) as FormRow[]).map(formFromRow);
 }
 
@@ -138,14 +140,17 @@ export async function getFormWithFields(
   db?: SupabaseClient,
 ): Promise<{ form: Form; fields: FieldWithOptions[] } | null> {
   const client = db ?? (await import("./db")).getDb();
-  const { data: formRow } = await client.from("form").select("*").eq("id", id).maybeSingle();
+  const { data: formRow, error: formError } = await client.from("form").select("*").eq("id", id).maybeSingle();
+  if (formError) { console.error("getFormWithFields form read failed", formError); return null; }
   if (!formRow) return null;
-  const { data: fieldRows } = await client.from("form_field").select("*").eq("form_id", id).order("position", { ascending: true });
+  const { data: fieldRows, error: fieldError } = await client.from("form_field").select("*").eq("form_id", id).order("position", { ascending: true });
+  if (fieldError) { console.error("getFormWithFields field read failed", fieldError); return null; }
   const fields = (fieldRows ?? []) as FormFieldRow[];
   const fieldIds = fields.map((f) => f.id);
-  const { data: optionRows } = fieldIds.length
+  const { data: optionRows, error: optionError } = fieldIds.length
     ? await client.from("form_field_option").select("*").in("field_id", fieldIds).order("position", { ascending: true })
-    : { data: [] as FormFieldOptionRow[] };
+    : { data: [] as FormFieldOptionRow[], error: null };
+  if (optionError) { console.error("getFormWithFields option read failed", optionError); return null; }
   const byField = new Map<string, FormFieldOptionRow[]>();
   for (const o of (optionRows ?? []) as FormFieldOptionRow[]) {
     (byField.get(o.field_id) ?? byField.set(o.field_id, []).get(o.field_id)!).push(o);

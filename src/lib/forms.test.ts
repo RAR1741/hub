@@ -62,6 +62,11 @@ describe("validateAnswers", () => {
       { fieldId: "ghost", values: ["x"] },
     ])).toEqual({ ok: false });
   });
+
+  test("dedupes repeated multi_select values", () => {
+    const r = validateAnswers([comps], [{ fieldId: "f_c", values: ["columbus", "columbus"] }]);
+    expect(r).toEqual({ ok: true, answers: [{ field_id: "f_c", value: "columbus" }] });
+  });
 });
 
 describe("parseFormInput", () => {
@@ -138,5 +143,21 @@ describe("getFormWithFields", () => {
     const r = await getFormWithFields("form1", fakeDb());
     expect(r?.form.title).toBe("Outreach");
     expect(r?.fields[0].options[0].value).toBe("yes");
+  });
+
+  test("returns null when the form_field read errors", async () => {
+    const errDb = {
+      from(table: string) {
+        if (table === "form") return { select: () => ({ eq: () => ({ maybeSingle: async () => ({
+          data: { id: "form1", title: "Outreach", description: null, kind: "event_signup", status: "published", created_by: "m1", created_at: "2020-01-01T00:00:00Z" },
+          error: null,
+        }) }) }) };
+        if (table === "form_field") return { select: () => ({ eq: () => ({ order: async () => ({
+          data: null, error: { code: "500" },
+        }) }) }) };
+        throw new Error(`unexpected table ${table}`);
+      },
+    } as never;
+    expect(await getFormWithFields("form1", errDb)).toBeNull();
   });
 });
