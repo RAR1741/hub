@@ -11,4 +11,5 @@ RUN apt-get update \
 # Bake the Playwright browser + OS deps into the image so `./dev npm run e2e`
 # works in a fresh container with no manual `playwright install` step. Pin to the
 # @playwright/test version in package.json — bump this literal on upgrade.
-RUN npx --yes playwright@1.62.1 install --with-deps chromium
+RUN npx --yes playwright@1.62.1 install --with-deps chromium \
+    && rm -rf /var/lib/apt/lists/*
