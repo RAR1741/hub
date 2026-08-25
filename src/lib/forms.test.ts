@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { parseFieldInput, parseFormInput, validateAnswers, type FieldWithOptions } from "./forms";
+import { createForm, getFormWithFields, parseFieldInput, parseFormInput, validateAnswers, type FieldWithOptions } from "./forms";
 
 const attending: FieldWithOptions = {
   id: "f_att", formId: "form1", label: "Attending?", helpText: null,
@@ -89,5 +89,54 @@ describe("parseFieldInput", () => {
   test("rejects unknown type and unknown semantic key", () => {
     expect(parseFieldInput({ label: "Q", type: "date", required: false, position: 0 })).toBeNull();
     expect(parseFieldInput({ label: "Q", type: "short_text", required: false, position: 0, semanticKey: "bogus" })).toBeNull();
+  });
+});
+
+describe("createForm", () => {
+  function fakeDb(insertError?: { code: string }) {
+    return {
+      from(table: string) {
+        if (table !== "form") throw new Error(`unexpected table ${table}`);
+        return {
+          insert: () => ({
+            select: () => ({
+              single: async () => (insertError ? { data: null, error: insertError } : { data: { id: "form1" }, error: null }),
+            }),
+          }),
+        };
+      },
+    } as never;
+  }
+  test("201 returns new id", async () => {
+    expect(await createForm({ title: "Outreach", description: null, kind: "event_signup", status: "draft" }, "m1", fakeDb()))
+      .toEqual({ ok: true, id: "form1" });
+  });
+  test("maps FK violation to 400", async () => {
+    expect(await createForm({ title: "x", description: null, kind: "event_signup", status: "draft" }, "m1", fakeDb({ code: "23503" })))
+      .toEqual({ ok: false, status: 400 });
+  });
+});
+
+describe("getFormWithFields", () => {
+  function fakeDb() {
+    return {
+      from(table: string) {
+        if (table === "form") return { select: () => ({ eq: () => ({ maybeSingle: async () => ({
+          data: { id: "form1", title: "Outreach", description: null, kind: "event_signup", status: "published", created_by: "m1", created_at: "2020-01-01T00:00:00Z" },
+        }) }) }) };
+        if (table === "form_field") return { select: () => ({ eq: () => ({ order: async () => ({
+          data: [{ id: "f1", form_id: "form1", label: "Attending?", help_text: null, type: "single_select", required: true, position: 0, semantic_key: "attending" }],
+        }) }) }) };
+        if (table === "form_field_option") return { select: () => ({ in: () => ({ order: async () => ({
+          data: [{ id: "o1", field_id: "f1", value: "yes", label: "Yes", position: 0 }],
+        }) }) }) };
+        throw new Error(`unexpected table ${table}`);
+      },
+    } as never;
+  }
+  test("assembles form + fields + options", async () => {
+    const r = await getFormWithFields("form1", fakeDb());
+    expect(r?.form.title).toBe("Outreach");
+    expect(r?.fields[0].options[0].value).toBe("yes");
   });
 });

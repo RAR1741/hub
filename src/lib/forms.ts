@@ -1,4 +1,6 @@
-import type { FormField, FormFieldOption, FormFieldType, SemanticKey } from "./types";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Form, FormField, FormFieldOption, FormFieldOptionRow, FormFieldRow, FormFieldType, FormRow, SemanticKey } from "./types";
+import { formFieldFromRow, formFieldOptionFromRow, formFromRow } from "./types";
 import { optInt, optString, reqString } from "./validate";
 
 export type FieldWithOptions = FormField & { options: FormFieldOption[] };
@@ -100,4 +102,110 @@ export function parseFieldInput(body: unknown): {
     }
   }
   return { label, helpText: helpText.value, type: type as FormFieldType, required, position: pos.value, semanticKey, options };
+}
+
+const FOREIGN_KEY_VIOLATION = "23503";
+const UNIQUE_VIOLATION = "23505";
+function mapWriteError(code: string | undefined): number {
+  if (code === FOREIGN_KEY_VIOLATION) return 400;
+  if (code === UNIQUE_VIOLATION) return 409;
+  return 500;
+}
+
+export async function createForm(
+  input: { title: string; description: string | null; kind: string; status: string },
+  creatorId: string,
+  db?: SupabaseClient,
+): Promise<{ ok: true; id: string } | { ok: false; status: number }> {
+  const client = db ?? (await import("./db")).getDb();
+  const { data, error } = await client
+    .from("form")
+    .insert({ title: input.title, description: input.description, kind: input.kind, status: input.status, created_by: creatorId })
+    .select("id")
+    .single();
+  if (error) return { ok: false, status: mapWriteError(error.code) };
+  return { ok: true, id: data.id as string };
+}
+
+export async function listForms(db?: SupabaseClient): Promise<Form[]> {
+  const client = db ?? (await import("./db")).getDb();
+  const { data } = await client.from("form").select("*").order("created_at", { ascending: false });
+  return ((data ?? []) as FormRow[]).map(formFromRow);
+}
+
+export async function getFormWithFields(
+  id: string,
+  db?: SupabaseClient,
+): Promise<{ form: Form; fields: FieldWithOptions[] } | null> {
+  const client = db ?? (await import("./db")).getDb();
+  const { data: formRow } = await client.from("form").select("*").eq("id", id).maybeSingle();
+  if (!formRow) return null;
+  const { data: fieldRows } = await client.from("form_field").select("*").eq("form_id", id).order("position", { ascending: true });
+  const fields = (fieldRows ?? []) as FormFieldRow[];
+  const fieldIds = fields.map((f) => f.id);
+  const { data: optionRows } = fieldIds.length
+    ? await client.from("form_field_option").select("*").in("field_id", fieldIds).order("position", { ascending: true })
+    : { data: [] as FormFieldOptionRow[] };
+  const byField = new Map<string, FormFieldOptionRow[]>();
+  for (const o of (optionRows ?? []) as FormFieldOptionRow[]) {
+    (byField.get(o.field_id) ?? byField.set(o.field_id, []).get(o.field_id)!).push(o);
+  }
+  return {
+    form: formFromRow(formRow as FormRow),
+    fields: fields.map((f) => ({
+      ...formFieldFromRow(f),
+      options: (byField.get(f.id) ?? []).map(formFieldOptionFromRow),
+    })),
+  };
+}
+
+export async function updateForm(
+  id: string,
+  input: { title: string; description: string | null; status: string },
+  db?: SupabaseClient,
+): Promise<{ ok: boolean; status: number }> {
+  const client = db ?? (await import("./db")).getDb();
+  const { data, error } = await client
+    .from("form")
+    .update({ title: input.title, description: input.description, status: input.status })
+    .eq("id", id).select("id").maybeSingle();
+  if (error) return { ok: false, status: mapWriteError(error.code) };
+  if (!data) return { ok: false, status: 404 };
+  return { ok: true, status: 200 };
+}
+
+export async function deleteForm(id: string, db?: SupabaseClient): Promise<{ ok: boolean; status: number }> {
+  const client = db ?? (await import("./db")).getDb();
+  const { error } = await client.from("form").delete().eq("id", id);
+  // event.form_id FK is nullable with no cascade; a form attached to an event
+  // will 23503 here — surface a clean 409.
+  if (error) return { ok: false, status: error.code === FOREIGN_KEY_VIOLATION ? 409 : 500 };
+  return { ok: true, status: 200 };
+}
+
+export async function addField(
+  formId: string,
+  input: NonNullable<ReturnType<typeof parseFieldInput>>,
+  db?: SupabaseClient,
+): Promise<{ ok: true; id: string } | { ok: false; status: number }> {
+  const client = db ?? (await import("./db")).getDb();
+  const { data, error } = await client
+    .from("form_field")
+    .insert({ form_id: formId, label: input.label, help_text: input.helpText, type: input.type, required: input.required, position: input.position, semantic_key: input.semanticKey })
+    .select("id").single();
+  if (error) return { ok: false, status: mapWriteError(error.code) };
+  const fieldId = data.id as string;
+  if (input.options.length) {
+    const { error: optErr } = await client.from("form_field_option")
+      .insert(input.options.map((o) => ({ field_id: fieldId, value: o.value, label: o.label, position: o.position })));
+    if (optErr) return { ok: false, status: mapWriteError(optErr.code) };
+  }
+  return { ok: true, id: fieldId };
+}
+
+export async function deleteField(fieldId: string, db?: SupabaseClient): Promise<{ ok: boolean; status: number }> {
+  const client = db ?? (await import("./db")).getDb();
+  const { error } = await client.from("form_field").delete().eq("id", fieldId);
+  if (error) return { ok: false, status: 500 };
+  return { ok: true, status: 200 };
 }
