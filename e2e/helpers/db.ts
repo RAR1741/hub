@@ -226,6 +226,39 @@ export async function seedLoginOtpCode(
   }
 }
 
+/**
+ * Upsert a manual build_day row (mirrors createManualBuildDay in
+ * src/lib/build-days.ts). Used to seed a required build day for a fixed
+ * past date so /me/attendance's "missed required day" row appears without
+ * needing a real gcal sync. Idempotent (on_conflict=date).
+ */
+export async function seedBuildDay(
+  date: string,
+  kind: "required" | "optional" = "required",
+): Promise<void> {
+  const res = await fetch(`${restBaseUrl()}/build_day?on_conflict=date`, {
+    method: "POST",
+    headers: authHeaders({ Prefer: "resolution=merge-duplicates" }),
+    body: JSON.stringify({ date, kind, source: "manual" }),
+  });
+  if (![200, 201, 204].includes(res.status)) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`seedBuildDay failed: ${res.status} ${body}`);
+  }
+}
+
+/** Delete the build_day row for a date, if any. Idempotent. */
+export async function deleteBuildDay(date: string): Promise<void> {
+  const res = await fetch(`${restBaseUrl()}/build_day?date=eq.${date}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`deleteBuildDay failed: ${res.status} ${body}`);
+  }
+}
+
 /** Delete the excusal row for a person+date, if any. Idempotent. */
 export async function deleteExcusal(personId: string, date: string): Promise<void> {
   const res = await fetch(
