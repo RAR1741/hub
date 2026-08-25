@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { hasRole } from "@/lib/authz";
 import { listEvents } from "@/lib/events";
+import { listForms } from "@/lib/forms";
 import { listPeriods } from "@/lib/periods";
 import type { Event, Period } from "@/lib/types";
 import { getViewer } from "@/lib/viewer";
@@ -11,7 +12,7 @@ export default async function AdminEventsPage() {
   const viewer = await getViewer();
   if (!hasRole(viewer.role, "mentor")) redirect("/");
 
-  const [events, periods] = await Promise.all([listEvents(), listPeriods()]);
+  const [events, periods, forms] = await Promise.all([listEvents(), listPeriods(), listForms()]);
   const now = new Date().toISOString();
   const upcoming = events.filter((e) => e.endsAt >= now).sort((a, b) => a.startsAt.localeCompare(b.startsAt));
   const past = events.filter((e) => e.endsAt < now);
@@ -28,7 +29,7 @@ export default async function AdminEventsPage() {
       <details className="card">
         <summary className="cursor-pointer font-semibold">New event</summary>
         <div className="mt-4">
-          <EventForm periods={periods} />
+          <EventForm periods={periods} forms={forms.map((f) => ({ id: f.id, title: f.title }))} />
         </div>
       </details>
 

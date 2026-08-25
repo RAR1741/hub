@@ -168,6 +168,7 @@ export default async function AdminHubPage() {
         <Card href="/admin/build-days" icon="calendar" title="Build days" count={buildDays.length} hint="Required/optional days for the active period." />
         <Card href="/admin/sessions" icon="clock" title="Sessions" count={sessions.length} hint="All attendance sessions, browse and edit." />
         <Card href="/admin/events" icon="calendar" title="Events" count={events.length} hint="Outreach, demos, training — sign-up + check-in." />
+        <Card href="/admin/forms" icon="calendar" title="Forms" hint="Sign-up forms attachable to events." />
         <Card href="/admin/projects" icon="chevron" title="Parts" count={projects.length} hint="Part numbering, assemblies, shop dashboard." />
         {isAdmin && (
           <Card href="/admin/periods" icon="calendar" title="Periods" count={periods.length} hint="Seasons and the active period." />

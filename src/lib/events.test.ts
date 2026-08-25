@@ -23,6 +23,7 @@ describe("parseEventInput", () => {
       location: null,
       description: null,
       gcalEventId: null,
+      formId: null,
     });
   });
 
@@ -32,6 +33,7 @@ describe("parseEventInput", () => {
       location: "Library",
       description: "Bring robot",
       gcalEventId: null,
+      formId: null,
     });
   });
 
@@ -115,6 +117,7 @@ describe("createEvent — linked to a calendar event", () => {
     startsAt: "2027-01-01T00:00:00.000Z",
     endsAt: "2027-01-01T01:00:00.000Z",
     gcalEventId: "evt-42",
+    formId: null,
   };
 
   test("resolves name/starts_at/ends_at from the matching meeting, ignoring client text", async () => {
@@ -216,6 +219,7 @@ describe("updateEvent", () => {
     startsAt: "2027-01-01T00:00:00.000Z",
     endsAt: "2027-01-01T01:00:00.000Z",
     gcalEventId: null,
+    formId: null,
   };
 
   test("always writes gcal_missing: false, resetting any stale flag", async () => {
@@ -353,4 +357,13 @@ describe("deleteEvent", () => {
     expect(await deleteEvent("ev1", fakeDb({ eventExists: true, sessionCount: 0 })))
       .toEqual({ ok: true, status: 200 });
   });
+});
+
+test("parseEventInput accepts an optional formId", () => {
+  const base = { name: "Demo", periodId: "11111111-1111-1111-1111-111111111111",
+    location: "Gym", description: "d", startsAt: "2099-01-01T18:00:00Z", endsAt: "2099-01-01T20:00:00Z" };
+  expect(parseEventInput({ ...base })?.formId).toBeNull();
+  expect(parseEventInput({ ...base, formId: "22222222-2222-2222-2222-222222222222" })?.formId)
+    .toBe("22222222-2222-2222-2222-222222222222");
+  expect(parseEventInput({ ...base, formId: "not-a-uuid" })).toBeNull();
 });
