@@ -83,6 +83,9 @@ export default async function HomePage() {
                 <Link href={`/people/${viewer.person.id}`} className="text-sm font-medium text-[var(--color-brand)]">
                   My profile
                 </Link>
+                <Link href="/me/attendance" className="text-sm font-medium text-[var(--color-brand)]">
+                  My attendance
+                </Link>
               </nav>
             </div>
           </div>
