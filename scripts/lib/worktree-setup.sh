@@ -111,7 +111,22 @@ setup_worktree() {
     if git -C "$MAIN_ROOT" rev-parse --verify "$BRANCH" >/dev/null 2>&1; then
       HUB_WORKTREE_SETUP=1 git -C "$MAIN_ROOT" worktree add "$TARGET" "$BRANCH"
     else
-      HUB_WORKTREE_SETUP=1 git -C "$MAIN_ROOT" worktree add "$TARGET" -b "$BRANCH"
+      # Base a brand-new branch on the latest origin/master, not on whatever the
+      # main checkout's local master happens to be (which can lag origin and
+      # breed merge conflicts). We refresh the origin/master remote-tracking ref
+      # rather than the local master branch: local master is usually checked out
+      # in the main root, so it can't be fast-forwarded without disturbing it,
+      # and origin/master is the true base we want anyway. Offline / no
+      # origin/master → fall back to plain HEAD. --no-track keeps the new branch
+      # a plain feature branch (basing off origin/master otherwise makes it track
+      # master as upstream, so git status reads "ahead of origin/master" and pull
+      # would pull master); `git push -u` sets the real upstream later.
+      local BASE=""
+      if git -C "$MAIN_ROOT" fetch --quiet origin master 2>/dev/null \
+         && git -C "$MAIN_ROOT" rev-parse --verify --quiet origin/master >/dev/null; then
+        BASE=origin/master
+      fi
+      HUB_WORKTREE_SETUP=1 git -C "$MAIN_ROOT" worktree add --no-track "$TARGET" -b "$BRANCH" $BASE
     fi
   fi
 
