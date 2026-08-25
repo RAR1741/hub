@@ -11,6 +11,7 @@ export type EventInput = {
   startsAt: string;
   endsAt: string;
   gcalEventId: string | null;
+  formId: string | null;
 };
 
 /** Validate an event payload. PURE. Null = invalid. */
@@ -34,6 +35,11 @@ export function parseEventInput(body: unknown): EventInput | null {
   const description = optString(b.description, 1000);
   if (!description) return null;
   const gcalEventId = typeof b.gcalEventId === "string" && b.gcalEventId.trim() ? b.gcalEventId.trim() : null;
+  let formId: string | null = null;
+  if (b.formId !== undefined && b.formId !== null) {
+    formId = reqUuid(b.formId);
+    if (!formId) return null;
+  }
   return {
     name,
     periodId,
@@ -42,6 +48,7 @@ export function parseEventInput(body: unknown): EventInput | null {
     location: location.value,
     description: description.value,
     gcalEventId,
+    formId,
   };
 }
 
@@ -104,6 +111,7 @@ export async function createEvent(
       ends_at: resolved.endsAt,
       created_by: creatorId,
       gcal_event_id: input.gcalEventId,
+      form_id: input.formId,
     })
     .select("id")
     .single();
@@ -152,6 +160,7 @@ export async function updateEvent(
       starts_at: resolved.startsAt,
       ends_at: resolved.endsAt,
       gcal_event_id: input.gcalEventId,
+      form_id: input.formId,
       // Any admin edit clears a stale missing-flag: unlinking (gcalEventId
       // null) should stop showing the banner, and re-pointing a flagged event
       // at a live meeting should too — the next sync run would eventually
