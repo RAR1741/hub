@@ -46,13 +46,16 @@ export default async function EventsPage() {
                     {e.location ? ` · ${e.location}` : ""}
                   </div>
                   {e.description && <div className="text-sm text-[var(--muted)]">{e.description}</div>}
-                  {showForm && <EventSignupForm eventId={e.id} fields={form.fields} />}
                 </div>
                 <div className="flex items-center gap-2">
                   {canEdit && (
                     <Link href={`/admin/events/${e.id}?edit=1`} className="btn btn-secondary px-3 py-1">Edit</Link>
                   )}
-                  {!showForm && <EventSignupButton eventId={e.id} initiallySignedUp={isSignedUp} />}
+                  {showForm ? (
+                    <EventSignupForm eventId={e.id} eventName={e.name} fields={form.fields} />
+                  ) : (
+                    <EventSignupButton eventId={e.id} initiallySignedUp={isSignedUp} />
+                  )}
                 </div>
               </div>
             );

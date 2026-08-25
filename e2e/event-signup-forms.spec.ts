@@ -73,10 +73,14 @@ test("mentor builds a form, student submits it, mentor sees the response", async
     // also catch other "E2E sign-up event ..." cards left over from a prior
     // (interrupted) run.
     const eventCard = studentPage.locator(".card").filter({ hasText: eventName });
-    await eventCard.getByRole("combobox").selectOption("yes");
-    await eventCard.getByRole("textbox").fill("Bringing snacks!");
+    // Clicking "Sign up" opens a modal with the form; nothing is submitted
+    // until "Submit" inside the modal is clicked.
     await eventCard.getByRole("button", { name: "Sign up" }).click();
-    // On success the card re-renders without the form, showing the signed-up state.
+    const dialog = studentPage.getByRole("dialog", { name: `Sign up for ${eventName}` });
+    await dialog.getByRole("combobox").selectOption("yes");
+    await dialog.getByRole("textbox").fill("Bringing snacks!");
+    await dialog.getByRole("button", { name: "Submit" }).click();
+    // On success the modal closes and the card shows the signed-up state.
     // Generous timeout: this hits the RPC + a full-page re-render, which can
     // be slow on a loaded local dev server (rest of the e2e suite running
     // alongside this spec).
