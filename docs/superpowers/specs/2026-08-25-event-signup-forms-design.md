@@ -61,9 +61,15 @@ form_response             -- one person's submission (1:1 with an event_signup r
   id                uuid pk
   form_id           uuid not null references form(id)
   person_id         uuid not null references person(id)
-  event_signup_id   uuid references event_signup(id) on delete cascade   -- set for event_signup kind; cascades on cancel
+  event_id          uuid references event(id)     -- set for event_signup kind; null for future kinds
   submitted_at      timestamptz not null default now()
-  unique(event_signup_id)
+  -- Composite FK ties the response to the boolean signup so it cascades on
+  -- cancel. event_signup has NO surrogate id (its PK is (event_id, person_id)),
+  -- so we reference that composite. MATCH SIMPLE = enforced only when BOTH
+  -- columns are non-null; future non-event kinds leave event_id null.
+  foreign key (event_id, person_id) references event_signup(event_id, person_id) on delete cascade
+  -- one response per person per event (partial unique index; future kinds have null event_id)
+  create unique index form_response_event_person_idx on form_response(event_id, person_id) where event_id is not null
 
 form_answer               -- EAV answer store; one row per scalar, multiple rows per multi_select
   id            uuid pk
@@ -112,7 +118,9 @@ The vocabulary is enforced in **app code** (a TS union), not a DB constraint, so
 - **Attaching a form:** a mentor builds/reuses a `form` (kind `event_signup`) and sets `event.form_id`. No form attached → sign-up stays today's one-click boolean (fully backward compatible).
 - **Submitting** (self-scoped; `person_id` forced from the viewer, never the request body) — one transaction:
   1. insert `event_signup(event_id, person_id)` via the existing `signUpForEvent` path, unchanged.
-  2. insert `form_response(form_id, person_id, event_signup_id)` + the `form_answer` rows.
+  2. insert `form_response(form_id, person_id, event_id)` + the `form_answer` rows.
+
+  Steps 1–2 run atomically inside a `submit_event_signup(...)` Postgres function invoked via `.rpc()` (same pattern as the existing `merge_person` / `close_stale_sessions` functions), so a partial submission can't leave a signup without its answers.
 - Answers are validated server-side against each field's type / `required` / options **before** the transaction.
 - **Cancelling** a sign-up cascades the response + answers away (existing `cancelEventSignup`).
 - `listEventRoster`, `signedUpEventIds`, and `checkInPerson` need **no changes**; a new read joins responses so mentors see the extra columns.
@@ -150,6 +158,7 @@ Answer validation lives server-side in `validateAnswers`; client rendering is co
 One migration file, `supabase db push` to prod (flagged in the task report per repo convention):
 
 - Create `form`, `form_field`, `form_field_option`, `form_response`, `form_answer`; add `event.form_id`.
+- Create the `submit_event_signup(...)` Postgres function (atomic signup + response + answers insert; raises mapped error codes like `merge_person` does).
 - `enable row level security` on all five new tables with **zero policies**; a `grant` migration for `service_role` (or fresh DBs 42501).
 - Check constraints: `form.kind`, `form.status`, `form_field.type`; the unique constraints above.
 - Never edit an applied migration in place — corrections are new migration files.
