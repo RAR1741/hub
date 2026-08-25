@@ -164,6 +164,22 @@ export async function deleteOnshapeConnection(personId: string): Promise<void> {
   }
 }
 
+/** The id of the seeded active period ("2026 Off Season") — needed to create events via the API. */
+export async function activePeriodId(): Promise<string> {
+  const res = await fetch(`${restBaseUrl()}/period?is_active=eq.true&select=id`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`activePeriodId lookup failed: ${res.status} ${body}`);
+  }
+  const rows = (await res.json()) as { id: string }[];
+  if (!rows[0]?.id) {
+    throw new Error("activePeriodId: no active period — is the DB seeded?");
+  }
+  return rows[0].id;
+}
+
 /** Delete the excusal row for a person+date, if any. Idempotent. */
 export async function deleteExcusal(personId: string, date: string): Promise<void> {
   const res = await fetch(

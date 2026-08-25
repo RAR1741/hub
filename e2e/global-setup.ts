@@ -31,6 +31,11 @@ const ROUTES = [
   "/admin/people",
   "/admin/settings",
   "/admin/reports",
+  // Dynamic route event-signup-forms.spec.ts hits — not otherwise warmed by
+  // any route above, so its first real hit in the suite would cold-compile
+  // and risk the 30s test timeout under load (same rationale as the onshape
+  // dummy-uuid route below).
+  "/admin/events/00000000-0000-0000-0000-000000000000",
   "/api/whos-here",
   "/onshape",
   "/onshape/connect",
