@@ -62,70 +62,87 @@ export function EventSignupForm({ eventId, eventName, fields }: Props) {
           aria-label={`Sign up for ${eventName}`}
           onClick={close}
         >
-          <form className="modal-card" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
-            <div className="flex items-start justify-between gap-3">
+          <form className="modal-card signup-modal" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
+            <div className="flex items-start justify-between gap-3" style={{ marginBottom: "1rem" }}>
               <h3 className="text-base font-semibold">Sign up: {eventName}</h3>
               <button type="button" className="btn" onClick={close} aria-label="Close">
                 ✕
               </button>
             </div>
 
-            {fields.map((f) => (
-              <div key={f.id} style={{ marginTop: "0.75rem" }}>
-                <label>
-                  <strong>{f.label}</strong>
-                  {f.required ? " *" : ""}
-                </label>
-                {f.helpText ? <div className="sub">{f.helpText}</div> : null}
-                {(f.type === "single_select" || f.type === "scale") && (
-                  <select required={f.required} value={values[f.id]?.[0] ?? ""} onChange={(e) => set(f.id, [e.target.value])}>
-                    <option value="" disabled>
-                      Choose…
-                    </option>
-                    {f.options.map((o) => (
-                      <option key={o.id} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                {f.type === "multi_select" &&
-                  f.options.map((o) => (
-                    <label key={o.id} style={{ display: "block" }}>
+            <div className="modal-list" style={{ border: "none", padding: 0, gap: 0 }}>
+              {fields.map((f) => (
+                <fieldset key={f.id} className="signup-q">
+                  <legend className="q-label">
+                    {f.label}
+                    {f.required ? <span className="q-req">*</span> : null}
+                  </legend>
+                  {f.helpText ? <div className="q-help">{f.helpText}</div> : null}
+                  <div className="q-control">
+                    {(f.type === "single_select" || f.type === "scale") &&
+                      f.options.map((o) => (
+                        <label key={o.id} className="signup-opt">
+                          <input
+                            type="radio"
+                            name={f.id}
+                            required={f.required}
+                            checked={values[f.id]?.[0] === o.value}
+                            onChange={() => set(f.id, [o.value])}
+                          />
+                          {o.label}
+                        </label>
+                      ))}
+                    {f.type === "multi_select" &&
+                      f.options.map((o) => (
+                        <label key={o.id} className="signup-opt">
+                          <input
+                            type="checkbox"
+                            checked={(values[f.id] ?? []).includes(o.value)}
+                            onChange={(e) => {
+                              const cur = new Set(values[f.id] ?? []);
+                              if (e.target.checked) cur.add(o.value);
+                              else cur.delete(o.value);
+                              set(f.id, [...cur]);
+                            }}
+                          />
+                          {o.label}
+                        </label>
+                      ))}
+                    {f.type === "boolean" && (
+                      <label className="signup-opt">
+                        <input
+                          type="checkbox"
+                          checked={values[f.id]?.[0] === "true"}
+                          onChange={(e) => set(f.id, [e.target.checked ? "true" : "false"])}
+                        />
+                        Yes
+                      </label>
+                    )}
+                    {f.type === "short_text" && (
                       <input
-                        type="checkbox"
-                        checked={(values[f.id] ?? []).includes(o.value)}
-                        onChange={(e) => {
-                          const cur = new Set(values[f.id] ?? []);
-                          if (e.target.checked) cur.add(o.value);
-                          else cur.delete(o.value);
-                          set(f.id, [...cur]);
-                        }}
-                      />{" "}
-                      {o.label}
-                    </label>
-                  ))}
-                {f.type === "boolean" && (
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={values[f.id]?.[0] === "true"}
-                      onChange={(e) => set(f.id, [e.target.checked ? "true" : "false"])}
-                    />{" "}
-                    Yes
-                  </label>
-                )}
-                {f.type === "short_text" && (
-                  <input type="text" required={f.required} value={values[f.id]?.[0] ?? ""} onChange={(e) => set(f.id, [e.target.value])} />
-                )}
-                {f.type === "long_text" && (
-                  <textarea required={f.required} value={values[f.id]?.[0] ?? ""} onChange={(e) => set(f.id, [e.target.value])} />
-                )}
-              </div>
-            ))}
+                        className="input"
+                        type="text"
+                        required={f.required}
+                        value={values[f.id]?.[0] ?? ""}
+                        onChange={(e) => set(f.id, [e.target.value])}
+                      />
+                    )}
+                    {f.type === "long_text" && (
+                      <textarea
+                        className="input"
+                        rows={3}
+                        required={f.required}
+                        value={values[f.id]?.[0] ?? ""}
+                        onChange={(e) => set(f.id, [e.target.value])}
+                      />
+                    )}
+                  </div>
+                </fieldset>
+              ))}
+            </div>
 
             {error ? (
-              <p className="sub" style={{ color: "var(--danger, crimson)" }}>
+              <p className="sub" style={{ color: "var(--red)", marginTop: "0.75rem" }}>
                 {error}
               </p>
             ) : null}

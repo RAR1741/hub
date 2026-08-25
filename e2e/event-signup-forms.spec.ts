@@ -77,7 +77,7 @@ test("mentor builds a form, student submits it, mentor sees the response", async
     // until "Submit" inside the modal is clicked.
     await eventCard.getByRole("button", { name: "Sign up" }).click();
     const dialog = studentPage.getByRole("dialog", { name: `Sign up for ${eventName}` });
-    await dialog.getByRole("combobox").selectOption("yes");
+    await dialog.getByRole("radio", { name: "Yes" }).check();
     await dialog.getByRole("textbox").fill("Bringing snacks!");
     await dialog.getByRole("button", { name: "Submit" }).click();
     // On success the modal closes and the card shows the signed-up state.

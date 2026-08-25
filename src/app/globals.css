@@ -1297,6 +1297,65 @@
   }
 
   /* -----------------------------------------------------------------------
+     Event sign-up form (issue #181) — Google-Forms-style question sections
+     rendered inside the sign-up modal. Each question is its own bordered
+     card so the form reads clearly top to bottom.
+     ----------------------------------------------------------------------- */
+  .signup-modal {
+    max-width: 34rem;
+  }
+
+  .signup-q {
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--hair);
+    border-radius: 10px;
+    background: var(--surface-2);
+  }
+
+  .signup-q + .signup-q {
+    margin-top: 0.75rem;
+  }
+
+  .signup-q .q-label {
+    display: block;
+    font-weight: 650;
+    font-size: 0.875rem;
+    color: var(--ink);
+  }
+
+  .signup-q .q-req {
+    color: var(--red);
+    margin-left: 2px;
+  }
+
+  .signup-q .q-help {
+    font-size: 0.8125rem;
+    color: var(--muted);
+    margin-top: 0.15rem;
+  }
+
+  .signup-q .q-control {
+    margin-top: 0.6rem;
+  }
+
+  .signup-opt {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.35rem 0.1rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+  }
+
+  .signup-opt input {
+    accent-color: var(--red);
+    width: 1rem;
+    height: 1rem;
+    margin: 0;
+    flex: none;
+  }
+
+  /* -----------------------------------------------------------------------
      Onshape right-panel (issue #95) — narrow (~320-400px) CAD side panel,
      so no page max-width and tighter spacing than the main site's cards.
      ----------------------------------------------------------------------- */
