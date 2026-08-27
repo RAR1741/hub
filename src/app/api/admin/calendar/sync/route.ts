@@ -4,6 +4,7 @@ import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
 import { secureEqual } from "@/lib/secure-compare";
 import { gcalCredentialsFromEnv, pickCalendarId, syncCalendar } from "@/lib/gcal";
+import { reportSyncOutcome } from "@/lib/slack-alerts";
 
 export async function POST(request: Request) {
   const db = getDb();
@@ -46,11 +47,13 @@ export async function POST(request: Request) {
   const tz = await getSetting<string>("team_timezone", "America/Indiana/Indianapolis", db);
   try {
     const result = await syncCalendar({ fetch: globalThis.fetch, db, credentials, tz });
+    await reportSyncOutcome("calendar_sync", true, { db });
     return Response.json(result);
   } catch (e) {
     // Surface the real cause server-side (bad calendar id, unshared calendar,
     // token/network failure) while keeping the client response generic.
     console.error("calendar sync failed:", e);
+    await reportSyncOutcome("calendar_sync", false, { db, error: e instanceof Error ? e.message : String(e) });
     return Response.json({ error: "sync_failed" }, { status: 502 });
   }
 }

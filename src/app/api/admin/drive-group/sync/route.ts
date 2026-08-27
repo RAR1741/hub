@@ -5,6 +5,7 @@ import { hasRole } from "@/lib/authz";
 import { secureEqual } from "@/lib/secure-compare";
 import { directoryCredentialsFromEnv } from "@/lib/google-directory";
 import { reconcileDriveGroups } from "@/lib/drive-group-sync";
+import { reportSyncOutcome } from "@/lib/slack-alerts";
 
 export async function POST(request: Request) {
   const db = getDb();
@@ -41,11 +42,13 @@ export async function POST(request: Request) {
 
   try {
     const result = await reconcileDriveGroups({ fetch: globalThis.fetch, db, credentials });
+    await reportSyncOutcome("drive_sync", true, { db });
     return Response.json(result);
   } catch (e) {
     // Surface the real cause server-side (bad group id, token/network failure)
     // while keeping the client response generic.
     console.error("drive-group sync failed:", e);
+    await reportSyncOutcome("drive_sync", false, { db, error: e instanceof Error ? e.message : String(e) });
     return Response.json({ error: "sync_failed" }, { status: 502 });
   }
 }
