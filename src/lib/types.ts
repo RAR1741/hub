@@ -25,6 +25,12 @@ export type PersonRow = {
   race?: string | null;
   interests?: string[] | null;
   last_application_at?: string | null;
+  first_people_id?: number | null;
+  first_consent_release?: boolean | null;
+  first_screening_status?: string | null;
+  first_screening_text?: string | null;
+  first_training_status?: string | null;
+  first_synced_at?: string | null;
 };
 
 export type Person = {
@@ -51,6 +57,12 @@ export type Person = {
   race: string | null;
   interests: string[] | null;
   lastApplicationAt: string | null;
+  firstPeopleId: number | null;
+  firstConsentRelease: boolean | null;
+  firstScreeningStatus: string | null;
+  firstScreeningText: string | null;
+  firstTrainingStatus: string | null;
+  firstSyncedAt: string | null;
 };
 
 export function personFromRow(row: PersonRow): Person {
@@ -78,6 +90,12 @@ export function personFromRow(row: PersonRow): Person {
     race: row.race ?? null,
     interests: row.interests ?? null,
     lastApplicationAt: row.last_application_at ?? null,
+    firstPeopleId: row.first_people_id ?? null,
+    firstConsentRelease: row.first_consent_release ?? null,
+    firstScreeningStatus: row.first_screening_status ?? null,
+    firstScreeningText: row.first_screening_text ?? null,
+    firstTrainingStatus: row.first_training_status ?? null,
+    firstSyncedAt: row.first_synced_at ?? null,
   };
 }
 
