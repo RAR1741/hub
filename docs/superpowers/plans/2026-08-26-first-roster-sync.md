@@ -4,7 +4,7 @@
 
 **Goal:** Sync mentors' Consent & Release, YPP screening, and YPP training statuses from my.firstinspires.org into the hub (nightly + Sync Now), shown on an admin dashboard and each person's page.
 
-**Architecture:** A pure-ish sync engine (`src/lib/first-sync.ts`) fetches the FIRST roster page + status JSON with a cached cookie session (`src/lib/first-auth.ts` re-logs in via HTTP replay of the Azure B2C flow when cookies expire), matches FIRST people to `person` rows (first_people_id → email → nameKey), updates status columns on `person`, and persists a report. One API route runs it (admin session or `x-sync-secret` for pg_cron), one PATCH route backs manual linking, and two UI surfaces render the data.
+**Architecture:** A pure-ish sync engine (`src/lib/first-sync.ts`) fetches the FIRST roster page + status JSON by replaying an admin-pasted session cookie (`src/lib/first-auth.ts`; automated login proved infeasible — the FIRST admin account is a bot-walled personal Microsoft account, see spec), matches FIRST people to `person` rows (first_people_id → email → nameKey), updates status columns on `person`, and persists a report. An admin pastes the FIRST session cookie into a dashboard card (validated on save); the nightly cron + data fetch/parse/match are automated. One API route runs the sync (admin session or `x-sync-secret` for pg_cron), a PATCH route backs manual linking, a session route stores the cookie, and two UI surfaces render the data.
 
 **Tech Stack:** Next.js App Router, Supabase (service-role via `getDb()`), vitest, Playwright e2e, pg_cron + pg_net.
 
@@ -14,7 +14,7 @@
 
 - Work in the `first-roster-sync` worktree (`.worktrees/first-roster-sync`). All commands run in the container: `./dev npm run test`, `./dev npm run typecheck`, etc. Never run node/npm on the host.
 - Commit after every task and push immediately (`git push`). Commits are GPG-signed; if signing fails with "keyboxd not running", commit from PowerShell after `& "C:\Program Files (x86)\GnuPG\bin\gpg-connect-agent.exe" /bye`.
-- Credentials: `FIRST_USERNAME` / `FIRST_PASSWORD` env vars only. NEVER write them to the DB, logs, fixtures, or test files.
+- No FIRST username/password anywhere (automated login is out — see spec). Auth is a manually-pasted session **Cookie header**, stored in `app_setting.first_session` and replayed. The cookie value is sensitive: NEVER log it, echo it in responses, or put it in fixtures/tests. `FIRST_USERNAME`/`FIRST_PASSWORD` are unused by v1.
 - `GetPersonStatus` requires REPEATED `&ids=N&ids=M` params — comma-separated silently returns `[]`.
 - FIRST people can hold multiple roles: always dedupe by `peopleId` (32 role entries → 29 unique adults on team 1741). Merge `ConsentReleaseStatus` as any-true.
 - Adults = `role_category` ∈ {`Primary Team Contacts`, `Additional Team Contacts`}. Everything else (youth) is out of scope for v1.
@@ -24,92 +24,96 @@
 
 ---
 
-### Task 1: Login spike → `first-auth.ts` (GATE)
+### Task 1: Cookie-based FIRST session → rework `first-auth.ts`
 
-This task is a feasibility gate. If HTTP-replay login proves infeasible after honest effort (bot-wall, CAPTCHA appears, encrypted flow), STOP — report findings; do not proceed to Task 2. The fallback decision (Playwright) is the user's call.
+Automated login was ruled out (spike commit `f73f8bb`: the FIRST admin account is a bot-walled personal Microsoft account — see spec §Authentication). This task reworks the existing `src/lib/first-auth.ts` to the manual-cookie model: store a pasted `Cookie:` header, replay it, detect expiry. NOT a gate — proceed to Task 2 when the live check passes.
+
+The current `first-auth.ts` (from the spike) has a `CookieJar` + `loginToFirst` + a jar-based `fetchWithSession`. Replace the login/jar machinery with the cookie-string model below. Keep the git history; just rewrite the file's exports.
 
 **Files:**
-- Create: `src/lib/first-auth.ts`
-- Create: `scripts/check-first-login.mjs` (manual live check, not run in CI)
-- Modify: `.env.example` (document `FIRST_USERNAME`, `FIRST_PASSWORD`)
+- Modify: `src/lib/first-auth.ts` (replace login/jar exports with the cookie model)
+- Create: `src/lib/first-auth.test.ts` (unit test the pure normalizer)
+- Modify: `scripts/check-first-login.mjs` (live check against a pasted cookie)
+- Modify: `.env.example` (remove FIRST_USERNAME/FIRST_PASSWORD; they're unused)
 
 **Interfaces:**
 - Produces:
   ```ts
   // src/lib/first-auth.ts
-  export type CookieJar = Record<string, Record<string, string>>; // host -> cookie name -> value
-  export function cookieHeader(jar: CookieJar, host: string): string;
-  export function storeSetCookies(jar: CookieJar, host: string, setCookies: string[]): void;
-  /** Full B2C login. Throws with a descriptive message on any step failure. */
-  export async function loginToFirst(
-    username: string,
-    password: string,
-    fetchFn?: typeof fetch,
-  ): Promise<CookieJar>;
   /**
-   * GET a my.firstinspires.org URL with the jar. Returns { kind: "ok", body } on 200,
-   * { kind: "auth" } when redirected to firstcommunity.firstinspires.org (session expired).
+   * Normalize a pasted Cookie header: strip an optional leading "Cookie:" label,
+   * trim, collapse internal newlines/whitespace to single spaces. PURE.
+   */
+  export function normalizeCookieHeader(pasted: string): string;
+  /**
+   * GET a my.firstinspires.org URL replaying `cookie` (a raw Cookie header).
+   * redirect: "manual". 200 → { kind: "ok", body }. A 3xx whose Location contains
+   * "firstcommunity.firstinspires.org" or "/Login" → { kind: "auth" } (expired).
+   * Any other status → throw Error("first-auth: roster fetch returned <status>").
    */
   export async function fetchWithSession(
     url: string,
-    jar: CookieJar,
+    cookie: string,
     fetchFn?: typeof fetch,
   ): Promise<{ kind: "ok"; body: string } | { kind: "auth" }>;
   ```
+  Remove `CookieJar`, `cookieHeader`, `storeSetCookies`, `loginToFirst` (dead under the cookie model). `fetchWithSession` never logs the cookie value.
 
-The B2C replay algorithm (adapt exact field names from what you observe live — this is the spike):
+- [ ] **Step 1: Write the failing normalizer test** in `src/lib/first-auth.test.ts`:
 
-1. `GET https://my.firstinspires.org/Dashboard/` with `redirect: "manual"`, following each 3xx yourself and collecting `Set-Cookie` (use `response.headers.getSetCookie()`) per host into the jar, until you land on the `firstcommunity.firstinspires.org/.../oauth2/v2.0/authorize` page (200 HTML). Keep the final authorize URL.
-2. Parse the authorize page HTML for the `SETTINGS` JS object: `var SETTINGS = {...};` — extract `csrf`, `transId` (looks like `StateProperties=...`), and the policy (`hosts.policy` or the `p=` param, e.g. `B2C_1A_signup_signin`).
-3. `POST https://firstcommunity.firstinspires.org/<tenantId>/<policy>/SelfAsserted?tx=<transId>&p=<policy>` with headers `X-CSRF-TOKEN: <csrf>`, `Content-Type: application/x-www-form-urlencoded`, B2C cookies; body `request_type=RESPONSE&signInName=<username>&password=<password>` (observe the real field names — may be `email` instead of `signInName`). Expect JSON `{"status":"200"}`.
-4. `GET .../<tenantId>/<policy>/api/CombinedSigninAndSignup/confirmed?rememberMe=false&csrf_token=<csrf>&tx=<transId>&p=<policy>` following redirects manually. The terminal response is an auto-submitting HTML `<form method="POST" action="https://my.firstinspires.org/...">` with hidden inputs (`state`, `code`, `id_token` — whatever is present).
-5. Parse those hidden inputs and `POST` them (form-encoded) to the form's `action` URL with the my.firstinspires.org cookies; collect the resulting session `Set-Cookie`s into the jar. Follow any final same-host redirects.
-6. Done — the jar now authenticates roster requests.
+```ts
+import { describe, it, expect } from "vitest";
+import { normalizeCookieHeader } from "./first-auth";
 
-`fetchWithSession`: `GET url` with `Cookie: cookieHeader(jar, "my.firstinspires.org")`, `redirect: "manual"`. 200 → ok. 3xx whose `Location` contains `firstcommunity.firstinspires.org` (or any 302 to `/Login`) → `{ kind: "auth" }`. Anything else → throw.
+describe("normalizeCookieHeader", () => {
+  it("strips a leading Cookie: label and trims", () => {
+    expect(normalizeCookieHeader("Cookie: a=1; b=2")).toBe("a=1; b=2");
+    expect(normalizeCookieHeader("  cookie:  a=1; b=2  ")).toBe("a=1; b=2");
+  });
+  it("collapses embedded newlines/whitespace to single spaces", () => {
+    expect(normalizeCookieHeader("a=1;\n  b=2")).toBe("a=1; b=2");
+  });
+  it("leaves a plain header unchanged", () => {
+    expect(normalizeCookieHeader("a=1; b=2")).toBe("a=1; b=2");
+  });
+});
+```
 
-- [ ] **Step 1: Write `src/lib/first-auth.ts`** with the jar helpers and the login flow above. Every network step that fails must throw an `Error` naming the step (e.g. `first-auth: SelfAsserted returned 403`) WITHOUT including credentials or cookie values.
+- [ ] **Step 2: Run it, verify it fails**: `./dev npx vitest run src/lib/first-auth.test.ts`. Expected: FAIL (export missing / old API).
 
-- [ ] **Step 2: Write `scripts/check-first-login.mjs`** — a manual live check (this is the one runnable check for this task; the login flow is deliberately not unit-tested):
+- [ ] **Step 3: Rewrite `src/lib/first-auth.ts`** to the interface above. `normalizeCookieHeader` is pure string work. `fetchWithSession` does one `fetch(url, { headers: { Cookie: cookie, "User-Agent": "Mozilla/5.0" }, redirect: "manual" })` and classifies the response per the contract (200 ok / auth-redirect / throw). Never log the cookie.
+
+- [ ] **Step 4: Run tests + gates**: `./dev npx vitest run src/lib/first-auth.test.ts`, then `./dev npm run typecheck` and `./dev npm run lint`. Expected: pass/clean.
+
+- [ ] **Step 5: Rewrite `scripts/check-first-login.mjs`** — live check that reads a pasted cookie from the `FIRST_COOKIE` env var (so no cookie is ever committed):
 
 ```js
-// Manual integration check: ./dev node scripts/check-first-login.mjs
-// Requires FIRST_USERNAME/FIRST_PASSWORD in the environment. Not run in CI.
-import { loginToFirst, fetchWithSession } from "../src/lib/first-auth.ts";
+// Manual live check: paste a fresh Cookie header into FIRST_COOKIE, then:
+//   ./dev bash -lc 'FIRST_COOKIE="<paste>" npx tsx scripts/check-first-login.mjs'
+// Not run in CI (CI can't reach FIRST).
+import { fetchWithSession, normalizeCookieHeader } from "../src/lib/first-auth.ts";
 
-const user = process.env.FIRST_USERNAME;
-const pass = process.env.FIRST_PASSWORD;
-if (!user || !pass) throw new Error("Set FIRST_USERNAME and FIRST_PASSWORD");
+const cookie = normalizeCookieHeader(process.env.FIRST_COOKIE ?? "");
+if (!cookie) throw new Error("Set FIRST_COOKIE to a pasted my.firstinspires.org Cookie header");
 
-const jar = await loginToFirst(user, pass);
 const res = await fetchWithSession(
   "https://my.firstinspires.org/Teams/Page/TeamContacts/TeamRoster?TeamProfileID=1790765",
-  jar,
+  cookie,
 );
-if (res.kind !== "ok") throw new Error("session did not authenticate");
+if (res.kind !== "ok") throw new Error("session did not authenticate (cookie expired?)");
 if (!res.body.includes("teamContactsModel")) throw new Error("roster model missing from page");
-console.log("OK: logged in, roster page fetched,", res.body.length, "bytes");
+console.log("OK: cookie authenticated, roster page fetched,", res.body.length, "bytes");
 ```
 
-If plain `node` can't import the `.ts` file, run it via `./dev npx tsx scripts/check-first-login.mjs` (tsx is fine as a devDependency if not present).
+- [ ] **Step 6: Run the live check** with a cookie you copy from your browser (DevTools → Network → a my.firstinspires.org request → Request Headers → Cookie): `./dev bash -lc 'FIRST_COOKIE="<paste>" npx tsx scripts/check-first-login.mjs'`. Expected: `OK: cookie authenticated, ...`. (If tsx isn't present: `./dev npm i -D tsx` first, note it in the report.) This confirms the replay path end-to-end; it is not a CI test.
 
-- [ ] **Step 3: Run the live check** with real credentials: `./dev npx tsx scripts/check-first-login.mjs`. Expected: `OK: logged in, ...`. Iterate on field names/steps by inspecting each intermediate response until it passes. If blocked by bot-detection/CAPTCHA: STOP THE PLAN and report.
+- [ ] **Step 7: Trim `.env.example`** — remove the `FIRST_USERNAME`/`FIRST_PASSWORD` lines added by the spike (unused now). No FIRST secrets belong in env.
 
-- [ ] **Step 4: Add to `.env.example`**:
-
-```
-# FIRST dashboard sync (my.firstinspires.org admin account)
-FIRST_USERNAME=
-FIRST_PASSWORD=
-```
-
-- [ ] **Step 5: Run `./dev npm run typecheck` and `./dev npm run lint`.** Expected: clean.
-
-- [ ] **Step 6: Commit + push**
+- [ ] **Step 8: Commit + push**
 
 ```bash
-git add src/lib/first-auth.ts scripts/check-first-login.mjs .env.example package.json package-lock.json
-git commit -m "feat(first-sync): B2C HTTP-replay login + session fetch"
+git add src/lib/first-auth.ts src/lib/first-auth.test.ts scripts/check-first-login.mjs .env.example package.json package-lock.json
+git commit -m "feat(first-sync): cookie-based FIRST session (replaces automated login)"
 git push
 ```
 
@@ -122,7 +126,7 @@ git push
 - Modify: `src/lib/types.ts` (PersonRow, Person, personFromRow)
 
 **Interfaces:**
-- Produces: `person` columns `first_people_id`, `first_consent_release`, `first_screening_status`, `first_screening_text`, `first_training_status`, `first_synced_at`; app_setting keys `first_team_profile_id`, `first_sync_secret`, `first_sync_url`, `first_session_cookies`, `first_last_sync_report`. TS fields `firstPeopleId`, `firstConsentRelease`, `firstScreeningStatus`, `firstScreeningText`, `firstTrainingStatus`, `firstSyncedAt` on `Person`.
+- Produces: `person` columns `first_people_id`, `first_consent_release`, `first_screening_status`, `first_screening_text`, `first_training_status`, `first_synced_at`; app_setting keys `first_team_profile_id`, `first_sync_secret`, `first_sync_url`, `first_session`, `first_last_sync_report`. TS fields `firstPeopleId`, `firstConsentRelease`, `firstScreeningStatus`, `firstScreeningText`, `firstTrainingStatus`, `firstSyncedAt` on `Person`.
 
 - [ ] **Step 1: Write the migration**
 
@@ -143,7 +147,7 @@ insert into app_setting (key, value) values
   ('first_sync_secret', '""'),
   -- Locally the app runs on the host-mapped port; set to the prod URL on the hosted project.
   ('first_sync_url', '"http://host.docker.internal:3000/api/admin/first/sync"'),
-  ('first_session_cookies', 'null'),
+  ('first_session', 'null'),
   ('first_last_sync_report', 'null')
 on conflict (key) do nothing;
 ```
@@ -182,7 +186,7 @@ git push
 - Test: `src/lib/first-sync.test.ts`
 
 **Interfaces:**
-- Consumes: `loginToFirst`, `fetchWithSession`, `CookieJar` from `./first-auth` (Task 1); `nameKey` from `./name-match`; `getSetting` from `./settings`.
+- Consumes: `fetchWithSession` from `./first-auth` (Task 1); `nameKey` from `./name-match`; `getSetting` from `./settings`.
 - Produces:
   ```ts
   export type FirstPerson = {
@@ -214,11 +218,11 @@ git push
   ```
 
 Implementation notes for `syncFirstRoster`:
-1. Read settings: `first_team_profile_id` (string or number — normalize to string), `first_session_cookies` (as `CookieJar | null`).
-2. `fetchWithSession(rosterUrl, jar)`; on `{kind:"auth"}` or null jar: check `process.env.FIRST_USERNAME/FIRST_PASSWORD` (throw `Error("first_not_configured")` if missing), `loginToFirst(...)`, upsert the new jar into `app_setting.first_session_cookies`, retry ONCE. Second `auth` → throw `Error("first_login_failed")`.
+1. Read settings: `first_team_profile_id` (string or number — normalize to string), `first_session` (as `{ cookie: string; savedAt: string } | null`).
+2. If `first_session` is null → throw `Error("first_not_configured")`. Else `fetchWithSession(rosterUrl, first_session.cookie)`; on `{kind:"auth"}` → throw `Error("first_session_expired")` (no automated re-login under the cookie model; the admin must re-paste). No retry.
 3. `parseTeamContactsModel`: locate the `teamContactsModel` assignment in the HTML — find the marker `teamContactsModel`, then the first `{` after the `=`, then brace-count (respecting strings) to the matching `}` and `JSON.parse` the slice. Throws with a clear message when the marker is absent.
 4. `adultsFromModel`: read `PeopleRoles` array; keep entries whose `role_category` is `"Primary Team Contacts"` or `"Additional Team Contacts"`; group by `peopleId`; merge consent any-true; take first-seen non-empty name/email; lowercase email.
-5. Fetch `statusUrl(...)` via `fetchWithSession`; parse JSON array; fold `screening.status/.text` and `training.status` into the `FirstPerson`s by `peopleId` (missing entry → statuses stay null).
+5. Fetch `statusUrl(...)` via `fetchWithSession(statusUrl, first_session.cookie)` (a mid-run `{kind:"auth"}` here also throws `first_session_expired`); parse JSON array; fold `screening.status/.text` and `training.status` into the `FirstPerson`s by `peopleId` (missing entry → statuses stay null).
 6. Build `HubCandidate`s: `person` rows where `role in ('mentor','admin')` (all of them — inactive too, so a returning mentor keeps their link), plus `person_identity.email` list per person (query `person_identity` separately, group in JS).
 7. `matchFirstToHub` ladder, first match wins, each hub person claimable once: (a) `firstPeopleId` equal; (b) email ∈ candidate.emails (all lowercased); (c) `nameKey(first.firstName, first.lastName) === nameKey(candidate.firstName, candidate.lastName)`.
 8. Update each matched `person`: the 5 status columns + `first_people_id` + `first_synced_at = ranAt`. Check `error` on every write; collect count.
@@ -264,18 +268,19 @@ git push
 
 ---
 
-### Task 4: Sync + link API routes, cron migration
+### Task 4: Sync + link + session API routes, cron migration
 
 **Files:**
 - Create: `src/app/api/admin/first/sync/route.ts`
 - Create: `src/app/api/admin/first/link/route.ts`
+- Create: `src/app/api/admin/first/session/route.ts`
 - Create: `supabase/migrations/<timestamp>_first_sync_cron.sql`
 
 **Interfaces:**
-- Consumes: `syncFirstRoster` (Task 3), `getSetting`, `getDb`, `getViewer`, `hasRole`, `secureEqual` (`src/lib/secure-compare`).
-- Produces: `POST /api/admin/first/sync` → `FirstSyncReport` JSON | `{error}`; `PATCH /api/admin/first/link` body `{ personId: string, firstPeopleId: number | null }` → `{ok: true}`.
+- Consumes: `syncFirstRoster` (Task 3), `fetchWithSession` + `normalizeCookieHeader` (Task 1), `getSetting`, `getDb`, `getViewer`, `hasRole`, `secureEqual` (`src/lib/secure-compare`).
+- Produces: `POST /api/admin/first/sync` → `FirstSyncReport` JSON | `{error}`; `PATCH /api/admin/first/link` body `{ personId: string, firstPeopleId: number | null }` → `{ok: true}`; `POST /api/admin/first/session` body `{ cookie: string }` → `{ok: true}` | 400 `{error:"invalid_session"}`.
 
-- [ ] **Step 1: Write the sync route** — clone the dual-auth shape of `src/app/api/admin/calendar/sync/route.ts` exactly, with these differences: setting key `first_sync_secret`, session gate `hasRole(viewer.role, "admin")` (admin, not mentor — spec: non-admin mentors can't see others' status), missing-env check:
+- [ ] **Step 1: Write the sync route** — clone the dual-auth shape of `src/app/api/admin/calendar/sync/route.ts` exactly, with these differences: setting key `first_sync_secret`, session gate `hasRole(viewer.role, "admin")` (admin, not mentor — spec: non-admin mentors can't see others' status). No env check (no FIRST env vars in the cookie model); the "session not configured / expired" cases surface as thrown errors from `syncFirstRoster`, mapped to clear responses:
 
 ```ts
 import { getDb } from "@/lib/db";
@@ -301,24 +306,19 @@ export async function POST(request: Request) {
     }
   }
 
-  if (!process.env.FIRST_USERNAME || !process.env.FIRST_PASSWORD) {
-    return Response.json(
-      {
-        error: "not_configured",
-        have: {
-          username: Boolean(process.env.FIRST_USERNAME),
-          password: Boolean(process.env.FIRST_PASSWORD),
-        },
-      },
-      { status: 400 },
-    );
-  }
-
   try {
     const report = await syncFirstRoster({ db });
     return Response.json(report);
   } catch (e) {
-    console.error("first sync failed:", e);
+    const msg = e instanceof Error ? e.message : String(e);
+    // Distinguish the two admin-actionable states from a generic failure.
+    if (msg === "first_not_configured") {
+      return Response.json({ error: "not_configured" }, { status: 400 });
+    }
+    if (msg === "first_session_expired") {
+      return Response.json({ error: "session_expired" }, { status: 400 });
+    }
+    console.error("first sync failed:", e); // never logs the cookie
     return Response.json({ error: "sync_failed" }, { status: 502 });
   }
 }
@@ -326,27 +326,31 @@ export async function POST(request: Request) {
 
 - [ ] **Step 2: Write the link route** (`src/app/api/admin/first/link/route.ts`): admin-only (same viewer gate, no secret path). Validate body: `personId` non-empty string, `firstPeopleId` integer or null → else 400 `{error:"bad_request"}`. Update: `db.from("person").update({ first_people_id: firstPeopleId }).eq("id", personId)`; check `error` (unique violation on an already-linked id → 409 `{error:"already_linked"}`, code `23505`); return `{ok:true}`.
 
-- [ ] **Step 3: Write the cron migration** — clone `supabase/migrations/20260811084653_calendar_cron.sql`, job name `first-nightly-sync`, schedule `0 8 * * *`, URL setting `first_sync_url`, secret setting `first_sync_secret`. (The URL/secret seeds already exist from Task 2 — this migration only adds the `cron.schedule` call.)
+- [ ] **Step 3: Write the session route** (`src/app/api/admin/first/session/route.ts`): admin-only (same viewer gate, no secret path). Body `{ cookie: string }`. Steps:
+  1. `const cookie = normalizeCookieHeader(String(body?.cookie ?? ""))`; empty → 400 `{error:"bad_request"}`.
+  2. Validate live: read `first_team_profile_id` from settings, build the roster URL, `const res = await fetchWithSession(rosterUrl, cookie)`. If `res.kind !== "ok"` or `!res.body.includes("teamContactsModel")` → 400 `{error:"invalid_session"}` and store nothing. Wrap the fetch in try/catch → also `invalid_session` on throw.
+  3. On success: `db.from("app_setting").upsert({ key: "first_session", value: { cookie, savedAt: new Date().toISOString() } })`; check `error`; return `{ok:true}`.
+  Never log or echo the cookie value in any response.
 
-- [ ] **Step 4: Apply + verify**: `./dev npm run db:reset`, then with the stack running, exercise the route with the secret header:
+- [ ] **Step 4: Write the cron migration** — clone `supabase/migrations/20260811084653_calendar_cron.sql`, job name `first-nightly-sync`, schedule `0 8 * * *`, URL setting `first_sync_url`, secret setting `first_sync_secret`. (The URL/secret seeds already exist from Task 2 — this migration only adds the `cron.schedule` call.)
+
+- [ ] **Step 5: Apply + verify**: `./dev npm run db:reset`, then with the stack running, exercise the route with the secret header:
 
 ```bash
-./dev bash -lc 'curl -s -X POST -H "x-sync-secret: $(echo dummy)" localhost:3000/api/admin/first/sync'
+./dev bash -lc 'curl -s -X POST -H "x-sync-secret: wrong" localhost:3000/api/admin/first/sync'
 ```
 
-Expected: `{"error":"forbidden"}` (secret is empty in DB, header wrong → falls to session gate → guest → 403). Set a secret and FIRST_* envs locally if you want a full live run; otherwise the e2e task covers the authorized path with mocks.
+Expected: `{"error":"forbidden"}` (secret is empty in DB, header wrong → falls to session gate → guest → 403). For a full authorized run: paste a real cookie via the session route (once Task 5's UI exists, or by curl with an admin cookie) — otherwise the e2e task covers the authorized path with seeded data.
 
-- [ ] **Step 5: Run `./dev npm run typecheck`, `./dev npm run lint`, `./dev npm run test`.** Expected: clean.
+- [ ] **Step 6: Run `./dev npm run typecheck`, `./dev npm run lint`, `./dev npm run test`.** Expected: clean.
 
-- [ ] **Step 6: Commit + push**
+- [ ] **Step 7: Commit + push**
 
 ```bash
 git add src/app/api/admin/first supabase/migrations/*_first_sync_cron.sql
-git commit -m "feat(first-sync): sync + manual-link routes, nightly cron"
+git commit -m "feat(first-sync): sync + link + session routes, nightly cron"
 git push
 ```
-
-- [ ] **Step 7: Verify login works in the Vercel runtime (spec gate, second half).** The push creates a Vercel preview deployment. Ask the user to add `FIRST_USERNAME`/`FIRST_PASSWORD` to the Vercel *preview* environment (they may already have). Note the preview DB is prod's Supabase — `first_sync_secret` may be empty there, so test with a browser admin session on the preview URL, or coordinate with the user to run Sync Now from the preview's `/admin/first-status` once Task 5 lands. Minimum bar before finishing the plan: one successful `syncFirstRoster` run (real report JSON, no `sync_failed`) from a Vercel function. If B2C login fails only on Vercel (IP reputation, TLS fingerprint), STOP and report — that reopens the Playwright fallback decision.
 
 ---
 
@@ -357,10 +361,11 @@ git push
 - Create: `src/components/FirstStatusTable.tsx` (client: sortable table)
 - Create: `src/components/FirstSyncPanel.tsx` (client: Sync Now)
 - Create: `src/components/FirstLinkPicker.tsx` (client: link unmatched FIRST entry to a person)
+- Create: `src/components/FirstSessionCard.tsx` (client: paste + save session cookie)
 - Modify: `src/app/admin/page.tsx` (add a nav card/link to `/admin/first-status`, matching how other admin tools are listed there)
 
 **Interfaces:**
-- Consumes: `FirstSyncReport` from `@/lib/first-sync`; `getSetting`; `listPeople(undefined, db)`; `displayName` from `@/lib/people`; `POST /api/admin/first/sync`; `PATCH /api/admin/first/link`.
+- Consumes: `FirstSyncReport` from `@/lib/first-sync`; `getSetting`; `listPeople(undefined, db)`; `displayName` from `@/lib/people`; `POST /api/admin/first/sync`; `PATCH /api/admin/first/link`; `POST /api/admin/first/session`.
 - Produces: `FirstStatusTable({ rows })` where `rows: { personId: string; name: string; consent: boolean | null; screeningStatus: string | null; screeningText: string | null; trainingStatus: string | null; syncedAt: string | null }[]`.
 
 Badge mapping (one shared helper inside `FirstStatusTable.tsx`, exported for reuse by the person-page card):
@@ -382,27 +387,30 @@ export function StatusBadge({ status, label }: { status: string | null; label?: 
 
 (Verify the `pill on/off/role/admin` classes render distinct colors — they're the existing pills used on the person page; adjust to whatever reads clearly, don't invent a new design system.)
 
-- [ ] **Step 1: Page server component.** Gate: `getViewer()` → `if (!hasRole(viewer.role, "admin")) redirect("/")` (same as drive-sync page). Load `listPeople(undefined, db)` filtered to `role !== "student" && is_active`, plus `getSetting<FirstSyncReport | null>("first_last_sync_report", null, db)`. Render:
+- [ ] **Step 1: Page server component.** Gate: `getViewer()` → `if (!hasRole(viewer.role, "admin")) redirect("/")` (same as drive-sync page). Load `listPeople(undefined, db)` filtered to `role !== "student" && is_active`, plus `getSetting<FirstSyncReport | null>("first_last_sync_report", null, db)` and `getSetting<{ cookie: string; savedAt: string } | null>("first_session", null, db)`. Render:
   1. Page head: title "FIRST roster status", sub showing `first_synced_at`-style "Last synced …" from the report's `ranAt` (or "never").
-  2. `<FirstSyncPanel />` in a card.
-  3. `<FirstStatusTable rows={...} />` in a card — one row per active mentor/admin from `person` (statuses straight off the row columns; people with no `first_people_id` still get a row with a "Not linked" pill in the consent column area).
-  4. "Unmatched FIRST roster entries" card: from `report.unmatchedFirst`, each row name + email + `<FirstLinkPicker firstPeopleId={...} people={peoplePicker} />` where `peoplePicker` is the same `{id, name}` list pattern as the drive-sync page. Empty state: "Everything on the FIRST roster is linked."
+  2. `<FirstSessionCard savedAt={session?.savedAt ?? null} />` in a card (do NOT pass the cookie value to the client — only whether/when one is saved).
+  3. `<FirstSyncPanel />` in a card.
+  4. `<FirstStatusTable rows={...} />` in a card — one row per active mentor/admin from `person` (statuses straight off the row columns; people with no `first_people_id` still get a row with a "Not linked" pill in the consent column area).
+  5. "Unmatched FIRST roster entries" card: from `report.unmatchedFirst`, each row name + email + `<FirstLinkPicker firstPeopleId={...} people={peoplePicker} />` where `peoplePicker` is the same `{id, name}` list pattern as the drive-sync page. Empty state: "Everything on the FIRST roster is linked."
 
-- [ ] **Step 2: `FirstSyncPanel.tsx`** — clone `src/components/DriveSyncPanel.tsx` verbatim, changing: endpoint `/api/admin/first/sync`, ok-state message `Synced — {matched} matched, {updated} updated, {unmatchedFirst.length} unmatched.` (read those fields off the response body), error state unchanged.
+- [ ] **Step 2: `FirstSessionCard.tsx`** — client component. Props: `{ savedAt: string | null }`. Shows session state: if `savedAt`, "FIRST session saved <relative/local time>. Re-paste when sync reports it expired." else "No FIRST session saved — paste one to enable syncing." A `<textarea>` for the Cookie header + a Save button that POSTs `/api/admin/first/session` with `{ cookie }`; on `{ok}` → `router.refresh()` + "Session saved."; on 400 `invalid_session` → "That cookie didn't authenticate — copy a fresh one and try again."; other errors inline (DriveSyncPanel outcome-state pattern). Include brief copy instructions as helper text: "In your browser, log into my.firstinspires.org, open DevTools → Network, click any my.firstinspires.org request, and copy the entire value of the request's Cookie header." Never render the stored cookie.
 
-- [ ] **Step 3: `FirstStatusTable.tsx`** — client component. Props: `rows` (shape above). Local `useState<{key, dir}>` sort state; clickable `<th>` for Name, Consent & Release, Screening, Training (sort by status text; ties by name). Render screening as `<StatusBadge status={row.screeningStatus} />` plus, when `screeningText` is non-empty and status isn't green, the text in a `text-sm text-[var(--muted)]` line under the badge — this is the "what to chase" message. Consent: `<StatusBadge status={row.consent == null ? null : row.consent ? "green" : "blue"} label={row.consent == null ? "Not linked" : row.consent ? "Signed" : "Not signed"} />`. Name cell links to `/people/{personId}`. Follow the `table` + `tablewrap` classes used by the drive-sync page.
+- [ ] **Step 3: `FirstSyncPanel.tsx`** — clone `src/components/DriveSyncPanel.tsx` verbatim, changing: endpoint `/api/admin/first/sync`, ok-state message `Synced — {matched} matched, {updated} updated, {unmatchedFirst.length} unmatched.` (read those fields off the response body). Error state: map `{error:"session_expired"}` → "FIRST session expired — re-paste the cookie above." and `{error:"not_configured"}` → "No FIRST session saved yet — paste the cookie above." else show the message.
 
-- [ ] **Step 4: `FirstLinkPicker.tsx`** — client component. Props: `{ firstPeopleId: number; people: { id: string; name: string }[] }`. A `<select>` (default "Link to person…") + confirm button; on submit `fetch("/api/admin/first/link", { method: "PATCH", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ personId, firstPeopleId }) })`; on ok `router.refresh()`; on 409 show "That FIRST record is already linked to someone else."; other errors show the message inline (same outcome-state pattern as DriveSyncPanel).
+- [ ] **Step 4: `FirstStatusTable.tsx`** — client component. Props: `rows` (shape above). Local `useState<{key, dir}>` sort state; clickable `<th>` for Name, Consent & Release, Screening, Training (sort by status text; ties by name). Render screening as `<StatusBadge status={row.screeningStatus} />` plus, when `screeningText` is non-empty and status isn't green, the text in a `text-sm text-[var(--muted)]` line under the badge — this is the "what to chase" message. Consent: `<StatusBadge status={row.consent == null ? null : row.consent ? "green" : "blue"} label={row.consent == null ? "Not linked" : row.consent ? "Signed" : "Not signed"} />`. Name cell links to `/people/{personId}`. Follow the `table` + `tablewrap` classes used by the drive-sync page.
 
-- [ ] **Step 5: Verify in the browser** at this worktree's app URL (port in `.env`, `APP_PORT`, default for this worktree 3002): dev-login as Admin → `/admin/first-status` renders, sort toggles, Sync Now returns either a report (if envs set) or the not_configured/sync_failed error rendered sanely. Dev-login as Mentor → route redirects to `/`.
+- [ ] **Step 5: `FirstLinkPicker.tsx`** — client component. Props: `{ firstPeopleId: number; people: { id: string; name: string }[] }`. A `<select>` (default "Link to person…") + confirm button; on submit `fetch("/api/admin/first/link", { method: "PATCH", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ personId, firstPeopleId }) })`; on ok `router.refresh()`; on 409 show "That FIRST record is already linked to someone else."; other errors show the message inline (same outcome-state pattern as DriveSyncPanel).
 
-- [ ] **Step 6: Run `./dev npm run typecheck`, `./dev npm run lint`, `./dev npm run test`.** Expected: clean.
+- [ ] **Step 6: Verify in the browser** at this worktree's app URL (port in `.env`, `APP_PORT`, default for this worktree 3002): dev-login as Admin → `/admin/first-status` renders; the session card shows "No FIRST session saved"; pasting a real cookie and Saving shows "Session saved" and flips the card to "saved <when>"; Sync Now then returns a report (or, with no session, the "paste the cookie above" message) rendered sanely; sort toggles. Dev-login as Mentor → route redirects to `/`.
 
-- [ ] **Step 7: Commit + push**
+- [ ] **Step 7: Run `./dev npm run typecheck`, `./dev npm run lint`, `./dev npm run test`.** Expected: clean.
+
+- [ ] **Step 8: Commit + push**
 
 ```bash
-git add src/app/admin/first-status src/components/FirstStatusTable.tsx src/components/FirstSyncPanel.tsx src/components/FirstLinkPicker.tsx src/app/admin/page.tsx
-git commit -m "feat(first-sync): admin FIRST status dashboard with sync-now and manual link"
+git add src/app/admin/first-status src/components/FirstStatusTable.tsx src/components/FirstSyncPanel.tsx src/components/FirstLinkPicker.tsx src/components/FirstSessionCard.tsx src/app/admin/page.tsx
+git commit -m "feat(first-sync): admin FIRST status dashboard — session card, sync-now, manual link"
 git push
 ```
 
@@ -480,7 +488,7 @@ git push
 - Create: `e2e/first-status.spec.ts`
 - Possibly modify: `supabase/seed.sql` or the e2e seeding helpers — FOLLOW the existing e2e self-seeding pattern (read `e2e/badges.spec.ts` and `e2e/helpers/` first; e2e tests here self-seed rather than assume rows).
 
-No FIRST network calls in CI: e2e seeds `person` status columns and `app_setting.first_last_sync_report` directly via the DB, then tests the UI. The sync engine's logic is already unit-tested; the login path is covered by the Task 1 manual check only.
+No FIRST network calls in CI: e2e seeds `person` status columns and `app_setting.first_last_sync_report` directly via the DB, then tests the UI. The sync engine's logic is already unit-tested; the cookie-replay path is covered by the Task 1 manual check only. Do NOT exercise the session-save route against real FIRST in e2e (it makes a live fetch) — seed `app_setting.first_session` directly if a test needs a "session present" state.
 
 - [ ] **Step 1: Write `e2e/first-status.spec.ts`** following the repo's existing spec style (dev-login helpers, self-seeding). Cases:
   1. Seed: one active mentor with `first_people_id=101`, consent true, screening `green`, training `blue`; a `first_last_sync_report` app_setting with one `unmatchedFirst` entry `{peopleId: 999, name: "Zed Zulu", email: "zed@example.org"}` (use pinned UUIDs per the repo's stale-seed gotcha).
@@ -501,7 +509,8 @@ git push
 - [ ] **Step 6: Open the PR** (per repo rules: straight to push + `gh pr create`, report the URL; master auto-deploys on merge, so the PR body must include the rollout checklist below).
 
 **Rollout checklist (manual, post-merge — include in PR body):**
-1. Vercel: add `FIRST_USERNAME` / `FIRST_PASSWORD` env vars (production).
-2. `supabase db push` the two migrations to prod.
-3. On prod DB: set `first_sync_url` to `https://hub.redalert1741.org/api/admin/first/sync` and `first_sync_secret` to a generated secret (`update app_setting set value = ... where key = ...` via Studio/SQL — settings values are one-off data, not schema).
-4. Log into prod as admin → `/admin/first-status` → Sync Now → verify the report and spot-check statuses against the FIRST dashboard.
+1. `supabase db push` the two migrations to prod. (No FIRST env vars — auth is a pasted cookie.)
+2. On prod DB: set `first_sync_url` to `https://hub.redalert1741.org/api/admin/first/sync` and `first_sync_secret` to a generated secret (`update app_setting set value = ... where key = ...` via Studio/SQL — settings values are one-off data, not schema).
+3. Log into prod as admin → `/admin/first-status` → paste a fresh FIRST session cookie into the session card → Save (expect "Session saved").
+4. Sync Now → verify the report and spot-check statuses against the FIRST dashboard.
+5. Re-paste the cookie whenever the dashboard/sync reports the session expired (frequency depends on FIRST's session lifetime, currently unknown).

@@ -46,26 +46,43 @@ session:
    - `supplemental` is uniformly grey/empty for Indiana — **excluded from
      v1**. Known extra if it ever populates.
 
-### Authentication
+### Authentication — manual cookie refresh
 
-Login is Azure AD B2C (`firstcommunity.firstinspires.org`, OIDC
-`response_mode=form_post`). No CAPTCHA/bot-protection observed on the login
-page. Expired/missing session is detectable: the data URL redirects (302) to
-the B2C authorize endpoint.
+**Superseded decision (2026-08-26):** the original plan was automated HTTP-replay
+login. A spike (commit `f73f8bb`) proved it infeasible: FIRST federates login
+through Microsoft, and the team-admin account is a **personal Microsoft Account
+(MSA)** whose real sign-in happens at `login.live.com` — a JS/SPA, bot-protected
+consumer flow that challenges datacenter IPs (both our dev container and Vercel
+prod). No unattended server-side login (fetch *or* headless browser) reliably
+gets past that wall for an MSA account. Automated login is therefore out for v1.
 
-**Decision: HTTP replay, spiked first.** Implementation task #1 is a
-throwaway spike proving login end-to-end in the real runtimes (local
-container, then a Vercel preview function): replay the B2C `SelfAsserted`
-flow with plain fetch — GET authorize page, parse CSRF token + transaction
-id, POST credentials to `SelfAsserted`, follow `confirmed`, complete the
-`form_post` back to my.firstinspires.org, capture the resulting cookie jar.
-No browser, runs anywhere. Brittle if FIRST changes B2C config — acceptable
-because failure just stops syncing (data goes stale, sync reports the error;
-nothing else breaks). If the spike proves replay infeasible, stop and
-re-decide (fallback: Playwright + headless Chromium in the Vercel function).
+**v1 decision: manual cookie refresh.** An admin logs into my.firstinspires.org
+in their own browser, copies the session Cookie, and pastes it into the app. The
+app stores that cookie and replays it on every roster/status fetch. The nightly
+sync and the data-fetch/parse/match are fully automated; only obtaining the
+session is manual. When the session expires, the sync fails loudly and the
+dashboard shows "session expired — refresh the FIRST cookie"; the admin re-pastes.
 
-Credentials live in **env vars**: `FIRST_USERNAME`, `FIRST_PASSWORD`
-(Vercel envs + local `.env`). Never in the DB, never in any UI.
+Mechanics that shape the design:
+- The auth cookie is **HttpOnly** (verified: `document.cookie` on a logged-in
+  page shows only analytics cookies). So the admin cannot copy `document.cookie`
+  — they copy the full `Cookie:` **request header** from a logged-in request
+  (DevTools → Network → any my.firstinspires.org request → Request Headers →
+  Cookie → copy value). The app stores and replays that string verbatim.
+- On **save**, the app validates the pasted cookie by test-fetching the roster
+  page and confirming `teamContactsModel` is present — instant "works / doesn't"
+  feedback, so a bad paste never silently becomes a failing nightly sync.
+- Session lifetime is unknown; the design does not assume one. The dashboard
+  always shows when the cookie was last refreshed and whether the last sync saw
+  an expired session, so the admin knows when to refresh.
+- No credentials (username/password) are stored anywhere — not env, not DB, not
+  UI. Only the pasted session cookie is stored (in `app_setting`, service-role
+  only). `FIRST_USERNAME`/`FIRST_PASSWORD` are NOT used by v1.
+
+Upgrade path if a non-MSA (tenant-native Entra) FIRST admin account ever
+exists: the spike's `first-auth.ts` Entra replay (in git history at `f73f8bb`)
+would very likely complete unattended with no browser, restoring fully
+automatic login. Out of scope for v1.
 
 ## Schema (one migration)
 
@@ -85,10 +102,11 @@ New columns on `person`:
 - `first_team_profile_id`: `1790765`
 - `first_sync_secret`: per-env secret for the cron header (same pattern as
   `gcal_sync_secret`)
-- `first_session_cookies`: jsonb cookie jar, written by the sync itself
-  (starts empty)
+- `first_session`: jsonb `{ cookie, savedAt }`, written when an admin pastes a
+  session cookie (starts null)
 - `first_last_sync_report`: jsonb, written at the end of each sync (backs the
-  unmatched lists on the dashboard; starts empty)
+  unmatched lists on the dashboard; starts null). Also records whether the run
+  hit an expired session.
 
 No new tables, so no new grants needed beyond what `person`/`app_setting`
 already have.
@@ -97,9 +115,10 @@ already have.
 
 `syncFirstRoster()`:
 
-1. **Fetch roster** with cached cookies from `app_setting.first_session_cookies`.
-   On redirect to B2C (or missing cookies): re-login via HTTP replay, store
-   the new jar, retry once. A second failure aborts with a clear error.
+1. **Fetch roster** with the stored cookie from `app_setting.first_session`.
+   Missing session → throw `first_not_configured`. Redirect to
+   firstcommunity/login (expired cookie) → throw `first_session_expired` (no
+   auto-relogin possible; the admin must re-paste).
 2. **Parse** `teamContactsModel` out of the HTML (regex/substring to the JSON
    literal, then `JSON.parse`).
 3. **Filter** to adult `role_category`s; **dedupe** by `peopleId`, merging
@@ -127,6 +146,11 @@ the degradation mode.
   the report JSON.
 - `PATCH /api/admin/first/link` — admin-only; body `{ personId, firstPeopleId }`
   (or `firstPeopleId: null` to unlink). Backs the manual-link picker.
+- `POST /api/admin/first/session` — admin-only; body `{ cookie }`. Validates by
+  test-fetching the roster with the pasted cookie and confirming
+  `teamContactsModel` is present; on success writes `first_session =
+  { cookie, savedAt }` and returns `{ ok: true }`; on failure returns 400
+  `{ error: "invalid_session" }` and stores nothing.
 - **Nightly cron migration**: pg_cron + pg_net POST to a `first_sync_url`
   app_setting with the `x-sync-secret` header — a clone of
   `20260811084653_calendar_cron.sql`, scheduled `0 8 * * *` UTC (≈3–4am
@@ -135,6 +159,11 @@ the degradation mode.
 ## UI
 
 - **`/admin/first-status`** (admin-only):
+  - **FIRST session card**: shows session state (valid + "last refreshed <when>",
+    or "expired/none — refresh needed"). A textarea to paste the `Cookie:` header
+    with step-by-step copy instructions (DevTools → Network → a
+    my.firstinspires.org request → Request Headers → Cookie), and a Save button
+    that POSTs `/api/admin/first/session` and reports validation result inline.
   - Table: one row per active `person` with role mentor/admin. Columns:
     name, Consent & Release, YPP screening, training — colored badges from
     the raw status values (`green`=ok, `orange`=in progress, `blue`/`false`=
@@ -157,21 +186,22 @@ the degradation mode.
   model extraction from HTML, adult filter + multi-role dedupe/merge,
   repeated-ids URL building, match ladder (first_people_id → email →
   identity email → nameKey), report shape.
-- **Login spike** is validated live, not unit-tested; the replay code keeps
-  one integration self-check script (run manually) since CI can't reach FIRST.
+- `fetchWithSession` / cookie handling is validated live via a manual check
+  script (CI can't reach FIRST); its pure cookie-normalization helper is unit-
+  tested.
 - **E2E** (Playwright): dashboard renders with seeded status columns, sort
   works, manual link flow — sync engine mocked/seeded, no FIRST calls in CI.
 - Standard gates before PR: `./dev npm run lint / typecheck / test / e2e`.
 
 ## Implementation order
 
-1. **Login spike** (throwaway): prove B2C HTTP-replay login + cookie capture
-   from the local container, then from a Vercel preview function. Gate: raw
-   roster HTML retrieved in both. If infeasible → stop, re-decide.
+1. Cookie-based FIRST session: rework `first-auth.ts` to store/replay a pasted
+   Cookie header; `fetchWithSession(url, cookie)`; manual live check script.
 2. Migration (columns + settings + grants check).
 3. Sync engine + unit tests (fixtures first).
-4. Sync/link endpoints + cron migration.
-5. Admin dashboard page + Sync Now + manual link.
+4. Sync/link/session endpoints + cron migration.
+5. Admin dashboard page + FIRST session card + Sync Now + manual link.
 6. Person-page card + visibility rules.
-7. E2E + prod rollout (env vars in Vercel, `supabase db push`, set
-   `first_sync_url` + `first_sync_secret` on prod, first manual sync).
+7. E2E + prod rollout (`supabase db push`, set `first_sync_url` +
+   `first_sync_secret` on prod, admin pastes the FIRST session cookie via the
+   dashboard, first manual sync). No FIRST env vars needed in Vercel.
