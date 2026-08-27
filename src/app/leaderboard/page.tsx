@@ -87,8 +87,8 @@ export default async function LeaderboardPage({
   const active = await getActivePeriod();
   const periodId = period ?? active?.id ?? periods[0]?.id;
   const entries = periodId ? await periodLeaderboard(periodId) : [];
-  const students = entries.filter((e) => e.role === "student");
-  const mentors = entries.filter((e) => e.role !== "student");
+  const students = entries.filter((e) => e.role === "student").slice(0, 10);
+  const mentors = entries.filter((e) => e.role !== "student").slice(0, 10);
 
   return (
     <main className="flex flex-col gap-6">
