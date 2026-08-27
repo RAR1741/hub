@@ -211,15 +211,26 @@ test.describe("Admin guardian CRUD", () => {
     await inputs.nth(4).fill("Test Company");
     await addDetails.locator("button:text('Add guardian')").click();
 
+    // Wait for the POST to persist before reloading — reloading immediately
+    // aborts the in-flight create request, so the guardian never exists and
+    // the search below can't find it. (The other tests in this block already
+    // wait here for the same reason.)
+    await expect(page.locator(`text=${guardianEmail}`)).toBeVisible({ timeout: 5000 });
+
     // Now link the same guardian again (simulate sibling case)
     // by using the search/link feature
     await page.reload();
     const linkDetails = guardianSection.locator("details:has(summary:text('Link existing'))");
     await linkDetails.locator("summary").click();
 
-    // Search for the guardian by name
+    // Search for the guardian by name. Use the full (timestamped) name so the
+    // result set can't collide with LinkGuardian rows left by prior runs —
+    // search is `ilike %term% ORDER BY last_name LIMIT 10` and every run shares
+    // last_name "TestLast", so a shared prefix like "LinkG" would eventually
+    // push this run's row past the top 10. The name is still a substring of the
+    // rendered "First Last — email", so partial matching is still exercised.
     const searchInput = linkDetails.locator("input[placeholder*='typing']");
-    await searchInput.fill(guardianName.substring(0, 5)); // partial search
+    await searchInput.fill(guardianName);
 
     // Wait for results
     const guardianResult = linkDetails.locator(`text=${guardianName}`).first();
