@@ -953,6 +953,11 @@
     }
   }
 
+  @keyframes activity-dot {
+    0%, 80%, 100% { opacity: 0.3; transform: translateY(0); }
+    40% { opacity: 1; transform: translateY(-3px); }
+  }
+
   .status-strip .sep {
     width: 1px;
     height: 16px;

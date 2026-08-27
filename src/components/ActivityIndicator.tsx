@@ -11,7 +11,7 @@ function Dots() {
       {DOT_DELAYS.map((delay) => (
         <span
           key={delay}
-          className="h-1.5 w-1.5 rounded-full bg-[var(--ink)] animate-bounce motion-reduce:animate-none"
+          className="h-1.5 w-1.5 rounded-full bg-[var(--ink)] animate-[activity-dot_1.2s_ease-in-out_infinite] motion-reduce:animate-none"
           style={{ animationDelay: delay }}
         />
       ))}
