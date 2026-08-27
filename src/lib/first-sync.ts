@@ -209,7 +209,11 @@ export async function syncFirstRoster(deps: {
   const fetchFn = deps.fetchFn ?? fetch;
 
   const teamProfileId = String(await getSetting<string | number | null>("first_team_profile_id", null, db));
-  const session = await getSetting<{ cookie: string; savedAt: string } | null>("first_session", null, db);
+  const session = await getSetting<{ cookie: string; savedAt: string; rotatedAt?: string } | null>(
+    "first_session",
+    null,
+    db,
+  );
   if (session == null) {
     throw new Error("first_not_configured");
   }
@@ -217,22 +221,25 @@ export async function syncFirstRoster(deps: {
   const rosterUrl = `https://my.firstinspires.org/Teams/Page/TeamContacts/TeamRoster?TeamProfileID=${teamProfileId}`;
   let adults: FirstPerson[];
   try {
-    const rosterRes = await fetchWithSession(rosterUrl, session.cookie, fetchFn);
+    let liveCookie = session.cookie;
+    const rosterRes = await fetchWithSession(rosterUrl, liveCookie, fetchFn);
     if (rosterRes.kind === "auth") {
       throw new Error("first_session_expired");
     }
+    liveCookie = rosterRes.cookie;
 
     const model = parseTeamContactsModel(rosterRes.body);
     adults = adultsFromModel(model);
 
     const statusRes = await fetchWithSession(
       statusUrl(teamProfileId, adults.map((p) => p.peopleId)),
-      session.cookie,
+      liveCookie,
       fetchFn,
     );
     if (statusRes.kind === "auth") {
       throw new Error("first_session_expired");
     }
+    liveCookie = statusRes.cookie;
     const statuses = JSON.parse(statusRes.body) as {
       peopleId: number;
       screening?: { status?: string | null; text?: string | null };
@@ -244,6 +251,14 @@ export async function syncFirstRoster(deps: {
       adult.screeningStatus = status?.screening?.status ?? null;
       adult.screeningText = status?.screening?.text ?? null;
       adult.trainingStatus = status?.training?.status ?? null;
+    }
+
+    if (liveCookie !== session.cookie) {
+      const { error: sessionError } = await db.from("app_setting").upsert(
+        { key: "first_session", value: { cookie: liveCookie, savedAt: session.savedAt, rotatedAt: new Date().toISOString() } },
+        { onConflict: "key" },
+      );
+      if (sessionError) throw new Error(`first-sync: failed to persist rotated session cookie: ${sessionError.message}`);
     }
   } catch (e) {
     if (e instanceof Error && e.message === "first_session_expired") {
