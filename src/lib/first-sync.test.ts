@@ -28,6 +28,24 @@ describe("parseTeamContactsModel", () => {
   test("throws when the marker is absent", () => {
     expect(() => parseTeamContactsModel("<html><body>nope</body></html>")).toThrow();
   });
+
+  test("skips earlier teamContactsModel references and finds the real assignment", () => {
+    // The live page mentions `teamContactsModel` several times before the real
+    // data: member-access references and a `$.ajax` block with unquoted JS keys.
+    // The parser must skip those and only take the `= { ...PeopleRoles... }`
+    // assignment (regression: it used to grab the first occurrence and choke on
+    // the JS-literal `$.ajax` block).
+    const decoyed =
+      `<script>` +
+      // JS block whose object literal has unquoted keys + a function — the old
+      // "first =, first {" parser grabbed this and JSON.parse threw here.
+      `teamContactsModel.load = function () { $.ajax({ url: '/x', success: function (d) { render(d); } }); };` +
+      `if (teamContactsModel.PeopleRoles) { render(teamContactsModel); }` +
+      `</script>` +
+      `<script>var teamContactsModel = ${JSON.stringify(MODEL)};</script>`;
+    const model = parseTeamContactsModel(decoyed) as { PeopleRoles: unknown[] };
+    expect(model.PeopleRoles).toHaveLength(4);
+  });
 });
 
 describe("adultsFromModel", () => {

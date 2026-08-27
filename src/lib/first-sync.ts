@@ -35,52 +35,70 @@ export type HubCandidate = {
 
 const ADULT_ROLE_CATEGORIES = new Set(["Primary Team Contacts", "Additional Team Contacts"]);
 
+const MODEL_MARKER = "teamContactsModel";
+
 /**
- * Locate `teamContactsModel = {...}` in the page HTML and JSON.parse the
- * object literal. Brace-counts (respecting string literals) from the first
- * `{` after the `=` to the matching `}`, since the object may contain nested
- * braces. PURE.
+ * Locate the `teamContactsModel = {...}` ASSIGNMENT in the page HTML and
+ * JSON.parse the object literal. The page mentions `teamContactsModel` many
+ * times before the real data — member-access references
+ * (`teamContactsModel.PeopleRoles`, `teamContactsModel.AdditionalContactsList`)
+ * and `$.ajax` script blocks — so we can't just take the first occurrence
+ * (that was the original bug). We accept only an occurrence immediately
+ * followed by `= {` (an assignment, not a `.member` reference) whose object
+ * literal actually contains `PeopleRoles` — the real model is emitted as valid
+ * JSON (double-quoted keys) by the server. Brace-counts (respecting string
+ * literals) from the `{` to the matching `}`. PURE.
  */
 export function parseTeamContactsModel(html: string): unknown {
-  const markerIdx = html.indexOf("teamContactsModel");
-  if (markerIdx === -1) {
-    throw new Error("first-sync: teamContactsModel marker not found in roster HTML");
-  }
-  const eqIdx = html.indexOf("=", markerIdx);
-  const start = html.indexOf("{", eqIdx);
-  if (eqIdx === -1 || start === -1) {
-    throw new Error("first-sync: teamContactsModel marker found but no object literal follows");
-  }
+  let sawAssignment = false;
+  for (
+    let markerIdx = html.indexOf(MODEL_MARKER);
+    markerIdx !== -1;
+    markerIdx = html.indexOf(MODEL_MARKER, markerIdx + MODEL_MARKER.length)
+  ) {
+    // Require `<ws>=<ws>{` right after the identifier: an assignment to an
+    // object literal, not a `.member` access or other reference.
+    const after = html.slice(markerIdx + MODEL_MARKER.length);
+    const assign = /^\s*=\s*\{/.exec(after);
+    if (!assign) continue;
+    sawAssignment = true;
+    const start = markerIdx + MODEL_MARKER.length + assign[0].length - 1; // the `{`
 
-  let depth = 0;
-  let inString: '"' | "'" | null = null;
-  let end = -1;
-  for (let i = start; i < html.length; i++) {
-    const ch = html[i];
-    if (inString) {
-      if (ch === "\\") {
-        i++; // skip escaped char
-      } else if (ch === inString) {
-        inString = null;
+    let depth = 0;
+    let inString: '"' | "'" | null = null;
+    let end = -1;
+    for (let i = start; i < html.length; i++) {
+      const ch = html[i];
+      if (inString) {
+        if (ch === "\\") {
+          i++; // skip escaped char
+        } else if (ch === inString) {
+          inString = null;
+        }
+        continue;
       }
-      continue;
-    }
-    if (ch === '"' || ch === "'") {
-      inString = ch;
-    } else if (ch === "{") {
-      depth++;
-    } else if (ch === "}") {
-      depth--;
-      if (depth === 0) {
-        end = i;
-        break;
+      if (ch === '"' || ch === "'") {
+        inString = ch;
+      } else if (ch === "{") {
+        depth++;
+      } else if (ch === "}") {
+        depth--;
+        if (depth === 0) {
+          end = i;
+          break;
+        }
       }
     }
+    if (end === -1) continue; // unclosed literal — not the one; keep looking
+    const lit = html.slice(start, end + 1);
+    if (!lit.includes("PeopleRoles")) continue; // an unrelated assignment
+    return JSON.parse(lit);
   }
-  if (end === -1) {
-    throw new Error("first-sync: teamContactsModel object literal is not closed");
-  }
-  return JSON.parse(html.slice(start, end + 1));
+  throw new Error(
+    sawAssignment
+      ? "first-sync: teamContactsModel assignment found but no PeopleRoles object literal parsed"
+      : "first-sync: teamContactsModel assignment not found in roster HTML",
+  );
 }
 
 type PeopleRole = {
