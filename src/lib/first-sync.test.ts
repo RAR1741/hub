@@ -49,6 +49,17 @@ describe("adultsFromModel", () => {
     const alice = adults.find((p) => p.peopleId === 101)!;
     expect(alice.email).toBe("alice@example.org");
   });
+
+  test("keeps first-seen non-empty email when the first role row has a blank email", () => {
+    const model = {
+      PeopleRoles: [
+        { peopleId: 301, name_first: "Dana", name_last: "Diaz", email: "", phone: "", role_category: "Additional Team Contacts", role_key: "Mentor", ConsentReleaseStatus: false },
+        { peopleId: 301, name_first: "Dana", name_last: "Diaz", email: "DANA@example.org", phone: "555-0003", role_category: "Primary Team Contacts", role_key: "coach-2", ConsentReleaseStatus: true },
+      ],
+    };
+    const [dana] = adultsFromModel(model);
+    expect(dana.email).toBe("dana@example.org");
+  });
 });
 
 describe("statusUrl", () => {

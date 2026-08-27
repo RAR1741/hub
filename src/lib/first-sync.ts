@@ -91,7 +91,7 @@ type PeopleRole = {
   ConsentReleaseStatus: boolean;
 };
 
-/** Filter to adult roles, dedupe by peopleId, merge consent any-true. PURE. */
+/** Filter to adult roles, dedupe by peopleId, merge consent any-true, keep first-seen non-empty fields. PURE. */
 export function adultsFromModel(model: unknown): FirstPerson[] {
   const roles = (model as { PeopleRoles?: PeopleRole[] }).PeopleRoles ?? [];
   const byId = new Map<number, FirstPerson>();
@@ -100,13 +100,16 @@ export function adultsFromModel(model: unknown): FirstPerson[] {
     const existing = byId.get(role.peopleId);
     if (existing) {
       existing.consentRelease = existing.consentRelease || !!role.ConsentReleaseStatus;
+      if (!existing.firstName && role.name_first) existing.firstName = role.name_first;
+      if (!existing.lastName && role.name_last) existing.lastName = role.name_last;
+      if (!existing.email && role.email) existing.email = role.email.toLowerCase();
       continue;
     }
     byId.set(role.peopleId, {
       peopleId: role.peopleId,
       firstName: role.name_first,
       lastName: role.name_last,
-      email: role.email.toLowerCase(),
+      email: role.email ? role.email.toLowerCase() : "",
       consentRelease: !!role.ConsentReleaseStatus,
       screeningStatus: null,
       screeningText: null,
@@ -288,7 +291,10 @@ export async function syncFirstRoster(deps: {
     unmatchedHub,
   };
 
-  await db.from("app_setting").upsert({ key: "first_last_sync_report", value: report }, { onConflict: "key" });
+  const { error: reportError } = await db
+    .from("app_setting")
+    .upsert({ key: "first_last_sync_report", value: report }, { onConflict: "key" });
+  if (reportError) throw new Error(`first-sync: failed to write sync report: ${reportError.message}`);
 
   return report;
 }
