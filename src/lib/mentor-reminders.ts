@@ -39,7 +39,7 @@ export async function sendMentorReminders(deps: {
   db: SupabaseClient;
   slack: SlackDeps;
   sleep?: (ms: number) => Promise<void>;
-}): Promise<{ reminded: number; unlinked: string[]; complete: number }> {
+}): Promise<{ reminded: number; unlinked: string[]; complete: number; failed: string[] }> {
   const sleep = deps.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
 
   const { data, error } = await deps.db
@@ -62,6 +62,7 @@ export async function sendMentorReminders(deps: {
   let reminded = 0;
   let complete = 0;
   const unlinked: string[] = [];
+  const failed: string[] = [];
 
   for (const m of mentors) {
     const items = outstandingItems(m);
@@ -69,13 +70,15 @@ export async function sendMentorReminders(deps: {
     if (!m.slackUserId) { unlinked.push(m.name); continue; }
     const ok = await sendDM(deps.slack, m.slackUserId, buildReminderText(m.name, items));
     if (ok) reminded++;
+    else failed.push(m.name);
     await sleep(1100); // ~1 msg/sec
   }
 
   const summary =
     `:memo: Weekly FIRST reminder run — DMed ${reminded} mentor(s); ${complete} fully complete.` +
-    (unlinked.length ? `\n:warning: No Slack link (not reminded): ${unlinked.join(", ")}` : "");
+    (unlinked.length ? `\n:warning: No Slack link (not reminded): ${unlinked.join(", ")}` : "") +
+    (failed.length ? `\n:x: DM failed (not reminded): ${failed.join(", ")}` : "");
   await postChannelMessage(deps.slack, "hub_alerts", summary);
 
-  return { reminded, unlinked, complete };
+  return { reminded, unlinked, complete, failed };
 }

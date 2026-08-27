@@ -86,6 +86,7 @@ describe("sendMentorReminders", () => {
     expect(result.reminded).toBe(1);
     expect(result.unlinked).toEqual(["B Name"]);
     expect(result.complete).toBe(1);
+    expect(result.failed).toEqual([]);
 
     const dms = posts.filter((p) => p.text.startsWith("[dev → DM"));
     expect(dms).toHaveLength(1);
@@ -95,5 +96,31 @@ describe("sendMentorReminders", () => {
     const summaryPost = posts.find((p) => p.text.startsWith("[dev → #hub_alerts]"));
     expect(summaryPost).toBeDefined();
     expect(summaryPost!.text).toContain("B Name");
+  });
+
+  test("a linked incomplete mentor whose DM fails is reported as failed, not reminded", async () => {
+    const people = [
+      person({ id: "pA", first_name: "A", last_name: "Name", slack_user_id: "UA", first_consent_release: false }),
+    ];
+    const db = fakeDb(people);
+    const posts: { channel: string; text: string }[] = [];
+    // DM sends fail (ok:false); any other post (the summary) succeeds.
+    const fetchFn = (async (url: string | URL, init?: RequestInit) => {
+      const body = init?.body ? (JSON.parse(init.body as string) as { channel: string; text: string }) : undefined;
+      if (body && String(url).includes("chat.postMessage")) posts.push(body);
+      const failed = !!body?.text.startsWith("[dev → DM");
+      return new Response(JSON.stringify({ ok: !failed }), { status: 200 });
+    }) as unknown as typeof globalThis.fetch;
+    const deps: SlackDeps = { fetch: fetchFn, token: "xoxb", isProd: false };
+
+    const result = await sendMentorReminders({ db: db as never, slack: deps, sleep: async () => {} });
+
+    expect(result.reminded).toBe(0);
+    expect(result.failed).toEqual(["A Name"]);
+
+    const summaryPost = posts.find((p) => p.text.startsWith("[dev → #hub_alerts]"));
+    expect(summaryPost).toBeDefined();
+    expect(summaryPost!.text).toContain("A Name");
+    expect(summaryPost!.text).toContain("DM failed");
   });
 });

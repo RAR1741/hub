@@ -28,16 +28,20 @@ export async function reportSyncOutcome(
     const next = ok ? "ok" : "failing";
 
     // Post alert only if state changed
+    let delivered = true;
     if (prev !== next) {
       const slack = opts.slack ?? slackDepsFromEnv();
       const text = ok
         ? `:white_check_mark: ${LABELS[source]} recovered — syncing normally again.`
         : `:rotating_light: ${LABELS[source]} is failing.${opts.error ? `\n\`\`\`${opts.error}\`\`\`` : ""}`;
-      await postChannelMessage(slack, "hub_alerts", text);
+      // Only advance state once the alert actually went out — a failed/no-op post
+      // (e.g. token not yet configured) must re-alert next run, not swallow the transition.
+      delivered = await postChannelMessage(slack, "hub_alerts", text);
     }
 
-    // Always save the current state
-    await opts.db.from("app_setting").upsert({ key, value: next }, { onConflict: "key" });
+    if (delivered) {
+      await opts.db.from("app_setting").upsert({ key, value: next }, { onConflict: "key" });
+    }
   } catch (e) {
     console.error(`[slack-alerts] reportSyncOutcome(${source}) threw:`, e);
   }

@@ -73,4 +73,13 @@ describe("reportSyncOutcome", () => {
     expect(posts).toHaveLength(0);
     expect(db.store.get("slack_alert_state_drive_sync")).toBe("ok");
   });
+
+  test("ok→failing with undelivered post does not advance state (re-alerts next run)", async () => {
+    const db = fakeDb({ slack_alert_state_first_sync: "ok" });
+    // Slack API call fails (e.g. token not yet configured post-deploy) — postChannelMessage returns false.
+    const fetchFn = (async () => new Response(JSON.stringify({ ok: false, error: "invalid_auth" }), { status: 200 })) as unknown as typeof globalThis.fetch;
+    const deps = { fetch: fetchFn, token: "xoxb", isProd: true };
+    await reportSyncOutcome("first_sync", false, { db: db as never, slack: deps, error: "session expired" });
+    expect(db.store.get("slack_alert_state_first_sync")).toBe("ok");
+  });
 });
