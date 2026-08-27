@@ -10,6 +10,7 @@ import { listBadgesForPerson, listAwardableBadges } from "@/lib/badges";
 import { BadgeAwardPanel } from "@/components/BadgeAwardPanel";
 import { RevokeBadgeButton } from "@/components/RevokeBadgeButton";
 import { getGuardiansForPerson } from "@/lib/guardians";
+import { StatusBadge } from "@/components/FirstStatusTable";
 
 export default async function PersonPage({
   params,
@@ -108,6 +109,44 @@ export default async function PersonPage({
           </ul>
         )}
       </section>
+
+      {person.role !== "student" &&
+        (hasRole(viewer.role, "admin") || viewer.person?.id === person.id) && (
+          <section className="card flex flex-col gap-3">
+            <h2 className="text-lg font-semibold">FIRST status</h2>
+            {person.firstPeopleId == null ? (
+              <p className="text-sm text-[var(--muted)]">
+                Not linked to a FIRST roster record yet.
+              </p>
+            ) : (
+              <dl className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-3">
+                <div>
+                  <dt className="label mb-0">Consent &amp; Release</dt>
+                  <dd><StatusBadge status={person.firstConsentRelease ? "green" : "blue"} label={person.firstConsentRelease ? "Signed" : "Not signed"} /></dd>
+                </div>
+                <div>
+                  <dt className="label mb-0">YPP screening</dt>
+                  <dd className="flex flex-col gap-1">
+                    <StatusBadge status={person.firstScreeningStatus} />
+                    {person.firstScreeningText && person.firstScreeningStatus !== "green" && (
+                      <span className="text-sm text-[var(--muted)]">{person.firstScreeningText}</span>
+                    )}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="label mb-0">YPP training</dt>
+                  <dd><StatusBadge status={person.firstTrainingStatus} /></dd>
+                </div>
+                {person.firstSyncedAt && (
+                  <div className="sm:col-span-3">
+                    <dt className="label mb-0">Last synced</dt>
+                    <dd className="text-sm text-[var(--muted)]">{new Date(person.firstSyncedAt).toLocaleString()}</dd>
+                  </div>
+                )}
+              </dl>
+            )}
+          </section>
+        )}
 
       {canViewGuardians && (
         <section className="card flex flex-col gap-3">
