@@ -2,14 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-
-type LinkReport = {
-  linked: number;
-  alreadyLinked: number;
-  ambiguous: { email: string; personIds: string[] }[];
-  unmatchedSlack: { id: string; email: string }[];
-  unmatchedPeople: { personId: string; name: string }[];
-};
+import type { LinkReport } from "@/lib/slack-link";
 
 type SyncOutcome =
   | { kind: "ok"; report: LinkReport }

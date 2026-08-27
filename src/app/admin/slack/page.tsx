@@ -20,10 +20,11 @@ export default async function AdminSlackPage() {
   if (!hasRole(viewer.role, "admin")) redirect("/");
 
   const db = getDb();
-  const { data } = await db
+  const { data, error } = await db
     .from("person")
     .select("id, first_name, last_name, display_name, role, is_active, slack_user_id")
     .order("last_name");
+  if (error) console.error("admin/slack: person select failed:", error.message);
   const people = (data ?? []) as PersonSlackRow[];
 
   const linked = people.filter((p) => p.slack_user_id);
@@ -44,63 +45,71 @@ export default async function AdminSlackPage() {
         <SlackLinkPanel />
       </section>
 
-      <section className="card flex flex-col gap-3">
-        <h2 className="text-base font-semibold">Linked people</h2>
-        {linked.length === 0 ? (
-          <p className="text-sm text-[var(--muted)]">No one is linked to Slack yet.</p>
-        ) : (
-          <div className="tablewrap">
-            <div style={{ overflowX: "auto" }}>
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Person</th>
-                    <th>Role</th>
-                    <th>Slack user ID</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {linked.map((p) => (
-                    <tr key={p.id}>
-                      <td>{displayName(p)}</td>
-                      <td>{p.role}</td>
-                      <td className="mono">{p.slack_user_id}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </section>
+      {error ? (
+        <section className="card flex flex-col gap-3">
+          <p className="text-sm text-[var(--red)]">Couldn&rsquo;t load the roster — try again.</p>
+        </section>
+      ) : (
+        <>
+          <section className="card flex flex-col gap-3">
+            <h2 className="text-base font-semibold">Linked people</h2>
+            {linked.length === 0 ? (
+              <p className="text-sm text-[var(--muted)]">No one is linked to Slack yet.</p>
+            ) : (
+              <div className="tablewrap">
+                <div style={{ overflowX: "auto" }}>
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Person</th>
+                        <th>Role</th>
+                        <th>Slack user ID</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {linked.map((p) => (
+                        <tr key={p.id}>
+                          <td>{displayName(p)}</td>
+                          <td>{p.role}</td>
+                          <td className="mono">{p.slack_user_id}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </section>
 
-      <section className="card flex flex-col gap-3">
-        <h2 className="text-base font-semibold">Unlinked mentors/admins</h2>
-        {unlinkedStaff.length === 0 ? (
-          <p className="text-sm text-[var(--muted)]">Every active mentor/admin is linked.</p>
-        ) : (
-          <div className="tablewrap">
-            <div style={{ overflowX: "auto" }}>
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Person</th>
-                    <th>Role</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {unlinkedStaff.map((p) => (
-                    <tr key={p.id}>
-                      <td>{displayName(p)}</td>
-                      <td>{p.role}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </section>
+          <section className="card flex flex-col gap-3">
+            <h2 className="text-base font-semibold">Unlinked mentors/admins</h2>
+            {unlinkedStaff.length === 0 ? (
+              <p className="text-sm text-[var(--muted)]">Every active mentor/admin is linked.</p>
+            ) : (
+              <div className="tablewrap">
+                <div style={{ overflowX: "auto" }}>
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Person</th>
+                        <th>Role</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {unlinkedStaff.map((p) => (
+                        <tr key={p.id}>
+                          <td>{displayName(p)}</td>
+                          <td>{p.role}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </section>
+        </>
+      )}
     </main>
   );
 }
