@@ -72,7 +72,11 @@ export default async function AdminFirstStatusPage() {
       <section className="card flex flex-col gap-3">
         <h2 className="text-base font-semibold">Unmatched FIRST roster entries</h2>
         {!report || report.unmatchedFirst.length === 0 ? (
-          <p className="text-sm text-[var(--muted)]">Everything on the FIRST roster is linked.</p>
+          <p className="text-sm text-[var(--muted)]">
+            {report?.error === "session_expired"
+              ? "Unavailable until the FIRST session is refreshed and a sync completes."
+              : "Everything on the FIRST roster is linked."}
+          </p>
         ) : (
           <div className="flex flex-col gap-2">
             {report.unmatchedFirst.map((entry) => (
