@@ -7,6 +7,7 @@ import { getGuardiansForPerson } from "@/lib/guardians";
 import { PersonForm } from "@/components/PersonForm";
 import { DeletePersonButton } from "@/components/DeletePersonButton";
 import { PersonEmails } from "@/components/PersonEmails";
+import { PersonSlackLink } from "@/components/PersonSlackLink";
 import { PersonGuardians } from "@/components/PersonGuardians";
 
 export default async function AdminEditPersonPage({
@@ -78,6 +79,11 @@ export default async function AdminEditPersonPage({
             linked: i.auth_user_id !== null,
           }))}
         />
+      </section>
+
+      <section className="card flex flex-col gap-3">
+        <h2 className="text-base font-semibold">Slack</h2>
+        <PersonSlackLink personId={p.id} slackUserId={p.slackUserId ?? null} />
       </section>
 
       <section className="card flex flex-col gap-4">
