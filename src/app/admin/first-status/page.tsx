@@ -48,9 +48,15 @@ export default async function AdminFirstStatusPage() {
         </div>
       </div>
 
+      {report?.error === "session_expired" && (
+        <p className="text-sm text-[var(--red)]">
+          FIRST session expired — re-paste a fresh cookie below to resume syncing.
+        </p>
+      )}
+
       <section className="card flex flex-col gap-4">
         <h2 className="text-base font-semibold">FIRST session</h2>
-        <FirstSessionCard savedAt={session?.savedAt ?? null} />
+        <FirstSessionCard savedAt={session?.savedAt ?? null} expired={report?.error === "session_expired"} />
       </section>
 
       <section className="card flex flex-col gap-4">

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 type SaveOutcome = { kind: "ok" } | { kind: "error"; message: string };
 
-export function FirstSessionCard({ savedAt }: { savedAt: string | null }) {
+export function FirstSessionCard({ savedAt, expired }: { savedAt: string | null; expired?: boolean }) {
   const [cookie, setCookie] = useState("");
   const [busy, setBusy] = useState(false);
   const [outcome, setOutcome] = useState<SaveOutcome | null>(null);
@@ -39,9 +39,11 @@ export function FirstSessionCard({ savedAt }: { savedAt: string | null }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-sm">
+      <p className={savedAt && expired ? "text-sm text-[var(--red)]" : "text-sm"}>
         {savedAt
-          ? `FIRST session saved ${new Date(savedAt).toLocaleString()}. Re-paste when sync reports it expired.`
+          ? expired
+            ? "FIRST session expired — paste a fresh cookie to resume."
+            : `FIRST session saved ${new Date(savedAt).toLocaleString()}. Re-paste when sync reports it expired.`
           : "No FIRST session saved — paste one to enable syncing."}
       </p>
       <p className="text-sm text-[var(--muted)]">

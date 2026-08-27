@@ -21,6 +21,7 @@ export type FirstSyncReport = {
   updated: number;
   unmatchedFirst: { peopleId: number; name: string; email: string }[];
   unmatchedHub: { personId: string; name: string }[];
+  error?: "session_expired";
 };
 
 export type HubCandidate = {
@@ -196,33 +197,53 @@ export async function syncFirstRoster(deps: {
   }
 
   const rosterUrl = `https://my.firstinspires.org/Teams/Page/TeamContacts/TeamRoster?TeamProfileID=${teamProfileId}`;
-  const rosterRes = await fetchWithSession(rosterUrl, session.cookie, fetchFn);
-  if (rosterRes.kind === "auth") {
-    throw new Error("first_session_expired");
-  }
+  let adults: FirstPerson[];
+  try {
+    const rosterRes = await fetchWithSession(rosterUrl, session.cookie, fetchFn);
+    if (rosterRes.kind === "auth") {
+      throw new Error("first_session_expired");
+    }
 
-  const model = parseTeamContactsModel(rosterRes.body);
-  const adults = adultsFromModel(model);
+    const model = parseTeamContactsModel(rosterRes.body);
+    adults = adultsFromModel(model);
 
-  const statusRes = await fetchWithSession(
-    statusUrl(teamProfileId, adults.map((p) => p.peopleId)),
-    session.cookie,
-    fetchFn,
-  );
-  if (statusRes.kind === "auth") {
-    throw new Error("first_session_expired");
-  }
-  const statuses = JSON.parse(statusRes.body) as {
-    peopleId: number;
-    screening?: { status?: string | null; text?: string | null };
-    training?: { status?: string | null };
-  }[];
-  const statusById = new Map(statuses.map((s) => [s.peopleId, s]));
-  for (const adult of adults) {
-    const status = statusById.get(adult.peopleId);
-    adult.screeningStatus = status?.screening?.status ?? null;
-    adult.screeningText = status?.screening?.text ?? null;
-    adult.trainingStatus = status?.training?.status ?? null;
+    const statusRes = await fetchWithSession(
+      statusUrl(teamProfileId, adults.map((p) => p.peopleId)),
+      session.cookie,
+      fetchFn,
+    );
+    if (statusRes.kind === "auth") {
+      throw new Error("first_session_expired");
+    }
+    const statuses = JSON.parse(statusRes.body) as {
+      peopleId: number;
+      screening?: { status?: string | null; text?: string | null };
+      training?: { status?: string | null };
+    }[];
+    const statusById = new Map(statuses.map((s) => [s.peopleId, s]));
+    for (const adult of adults) {
+      const status = statusById.get(adult.peopleId);
+      adult.screeningStatus = status?.screening?.status ?? null;
+      adult.screeningText = status?.screening?.text ?? null;
+      adult.trainingStatus = status?.training?.status ?? null;
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message === "first_session_expired") {
+      const marker: FirstSyncReport = {
+        ranAt: new Date().toISOString(),
+        rosterCount: 0,
+        matched: 0,
+        updated: 0,
+        unmatchedFirst: [],
+        unmatchedHub: [],
+        error: "session_expired",
+      };
+      const { error: markerError } = await db
+        .from("app_setting")
+        .upsert({ key: "first_last_sync_report", value: marker }, { onConflict: "key" });
+      if (markerError) throw new Error(`first-sync: failed to write expired-session marker: ${markerError.message}`);
+    }
+    throw e;
   }
 
   const { data: personRows, error: personError } = await db
