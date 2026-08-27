@@ -37,36 +37,30 @@ Closes #194, #195, #196. Produces the sending library and wires transition-based
 **Interfaces:**
 - Produces:
   - `CHANNELS` (const map), `type ChannelName = keyof typeof CHANNELS`
-  - `TEAMS` (const map), `type TeamName = keyof typeof TEAMS`
   - `slackTokenFromEnv(): string | null`
   - `type SlackDeps = { fetch: typeof globalThis.fetch; token: string | null; isProd: boolean }`
   - `slackDepsFromEnv(): SlackDeps`
   - `postChannelMessage(deps: SlackDeps, channel: ChannelName, text: string): Promise<boolean>`
   - `sendDM(deps: SlackDeps, slackUserId: string, text: string): Promise<boolean>`
-  - `mention(team: TeamName): string`
 
 - [ ] **Step 1: Write the registry file**
 
 `src/lib/slack-registry.ts`:
 
 ```ts
-// Slack channel + usergroup IDs. Same workspace across all environments, so
-// these are identical everywhere and live in code (typos fail typecheck).
-// Fill the C0… / S0… IDs from the workspace before this ships:
-//   channel ID: open the channel → About → bottom, or right-click → Copy link
-//   usergroup ID: https://app.slack.com/client/<team>/browse-user-groups → click group → URL
+// Slack channel IDs. Same workspace across all environments, so these are
+// identical everywhere and live in code (a typo'd name fails typecheck).
 export const CHANNELS = {
-  bot_test: "C0XXXXXXX", // #bot-test — all non-prod sends land here
-  hub_alerts: "C0YYYYYYY", // private admin-alerts channel (invite the prod bot once)
+  bot_test: "C072BAED43B", // #bot-test — all non-prod sends land here
+  hub_alerts: "C0BTB9TMAE8", // #hub-admin-alerts — invite the prod bot once
 } as const;
 export type ChannelName = keyof typeof CHANNELS;
-
-// Usergroup mentions render as "@mentors" — must be the "<!subteam^ID>" form.
-export const TEAMS = {
-  mentors: "<!subteam^S0ZZZZZZZ>",
-} as const;
-export type TeamName = keyof typeof TEAMS;
 ```
+
+Usergroup mentions (`TEAMS`/`mention`) are intentionally omitted for now — no
+usergroup is in use yet, so adding them would be dead code (YAGNI). When a
+usergroup reminder is needed, add a `TEAMS` const + `mention(team)` helper in
+the same shape and re-add the `mention` test.
 
 - [ ] **Step 2: Write the failing tests**
 
@@ -74,8 +68,8 @@ export type TeamName = keyof typeof TEAMS;
 
 ```ts
 import { describe, expect, test } from "vitest";
-import { CHANNELS, TEAMS } from "./slack-registry";
-import { mention, postChannelMessage, sendDM, type SlackDeps } from "./slack";
+import { CHANNELS } from "./slack-registry";
+import { postChannelMessage, sendDM, type SlackDeps } from "./slack";
 
 type CapturedRequest = { url: string; init?: RequestInit };
 
@@ -99,12 +93,6 @@ const devDeps = (fetchFn: typeof globalThis.fetch): SlackDeps => ({ fetch: fetch
 function bodyOf(req: CapturedRequest) {
   return JSON.parse(req.init!.body as string) as Record<string, unknown>;
 }
-
-describe("mention", () => {
-  test("returns the raw subteam string for a known team", () => {
-    expect(mention("mentors")).toBe(TEAMS.mentors);
-  });
-});
 
 describe("postChannelMessage", () => {
   test("posts to chat.postMessage with the resolved channel id and bearer token", async () => {
@@ -181,7 +169,7 @@ Expected: FAIL — `slack.ts` has no exports yet.
 - [ ] **Step 4: Implement `src/lib/slack.ts`**
 
 ```ts
-import { CHANNELS, TEAMS, type ChannelName, type TeamName } from "./slack-registry";
+import { CHANNELS, type ChannelName } from "./slack-registry";
 
 const API = "https://slack.com/api/";
 
@@ -203,11 +191,6 @@ export function slackDepsFromEnv(): SlackDeps {
     // Reserved, unforgeable. Any non-"production" value (preview/dev/unset) is non-prod.
     isProd: process.env.VERCEL_ENV === "production",
   };
-}
-
-/** Render an @usergroup mention for interpolation into message text. */
-export function mention(team: TeamName): string {
-  return TEAMS[team];
 }
 
 async function post(deps: SlackDeps, method: string, payload: Record<string, unknown>): Promise<{ ok: boolean; body: Record<string, unknown> }> {
