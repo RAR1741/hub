@@ -175,11 +175,17 @@ describe("state machine", () => {
     expect(store.getSnapshot().phase).toBe("error");
   });
 
-  it("error clears on the next tracked request start", () => {
+  it("error clears on the next mutation start (a GET start does not clear it)", () => {
     store.started(true);
     store.settled(true, false);
     expect(store.getSnapshot().phase).toBe("error");
-    store.started(false);
+
+    store.started(false); // GET/RSC (e.g. router.refresh()) rides over the error
+    expect(store.getSnapshot().phase).toBe("error");
+    store.settled(false, true);
+    expect(store.getSnapshot().phase).toBe("error");
+
+    store.started(true); // a real new mutation clears it
     expect(store.getSnapshot().phase).toBe("idle");
   });
 
@@ -191,11 +197,58 @@ describe("state machine", () => {
     expect(store.getSnapshot().phase).toBe("idle");
   });
 
-  it("a new request during the saved flash cuts it immediately", () => {
+  it("a trailing GET (router.refresh()) rides over the saved flash for its full duration", () => {
+    store.started(true);
+    vi.advanceTimersByTime(250);
+    store.settled(true, true);
+    expect(store.getSnapshot().phase).toBe("saved");
+
+    // router.refresh() fires ~6ms later as a tracked RSC fetch
+    vi.advanceTimersByTime(6);
+    store.started(false);
+    expect(store.getSnapshot().phase).toBe("saved");
+    store.settled(false, true);
+    expect(store.getSnapshot().phase).toBe("saved");
+
+    vi.advanceTimersByTime(2000 - 6 - 1);
+    expect(store.getSnapshot().phase).toBe("saved");
+    vi.advanceTimersByTime(1);
+    expect(store.getSnapshot().phase).toBe("idle");
+  });
+
+  it("a fast save's saved flash also survives a trailing GET (excusal-modal flow)", () => {
+    store.started(true);
+    vi.advanceTimersByTime(100); // settles before the show delay
+    store.settled(true, true);
+    expect(store.getSnapshot().phase).toBe("saved");
+
+    store.started(false);
+    store.settled(false, true);
+    expect(store.getSnapshot().phase).toBe("saved");
+
+    vi.advanceTimersByTime(2000);
+    expect(store.getSnapshot().phase).toBe("idle");
+  });
+
+  it("a genuinely new mutation during the saved flash cuts it and transitions to saving", () => {
     store.started(true);
     store.settled(true, true);
     expect(store.getSnapshot().phase).toBe("saved");
-    store.started(false);
+
+    store.started(true);
+    expect(store.getSnapshot().phase).toBe("idle");
+    vi.advanceTimersByTime(250);
+    expect(store.getSnapshot().phase).toBe("saving");
+  });
+
+  it("no double-flash: once the saved flash expires, a trailing settle doesn't re-show it", () => {
+    store.started(true);
+    store.settled(true, true);
+    store.started(false); // trailing GET still in flight when the flash expires
+    vi.advanceTimersByTime(2000);
+    expect(store.getSnapshot().phase).toBe("idle");
+
+    store.settled(false, true); // settles after the flash already ended
     expect(store.getSnapshot().phase).toBe("idle");
   });
 });

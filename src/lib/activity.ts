@@ -70,8 +70,15 @@ export function createStore(): Store {
     },
 
     started(isMutation) {
-      // A new request cuts a standing error or a "saved" flash immediately.
+      // Only a genuinely new mutation cuts a standing error/"saved" flash. A
+      // non-mutation (e.g. the router.refresh() ~55 save handlers fire right
+      // after a successful save) is display-transparent: counted for
+      // integrity, but rides over the flash instead of wiping it in ~6ms.
       if (phase === "error" || phase === "saved") {
+        if (!isMutation) {
+          count++;
+          return;
+        }
         clearTimer();
         setPhase("idle");
       }
@@ -101,6 +108,14 @@ export function createStore(): Store {
     // long streaming RSC response clears the indicator slightly early. Upgrade
     // path: count a TransformStream on res.body instead, not worth it now.
     settled(isMutation, ok) {
+      if (phase === "error" || phase === "saved") {
+        // Settle of a display-transparent request riding over a standing
+        // flash (see started() above) — count only, the flash's own timer
+        // owns the phase transition from here.
+        count--;
+        return;
+      }
+
       count--;
       if (isMutation) {
         nonGetCount--;
@@ -122,13 +137,19 @@ export function createStore(): Store {
 
       if (sawMutationFail) {
         setPhase("error");
+        sawMutationOk = false;
+        sawMutationFail = false; // no double-flash from a later-settling transparent request
         return;
       }
 
       if (sawMutationOk) {
         setPhase("saved"); // MIN_VISIBLE never gates the saved flash
+        sawMutationOk = false;
+        sawMutationFail = false;
         timer = setTimeout(() => {
           timer = null;
+          sawMutationOk = false;
+          sawMutationFail = false;
           setPhase("idle");
         }, SAVED_FLASH);
         return;
