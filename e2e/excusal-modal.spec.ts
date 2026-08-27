@@ -34,6 +34,9 @@ test("student requests excusal from the missed-day modal and the row shows Pendi
   await dialog.getByLabel("Reason (optional)").fill("e2e: family event");
   await dialog.getByRole("button", { name: "Request excusal" }).click();
 
+  // Site-wide activity indicator flashes "Saved" on the successful POST.
+  await expect(page.getByRole("status").filter({ hasText: "Saved" })).toBeVisible();
+
   // Modal closes and the page refreshes with the new pending request.
   await expect(dialog).not.toBeVisible();
   await expect(row.getByText("Pending excusal")).toBeVisible();
