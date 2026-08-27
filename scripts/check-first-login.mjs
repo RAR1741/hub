@@ -1,16 +1,15 @@
-// Manual integration check: ./dev npx tsx scripts/check-first-login.mjs
-// Requires FIRST_USERNAME/FIRST_PASSWORD in the environment. Not run in CI.
-import { loginToFirst, fetchWithSession } from "../src/lib/first-auth.ts";
+// Manual live check: paste a fresh Cookie header into FIRST_COOKIE, then:
+//   ./dev bash -lc 'FIRST_COOKIE="<paste>" npx tsx scripts/check-first-login.mjs'
+// Not run in CI (CI can't reach FIRST).
+import { fetchWithSession, normalizeCookieHeader } from "../src/lib/first-auth.ts";
 
-const user = process.env.FIRST_USERNAME;
-const pass = process.env.FIRST_PASSWORD;
-if (!user || !pass) throw new Error("Set FIRST_USERNAME and FIRST_PASSWORD");
+const cookie = normalizeCookieHeader(process.env.FIRST_COOKIE ?? "");
+if (!cookie) throw new Error("Set FIRST_COOKIE to a pasted my.firstinspires.org Cookie header");
 
-const jar = await loginToFirst(user, pass);
 const res = await fetchWithSession(
   "https://my.firstinspires.org/Teams/Page/TeamContacts/TeamRoster?TeamProfileID=1790765",
-  jar,
+  cookie,
 );
-if (res.kind !== "ok") throw new Error("session did not authenticate");
+if (res.kind !== "ok") throw new Error("session did not authenticate (cookie expired?)");
 if (!res.body.includes("teamContactsModel")) throw new Error("roster model missing from page");
-console.log("OK: logged in, roster page fetched,", res.body.length, "bytes");
+console.log("OK: cookie authenticated, roster page fetched,", res.body.length, "bytes");
