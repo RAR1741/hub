@@ -89,4 +89,32 @@ describe("sendDM", () => {
     expect(bodyOf(post).channel).toBe(CHANNELS.bot_test);
     expect(String(bodyOf(post).text)).toContain("U123");
   });
+
+  test("no token → no request, returns false", async () => {
+    const { fetchFn, requests } = fakeFetch();
+    const ok = await sendDM({ fetch: fetchFn, token: null, isProd: true }, "U123", "hi");
+    expect(ok).toBe(false);
+    expect(requests).toHaveLength(0);
+  });
+
+  test("conversations.open fails (ok:false) → returns false, no post", async () => {
+    const { fetchFn, requests } = fakeFetch([{ status: 200, body: { ok: false, error: "user_not_found" } }]);
+    const ok = await sendDM(prodDeps(fetchFn), "U123", "hi");
+    expect(ok).toBe(false);
+    expect(requests.every((r) => !r.url.includes("chat.postMessage"))).toBe(true);
+  });
+
+  test("conversations.open ok but missing channel.id → returns false", async () => {
+    const { fetchFn } = fakeFetch([{ status: 200, body: { ok: true } }]);
+    const ok = await sendDM(prodDeps(fetchFn), "U123", "hi");
+    expect(ok).toBe(false);
+  });
+
+  test("network throw is swallowed → returns false", async () => {
+    const fetchFn = (async () => {
+      throw new Error("network down");
+    }) as unknown as typeof globalThis.fetch;
+    const ok = await sendDM(prodDeps(fetchFn), "U123", "hi");
+    expect(ok).toBe(false);
+  });
 });
