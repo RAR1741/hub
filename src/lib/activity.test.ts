@@ -251,6 +251,45 @@ describe("state machine", () => {
     store.settled(false, true); // settles after the flash already ended
     expect(store.getSnapshot().phase).toBe("idle");
   });
+
+  it("a new mutation that cuts a flash while a transparent GET is still in flight still shows saving", () => {
+    store.started(true);
+    store.settled(true, true); // -> "saved"
+    store.started(false); // trailing router.refresh(), still in flight -> count=1
+    store.started(true); // a genuinely NEW mutation
+    vi.advanceTimersByTime(250);
+    expect(store.getSnapshot().phase).toBe("saving"); // was "idle" — the bug
+
+    store.settled(false, true); // trailing GET settles
+    expect(store.getSnapshot().phase).toBe("saving");
+    store.settled(true, true); // the new mutation settles ok
+    expect(store.getSnapshot().phase).toBe("saved");
+    vi.advanceTimersByTime(2000);
+    expect(store.getSnapshot().phase).toBe("idle"); // counter integrity: burst after this arms normally
+    store.started(false);
+    vi.advanceTimersByTime(300);
+    expect(store.getSnapshot().phase).toBe("loading");
+  });
+
+  it("same defect on the error branch: a new save while a failed save's trailing GET is in flight", () => {
+    store.started(true);
+    store.settled(true, false); // -> "error"
+    store.started(false); // trailing GET still in flight
+    store.started(true); // a fresh save
+    vi.advanceTimersByTime(250);
+    expect(store.getSnapshot().phase).toBe("saving");
+
+    store.settled(false, true); // trailing GET settles
+    store.settled(true, false); // the fresh save fails too
+    expect(store.getSnapshot().phase).toBe("error");
+
+    // counter integrity: dismissing and starting a fresh burst behaves normally
+    store.dismissError();
+    expect(store.getSnapshot().phase).toBe("idle");
+    store.started(false);
+    vi.advanceTimersByTime(300);
+    expect(store.getSnapshot().phase).toBe("loading");
+  });
 });
 
 describe("module-level exports wire to the singleton store", () => {

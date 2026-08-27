@@ -65,6 +65,7 @@ export function createStore(): Store {
     dismissError() {
       if (phase === "error") {
         clearTimer();
+        shownAt = null;
         setPhase("idle");
       }
     },
@@ -80,18 +81,21 @@ export function createStore(): Store {
           return;
         }
         clearTimer();
+        shownAt = null;
         setPhase("idle");
       }
 
       count++;
       if (isMutation) nonGetCount++;
 
-      if (count === 1) {
-        // Burst start: hidden for SHOW_DELAY so quick GETs never flicker.
+      // Arm a hidden burst whenever we're idle with nothing already pending
+      // or shown — NOT just on count===1. A mutation that just cut a flash
+      // above can land here with count already >1 (a transparent request,
+      // e.g. router.refresh(), was still in flight); it still needs to arm
+      // the show-delay timer so "saving" renders instead of staying idle.
+      if (phase === "idle" && timer === null && shownAt === null) {
         sawMutationOk = false;
         sawMutationFail = false;
-        shownAt = null;
-        clearTimer();
         timer = setTimeout(() => {
           timer = null;
           if (count > 0) {
@@ -150,6 +154,7 @@ export function createStore(): Store {
           timer = null;
           sawMutationOk = false;
           sawMutationFail = false;
+          shownAt = null; // next burst must be free to re-arm
           setPhase("idle");
         }, SAVED_FLASH);
         return;
@@ -157,15 +162,23 @@ export function createStore(): Store {
 
       if (wasHiddenPending) {
         setPhase("idle"); // GET-only burst settled before it ever showed
+        shownAt = null;
         return;
       }
 
       const elapsed = shownAt !== null ? Date.now() - shownAt : MIN_VISIBLE;
       if (elapsed >= MIN_VISIBLE) {
         setPhase("idle");
+        shownAt = null;
       } else {
         timer = setTimeout(() => {
           timer = null;
+          if (count > 0) {
+            // a new request arrived during the min-visible hold — stay visible
+            setPhase(nonGetCount > 0 ? "saving" : "loading");
+            return;
+          }
+          shownAt = null;
           setPhase("idle");
         }, MIN_VISIBLE - elapsed);
       }
