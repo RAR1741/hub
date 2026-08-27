@@ -4,6 +4,7 @@ import {
   adultsFromModel,
   statusUrl,
   matchFirstToHub,
+  syncFirstRoster,
   type FirstPerson,
   type HubCandidate,
 } from "./first-sync";
@@ -85,6 +86,87 @@ describe("statusUrl", () => {
     expect(statusUrl("1790765", [101, 102])).toBe(
       "https://my.firstinspires.org/Teams/Page/TeamContacts/GetPersonStatus?TeamProfileID=1790765&ids=101&ids=102",
     );
+  });
+});
+
+// Minimal fake db: app_setting get/set by key, empty person/person_identity rosters.
+function fakeDb(settings: Record<string, unknown>) {
+  const upserts: Record<string, unknown>[] = [];
+  const db = {
+    from(table: string) {
+      if (table === "app_setting") {
+        return {
+          select: () => ({ eq: (_col: string, key: string) => ({ maybeSingle: async () => ({ data: key in settings ? { value: settings[key] } : null, error: null }) }) }),
+          upsert: async (row: Record<string, unknown>) => { upserts.push(row); return { error: null }; },
+        };
+      }
+      if (table === "person") {
+        return { select: () => ({ in: () => ({ data: [], error: null }) }) };
+      }
+      if (table === "person_identity") {
+        return { select: () => ({ data: [], error: null }) };
+      }
+      throw new Error(`unexpected table ${table}`);
+    },
+  } as never;
+  return { db, upserts };
+}
+
+const ROSTER_MODEL = { PeopleRoles: [] };
+const ROSTER_HTML = `<html><script>window.teamContactsModel = ${JSON.stringify(ROSTER_MODEL)};</script></html>`;
+
+describe("syncFirstRoster cookie rotation", () => {
+  test("persists the rotated cookie after both fetches succeed, preserving savedAt", async () => {
+    const { db, upserts } = fakeDb({
+      first_team_profile_id: "1790765",
+      first_session: { cookie: "old=1", savedAt: "2026-01-01T00:00:00.000Z" },
+    });
+    let call = 0;
+    const fetchFn = (async (_url: string) => {
+      call++;
+      if (call === 1) {
+        return {
+          status: 200,
+          headers: { getSetCookie: () => ["old=2"], get: () => null },
+          text: async () => ROSTER_HTML,
+        };
+      }
+      return {
+        status: 200,
+        headers: { getSetCookie: () => ["old=3"], get: () => null },
+        text: async () => "[]",
+      };
+    }) as unknown as typeof fetch;
+
+    const report = await syncFirstRoster({ db, fetchFn });
+
+    expect(report.rosterCount).toBe(0);
+    const sessionUpsert = upserts.find((u) => u.key === "first_session");
+    expect(sessionUpsert).toBeDefined();
+    const value = sessionUpsert!.value as { cookie: string; savedAt: string; rotatedAt: string };
+    expect(value.cookie).toBe("old=3"); // rotated on both requests, ends at the status fetch's cookie
+    expect(value.savedAt).toBe("2026-01-01T00:00:00.000Z"); // preserved, not overwritten
+    expect(value.rotatedAt).toBeTypeOf("string");
+  });
+
+  test("skips the session upsert when the cookie never rotates", async () => {
+    const { db, upserts } = fakeDb({
+      first_team_profile_id: "1790765",
+      first_session: { cookie: "old=1", savedAt: "2026-01-01T00:00:00.000Z" },
+    });
+    let call = 0;
+    const fetchFn = (async () => {
+      call++;
+      return {
+        status: 200,
+        headers: { getSetCookie: () => [], get: () => null },
+        text: async () => (call === 1 ? ROSTER_HTML : "[]"),
+      };
+    }) as unknown as typeof fetch;
+
+    await syncFirstRoster({ db, fetchFn });
+
+    expect(upserts.find((u) => u.key === "first_session")).toBeUndefined();
   });
 });
 
