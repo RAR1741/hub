@@ -29,10 +29,12 @@ export function normalizeCookieHeader(pasted: string): string {
 export function mergeSetCookies(header: string, setCookies: string[]): string {
   const names: string[] = [];
   const values = new Map<string, string>();
-  for (const pair of header.split("; ")) {
+  for (const pair of header.split(/;\s*/)) {
+    if (!pair) continue;
     const eq = pair.indexOf("=");
     if (eq < 0) continue;
-    const name = pair.slice(0, eq);
+    const name = pair.slice(0, eq).trim();
+    if (!name) continue;
     names.push(name);
     values.set(name, pair.slice(eq + 1));
   }

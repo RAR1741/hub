@@ -50,6 +50,14 @@ describe("mergeSetCookies", () => {
     ]);
     expect(result).toBe("a=1; b=2new; d=4");
   });
+
+  it("parses a header whose pairs lack a space after the semicolon", () => {
+    // A Cookie header without ""; "" separators must still tokenize per-cookie,
+    // so rotating one cookie does not swallow the next into its value.
+    const result = mergeSetCookies("a=1;b=2", ["b=3; Path=/"]);
+    // order preserved, b rotated in place, no duplicate b= entry
+    expect(result).toBe("a=1; b=3");
+  });
 });
 
 describe("fetchWithSession", () => {

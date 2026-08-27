@@ -253,6 +253,10 @@ export async function syncFirstRoster(deps: {
       adult.trainingStatus = status?.training?.status ?? null;
     }
 
+    // ponytail: last-write-wins if a cron tick and a manual sync overlap — both
+    // get a valid rotation of the same session, so a lost update just keeps a
+    // slightly older still-valid cookie. Add a compare-and-swap only if that
+    // proves insufficient in practice.
     if (liveCookie !== session.cookie) {
       const { error: sessionError } = await db.from("app_setting").upsert(
         { key: "first_session", value: { cookie: liveCookie, savedAt: session.savedAt, rotatedAt: new Date().toISOString() } },
