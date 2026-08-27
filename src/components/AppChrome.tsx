@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { ActivityIndicator } from "@/components/ActivityIndicator";
 
 /**
  * Hides the global hub chrome (nav, masquerade banner) on the /onshape panel
@@ -11,7 +12,12 @@ import { usePathname } from "next/navigation";
 export function AppChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   if (pathname === "/onshape" || pathname?.startsWith("/onshape/")) return null;
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <ActivityIndicator />
+    </>
+  );
 }
 
 /** Same panel-route check for the `#main` content wrapper — the onshape
