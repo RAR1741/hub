@@ -318,6 +318,79 @@ export async function deleteBadgeByName(name: string): Promise<void> {
   }
 }
 
+/**
+ * Upsert a person row by fixed id (pinned UUID) — used by first-status.spec.ts
+ * to seed mentors/admins with known FIRST-sync status columns. Idempotent via
+ * on_conflict=id, so re-runs without db:reset overwrite rather than collide.
+ */
+export async function upsertPerson(
+  id: string,
+  fields: {
+    firstName: string;
+    lastName: string;
+    role: "mentor" | "admin";
+    email: string;
+    isActive?: boolean;
+    firstPeopleId?: number | null;
+    firstConsentRelease?: boolean | null;
+    firstScreeningStatus?: string | null;
+    firstScreeningText?: string | null;
+    firstTrainingStatus?: string | null;
+  },
+): Promise<void> {
+  const res = await fetch(`${restBaseUrl()}/person?on_conflict=id`, {
+    method: "POST",
+    headers: authHeaders({ Prefer: "resolution=merge-duplicates" }),
+    body: JSON.stringify({
+      id,
+      first_name: fields.firstName,
+      last_name: fields.lastName,
+      role: fields.role,
+      email: fields.email,
+      is_active: fields.isActive ?? true,
+      first_people_id: fields.firstPeopleId ?? null,
+      first_consent_release: fields.firstConsentRelease ?? null,
+      first_screening_status: fields.firstScreeningStatus ?? null,
+      first_screening_text: fields.firstScreeningText ?? null,
+      first_training_status: fields.firstTrainingStatus ?? null,
+    }),
+  });
+  if (![200, 201, 204].includes(res.status)) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`upsertPerson failed: ${res.status} ${body}`);
+  }
+}
+
+/** The current first_people_id for a person, or undefined if the person doesn't exist. */
+export async function personFirstPeopleId(id: string): Promise<number | null | undefined> {
+  const res = await fetch(`${restBaseUrl()}/person?id=eq.${id}&select=first_people_id`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`personFirstPeopleId lookup failed: ${res.status} ${body}`);
+  }
+  const rows = (await res.json()) as { first_people_id: number | null }[];
+  return rows[0]?.first_people_id;
+}
+
+/**
+ * Upsert an app_setting row by key (JSON value). Used to seed
+ * `first_last_sync_report` / `first_session` directly, simulating what a
+ * real FIRST sync would have written, without making a live FIRST call.
+ */
+export async function seedAppSetting(key: string, value: unknown): Promise<void> {
+  const res = await fetch(`${restBaseUrl()}/app_setting?on_conflict=key`, {
+    method: "POST",
+    headers: authHeaders({ Prefer: "resolution=merge-duplicates" }),
+    body: JSON.stringify({ key, value }),
+  });
+  if (![200, 201, 204].includes(res.status)) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`seedAppSetting failed: ${res.status} ${body}`);
+  }
+}
+
 /** True if a badge_award row exists for the given badge+person. */
 export async function badgeAwardExists(badgeId: string, personId: string): Promise<boolean> {
   const res = await fetch(

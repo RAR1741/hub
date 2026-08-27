@@ -21,6 +21,8 @@ describe("withRole", () => {
         dateOfBirth: null, streetAddress: null, city: null, zip: null,
         homePhone: null, school: null, ethnicity: null, race: null,
         interests: null, lastApplicationAt: null,
+        firstPeopleId: null, firstConsentRelease: null, firstScreeningStatus: null,
+        firstScreeningText: null, firstTrainingStatus: null, firstSyncedAt: null,
       },
       role: "admin",
     })(new Request("http://test/api/admin/ping"));
@@ -50,6 +52,8 @@ describe("withRole", () => {
           dateOfBirth: null, streetAddress: null, city: null, zip: null,
           homePhone: null, school: null, ethnicity: null, race: null,
           interests: null, lastApplicationAt: null,
+          firstPeopleId: null, firstConsentRelease: null, firstScreeningStatus: null,
+          firstScreeningText: null, firstTrainingStatus: null, firstSyncedAt: null,
         },
         role: "admin",
       }),
@@ -70,6 +74,8 @@ describe("withRole", () => {
         dateOfBirth: null, streetAddress: null, city: null, zip: null,
         homePhone: null, school: null, ethnicity: null, race: null,
         interests: null, lastApplicationAt: null,
+        firstPeopleId: null, firstConsentRelease: null, firstScreeningStatus: null,
+        firstScreeningText: null, firstTrainingStatus: null, firstSyncedAt: null,
       },
       role: "student",
       masquerade: {
