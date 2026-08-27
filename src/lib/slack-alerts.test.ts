@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from "vitest";
+import { describe, expect, test } from "vitest";
 import { reportSyncOutcome } from "./slack-alerts";
 
 // Minimal fake app_setting store honoring getSetting's .select().eq().maybeSingle()
