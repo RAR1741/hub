@@ -44,8 +44,10 @@ type Identity = { person_id: string; email: string };
 //   db.from("person").update({slack_user_id}).eq("id", personId) -> { error }
 function fakeDb(people: Person[], identities: Identity[] = []) {
   const updates: { table: string; values: Record<string, unknown>; id: string }[] = [];
+  const upserts: { table: string; values: Record<string, unknown> }[] = [];
   return {
     updates,
+    upserts,
     people,
     from(table: string) {
       return {
@@ -68,6 +70,10 @@ function fakeDb(people: Person[], identities: Identity[] = []) {
             },
           };
         },
+        upsert(values: Record<string, unknown>) {
+          upserts.push({ table, values });
+          return Promise.resolve({ error: null });
+        },
       };
     },
   };
@@ -86,7 +92,13 @@ function person(overrides: Partial<Person>): Person {
   };
 }
 
-function member(id: string, email: string, extra: Record<string, unknown> = {}) {
+function member(id: string, email: string, name = "", extra: Record<string, unknown> = {}) {
+  return { id, profile: { email }, real_name: name, ...extra };
+}
+
+// Original 3-positional-arg form used by pre-existing fetchSlackMembers tests
+// (extra flags like { deleted: true }, no name involved).
+function rawMember(id: string, email: string, extra: Record<string, unknown> = {}) {
   return { id, profile: { email }, ...extra };
 }
 
@@ -98,12 +110,12 @@ describe("fetchSlackMembers", () => {
         body: {
           ok: true,
           members: [
-            member("U1", "Alice@Example.com"),
-            member("U2", "bob@example.com", { deleted: true }),
-            member("U3", "bot@example.com", { is_bot: true }),
-            member("U4", "restricted@example.com", { is_restricted: true }),
-            member("U5", "ultra@example.com", { is_ultra_restricted: true }),
-            member("U6", "unconfirmed@example.com", { is_email_confirmed: false }),
+            rawMember("U1", "Alice@Example.com"),
+            rawMember("U2", "bob@example.com", { deleted: true }),
+            rawMember("U3", "bot@example.com", { is_bot: true }),
+            rawMember("U4", "restricted@example.com", { is_restricted: true }),
+            rawMember("U5", "ultra@example.com", { is_ultra_restricted: true }),
+            rawMember("U6", "unconfirmed@example.com", { is_email_confirmed: false }),
             { id: "U7", profile: {} },
           ],
           response_metadata: { next_cursor: "page2" },
@@ -122,11 +134,38 @@ describe("fetchSlackMembers", () => {
     const result = await fetchSlackMembers(deps);
 
     expect(result).toEqual([
-      { id: "U1", email: "alice@example.com" },
-      { id: "U8", email: "carol@example.com" },
+      { id: "U1", email: "alice@example.com", name: "" },
+      { id: "U8", email: "carol@example.com", name: "" },
     ]);
     expect(requests).toHaveLength(2);
     expect(requests[1].url).toContain("cursor=page2");
+  });
+
+  test("name sourcing prefers profile.real_name, then real_name, then profile.display_name, else empty", async () => {
+    const { deps } = slackDeps([
+      {
+        status: 200,
+        body: {
+          ok: true,
+          members: [
+            { id: "U1", profile: { email: "a@example.com", real_name: "Profile Real", display_name: "Display" }, real_name: "Top Real" },
+            { id: "U2", profile: { email: "b@example.com", display_name: "Display Only" }, real_name: "Top Real" },
+            { id: "U3", profile: { email: "c@example.com", display_name: "Display Only 2" } },
+            { id: "U4", profile: { email: "d@example.com" } },
+          ],
+          response_metadata: { next_cursor: "" },
+        },
+      },
+    ]);
+
+    const result = await fetchSlackMembers(deps);
+
+    expect(result).toEqual([
+      { id: "U1", email: "a@example.com", name: "Profile Real" },
+      { id: "U2", email: "b@example.com", name: "Top Real" },
+      { id: "U3", email: "c@example.com", name: "Display Only 2" },
+      { id: "U4", email: "d@example.com", name: "" },
+    ]);
   });
 });
 
@@ -212,7 +251,167 @@ describe("syncSlackLinks", () => {
 
     const report = await syncSlackLinks({ db: db as never, slack: deps });
 
-    expect(report.unmatchedSlack).toEqual([{ id: "U2", email: "stray@example.com" }]);
+    expect(report.unmatchedSlack).toEqual([{ id: "U2", email: "stray@example.com", name: "" }]);
     expect(report.unmatchedPeople).toEqual([{ personId: "p2", name: "No Match" }]);
+  });
+
+  test("name fallback: no email match, name normalizes to exactly one unlinked person", async () => {
+    const people = [person({ id: "p1", email: null, first_name: "Jane", last_name: "Doe" })];
+    const db = fakeDb(people);
+    const { deps } = slackDeps([
+      { status: 200, body: { ok: true, members: [member("U1", "nomatch@example.com", "Jane   Doe")] } },
+    ]);
+
+    const report = await syncSlackLinks({ db: db as never, slack: deps });
+
+    expect(report.linked).toBe(1);
+    expect(people[0].slack_user_id).toBe("U1");
+    expect(report.unmatchedSlack).toEqual([]);
+    expect(report.unmatchedPeople).toEqual([]);
+  });
+
+  test("name fallback matches via display_name", async () => {
+    const people = [
+      person({ id: "p1", email: null, first_name: "Jane", last_name: "Doe", display_name: "JD" }),
+    ];
+    const db = fakeDb(people);
+    const { deps } = slackDeps([
+      { status: 200, body: { ok: true, members: [member("U1", "nomatch@example.com", "JD")] } },
+    ]);
+
+    const report = await syncSlackLinks({ db: db as never, slack: deps });
+
+    expect(report.linked).toBe(1);
+    expect(people[0].slack_user_id).toBe("U1");
+  });
+
+  test("name never overwrites an existing slack_user_id", async () => {
+    const people = [
+      person({ id: "p1", email: null, first_name: "Jane", last_name: "Doe", slack_user_id: "UOLD" }),
+    ];
+    const db = fakeDb(people);
+    const { deps } = slackDeps([
+      { status: 200, body: { ok: true, members: [member("U1", "nomatch@example.com", "Jane Doe")] } },
+    ]);
+
+    const report = await syncSlackLinks({ db: db as never, slack: deps });
+
+    expect(report.linked).toBe(0);
+    expect(people[0].slack_user_id).toBe("UOLD");
+    expect(report.unmatchedSlack).toEqual([{ id: "U1", email: "nomatch@example.com", name: "Jane Doe" }]);
+  });
+
+  test("name-ambiguous: two unlinked people share a normalized name", async () => {
+    const people = [
+      person({ id: "p1", email: null, first_name: "Jane", last_name: "Doe" }),
+      person({ id: "p2", email: null, first_name: "Jane", last_name: "Doe" }),
+    ];
+    const db = fakeDb(people);
+    const { deps } = slackDeps([
+      { status: 200, body: { ok: true, members: [member("U1", "nomatch@example.com", "Jane Doe")] } },
+    ]);
+
+    const report = await syncSlackLinks({ db: db as never, slack: deps });
+
+    expect(report.linked).toBe(0);
+    expect(report.ambiguous).toEqual([]);
+    expect(report.unmatchedSlack).toEqual([{ id: "U1", email: "nomatch@example.com", name: "Jane Doe" }]);
+    expect(people[0].slack_user_id).toBeNull();
+    expect(people[1].slack_user_id).toBeNull();
+  });
+
+  test("claim-once: two Slack members with the same name, only the first claims", async () => {
+    const people = [person({ id: "p1", email: null, first_name: "Jane", last_name: "Doe" })];
+    const db = fakeDb(people);
+    const { deps } = slackDeps([
+      {
+        status: 200,
+        body: {
+          ok: true,
+          members: [
+            member("U1", "a@example.com", "Jane Doe"),
+            member("U2", "b@example.com", "Jane Doe"),
+          ],
+        },
+      },
+    ]);
+
+    const report = await syncSlackLinks({ db: db as never, slack: deps });
+
+    expect(report.linked).toBe(1);
+    expect(people[0].slack_user_id).toBe("U1");
+    expect(report.unmatchedSlack).toEqual([{ id: "U2", email: "b@example.com", name: "Jane Doe" }]);
+  });
+
+  test("email claim blocks a same-named member's name claim", async () => {
+    const people = [person({ id: "p1", email: "jane@example.com", first_name: "Jane", last_name: "Doe" })];
+    const db = fakeDb(people);
+    const { deps } = slackDeps([
+      {
+        status: 200,
+        body: {
+          ok: true,
+          members: [
+            member("U1", "jane@example.com", "Jane Doe"),
+            member("U2", "other@example.com", "Jane Doe"),
+          ],
+        },
+      },
+    ]);
+
+    const report = await syncSlackLinks({ db: db as never, slack: deps });
+
+    expect(people[0].slack_user_id).toBe("U1");
+    expect(report.linked).toBe(1);
+    expect(report.unmatchedSlack).toEqual([{ id: "U2", email: "other@example.com", name: "Jane Doe" }]);
+  });
+
+  test("ambiguous email terminates the ladder: no name fallback, not in unmatchedSlack", async () => {
+    const people = [
+      person({ id: "p1", email: "shared@example.com", first_name: "Jane", last_name: "Doe" }),
+      person({ id: "p2", email: "shared@example.com", first_name: "Other", last_name: "Person" }),
+    ];
+    const db = fakeDb(people);
+    const { deps } = slackDeps([
+      { status: 200, body: { ok: true, members: [member("U1", "shared@example.com", "Jane Doe")] } },
+    ]);
+
+    const report = await syncSlackLinks({ db: db as never, slack: deps });
+
+    expect(report.ambiguous).toHaveLength(1);
+    expect(report.unmatchedSlack).toEqual([]);
+    expect(report.linked).toBe(0);
+    expect(people[0].slack_user_id).toBeNull();
+  });
+
+  test("empty name with no email match goes straight to unmatchedSlack", async () => {
+    const people = [person({ id: "p1", email: null, first_name: "Jane", last_name: "Doe" })];
+    const db = fakeDb(people);
+    const { deps } = slackDeps([
+      { status: 200, body: { ok: true, members: [member("U1", "nomatch@example.com", "")] } },
+    ]);
+
+    const report = await syncSlackLinks({ db: db as never, slack: deps });
+
+    expect(report.linked).toBe(0);
+    expect(report.unmatchedSlack).toEqual([{ id: "U1", email: "nomatch@example.com", name: "" }]);
+  });
+
+  test("persists the sync report to app_setting/slack_last_sync_report", async () => {
+    const people = [person({ id: "p1", email: null, first_name: "Jane", last_name: "Doe" })];
+    const db = fakeDb(people);
+    const { deps } = slackDeps([
+      { status: 200, body: { ok: true, members: [member("U1", "nomatch@example.com", "")] } },
+    ]);
+
+    const report = await syncSlackLinks({ db: db as never, slack: deps });
+
+    expect(db.upserts).toHaveLength(1);
+    expect(db.upserts[0].table).toBe("app_setting");
+    expect(db.upserts[0].values).toMatchObject({ key: "slack_last_sync_report" });
+    const persisted = db.upserts[0].values.value as LinkReport;
+    expect(persisted.ranAt).toBe(report.ranAt);
+    expect(typeof persisted.ranAt).toBe("string");
+    expect(persisted.unmatchedSlack).toEqual([{ id: "U1", email: "nomatch@example.com", name: "" }]);
   });
 });
