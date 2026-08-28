@@ -70,10 +70,10 @@ export function KioskBoard({
     return () => clearInterval(id);
   }, []);
 
-  // Auto-dismiss the sign in/out banner after 10s so it doesn't crowd the screen.
+  // Auto-dismiss the sign in/out banner after 5s so it doesn't crowd the screen.
   useEffect(() => {
     if (!flash) return;
-    const id = setTimeout(() => setFlash(null), 10_000);
+    const id = setTimeout(() => setFlash(null), 5_000);
     return () => clearTimeout(id);
   }, [flash]);
 
