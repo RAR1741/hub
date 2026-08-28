@@ -57,20 +57,6 @@ export function SlackLinkPanel() {
               ))}
             </ul>
           )}
-          {outcome.report.unmatchedSlack.length > 0 && (
-            <ul className="list-disc pl-5 text-[var(--muted)]">
-              {outcome.report.unmatchedSlack.map((m) => (
-                <li key={m.id}>{m.email} (no matching person)</li>
-              ))}
-            </ul>
-          )}
-          {outcome.report.unmatchedPeople.length > 0 && (
-            <ul className="list-disc pl-5 text-[var(--muted)]">
-              {outcome.report.unmatchedPeople.map((p) => (
-                <li key={p.personId}>{p.name} (no Slack match)</li>
-              ))}
-            </ul>
-          )}
         </div>
       )}
       {outcome?.kind === "not_configured" && (

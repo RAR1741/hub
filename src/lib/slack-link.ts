@@ -1,9 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SlackDeps } from "./slack";
+import { normalizeFull } from "./name-match";
 
 const API = "https://slack.com/api/";
 
-export type SlackMember = { id: string; email: string };
+export type SlackMember = { id: string; email: string; name: string };
 
 type RawMember = {
   id: string;
@@ -11,7 +12,8 @@ type RawMember = {
   is_bot?: boolean;
   is_restricted?: boolean;
   is_ultra_restricted?: boolean;
-  profile?: { email?: string | null };
+  real_name?: string | null;
+  profile?: { email?: string | null; real_name?: string | null; display_name?: string | null };
   // Slack sets is_email_confirmed on the member; treat missing as confirmed.
   is_email_confirmed?: boolean;
 };
@@ -35,7 +37,8 @@ export async function fetchSlackMembers(deps: SlackDeps): Promise<SlackMember[]>
       if (m.is_email_confirmed === false) continue;
       const email = m.profile?.email?.trim().toLowerCase();
       if (!email) continue;
-      out.push({ id: m.id, email });
+      const name = m.profile?.real_name ?? m.real_name ?? m.profile?.display_name ?? "";
+      out.push({ id: m.id, email, name });
     }
     cursor = body.response_metadata?.next_cursor ?? "";
   } while (cursor);
@@ -74,12 +77,23 @@ export async function syncSlackLinks(deps: { db: SupabaseClient; slack: SlackDep
   for (const row of (identRows ?? []) as { person_id: string; email: string }[]) add(row.email, row.person_id);
 
   const linkedByPerson = new Map(people.map((p) => [p.id, p.slack_user_id]));
-  const report: LinkReport = { linked: 0, alreadyLinked: 0, ambiguous: [], unmatchedSlack: [], unmatchedPeople: [] };
+  const report: LinkReport = {
+    ranAt: "",
+    linked: 0,
+    alreadyLinked: 0,
+    ambiguous: [],
+    unmatchedSlack: [],
+    unmatchedPeople: [],
+  };
   const matchedPeople = new Set<string>();
 
+  // PASS 1 — email (unchanged semantics: may overwrite an existing slack_user_id).
+  // Ambiguous email TERMINATES the ladder for that member: no name fallback,
+  // and it is NOT added to unmatchedSlack (it only shows up in `ambiguous`).
+  const needsNamePass: SlackMember[] = [];
   for (const m of members) {
     const ids = byEmail.get(m.email);
-    if (!ids || ids.size === 0) { report.unmatchedSlack.push(m); continue; }
+    if (!ids || ids.size === 0) { needsNamePass.push(m); continue; }
     if (ids.size > 1) { report.ambiguous.push({ email: m.email, personIds: [...ids] }); continue; }
     const personId = [...ids][0];
     matchedPeople.add(personId);
@@ -89,14 +103,49 @@ export async function syncSlackLinks(deps: { db: SupabaseClient; slack: SlackDep
     report.linked++;
   }
 
+  // Name index, built AFTER pass 1, over people still unlinked and unclaimed —
+  // so the name rung structurally never overwrites an existing slack_user_id.
+  const nameIndex = new Map<string, Set<string>>();
+  const addName = (key: string, personId: string) => {
+    if (!key) return;
+    (nameIndex.get(key) ?? nameIndex.set(key, new Set()).get(key)!).add(personId);
+  };
+  for (const p of people) {
+    if (p.slack_user_id !== null || matchedPeople.has(p.id)) continue;
+    addName(normalizeFull(`${p.first_name} ${p.last_name}`), p.id);
+    if (p.display_name) addName(normalizeFull(p.display_name), p.id);
+  }
+
+  // PASS 2 — exact-normalized name, claim-once, never overwrites.
+  for (const m of needsNamePass) {
+    const key = normalizeFull(m.name);
+    if (!key) { report.unmatchedSlack.push(m); continue; }
+    const ids = nameIndex.get(key);
+    const candidates = ids ? [...ids].filter((id) => !matchedPeople.has(id)) : [];
+    if (candidates.length !== 1) { report.unmatchedSlack.push(m); continue; }
+    const personId = candidates[0];
+    matchedPeople.add(personId);
+    const { error } = await db.from("person").update({ slack_user_id: m.id }).eq("id", personId);
+    if (error) throw new Error(`slack-link: update ${personId} failed: ${error.message}`);
+    report.linked++;
+  }
+
   report.unmatchedPeople = people
     .filter((p) => p.is_active && !p.slack_user_id && !matchedPeople.has(p.id))
     .map((p) => ({ personId: p.id, name: p.display_name ?? `${p.first_name} ${p.last_name}` }));
+
+  report.ranAt = new Date().toISOString();
+
+  const { error: reportError } = await db
+    .from("app_setting")
+    .upsert({ key: "slack_last_sync_report", value: report }, { onConflict: "key" });
+  if (reportError) throw new Error(`slack-link: failed to write sync report: ${reportError.message}`);
 
   return report;
 }
 
 export type LinkReport = {
+  ranAt: string;
   linked: number;
   alreadyLinked: number;
   ambiguous: { email: string; personIds: string[] }[];
