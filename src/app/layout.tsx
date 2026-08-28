@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { Archivo, Inter, JetBrains_Mono } from "next/font/google";
 import { SiteNav } from "@/components/SiteNav";
 import { MasqueradeBanner } from "@/components/MasqueradeBanner";
@@ -42,10 +43,16 @@ const noFlashThemeScript = `
 })();
 `;
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  // Apply a persisted cookie choice server-side so the theme survives even when
+  // the browser blocks localStorage (guest/kiosk modes) — no JS or inline script
+  // needed. The inline script below still covers legacy localStorage-only choices.
+  const cookieTheme = (await cookies()).get("hub-theme")?.value;
+  const theme = cookieTheme === "light" || cookieTheme === "dark" ? cookieTheme : undefined;
   return (
     <html
       lang="en"
+      data-theme={theme}
       className={`${archivo.variable} ${inter.variable} ${jetbrainsMono.variable}`}
       // The no-flash script below sets data-theme on <html> before hydration
       // from localStorage, which the server can't know — suppress the expected

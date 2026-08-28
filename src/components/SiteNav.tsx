@@ -1,13 +1,19 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
+import { KIOSK_COOKIE, verifyKioskToken } from "@/lib/kiosk";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 const navLinkClass =
   "rounded-lg px-2.5 py-1.5 text-[13.5px] font-semibold text-[var(--muted)] transition-colors hover:bg-[var(--steel-soft)] hover:text-[var(--ink)] hover:no-underline";
 
 export async function SiteNav() {
-  const viewer = await getViewer();
+  const token = (await cookies()).get(KIOSK_COOKIE)?.value;
+  // Show the Kiosk link on a registered tablet no matter who's logged in, so a
+  // guest who navigates away can get back without typing /kiosk. No kiosk cookie
+  // → verifyKioskToken short-circuits to false with no DB hit.
+  const [viewer, kioskRegistered] = await Promise.all([getViewer(), verifyKioskToken(token)]);
   const initials = viewer.person
     ? `${viewer.person.firstName ?? ""} ${viewer.person.lastName ?? ""}`
         .trim()
@@ -55,7 +61,7 @@ export async function SiteNav() {
                 Events
               </Link>
             )}{" "}
-            {hasRole(viewer.role, "mentor") && (
+            {(hasRole(viewer.role, "mentor") || kioskRegistered) && (
               <Link href="/kiosk" className={navLinkClass}>
                 Kiosk
               </Link>

@@ -70,6 +70,13 @@ export function KioskBoard({
     return () => clearInterval(id);
   }, []);
 
+  // Auto-dismiss the sign in/out banner after 5s so it doesn't crowd the screen.
+  useEffect(() => {
+    if (!flash) return;
+    const id = setTimeout(() => setFlash(null), 5_000);
+    return () => clearTimeout(id);
+  }, [flash]);
+
   async function call(path: string, personId: string, name: string, verb: string) {
     if (busy || !canAct) return;
     setBusy(true);
