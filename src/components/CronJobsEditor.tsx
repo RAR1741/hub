@@ -46,12 +46,12 @@ export function CronJobsEditor({ jobs }: { jobs: CronJob[] }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-[13px] text-[var(--muted)]">
+      <p className="text-[13px] text-[var(--color-muted-fg)]">
         Schedules run in UTC, using standard 5-field cron syntax (minute hour day month weekday).
       </p>
       <div className="flex flex-col gap-4">
         {jobs.map((job) => {
-          const row = rows[job.jobid];
+          const row = rows[job.jobid] ?? { schedule: job.schedule, busy: false, status: null, error: null };
           return (
             <div key={job.jobid} className="flex flex-col gap-2 border-b border-[var(--steel)] pb-4 last:border-b-0 last:pb-0">
               <div className="flex flex-wrap items-center justify-between gap-2">

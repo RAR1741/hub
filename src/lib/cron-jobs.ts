@@ -13,7 +13,7 @@ export async function listCronJobs(db?: SupabaseClient): Promise<CronJob[]> {
   const client = db ?? (await import("./db")).getDb();
   const { data, error } = await client.rpc("list_cron_jobs");
   if (error) throw error;
-  return (data as Record<string, unknown>[]).map((row) => ({
+  return ((data ?? []) as Record<string, unknown>[]).map((row) => ({
     jobid: row.jobid as number,
     jobname: row.jobname as string,
     schedule: row.schedule as string,

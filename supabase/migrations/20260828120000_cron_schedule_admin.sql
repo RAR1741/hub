@@ -52,6 +52,10 @@ security definer
 set search_path = ''
 as $$
 begin
+  if not exists (select 1 from cron.job where jobid = job_id) then
+    raise exception 'cron job % not found', job_id;
+  end if;
+
   -- pg_cron's alter_job is the validator (accepts both 5-field cron syntax
   -- and interval syntax like '30 seconds'); it raises on an invalid schedule.
   perform cron.alter_job(job_id := job_id, schedule := new_schedule);
