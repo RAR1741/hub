@@ -34,9 +34,7 @@ export default async function AdminSlackPage() {
   const people = (data ?? []) as PersonSlackRow[];
 
   const linked = people.filter((p) => p.slack_user_id);
-  const unlinkedStaff = people.filter(
-    (p) => p.is_active && !p.slack_user_id && (p.role === "mentor" || p.role === "admin"),
-  );
+  const unlinkedPeople = people.filter((p) => p.is_active && !p.slack_user_id);
 
   const pickerPeople = people
     .filter((p) => p.is_active && !p.slack_user_id)
@@ -94,6 +92,34 @@ export default async function AdminSlackPage() {
           </section>
 
           <section className="card flex flex-col gap-3">
+            <h2 className="text-base font-semibold">Unlinked people</h2>
+            {unlinkedPeople.length === 0 ? (
+              <p className="text-sm text-[var(--muted)]">Every active person is linked.</p>
+            ) : (
+              <div className="tablewrap">
+                <div style={{ overflowX: "auto" }}>
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Person</th>
+                        <th>Role</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {unlinkedPeople.map((p) => (
+                        <tr key={p.id}>
+                          <td>{displayName(p)}</td>
+                          <td>{p.role}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </section>
+
+          <section className="card flex flex-col gap-3">
             <h2 className="text-base font-semibold">Linked people</h2>
             {linked.length === 0 ? (
               <p className="text-sm text-[var(--muted)]">No one is linked to Slack yet.</p>
@@ -114,34 +140,6 @@ export default async function AdminSlackPage() {
                           <td>{displayName(p)}</td>
                           <td>{p.role}</td>
                           <td className="mono">{p.slack_user_id}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </section>
-
-          <section className="card flex flex-col gap-3">
-            <h2 className="text-base font-semibold">Unlinked mentors/admins</h2>
-            {unlinkedStaff.length === 0 ? (
-              <p className="text-sm text-[var(--muted)]">Every active mentor/admin is linked.</p>
-            ) : (
-              <div className="tablewrap">
-                <div style={{ overflowX: "auto" }}>
-                  <table className="table">
-                    <thead>
-                      <tr>
-                        <th>Person</th>
-                        <th>Role</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {unlinkedStaff.map((p) => (
-                        <tr key={p.id}>
-                          <td>{displayName(p)}</td>
-                          <td>{p.role}</td>
                         </tr>
                       ))}
                     </tbody>
