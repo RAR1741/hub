@@ -10,7 +10,7 @@ create extension if not exists pg_net;
 
 select cron.schedule(
   'slack-mentor-reminders-weekly',
-  '0 14 * * 1',  -- Mondays 14:00 UTC ≈ 9-10am team-local (America/Indiana)
+  '0 23 * * 4',  -- Thursdays 23:00 UTC = 6:00pm EST (7:00pm EDT during daylight saving; pg_cron runs in UTC)
   $cron$
   select net.http_post(
     url := (select value #>> '{}' from public.app_setting where key = 'slack_reminder_url'),
