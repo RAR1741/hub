@@ -58,7 +58,7 @@ areas they can act on) linking every admin area with live counts — People, Tea
 Build days, Sessions, Flagged sessions, Kiosk devices, Requests, Settings. Every model in the schema
 has full create/read/update/delete reachable from the hub (person, team, period, meeting, build_day,
 session, kiosk_device, plus read/update for app_setting and the requests review queues) — see the
-CRUD gap table in `docs/plans/2026-08-12-m5-ui-and-crud.md` for what M5 closed.
+CRUD gap table in `docs/superpowers/plans/2026-08-12-m5-ui-and-crud.md` for what M5 closed.
 
 Pages are built from semantic HTML (`<main>`, `<table>`, `<form>`, `<label>`, headings) styled with
 Tailwind utility classes plus the component classes above. Reach for the existing component classes
