@@ -14,7 +14,7 @@ signature verification). Inbound is phase 2.
 
 ## Goals
 
-- Typed, human-readable sending API: `postChannelMessage("hub_alerts", ...)`
+- Typed, human-readable sending API: `postChannelMessage("hub-admin-alerts", ...)`
   where a misspelled channel name is a compile error.
 - Admin alerts to a private channel when FIRST sync, Google Calendar sync, or
   Drive group sync fails (#194/#195/#196) — on state *transition*, not per
@@ -68,7 +68,7 @@ environments — which is what lets the channel registry be checked-in code.
 ```ts
 export const CHANNELS = {
   bot_test: "C0XXXXXXX",   // #bot-test — all non-prod sends land here
-  hub_alerts: "C0YYYYYYY", // private admin alerts channel
+  "hub-admin-alerts": "C0YYYYYYY", // private admin alerts channel
 } as const;
 export type ChannelName = keyof typeof CHANNELS;
 
@@ -90,7 +90,7 @@ endpoints). Exposed API:
 ```ts
 postChannelMessage(channel: ChannelName, text: string): Promise<void>
 sendDM(slackUserId: string, text: string): Promise<void>   // conversations.open → chat.postMessage
-sendAdminAlert(text: string): Promise<void>                // → hub_alerts
+sendAdminAlert(text: string): Promise<void>                // → hub-admin-alerts
 mention(team: TeamName): string                            // interpolate into text
 ```
 
@@ -120,7 +120,7 @@ reportSyncOutcome(source: "first_sync" | "calendar_sync" | "drive_sync", ok: boo
 ```
 
 which compares against `app_setting.slack_alert_state_<source>` and alerts
-**only on transition**: `ok → failing` posts the error to `hub_alerts`;
+**only on transition**: `ok → failing` posts the error to `hub-admin-alerts`;
 `failing → ok` posts a recovery note. Rationale: first-sync runs every 15
 minutes; per-failure alerting would post ~96 messages/day during a persistent
 outage. The expired-FIRST-session case (#190/#194) reports as a failure like
@@ -154,7 +154,7 @@ The endpoint:
    values count as "complete" (and whether YPP is distinguishable within it)
    is pinned down during implementation from real synced data.
 2. DMs each **linked** mentor their specific outstanding items, paced ~1/sec.
-3. Posts one summary to `hub_alerts`: how many reminded, and **by name who
+3. Posts one summary to `hub-admin-alerts`: how many reminded, and **by name who
    could not be DMed because they're unlinked**. Unlinked ≠ silently skipped.
 
 Fully-complete mentors get nothing. Day/time is set in the cron expression

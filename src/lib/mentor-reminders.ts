@@ -32,7 +32,7 @@ export function buildReminderText(name: string, items: string[]): string {
 
 /**
  * DM every LINKED mentor who has outstanding FIRST requirements their specific
- * list, paced to respect Slack rate limits, and post one summary to #hub_alerts
+ * list, paced to respect Slack rate limits, and post one summary to #hub-admin-alerts
  * that names any incomplete mentor who couldn't be DMed (no Slack link).
  */
 export async function sendMentorReminders(deps: {
@@ -78,7 +78,7 @@ export async function sendMentorReminders(deps: {
     `:memo: Weekly FIRST reminder run — DMed ${reminded} mentor(s); ${complete} fully complete.` +
     (unlinked.length ? `\n:warning: No Slack link (not reminded): ${unlinked.join(", ")}` : "") +
     (failed.length ? `\n:x: DM failed (not reminded): ${failed.join(", ")}` : "");
-  await postChannelMessage(deps.slack, "hub_alerts", summary);
+  await postChannelMessage(deps.slack, "hub-admin-alerts", summary);
 
   return { reminded, unlinked, complete, failed };
 }

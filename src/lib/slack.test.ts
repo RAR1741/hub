@@ -28,33 +28,33 @@ function bodyOf(req: CapturedRequest) {
 describe("postChannelMessage", () => {
   test("posts to chat.postMessage with the resolved channel id and bearer token", async () => {
     const { fetchFn, requests } = fakeFetch([{ status: 200, body: { ok: true } }]);
-    const ok = await postChannelMessage(prodDeps(fetchFn), "hub_alerts", "hello");
+    const ok = await postChannelMessage(prodDeps(fetchFn), "hub-admin-alerts", "hello");
     expect(ok).toBe(true);
     const req = requests.find((r) => r.url.includes("chat.postMessage"))!;
     expect((req.init?.headers as Record<string, string>).Authorization).toBe("Bearer xoxb-test");
-    expect(bodyOf(req).channel).toBe(CHANNELS.hub_alerts);
+    expect(bodyOf(req).channel).toBe(CHANNELS["hub-admin-alerts"]);
     expect(bodyOf(req).text).toBe("hello");
   });
 
   test("non-production redirects the message to bot_test with a preface", async () => {
     const { fetchFn, requests } = fakeFetch([{ status: 200, body: { ok: true } }]);
-    await postChannelMessage(devDeps(fetchFn), "hub_alerts", "hello");
+    await postChannelMessage(devDeps(fetchFn), "hub-admin-alerts", "hello");
     const req = requests.find((r) => r.url.includes("chat.postMessage"))!;
     expect(bodyOf(req).channel).toBe(CHANNELS.bot_test);
-    expect(String(bodyOf(req).text)).toContain("hub_alerts");
+    expect(String(bodyOf(req).text)).toContain("hub-admin-alerts");
     expect(String(bodyOf(req).text)).toContain("hello");
   });
 
   test("no token → no request, returns false", async () => {
     const { fetchFn, requests } = fakeFetch();
-    const ok = await postChannelMessage({ fetch: fetchFn, token: null, isProd: true }, "hub_alerts", "hi");
+    const ok = await postChannelMessage({ fetch: fetchFn, token: null, isProd: true }, "hub-admin-alerts", "hi");
     expect(ok).toBe(false);
     expect(requests).toHaveLength(0);
   });
 
   test("Slack API error (ok:false) is swallowed, returns false", async () => {
     const { fetchFn } = fakeFetch([{ status: 200, body: { ok: false, error: "channel_not_found" } }]);
-    const ok = await postChannelMessage(prodDeps(fetchFn), "hub_alerts", "hi");
+    const ok = await postChannelMessage(prodDeps(fetchFn), "hub-admin-alerts", "hi");
     expect(ok).toBe(false);
   });
 
@@ -62,7 +62,7 @@ describe("postChannelMessage", () => {
     const fetchFn = (async () => {
       throw new Error("network down");
     }) as unknown as typeof globalThis.fetch;
-    const ok = await postChannelMessage(prodDeps(fetchFn), "hub_alerts", "hi");
+    const ok = await postChannelMessage(prodDeps(fetchFn), "hub-admin-alerts", "hi");
     expect(ok).toBe(false);
   });
 });

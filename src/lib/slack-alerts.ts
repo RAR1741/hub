@@ -11,7 +11,7 @@ const LABELS: Record<AlertSource, string> = {
 };
 
 /**
- * Post an admin alert to #hub_alerts only when a sync's health CHANGES
+ * Post an admin alert to #hub-admin-alerts only when a sync's health CHANGES
  * (ok→failing or failing→ok). Last-known state per source lives in
  * app_setting.slack_alert_state_<source> (default "ok"). This prevents the
  * every-15-min FIRST sync from posting ~96 alerts/day during an outage.
@@ -36,7 +36,7 @@ export async function reportSyncOutcome(
         : `:rotating_light: ${LABELS[source]} is failing.${opts.error ? `\n\`\`\`${opts.error}\`\`\`` : ""}`;
       // Only advance state once the alert actually went out — a failed/no-op post
       // (e.g. token not yet configured) must re-alert next run, not swallow the transition.
-      delivered = await postChannelMessage(slack, "hub_alerts", text);
+      delivered = await postChannelMessage(slack, "hub-admin-alerts", text);
     }
 
     if (delivered) {

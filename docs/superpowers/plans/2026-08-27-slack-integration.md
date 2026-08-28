@@ -52,7 +52,7 @@ Closes #194, #195, #196. Produces the sending library and wires transition-based
 // identical everywhere and live in code (a typo'd name fails typecheck).
 export const CHANNELS = {
   bot_test: "C072BAED43B", // #bot-test — all non-prod sends land here
-  hub_alerts: "C0BTB9TMAE8", // #hub-admin-alerts — invite the prod bot once
+  "hub-admin-alerts": "C0BTB9TMAE8", // #hub-admin-alerts — invite the prod bot once
 } as const;
 export type ChannelName = keyof typeof CHANNELS;
 ```
@@ -97,33 +97,33 @@ function bodyOf(req: CapturedRequest) {
 describe("postChannelMessage", () => {
   test("posts to chat.postMessage with the resolved channel id and bearer token", async () => {
     const { fetchFn, requests } = fakeFetch([{ status: 200, body: { ok: true } }]);
-    const ok = await postChannelMessage(prodDeps(fetchFn), "hub_alerts", "hello");
+    const ok = await postChannelMessage(prodDeps(fetchFn), "hub-admin-alerts", "hello");
     expect(ok).toBe(true);
     const req = requests.find((r) => r.url.includes("chat.postMessage"))!;
     expect((req.init?.headers as Record<string, string>).Authorization).toBe("Bearer xoxb-test");
-    expect(bodyOf(req).channel).toBe(CHANNELS.hub_alerts);
+    expect(bodyOf(req).channel).toBe(CHANNELS["hub-admin-alerts"]);
     expect(bodyOf(req).text).toBe("hello");
   });
 
   test("non-production redirects the message to bot_test with a preface", async () => {
     const { fetchFn, requests } = fakeFetch([{ status: 200, body: { ok: true } }]);
-    await postChannelMessage(devDeps(fetchFn), "hub_alerts", "hello");
+    await postChannelMessage(devDeps(fetchFn), "hub-admin-alerts", "hello");
     const req = requests.find((r) => r.url.includes("chat.postMessage"))!;
     expect(bodyOf(req).channel).toBe(CHANNELS.bot_test);
-    expect(String(bodyOf(req).text)).toContain("hub_alerts");
+    expect(String(bodyOf(req).text)).toContain("hub-admin-alerts");
     expect(String(bodyOf(req).text)).toContain("hello");
   });
 
   test("no token → no request, returns false", async () => {
     const { fetchFn, requests } = fakeFetch();
-    const ok = await postChannelMessage({ fetch: fetchFn, token: null, isProd: true }, "hub_alerts", "hi");
+    const ok = await postChannelMessage({ fetch: fetchFn, token: null, isProd: true }, "hub-admin-alerts", "hi");
     expect(ok).toBe(false);
     expect(requests).toHaveLength(0);
   });
 
   test("Slack API error (ok:false) is swallowed, returns false", async () => {
     const { fetchFn } = fakeFetch([{ status: 200, body: { ok: false, error: "channel_not_found" } }]);
-    const ok = await postChannelMessage(prodDeps(fetchFn), "hub_alerts", "hi");
+    const ok = await postChannelMessage(prodDeps(fetchFn), "hub-admin-alerts", "hi");
     expect(ok).toBe(false);
   });
 
@@ -131,7 +131,7 @@ describe("postChannelMessage", () => {
     const fetchFn = (async () => {
       throw new Error("network down");
     }) as unknown as typeof globalThis.fetch;
-    const ok = await postChannelMessage(prodDeps(fetchFn), "hub_alerts", "hi");
+    const ok = await postChannelMessage(prodDeps(fetchFn), "hub-admin-alerts", "hi");
     expect(ok).toBe(false);
   });
 });
@@ -398,7 +398,7 @@ const LABELS: Record<AlertSource, string> = {
 };
 
 /**
- * Post an admin alert to #hub_alerts only when a sync's health CHANGES
+ * Post an admin alert to #hub-admin-alerts only when a sync's health CHANGES
  * (ok→failing or failing→ok). Last-known state per source lives in
  * app_setting.slack_alert_state_<source> (default "ok"). This prevents the
  * every-15-min FIRST sync from posting ~96 alerts/day during an outage.
@@ -419,7 +419,7 @@ export async function reportSyncOutcome(
     const text = ok
       ? `:white_check_mark: ${LABELS[source]} recovered — syncing normally again.`
       : `:rotating_light: ${LABELS[source]} is failing.${opts.error ? `\n\`\`\`${opts.error}\`\`\`` : ""}`;
-    await postChannelMessage(slack, "hub_alerts", text);
+    await postChannelMessage(slack, "hub-admin-alerts", text);
 
     await opts.db.from("app_setting").upsert({ key, value: next }, { onConflict: "key" });
   } catch (e) {
@@ -841,7 +841,7 @@ Then `./dev npm run lint && ./dev npm run typecheck && ./dev npm run test && ./d
 
 # Phase 3 — Weekly mentor reminders (PR 3)
 
-Closes #191. A weekly pg_cron job hits a secret-gated endpoint that DMs each linked mentor with outstanding FIRST requirements and posts a summary (including who's unlinked) to `#hub_alerts`.
+Closes #191. A weekly pg_cron job hits a secret-gated endpoint that DMs each linked mentor with outstanding FIRST requirements and posts a summary (including who's unlinked) to `#hub-admin-alerts`.
 
 ## Task 8: Reminder computation + send library
 
@@ -889,7 +889,7 @@ describe("sendMentorReminders", () => {
     // fake db returns 3 mentors: A linked+incomplete, B unlinked+incomplete, C linked+complete
     // spy slack records DMs + the summary channel post
     // assert: reminded === 1; unlinked === ["B Name"]; complete === 1
-    // assert the summary post text contains "B Name" and channel is hub_alerts (bot_test in test)
+    // assert the summary post text contains "B Name" and channel is hub-admin-alerts (bot_test in test)
   });
 });
 ```
@@ -937,7 +937,7 @@ export function buildReminderText(name: string, items: string[]): string {
 
 /**
  * DM every LINKED mentor who has outstanding FIRST requirements their specific
- * list, paced to respect Slack rate limits, and post one summary to #hub_alerts
+ * list, paced to respect Slack rate limits, and post one summary to #hub-admin-alerts
  * that names any incomplete mentor who couldn't be DMed (no Slack link).
  */
 export async function sendMentorReminders(deps: {
@@ -980,7 +980,7 @@ export async function sendMentorReminders(deps: {
   const summary =
     `:memo: Weekly FIRST reminder run — DMed ${reminded} mentor(s); ${complete} fully complete.` +
     (unlinked.length ? `\n:warning: No Slack link (not reminded): ${unlinked.join(", ")}` : "");
-  await postChannelMessage(deps.slack, "hub_alerts", summary);
+  await postChannelMessage(deps.slack, "hub-admin-alerts", summary);
 
   return { reminded, unlinked, complete };
 }
@@ -1093,7 +1093,7 @@ Then `./dev npm run lint && ./dev npm run typecheck && ./dev npm run test && ./d
 These are one-time operational steps, not code — do them as the PRs merge:
 
 1. **Create the two Slack apps** from `slack/manifest.yml` (a manifest file is worth adding in PR 1 if convenient; otherwise configure in the Slack UI). Scopes: `chat:write`, `chat:write.public`, `im:write`, `users:read`, `users:read.email`. Verify exact scope names against Slack docs.
-2. **Fill real IDs** into `src/lib/slack-registry.ts` (`bot_test`, `hub_alerts` channel IDs; `mentors` usergroup id) and invite the prod bot to the private `hub_alerts` channel; invite the dev bot only to `#bot-test`.
+2. **Fill real IDs** into `src/lib/slack-registry.ts` (`bot_test`, `hub-admin-alerts` channel IDs; `mentors` usergroup id) and invite the prod bot to the private `hub-admin-alerts` channel; invite the dev bot only to `#bot-test`.
 3. **Set env + settings per environment:** `SLACK_BOT_TOKEN` (dev token locally, prod token in Vercel production env); set `slack_reminder_secret` and the `*_url` app_settings to the production URL in prod (they default to the docker-host dev URL).
 4. **Confirm the `SATISFIED` training/screening values** (Task 8) against real synced FIRST data before trusting the reminder contents.
 

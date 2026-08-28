@@ -93,7 +93,7 @@ describe("sendMentorReminders", () => {
     expect(dms[0].text).toContain("[dev → DM UA]");
     expect(posts.some((p) => p.text.includes("DM UC"))).toBe(false);
 
-    const summaryPost = posts.find((p) => p.text.startsWith("[dev → #hub_alerts]"));
+    const summaryPost = posts.find((p) => p.text.startsWith("[dev → #hub-admin-alerts]"));
     expect(summaryPost).toBeDefined();
     expect(summaryPost!.text).toContain("B Name");
   });
@@ -118,7 +118,7 @@ describe("sendMentorReminders", () => {
     expect(result.reminded).toBe(0);
     expect(result.failed).toEqual(["A Name"]);
 
-    const summaryPost = posts.find((p) => p.text.startsWith("[dev → #hub_alerts]"));
+    const summaryPost = posts.find((p) => p.text.startsWith("[dev → #hub-admin-alerts]"));
     expect(summaryPost).toBeDefined();
     expect(summaryPost!.text).toContain("A Name");
     expect(summaryPost!.text).toContain("DM failed");
