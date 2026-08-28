@@ -31,6 +31,7 @@ export type PersonRow = {
   first_screening_text?: string | null;
   first_training_status?: string | null;
   first_synced_at?: string | null;
+  slack_user_id?: string | null;
 };
 
 export type Person = {
@@ -63,6 +64,7 @@ export type Person = {
   firstScreeningText: string | null;
   firstTrainingStatus: string | null;
   firstSyncedAt: string | null;
+  slackUserId?: string | null;
 };
 
 export function personFromRow(row: PersonRow): Person {
@@ -96,6 +98,7 @@ export function personFromRow(row: PersonRow): Person {
     firstScreeningText: row.first_screening_text ?? null,
     firstTrainingStatus: row.first_training_status ?? null,
     firstSyncedAt: row.first_synced_at ?? null,
+    slackUserId: row.slack_user_id ?? null,
   };
 }
 
