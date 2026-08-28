@@ -1,6 +1,6 @@
 # Team Hub v1 — Milestone Roadmap
 
-Spec: [docs/specs/2026-08-10-v1-design.md](../specs/2026-08-10-v1-design.md) (approved 2026-08-10).
+Spec: [docs/superpowers/specs/2026-08-10-v1-design.md](../specs/2026-08-10-v1-design.md) (approved 2026-08-10).
 
 v1 is delivered as four sequential plans; each produces working, testable software. Detailed task plans are written when the preceding milestone completes, so they reflect the real codebase rather than guesses.
 

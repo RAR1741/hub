@@ -56,7 +56,7 @@ open input to source from the user rather than assume.
 - [docs/features.md](docs/features.md) — full feature catalog.
 - [docs/design/ui-system.md](docs/design/ui-system.md) — existing UI/design-system notes
   (incumbent visual documentation, separate from this file).
-- [docs/specs/2026-08-10-v1-design.md](docs/specs/2026-08-10-v1-design.md) — v1 design spec.
+- [docs/superpowers/specs/2026-08-10-v1-design.md](docs/superpowers/specs/2026-08-10-v1-design.md) — v1 design spec.
 - No real logo, brand color, testimonial, or press assets on hand.
 
 ## Product Principles

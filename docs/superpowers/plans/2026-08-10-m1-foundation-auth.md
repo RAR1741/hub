@@ -1805,15 +1805,15 @@ Expected: `{"role":"guest","name":null}` and `403`.
 
 - [ ] **Step 6: Rewrite README**
 
-Replace `README.md` body with: project one-liner, links to the spec/roadmap (`docs/specs/2026-08-10-v1-design.md`, `docs/plans/2026-08-10-v1-milestones.md`), and dev setup:
+Replace `README.md` body with: project one-liner, links to the spec/roadmap (`docs/superpowers/specs/2026-08-10-v1-design.md`, `docs/superpowers/plans/2026-08-10-v1-milestones.md`), and dev setup:
 
 ```markdown
 # Team Hub
 
 Attendance + roster web app for FRC Team 1741 (Red Alert Robotics).
 
-- Spec: [docs/specs/2026-08-10-v1-design.md](docs/specs/2026-08-10-v1-design.md)
-- Roadmap: [docs/plans/2026-08-10-v1-milestones.md](docs/plans/2026-08-10-v1-milestones.md)
+- Spec: [docs/superpowers/specs/2026-08-10-v1-design.md](docs/superpowers/specs/2026-08-10-v1-design.md)
+- Roadmap: [docs/superpowers/plans/2026-08-10-v1-milestones.md](docs/superpowers/plans/2026-08-10-v1-milestones.md)
 - Research: [docs/research/](docs/research/)
 
 ## Development
