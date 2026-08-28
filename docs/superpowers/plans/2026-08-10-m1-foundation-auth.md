@@ -1812,9 +1812,9 @@ Replace `README.md` body with: project one-liner, links to the spec/roadmap (`do
 
 Attendance + roster web app for FRC Team 1741 (Red Alert Robotics).
 
-- Spec: [docs/superpowers/specs/2026-08-10-v1-design.md](docs/superpowers/specs/2026-08-10-v1-design.md)
-- Roadmap: [docs/superpowers/plans/2026-08-10-v1-milestones.md](docs/superpowers/plans/2026-08-10-v1-milestones.md)
-- Research: [docs/research/](docs/research/)
+- Spec: [docs/superpowers/specs/2026-08-10-v1-design.md](../specs/2026-08-10-v1-design.md)
+- Roadmap: [docs/superpowers/plans/2026-08-10-v1-milestones.md](2026-08-10-v1-milestones.md)
+- Research: [docs/research/](../../research/)
 
 ## Development
 
