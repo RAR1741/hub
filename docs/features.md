@@ -107,8 +107,7 @@ scannable catalog of what's built, grouped by area, with a route per entry. The
 
 ## Integrations
 
-- **Slack** — account linking, weekly mentor FIRST reminders, and sync-failure alerts. See
-  [features/slack-integration.md](features/slack-integration.md), [setup/slack.md](setup/slack.md)
+- **Slack** — account linking, weekly mentor FIRST reminders, and sync-failure alerts. `/admin/slack` — see [features/slack-integration.md](features/slack-integration.md), [setup/slack.md](setup/slack.md)
 - **FIRST roster sync** — syncs roster data from FIRST, with a status dashboard.
   `/admin/first-status` — see [features/first-roster-sync.md](features/first-roster-sync.md)
 - **Google Drive group sync** — syncs team membership to Google Groups. `/admin/drive-sync` — see
