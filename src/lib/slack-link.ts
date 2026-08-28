@@ -78,7 +78,7 @@ export async function syncSlackLinks(deps: { db: SupabaseClient; slack: SlackDep
 
   const linkedByPerson = new Map(people.map((p) => [p.id, p.slack_user_id]));
   const report: LinkReport = {
-    ranAt: new Date().toISOString(),
+    ranAt: "",
     linked: 0,
     alreadyLinked: 0,
     ambiguous: [],
@@ -133,6 +133,8 @@ export async function syncSlackLinks(deps: { db: SupabaseClient; slack: SlackDep
   report.unmatchedPeople = people
     .filter((p) => p.is_active && !p.slack_user_id && !matchedPeople.has(p.id))
     .map((p) => ({ personId: p.id, name: p.display_name ?? `${p.first_name} ${p.last_name}` }));
+
+  report.ranAt = new Date().toISOString();
 
   const { error: reportError } = await db
     .from("app_setting")

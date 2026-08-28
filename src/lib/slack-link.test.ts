@@ -44,7 +44,7 @@ type Identity = { person_id: string; email: string };
 //   db.from("person").update({slack_user_id}).eq("id", personId) -> { error }
 function fakeDb(people: Person[], identities: Identity[] = []) {
   const updates: { table: string; values: Record<string, unknown>; id: string }[] = [];
-  const upserts: { table: string; values: Record<string, unknown> }[] = [];
+  const upserts: { table: string; values: Record<string, unknown>; opts: unknown }[] = [];
   return {
     updates,
     upserts,
@@ -54,7 +54,10 @@ function fakeDb(people: Person[], identities: Identity[] = []) {
         select() {
           return Promise.resolve(
             table === "person"
-              ? { data: people, error: null }
+              // Shallow-copy snapshot, matching production: this SELECT runs before
+              // pass 1's UPDATEs, so later mutations to `people` must not retroactively
+              // change what this pass sees (see matchedPeople guard in slack-link.ts).
+              ? { data: people.map((p) => ({ ...p })), error: null }
               : table === "person_identity"
                 ? { data: identities, error: null }
                 : { data: [], error: null },
@@ -70,8 +73,8 @@ function fakeDb(people: Person[], identities: Identity[] = []) {
             },
           };
         },
-        upsert(values: Record<string, unknown>) {
-          upserts.push({ table, values });
+        upsert(values: Record<string, unknown>, opts?: unknown) {
+          upserts.push({ table, values, opts });
           return Promise.resolve({ error: null });
         },
       };
@@ -409,6 +412,7 @@ describe("syncSlackLinks", () => {
     expect(db.upserts).toHaveLength(1);
     expect(db.upserts[0].table).toBe("app_setting");
     expect(db.upserts[0].values).toMatchObject({ key: "slack_last_sync_report" });
+    expect(db.upserts[0].opts).toEqual({ onConflict: "key" });
     const persisted = db.upserts[0].values.value as LinkReport;
     expect(persisted.ranAt).toBe(report.ranAt);
     expect(typeof persisted.ranAt).toBe("string");

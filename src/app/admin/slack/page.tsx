@@ -63,36 +63,36 @@ export default async function AdminSlackPage() {
         <SlackLinkPanel />
       </section>
 
-      <section className="card flex flex-col gap-3">
-        <h2 className="text-base font-semibold">Unmatched roster entries</h2>
-        {!report || unmatchedMembers.length === 0 ? (
-          <p className="text-sm text-[var(--muted)]">
-            {!report ? "Run a sync to see unmatched Slack members." : "Everything from Slack is linked."}
-          </p>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {unmatchedMembers.map((m) => (
-              <div
-                key={m.id}
-                className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--hair)] pt-3 first:border-t-0 first:pt-0"
-              >
-                <div>
-                  <div className="font-medium">{m.name || m.id}</div>
-                  <div className="text-sm text-[var(--muted)]">{m.email}</div>
-                </div>
-                <SlackLinkPicker slackUserId={m.id} people={pickerPeople} />
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
       {error ? (
         <section className="card flex flex-col gap-3">
           <p className="text-sm text-[var(--red)]">Couldn&rsquo;t load the roster — try again.</p>
         </section>
       ) : (
         <>
+          <section className="card flex flex-col gap-3">
+            <h2 className="text-base font-semibold">Unmatched roster entries</h2>
+            {!report || unmatchedMembers.length === 0 ? (
+              <p className="text-sm text-[var(--muted)]">
+                {!report ? "Run a sync to see unmatched Slack members." : "Everything from Slack is linked."}
+              </p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {unmatchedMembers.map((m) => (
+                  <div
+                    key={m.id}
+                    className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--hair)] pt-3 first:border-t-0 first:pt-0"
+                  >
+                    <div>
+                      <div className="font-medium">{m.name || m.id}</div>
+                      <div className="text-sm text-[var(--muted)]">{m.email}</div>
+                    </div>
+                    <SlackLinkPicker slackUserId={m.id} people={pickerPeople} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
           <section className="card flex flex-col gap-3">
             <h2 className="text-base font-semibold">Linked people</h2>
             {linked.length === 0 ? (
