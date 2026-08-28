@@ -35,10 +35,11 @@
         "value": "13px",
         "files": [
           "src/app/admin/cron/page.tsx",
-          "src/components/CronJobsEditor.tsx"
+          "src/components/CronJobsEditor.tsx",
+          "src/app/admin/page.tsx"
         ],
         "createdAt": "2026-08-28T04:14:41.695Z",
-        "reason": "matches existing Card hint text-[13px] text-[var(--muted)] convention already used in src/app/admin/page.tsx"
+        "reason": "13px is the established Card hint (text-[13px] text-[var(--muted)]) convention already used throughout src/app/admin/page.tsx; the cron admin page/editor reuse it for consistency."
       }
     ]
   }
