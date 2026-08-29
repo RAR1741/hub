@@ -50,6 +50,19 @@ test("cross-kiosk realtime sync: clock-in/out on one kiosk reflects on another w
     predicate: (ws) => ws.url().includes("/realtime/v1/websocket"),
   });
 
+  // Arm the join-ok frame wait as soon as B's socket is created — the reply
+  // frame fires within milliseconds of the join, so the listener must be
+  // attached before navigation gets that far, not after the toBeVisible awaits.
+  const kioskBJoined = kioskBRealtimeWs.then((ws) =>
+    ws.waitForEvent("framereceived", {
+      predicate: (f) =>
+        typeof f.payload === "string" &&
+        f.payload.includes("hub:presence") &&
+        f.payload.includes('"status":"ok"'),
+      timeout: 20_000,
+    }),
+  );
+
   await kioskA.goto("/kiosk");
   await kioskB.goto("/kiosk");
 
@@ -65,14 +78,7 @@ test("cross-kiosk realtime sync: clock-in/out on one kiosk reflects on another w
   // would only be saved by B's own subscribe-time refetch — passing without
   // ever exercising a real broadcast. Match Phoenix's join-ok reply frame for
   // our topic (Supabase prefixes it, e.g. "realtime:hub:presence").
-  const ws = await kioskBRealtimeWs;
-  await ws.waitForEvent("framereceived", {
-    predicate: (f) =>
-      typeof f.payload === "string" &&
-      f.payload.includes("hub:presence") &&
-      f.payload.includes('"status":"ok"'),
-    timeout: 20_000,
-  });
+  await kioskBJoined;
 
   // Clock the student in on kiosk A by driving the real UI.
   await kioskA.getByLabel("Search names").fill(STUDENT_NAME);
