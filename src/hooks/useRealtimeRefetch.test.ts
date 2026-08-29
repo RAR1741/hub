@@ -1,0 +1,59 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { nextBackoff, throttle } from "./useRealtimeRefetch";
+
+describe("nextBackoff", () => {
+  it("starts at the base delay and doubles each attempt", () => {
+    expect(nextBackoff(0)).toBe(2000);
+    expect(nextBackoff(1)).toBe(4000);
+    expect(nextBackoff(2)).toBe(8000);
+    expect(nextBackoff(3)).toBe(16_000);
+  });
+
+  it("caps at 60s for large attempt counts", () => {
+    expect(nextBackoff(10)).toBe(60_000);
+    expect(nextBackoff(100)).toBe(60_000);
+  });
+});
+
+describe("throttle", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it("calls immediately on the leading edge", () => {
+    const fn = vi.fn();
+    const t = throttle(fn, 2000);
+    t.call();
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it("coalesces calls within the window into one trailing call", () => {
+    const fn = vi.fn();
+    const t = throttle(fn, 2000);
+    t.call(); // leading, t=0
+    vi.advanceTimersByTime(500);
+    t.call(); // within window, scheduled for t=2000
+    t.call(); // still within window, no extra timer
+    expect(fn).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(1500);
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  it("allows an immediate call again once the window has fully elapsed", () => {
+    const fn = vi.fn();
+    const t = throttle(fn, 2000);
+    t.call();
+    vi.advanceTimersByTime(2000);
+    t.call();
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  it("cancel prevents a pending trailing call", () => {
+    const fn = vi.fn();
+    const t = throttle(fn, 2000);
+    t.call();
+    t.call();
+    t.cancel();
+    vi.advanceTimersByTime(2000);
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+});
