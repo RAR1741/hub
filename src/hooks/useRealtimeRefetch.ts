@@ -166,7 +166,8 @@ export function useRealtimeRefetch(
       try {
         const { token, expiresAt } = await fetchToken();
         if (cancelled) return;
-        supabase.realtime.setAuth(token);
+        await supabase.realtime.setAuth(token);
+        if (cancelled) return;
         scheduleTokenRefresh(expiresAt);
       } catch {
         scheduleRetry();
@@ -183,7 +184,13 @@ export function useRealtimeRefetch(
         return;
       }
       if (cancelled) return;
-      supabase.realtime.setAuth(tokenData.token);
+      try {
+        await supabase.realtime.setAuth(tokenData.token);
+      } catch {
+        scheduleRetry();
+        return;
+      }
+      if (cancelled) return;
       scheduleTokenRefresh(tokenData.expiresAt);
 
       teardownChannel();
