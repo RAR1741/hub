@@ -51,6 +51,7 @@ jobs:
           # supabase status -o env emits ANON_KEY / SERVICE_ROLE_KEY; wire them to the app's names.
           echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$(npx supabase status -o env | grep '^ANON_KEY=' | cut -d= -f2- | tr -d '\"')" >> "$GITHUB_ENV"
           echo "SUPABASE_SERVICE_ROLE_KEY=$(npx supabase status -o env | grep '^SERVICE_ROLE_KEY=' | cut -d= -f2- | tr -d '\"')" >> "$GITHUB_ENV"
+          echo "SUPABASE_JWT_SECRET=$(npx supabase status -o env | grep '^JWT_SECRET=' | cut -d= -f2- | tr -d '\"')" >> "$GITHUB_ENV"
       - name: Reset DB (loopback URL — the npm script's host.docker.internal won't resolve here)
         run: npx supabase db reset --db-url postgresql://postgres:postgres@127.0.0.1:54322/postgres?sslmode=disable --yes
       - run: npm run build

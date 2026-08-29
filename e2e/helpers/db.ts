@@ -164,6 +164,26 @@ export async function deleteOnshapeConnection(personId: string): Promise<void> {
   }
 }
 
+/**
+ * Force-close any open session (time_out is null) for a person. Used by
+ * kiosk-realtime.spec.ts to make sure the seeded student starts each run
+ * signed out, regardless of what a prior run (or kiosk.spec.ts) left behind.
+ */
+export async function closeOpenSessionsForPerson(personId: string): Promise<void> {
+  const res = await fetch(
+    `${restBaseUrl()}/session?person_id=eq.${personId}&time_out=is.null`,
+    {
+      method: "PATCH",
+      headers: authHeaders(),
+      body: JSON.stringify({ time_out: new Date().toISOString() }),
+    },
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`closeOpenSessionsForPerson failed: ${res.status} ${body}`);
+  }
+}
+
 /** The id of the seeded active period ("2026 Off Season") — needed to create events via the API. */
 export async function activePeriodId(): Promise<string> {
   const res = await fetch(`${restBaseUrl()}/period?is_active=eq.true&select=id`, {
