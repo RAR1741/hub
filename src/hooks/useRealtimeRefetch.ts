@@ -39,6 +39,27 @@ export function createRetryState() {
 }
 
 /**
+ * Pure decision for a channel's subscribe-status callback, factored out for
+ * testability the same way createRetryState/throttle are.
+ *
+ * `current` is whether this status came from the channel we still consider
+ * active. `supabase.removeChannel()` unsubscribes asynchronously (a server
+ * round-trip), and the resulting `CLOSED` status arrives via that same async
+ * path — so a channel we've already torn down (reconnect, or unmount) keeps
+ * emitting `CLOSED` after we've moved on. Those must be ignored, or our own
+ * teardown would trigger a retry storm.
+ */
+export function subscribeStatusAction(
+  status: string,
+  current: boolean,
+): "joined" | "retry" | "ignore" {
+  if (!current) return "ignore";
+  if (status === "SUBSCRIBED") return "joined";
+  if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") return "retry";
+  return "ignore";
+}
+
+/**
  * Leading+trailing throttle: the first call runs immediately, further calls
  * within `ms` are coalesced into a single trailing call at the end of the
  * window. Guarantees `fn` runs at most once per `ms`.
@@ -166,19 +187,25 @@ export function useRealtimeRefetch(
       scheduleTokenRefresh(tokenData.expiresAt);
 
       teardownChannel();
-      channel = supabase
+      const thisChannel = supabase
         .channel(topic, { config: { private: true } })
-        .on("broadcast", { event: "*" }, () => throttled.call())
-        .subscribe((status) => {
-          if (cancelled) return;
-          if (status === "SUBSCRIBED") {
+        .on("broadcast", { event: "*" }, () => throttled.call());
+      channel = thisChannel;
+      thisChannel.subscribe((status) => {
+        if (cancelled) return;
+        switch (subscribeStatusAction(status, channel === thisChannel)) {
+          case "joined":
             retryState.onJoinSuccess();
             refetchRef.current();
-          } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+            break;
+          case "retry":
             teardownChannel();
             scheduleRetry();
-          }
-        });
+            break;
+          case "ignore":
+            break;
+        }
+      });
     }
 
     void connect();

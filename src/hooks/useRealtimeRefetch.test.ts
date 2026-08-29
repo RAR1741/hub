@@ -1,5 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createRetryState, nextBackoff, throttle } from "./useRealtimeRefetch";
+import { createRetryState, nextBackoff, subscribeStatusAction, throttle } from "./useRealtimeRefetch";
+
+describe("subscribeStatusAction", () => {
+  it("ignores any status from a channel that's no longer current (our own teardown)", () => {
+    expect(subscribeStatusAction("CLOSED", false)).toBe("ignore");
+    expect(subscribeStatusAction("SUBSCRIBED", false)).toBe("ignore");
+    expect(subscribeStatusAction("CHANNEL_ERROR", false)).toBe("ignore");
+  });
+
+  it("treats SUBSCRIBED on the current channel as joined", () => {
+    expect(subscribeStatusAction("SUBSCRIBED", true)).toBe("joined");
+  });
+
+  it("retries on CHANNEL_ERROR, TIMED_OUT, or CLOSED for the current channel", () => {
+    expect(subscribeStatusAction("CHANNEL_ERROR", true)).toBe("retry");
+    expect(subscribeStatusAction("TIMED_OUT", true)).toBe("retry");
+    expect(subscribeStatusAction("CLOSED", true)).toBe("retry");
+  });
+});
 
 describe("createRetryState", () => {
   it("escalates the backoff delay across repeated join failures", () => {
