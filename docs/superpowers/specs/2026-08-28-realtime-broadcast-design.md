@@ -115,8 +115,10 @@ One new migration adding a single policy on Realtime's own message table
 create policy "authenticated can receive hub broadcasts"
   on realtime.messages for select
   to authenticated
-  using (realtime.topic() like 'hub:%');
+  using (realtime.messages.topic like 'hub:%');
 ```
+
+Scoped on the `topic` **column** rather than the `realtime.topic()` function: in Realtime v2.124.2's private-channel read-authorization path the GUC that function reads isn't populated, so a function-based predicate evaluates to NULL and denies; the synthetic per-subscribe row's `topic` column is populated, so scope on it.
 
 No INSERT policy: clients never send; the service key (server) bypasses RLS.
 
