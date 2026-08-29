@@ -1,5 +1,42 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { nextBackoff, throttle } from "./useRealtimeRefetch";
+import { createRetryState, nextBackoff, throttle } from "./useRealtimeRefetch";
+
+describe("createRetryState", () => {
+  it("escalates the backoff delay across repeated join failures", () => {
+    const retry = createRetryState();
+    expect(retry.onJoinFailure()).toBe(2000);
+    expect(retry.onJoinFailure()).toBe(4000);
+    expect(retry.onJoinFailure()).toBe(8000);
+    expect(retry.onJoinFailure()).toBe(16_000);
+  });
+
+  it("does not reset on its own — only onJoinSuccess resets it", () => {
+    // Regression test: connect() used to reset the attempt counter right
+    // after a successful token fetch, before the channel join could fail.
+    // With the token fetch outside this state entirely, nothing but an
+    // actual SUBSCRIBED can reset it, so repeated CHANNEL_ERROR/TIMED_OUT
+    // cycles (each a fresh connect() call) keep escalating instead of
+    // pinning at the base delay forever.
+    const retry = createRetryState();
+    retry.onJoinFailure();
+    retry.onJoinFailure();
+    expect(retry.onJoinFailure()).toBe(8000);
+  });
+
+  it("resets to the base delay after a successful join", () => {
+    const retry = createRetryState();
+    retry.onJoinFailure();
+    retry.onJoinFailure();
+    retry.onJoinSuccess();
+    expect(retry.onJoinFailure()).toBe(2000);
+  });
+
+  it("caps at 60s across many consecutive failures", () => {
+    const retry = createRetryState();
+    for (let i = 0; i < 10; i++) retry.onJoinFailure();
+    expect(retry.onJoinFailure()).toBe(60_000);
+  });
+});
 
 describe("nextBackoff", () => {
   it("starts at the base delay and doubles each attempt", () => {

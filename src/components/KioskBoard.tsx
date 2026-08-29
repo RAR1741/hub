@@ -66,10 +66,6 @@ export function KioskBoard({
   const busyRef = useRef(busy);
   const router = useRouter();
 
-  useEffect(() => {
-    busyRef.current = busy;
-  }, [busy]);
-
   useRealtimeRefetch("hub:presence", () => {
     if (!busyRef.current) router.refresh();
   });
@@ -90,6 +86,7 @@ export function KioskBoard({
   async function call(path: string, personId: string, name: string, verb: string) {
     if (busy || !canAct) return;
     setBusy(true);
+    busyRef.current = true;
     setFlash(null);
     const res = await fetch(path, {
       method: "POST",
@@ -97,6 +94,7 @@ export function KioskBoard({
       body: JSON.stringify({ personId }),
     });
     setBusy(false);
+    busyRef.current = false;
     if (res.ok) {
       setFlash(`${verb} ${name}`);
       setSearch("");

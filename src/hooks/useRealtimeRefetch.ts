@@ -6,6 +6,7 @@ import { browserSupabase } from "@/lib/realtime-browser-client";
 
 const DEBOUNCE_MS = 2000;
 const REFRESH_SKEW_MS = 5 * 60 * 1000;
+const MIN_REFRESH_MS = 60_000;
 const BACKOFF_BASE_MS = 2000;
 const BACKOFF_CAP_MS = 60_000;
 const DEFAULT_FALLBACK_MS = 5 * 60 * 1000;
@@ -13,6 +14,28 @@ const DEFAULT_FALLBACK_MS = 5 * 60 * 1000;
 /** Capped exponential backoff delay (ms) for the Nth (0-indexed) retry attempt. */
 export function nextBackoff(attempt: number): number {
   return Math.min(BACKOFF_BASE_MS * 2 ** attempt, BACKOFF_CAP_MS);
+}
+
+/**
+ * Pure retry-attempt counter, kept outside `connect()` so a successful token
+ * fetch can never reset it: only an actual `SUBSCRIBED` (via `onJoinSuccess`)
+ * resets the count. `connect()` re-running after a token-fetch failure or a
+ * channel-join failure both go through `onJoinFailure`, so escalation is
+ * shared across both failure kinds, same as before this was extracted.
+ */
+export function createRetryState() {
+  let attempt = 0;
+  return {
+    /** Returns the delay (ms) to wait before the next retry, then advances the attempt. */
+    onJoinFailure(): number {
+      const delay = nextBackoff(attempt);
+      attempt += 1;
+      return delay;
+    },
+    onJoinSuccess(): void {
+      attempt = 0;
+    },
+  };
 }
 
 /**
@@ -80,7 +103,7 @@ export function useRealtimeRefetch(
     let channel: RealtimeChannel | null = null;
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
-    let attempt = 0;
+    const retryState = createRetryState();
     const throttled = throttle(() => refetchRef.current(), DEBOUNCE_MS);
 
     const clearRefresh = () => {
@@ -99,8 +122,7 @@ export function useRealtimeRefetch(
     const scheduleRetry = () => {
       if (cancelled) return;
       clearRetry();
-      const delay = nextBackoff(attempt);
-      attempt += 1;
+      const delay = retryState.onJoinFailure();
       retryTimer = setTimeout(() => void connect(), delay);
     };
 
@@ -112,7 +134,9 @@ export function useRealtimeRefetch(
 
     function scheduleTokenRefresh(expiresAt: number) {
       clearRefresh();
-      const refreshIn = Math.max(expiresAt - Date.now() - REFRESH_SKEW_MS, 0);
+      // Floor at MIN_REFRESH_MS, not 0: a kiosk clock skewed ahead of the
+      // server would otherwise compute ~0 forever, refreshing in a tight loop.
+      const refreshIn = Math.max(expiresAt - Date.now() - REFRESH_SKEW_MS, MIN_REFRESH_MS);
       refreshTimer = setTimeout(() => void refreshToken(), refreshIn);
     }
 
@@ -138,7 +162,6 @@ export function useRealtimeRefetch(
         return;
       }
       if (cancelled) return;
-      attempt = 0;
       supabase.realtime.setAuth(tokenData.token);
       scheduleTokenRefresh(tokenData.expiresAt);
 
@@ -149,7 +172,7 @@ export function useRealtimeRefetch(
         .subscribe((status) => {
           if (cancelled) return;
           if (status === "SUBSCRIBED") {
-            attempt = 0;
+            retryState.onJoinSuccess();
             refetchRef.current();
           } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
             teardownChannel();

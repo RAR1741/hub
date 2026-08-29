@@ -51,6 +51,23 @@ describe("broadcast", () => {
     expect(JSON.parse(init!.body as string).messages[0].payload).toEqual({});
   });
 
+  test("logs a non-ok response instead of throwing", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("bad service-role key", { status: 401 })),
+    );
+
+    await expect(broadcast("hub:presence", "clock-in")).resolves.toBeUndefined();
+    expect(errorSpy).toHaveBeenCalledWith(
+      "broadcast failed",
+      "hub:presence",
+      "clock-in",
+      401,
+      "bad service-role key",
+    );
+  });
+
   test("swallows a rejected fetch instead of throwing", async () => {
     vi.stubGlobal(
       "fetch",

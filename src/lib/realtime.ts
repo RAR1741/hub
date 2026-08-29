@@ -13,7 +13,7 @@ export async function broadcast(
 ): Promise<void> {
   try {
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-    await fetch(`${serverSupabaseUrl()}/realtime/v1/api/broadcast`, {
+    const res = await fetch(`${serverSupabaseUrl()}/realtime/v1/api/broadcast`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -25,6 +25,9 @@ export async function broadcast(
       }),
       signal: AbortSignal.timeout(2000),
     });
+    if (!res.ok) {
+      console.error("broadcast failed", topic, event, res.status, await res.text().catch(() => ""));
+    }
   } catch (err) {
     console.error("broadcast failed", topic, event, err);
   }
