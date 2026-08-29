@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { formatClockDuration } from "@/lib/format";
+import { useRealtimeRefetch } from "@/hooks/useRealtimeRefetch";
 
 type Entry = { name: string; since: string };
 
@@ -9,17 +10,16 @@ export function WhosHere({ initial }: { initial: Entry[] }) {
   const [here, setHere] = useState<Entry[]>(initial);
   const [now, setNow] = useState(() => Date.now());
 
-  useEffect(() => {
-    const id = setInterval(async () => {
-      try {
-        const res = await fetch("/api/whos-here", { cache: "no-store" });
-        if (res.ok) setHere(((await res.json()).here as Entry[]) ?? []);
-      } catch {
-        // transient; keep last known list
-      }
-    }, 30_000);
-    return () => clearInterval(id);
+  const refetchHere = useCallback(async () => {
+    try {
+      const res = await fetch("/api/whos-here", { cache: "no-store" });
+      if (res.ok) setHere(((await res.json()).here as Entry[]) ?? []);
+    } catch {
+      // transient; keep last known list
+    }
   }, []);
+
+  useRealtimeRefetch("hub:presence", refetchHere);
 
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
