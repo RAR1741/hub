@@ -29,6 +29,17 @@
         ],
         "createdAt": "2026-08-23T00:00:00.000Z",
         "reason": "Established small-text step already used in globals.css (e.g. L345); the Onshape panel (#95) reuses it for part-meta text for consistency. Documenting 13px on DESIGN.md's ramp is a separate design-system task."
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "13px",
+        "files": [
+          "src/app/admin/cron/page.tsx",
+          "src/components/CronJobsEditor.tsx",
+          "src/app/admin/page.tsx"
+        ],
+        "createdAt": "2026-08-28T04:14:41.695Z",
+        "reason": "13px is the established Card hint (text-[13px] text-[var(--muted)]) convention already used throughout src/app/admin/page.tsx; the cron admin page/editor reuse it for consistency."
       }
     ]
   }

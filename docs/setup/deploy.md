@@ -77,6 +77,8 @@ and `pg_net` extensions, which aren't always available immediately on a fresh pr
    trigger a sync. Full calendar wiring (service account, calendar share, `GOOGLE_SA_*` env vars) is
    covered in `docs/setup/google-calendar.md` — do that first if you haven't.
 
+> **Editing cron schedules after deploy:** admins can view and reschedule any `pg_cron` job at runtime from **Admin → Cron jobs** (`/admin/cron`), which calls `cron.alter_job` directly. Migrations seed a job's *initial* schedule; an admin edit overrides it and wins until changed again (a fresh DB replays the migration schedule until someone edits it). Runtime schedules can therefore drift from the committed migration files — this is expected. pg_cron runs in **UTC**.
+
 ## 3. Vercel project
 
 1. [vercel.com](https://vercel.com/) → **Add New → Project** → import this repo.
