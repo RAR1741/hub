@@ -20,3 +20,11 @@ graphify-out/
 
 # Isolated per-branch worktrees (any `git worktree add`; see scripts/install-git-hooks.sh)
 /.worktrees/
+
+# design-sync (claude.ai/design) converter working dirs — durable inputs under
+# .design-sync/ (config.json, hub.css, conventions.md, NOTES.md, previews/) ARE committed
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules
