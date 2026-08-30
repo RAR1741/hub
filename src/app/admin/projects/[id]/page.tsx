@@ -12,7 +12,7 @@ import { ProjectForm } from "@/components/ProjectForm";
 
 const SORT_KEYS: PartSortKey[] = ["number", "type", "name", "parent", "status"];
 
-export const metadata: Metadata = { title: "Project" };
+export const metadata: Metadata = { title: "Manage Project" };
 
 export default async function ProjectDetailPage({
   params,
