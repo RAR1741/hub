@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
@@ -6,6 +7,8 @@ import Link from "next/link";
 import { PeriodForm } from "@/components/PeriodForm";
 import { ActivatePeriodButton } from "@/components/ActivatePeriodButton";
 import { DeletePeriodButton } from "@/components/DeletePeriodButton";
+
+export const metadata: Metadata = { title: "Periods" };
 
 export default async function AdminPeriodsPage() {
   const viewer = await getViewer();

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
@@ -5,6 +6,8 @@ import { getActivePeriod } from "@/lib/periods";
 import { listBuildDays } from "@/lib/build-days";
 import { BuildDayForm } from "@/components/BuildDayForm";
 import { BuildDayRow } from "@/components/BuildDayRow";
+
+export const metadata: Metadata = { title: "Build Days" };
 
 export default async function AdminBuildDaysPage() {
   const viewer = await getViewer();

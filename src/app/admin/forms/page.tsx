@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { hasRole } from "@/lib/authz";
 import { listForms } from "@/lib/forms";
 import { getViewer } from "@/lib/viewer";
 import { CreateFormForm } from "@/components/FormFieldEditor";
+
+export const metadata: Metadata = { title: "Forms" };
 
 export default async function AdminFormsPage() {
   const viewer = await getViewer();

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { hasRole } from "@/lib/authz";
@@ -10,6 +11,8 @@ import { PartsTable } from "@/components/PartsTable";
 import { ProjectForm } from "@/components/ProjectForm";
 
 const SORT_KEYS: PartSortKey[] = ["number", "type", "name", "parent", "status"];
+
+export const metadata: Metadata = { title: "Manage Project" };
 
 export default async function ProjectDetailPage({
   params,

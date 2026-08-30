@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { hasRole } from "@/lib/authz";
 import { getConnection } from "@/lib/onshape";
@@ -11,6 +12,8 @@ import { OnshapeConnect } from "@/components/OnshapeConnect";
  * onshape.com) never gets them. Mints the panel token server-side and hands
  * it to the client child, which posts it back to the panel via `postMessage`.
  */
+export const metadata: Metadata = { title: "Connect Onshape" };
+
 export default async function OnshapeConnectPage({
   searchParams,
 }: {

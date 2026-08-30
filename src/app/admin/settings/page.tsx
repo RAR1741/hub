@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
 import { getSetting } from "@/lib/settings";
 import { SettingsForm } from "@/components/SettingsForm";
+
+export const metadata: Metadata = { title: "Settings" };
 
 export default async function AdminSettingsPage() {
   const viewer = await getViewer();

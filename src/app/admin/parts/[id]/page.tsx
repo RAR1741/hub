@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { hasRole } from "@/lib/authz";
@@ -7,6 +8,8 @@ import { fullPartNumber, PRIORITY_MAP, STATUS_MAP } from "@/lib/types";
 import { DeletePartButton } from "@/components/DeletePartButton";
 import { PartEditForm } from "@/components/PartEditForm";
 import { PartsTable } from "@/components/PartsTable";
+
+export const metadata: Metadata = { title: "Part" };
 
 export default async function PartDetailPage({
   params,

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
@@ -5,6 +6,8 @@ import { getActivePeriod, listPeriods } from "@/lib/periods";
 import { listSessionsForPeriod } from "@/lib/reports";
 import { listPeople, displayName } from "@/lib/people";
 import { SessionEditRow } from "@/components/SessionEditRow";
+
+export const metadata: Metadata = { title: "Sessions" };
 
 export default async function AdminSessionsPage({
   searchParams,

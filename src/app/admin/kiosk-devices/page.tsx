@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
 import { listKioskDevices } from "@/lib/kiosk";
 import { KioskDeviceManager } from "@/components/KioskDeviceManager";
+
+export const metadata: Metadata = { title: "Kiosk Devices" };
 
 export default async function AdminKioskDevicesPage() {
   const viewer = await getViewer();

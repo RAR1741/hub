@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 import { StudentLoginForm } from "@/components/StudentLoginForm";
 import { AccountRequestForm } from "@/components/AccountRequestForm";
 import { EmailOtpForm } from "@/components/EmailOtpForm";
+
+export const metadata: Metadata = { title: "Sign In" };
 
 export default function LoginPage() {
   return (

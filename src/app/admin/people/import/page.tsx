@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
 import { listPeople } from "@/lib/people";
 import { RosterImportForm } from "@/components/RosterImportForm";
+
+export const metadata: Metadata = { title: "Import People" };
 
 export default async function AdminPeopleImportPage() {
   const viewer = await getViewer();

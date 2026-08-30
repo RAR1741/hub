@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { hasRole } from "@/lib/authz";
@@ -12,6 +13,8 @@ import { getViewer } from "@/lib/viewer";
 import { EventForm } from "@/components/EventForm";
 import { EventRosterActions, ManualAddPerson } from "@/components/EventRosterActions";
 import { EventUnlinkBanner } from "@/components/EventUnlinkBanner";
+
+export const metadata: Metadata = { title: "Manage Event" };
 
 export default async function EventRosterPage({
   params,

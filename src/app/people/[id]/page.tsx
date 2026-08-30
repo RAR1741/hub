@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
@@ -11,6 +12,8 @@ import { BadgeAwardPanel } from "@/components/BadgeAwardPanel";
 import { RevokeBadgeButton } from "@/components/RevokeBadgeButton";
 import { getGuardiansForPerson } from "@/lib/guardians";
 import { StatusBadge } from "@/components/FirstStatusTable";
+
+export const metadata: Metadata = { title: "Person" };
 
 export default async function PersonPage({
   params,

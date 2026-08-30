@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
@@ -9,6 +10,8 @@ import { DeletePersonButton } from "@/components/DeletePersonButton";
 import { PersonEmails } from "@/components/PersonEmails";
 import { PersonSlackLink } from "@/components/PersonSlackLink";
 import { PersonGuardians } from "@/components/PersonGuardians";
+
+export const metadata: Metadata = { title: "Manage Person" };
 
 export default async function AdminEditPersonPage({
   params,

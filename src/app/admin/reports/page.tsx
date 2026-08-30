@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
 import { getActivePeriod, listPeriods } from "@/lib/periods";
 import { hoursReportForPeriod, dietaryRestrictionsReport } from "@/lib/reports";
 import { attendanceSummaryForPeriod } from "@/lib/attendance";
+
+export const metadata: Metadata = { title: "Reports" };
 
 export default async function AdminReportsPage({
   searchParams,

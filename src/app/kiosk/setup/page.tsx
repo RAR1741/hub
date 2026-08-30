@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
 import { KioskSetupForm } from "@/components/KioskBoard";
+
+export const metadata: Metadata = { title: "Kiosk Setup" };
 
 export default async function KioskSetupPage() {
   // Registering a tablet is a mentor+ action: they log in, enter the device

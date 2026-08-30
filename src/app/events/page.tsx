@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { hasRole } from "@/lib/authz";
@@ -7,6 +8,8 @@ import { getFormWithFields } from "@/lib/forms";
 import { getViewer } from "@/lib/viewer";
 import { EventSignupButton } from "@/components/EventSignupButton";
 import { EventSignupForm } from "@/components/EventSignupForm";
+
+export const metadata: Metadata = { title: "Events" };
 
 export default async function EventsPage() {
   const viewer = await getViewer();

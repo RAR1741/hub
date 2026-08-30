@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
 import { GenerateSeasonPeriodsForm } from "@/components/GenerateSeasonPeriodsForm";
+
+export const metadata: Metadata = { title: "Generate Periods" };
 
 export default async function GenerateSeasonPeriodsPage() {
   const viewer = await getViewer();

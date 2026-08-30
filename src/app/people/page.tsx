@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
 import { listPeople } from "@/lib/people";
 import { personFromRow } from "@/lib/types";
 import { PeopleBrowser, type PeopleRow } from "@/components/PeopleBrowser";
+
+export const metadata: Metadata = { title: "People" };
 
 export default async function PeoplePage() {
   const viewer = await getViewer();

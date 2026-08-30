@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
@@ -31,6 +32,8 @@ async function expectedCount(teamId: string, db: ReturnType<typeof getDb>): Prom
       Array.isArray(p.person_identity) ? p.person_identity : p.person_identity ? [p.person_identity] : [],
     ).length;
 }
+
+export const metadata: Metadata = { title: "Drive Sync" };
 
 export default async function AdminDriveSyncPage() {
   const viewer = await getViewer();

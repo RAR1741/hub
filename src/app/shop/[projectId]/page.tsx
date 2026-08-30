@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { hasRole } from "@/lib/authz";
@@ -11,6 +12,8 @@ type Params = { params: Promise<{ projectId: string }> };
 // Student+: server shell (name + back link) renders the initial parts list
 // server-side (matches the WhosHere pattern) — the client board then polls
 // the student+ /api/shop/[projectId] route for refreshes.
+export const metadata: Metadata = { title: "Project" };
+
 export default async function ShopBoardPage({ params }: Params) {
   const viewer = await getViewer();
   if (!hasRole(viewer.role, "student")) redirect("/login");

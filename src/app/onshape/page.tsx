@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { discardOnshapeToken } from "@/lib/onshape";
 import { OnshapePanel } from "@/components/OnshapePanel";
 
@@ -8,6 +9,8 @@ import { OnshapePanel } from "@/components/OnshapePanel";
 export const dynamic = "force-dynamic";
 
 type SearchParams = Record<string, string | string[] | undefined>;
+
+export const metadata: Metadata = { title: "Onshape" };
 
 export default async function OnshapePanelPage({
   searchParams,
