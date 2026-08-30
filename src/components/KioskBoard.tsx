@@ -143,6 +143,9 @@ export function KioskBoard({
           </span>
           Sign in / out
         </div>
+        <p role="status" className="k-flash" style={{ visibility: flash ? "visible" : "hidden" }}>
+          {flash ?? " "}
+        </p>
         <div className="k-now mono">
           {nowDate.toLocaleDateString(undefined, { weekday: "short" }).toUpperCase()} ·{" "}
           {nowDate.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })} ·{" "}
@@ -154,16 +157,6 @@ export function KioskBoard({
           )}
         </div>
       </div>
-
-      {flash && (
-        <p
-          role="status"
-          className="mx-5 mt-4 rounded-xl border px-6 py-4 text-center text-xl font-bold shadow-lg"
-          style={{ background: "#E01926", borderColor: "#E01926", color: "#ffffff" }}
-        >
-          {flash}
-        </p>
-      )}
 
       <div className="kiosk-search-row">
         <input
