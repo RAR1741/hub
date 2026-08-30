@@ -1072,6 +1072,22 @@
     color: #9aa0a8;
   }
 
+  .kiosk-head .k-flash {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    padding: 6px 14px;
+    border-radius: 9px;
+    font-size: 15px;
+    font-weight: 700;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    background: #e01926;
+    color: #ffffff;
+  }
+
   .kiosk-search-row {
     padding: 14px 20px 0;
   }
