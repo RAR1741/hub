@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { hasRole } from "@/lib/authz";
 import { countPartsByProject, listProjects } from "@/lib/parts";
 import { getViewer } from "@/lib/viewer";
 import { ProjectForm } from "@/components/ProjectForm";
+
+export const metadata: Metadata = { title: "Projects" };
 
 export default async function AdminProjectsPage() {
   const viewer = await getViewer();

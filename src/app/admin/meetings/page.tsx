@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
 import { listAllMeetings } from "@/lib/meetings";
 import { MeetingForm } from "@/components/MeetingForm";
 import { MeetingRow } from "@/components/MeetingRow";
+
+export const metadata: Metadata = { title: "Meetings" };
 
 export default async function AdminMeetingsPage() {
   const viewer = await getViewer();

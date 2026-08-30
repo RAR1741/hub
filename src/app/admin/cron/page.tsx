@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
 import { listCronJobs } from "@/lib/cron-jobs";
 import { CronJobsEditor } from "@/components/CronJobsEditor";
+
+export const metadata: Metadata = { title: "Cron Jobs" };
 
 export default async function AdminCronPage() {
   const viewer = await getViewer();

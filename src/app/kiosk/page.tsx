@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { KIOSK_COOKIE, verifyKioskToken } from "@/lib/kiosk";
@@ -5,6 +6,8 @@ import { activeMembersForKiosk, listWhosHere } from "@/lib/sessions";
 import { KioskBoard } from "@/components/KioskBoard";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
+
+export const metadata: Metadata = { title: "Kiosk" };
 
 export default async function KioskPage() {
   const token = (await cookies()).get(KIOSK_COOKIE)?.value;

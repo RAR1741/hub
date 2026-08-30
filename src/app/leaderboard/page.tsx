@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
@@ -67,6 +68,8 @@ function LeaderColumn({
     </div>
   );
 }
+
+export const metadata: Metadata = { title: "Leaderboard" };
 
 export default async function LeaderboardPage({
   searchParams,

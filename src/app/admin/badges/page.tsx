@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
@@ -5,6 +6,8 @@ import { hasRole } from "@/lib/authz";
 import { listBadges } from "@/lib/badges";
 import { listTeams } from "@/lib/teams";
 import { BadgeForm } from "@/components/BadgeForm";
+
+export const metadata: Metadata = { title: "Badges" };
 
 export default async function AdminBadgesPage() {
   const viewer = await getViewer();

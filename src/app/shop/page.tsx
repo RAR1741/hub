@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { hasRole } from "@/lib/authz";
 import { listProjects } from "@/lib/parts";
 import { getViewer } from "@/lib/viewer";
+
+export const metadata: Metadata = { title: "Shop" };
 
 export default async function ShopIndexPage() {
   const viewer = await getViewer();

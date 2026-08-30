@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
@@ -11,6 +12,8 @@ import {
   ApplicationActions,
   ExcusalRequestActions,
 } from "@/components/RequestActions";
+
+export const metadata: Metadata = { title: "Requests" };
 
 export default async function AdminRequestsPage() {
   const viewer = await getViewer();

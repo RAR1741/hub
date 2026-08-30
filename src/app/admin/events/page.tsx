@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { hasRole } from "@/lib/authz";
@@ -7,6 +8,8 @@ import { listPeriods } from "@/lib/periods";
 import type { Event, Period } from "@/lib/types";
 import { getViewer } from "@/lib/viewer";
 import { EventForm } from "@/components/EventForm";
+
+export const metadata: Metadata = { title: "Manage Events" };
 
 export default async function AdminEventsPage() {
   const viewer = await getViewer();

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -66,6 +67,8 @@ function Section({ label, children }: { label: string; children: ReactNode }) {
     </section>
   );
 }
+
+export const metadata: Metadata = { title: "Admin" };
 
 export default async function AdminHubPage() {
   const viewer = await getViewer();

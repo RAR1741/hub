@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { getActivePeriod } from "@/lib/periods";
@@ -12,6 +13,8 @@ import { attendanceForDate, attendanceSummary, localDateOf } from "@/lib/attenda
 import { ExcusalRequestForm } from "@/components/ExcusalRequestForm";
 import { ExcusalRequestList } from "@/components/ExcusalRequestList";
 import { MissedDaysExcusal } from "@/components/MissedDaysExcusal";
+
+export const metadata: Metadata = { title: "My Attendance" };
 
 export default async function MyAttendancePage() {
   const viewer = await getViewer();

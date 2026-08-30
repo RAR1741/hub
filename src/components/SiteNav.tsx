@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { cookies } from "next/headers";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
@@ -30,17 +31,16 @@ export async function SiteNav() {
       <div className="hazard" />
       <nav className="border-b border-[var(--hair)] bg-[var(--surface)]/95 backdrop-blur supports-[backdrop-filter]:bg-[var(--surface)]/85">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-1 gap-y-2 px-4 py-2.5">
-          <Link
-            href="/"
-            className="mr-2 flex items-center gap-2.5 font-[family-name:var(--font-display)] text-base font-extrabold tracking-tight text-[var(--ink)] hover:no-underline"
-          >
-            <span
-              className="rounded-md px-[7px] py-[3px] font-[family-name:var(--font-mono)] text-[13px] font-bold tracking-[0.02em]"
-              style={{ background: "var(--red)", color: "var(--red-fg)" }}
-            >
-              1741
+          <Link href="/" className="mr-2 flex items-center hover:no-underline">
+            <span className="flex items-center rounded-md border border-black/5 bg-white px-2 py-1 shadow-sm">
+              <Image
+                src="/redalert-logo.png"
+                alt="Red Alert Robotics 1741"
+                width={116}
+                height={32}
+                priority
+              />
             </span>
-            Team Hub
           </Link>
           <div className="flex flex-1 flex-wrap items-center gap-x-1">
             <Link href="/" className={navLinkClass}>

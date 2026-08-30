@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
@@ -17,6 +18,8 @@ function initials(name: string): string {
     .join("")
     .toUpperCase();
 }
+
+export const metadata: Metadata = { title: "Manage People" };
 
 export default async function AdminPeoplePage() {
   const viewer = await getViewer();

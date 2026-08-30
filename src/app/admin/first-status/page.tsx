@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
@@ -9,6 +10,8 @@ import { FirstSessionCard } from "@/components/FirstSessionCard";
 import { FirstSyncPanel } from "@/components/FirstSyncPanel";
 import { FirstStatusTable, type FirstStatusRow } from "@/components/FirstStatusTable";
 import { FirstLinkPicker } from "@/components/FirstLinkPicker";
+
+export const metadata: Metadata = { title: "FIRST Status" };
 
 export default async function AdminFirstStatusPage() {
   const viewer = await getViewer();

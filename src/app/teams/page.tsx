@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
@@ -13,6 +14,8 @@ import {
 } from "@/lib/teams";
 import { JoinButtons } from "@/components/JoinButtons";
 import { TeamTreeView } from "@/components/TeamTree";
+
+export const metadata: Metadata = { title: "Teams" };
 
 export default async function TeamsPage() {
   const viewer = await getViewer();

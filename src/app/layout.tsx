@@ -25,7 +25,10 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Team Hub",
+  title: {
+    default: "1741 Hub",
+    template: "%s - 1741 Hub",
+  },
   description: "Attendance and roster for FRC Team 1741.",
 };
 

@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
 import { listDuplicateCandidates, listRejectedPairs } from "@/lib/merge-people";
 import { DuplicatePeople } from "@/components/DuplicatePeople";
+
+export const metadata: Metadata = { title: "Duplicate People" };
 
 export default async function AdminDuplicatePeoplePage() {
   const viewer = await getViewer();

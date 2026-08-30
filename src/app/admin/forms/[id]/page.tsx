@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { hasRole } from "@/lib/authz";
 import { getFormWithFields } from "@/lib/forms";
 import { getViewer } from "@/lib/viewer";
 import { FormFieldEditor, FormSettingsForm } from "@/components/FormFieldEditor";
+
+export const metadata: Metadata = { title: "Form" };
 
 export default async function AdminFormEditPage({ params }: { params: Promise<{ id: string }> }) {
   const viewer = await getViewer();

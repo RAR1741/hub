@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
 import { listPeriods } from "@/lib/periods";
 import { TimeImportForm } from "@/components/TimeImportForm";
+
+export const metadata: Metadata = { title: "Time Import" };
 
 export default async function AdminTimeImportPage() {
   const viewer = await getViewer();

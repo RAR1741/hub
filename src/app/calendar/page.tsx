@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
@@ -9,6 +10,8 @@ import { listPeople, displayName } from "@/lib/people";
 import { getSetting } from "@/lib/settings";
 import { attendanceForDate, attendanceSummary } from "@/lib/attendance";
 import { AttendanceCell } from "@/components/AttendanceGridActions";
+
+export const metadata: Metadata = { title: "Calendar" };
 
 export default async function CalendarPage() {
   const viewer = await getViewer();

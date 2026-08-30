@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
@@ -5,6 +6,8 @@ import { hasRole } from "@/lib/authz";
 import { buildTeamTree, listTeams, teamMemberCounts, type TeamNode } from "@/lib/teams";
 import { TeamForm } from "@/components/TeamForm";
 import { TeamTreeView } from "@/components/TeamTree";
+
+export const metadata: Metadata = { title: "Manage Teams" };
 
 export default async function AdminTeamsPage() {
   const viewer = await getViewer();

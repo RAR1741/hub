@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
@@ -9,6 +10,8 @@ import { listUpcomingMeetings } from "@/lib/meetings";
 import { listBuildDays } from "@/lib/build-days";
 import { getSetting } from "@/lib/settings";
 import { hoursGoalProgress } from "@/lib/hours-goal";
+
+export const metadata: Metadata = { title: "Home" };
 
 export default async function HomePage() {
   const viewer = await getViewer();

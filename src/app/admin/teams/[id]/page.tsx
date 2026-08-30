@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
@@ -6,6 +7,8 @@ import { listPeople, displayName } from "@/lib/people";
 import { TeamForm } from "@/components/TeamForm";
 import { MemberManager } from "@/components/MemberManager";
 import { DeleteTeamButton } from "@/components/DeleteTeamButton";
+
+export const metadata: Metadata = { title: "Manage Team" };
 
 export default async function AdminTeamPage({
   params,

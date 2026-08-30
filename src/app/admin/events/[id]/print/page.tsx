@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { hasRole } from "@/lib/authz";
@@ -11,6 +12,8 @@ import { PrintButton } from "@/components/PrintButton";
  * check-in status. Issue #54 — deliberately not GatherPack's grouping/notes/
  * page-break-control roster; add those if mentors ask once this ships.
  */
+export const metadata: Metadata = { title: "Event Print" };
+
 export default async function EventRosterPrintPage({ params }: { params: Promise<{ id: string }> }) {
   const viewer = await getViewer();
   if (!hasRole(viewer.role, "mentor")) redirect("/");
