@@ -1,0 +1,15 @@
+{
+  "pkg": "team-hub",
+  "globalName": "TeamHub",
+  "projectId": "70a412e7-1359-405e-9f4f-736db360f765",
+  "shape": "package",
+  "entry": "./src/components/Icon.tsx",
+  "srcDir": "src",
+  "tsconfig": "./tsconfig.json",
+  "componentSrcMap": {
+    "Icon": "src/components/Icon.tsx"
+  },
+  "cssEntry": ".design-sync/hub.css",
+  "readmeHeader": ".design-sync/conventions.md",
+  "guidelinesGlob": ["docs/design/*.md"]
+}
