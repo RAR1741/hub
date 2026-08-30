@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatClockDuration } from "@/lib/format";
 import { roleColorVar } from "@/lib/roster-colors";
+import { useRealtimeRefetch } from "@/hooks/useRealtimeRefetch";
 
 export function KioskSetupForm() {
   const [token, setToken] = useState("");
@@ -62,7 +63,12 @@ export function KioskBoard({
   const [now, setNow] = useState(() => Date.now());
   const [search, setSearch] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
+  const busyRef = useRef(busy);
   const router = useRouter();
+
+  useRealtimeRefetch("hub:presence", () => {
+    if (!busyRef.current) router.refresh();
+  });
 
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -80,6 +86,7 @@ export function KioskBoard({
   async function call(path: string, personId: string, name: string, verb: string) {
     if (busy || !canAct) return;
     setBusy(true);
+    busyRef.current = true;
     setFlash(null);
     const res = await fetch(path, {
       method: "POST",
@@ -87,6 +94,7 @@ export function KioskBoard({
       body: JSON.stringify({ personId }),
     });
     setBusy(false);
+    busyRef.current = false;
     if (res.ok) {
       setFlash(`${verb} ${name}`);
       setSearch("");
