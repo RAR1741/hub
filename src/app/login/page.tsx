@@ -1,5 +1,5 @@
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
-import { StudentLoginForm } from "@/components/StudentLoginForm";
+// import { StudentLoginForm } from "@/components/StudentLoginForm"; // Student ID login hidden during internal-tool rollout
 import { AccountRequestForm } from "@/components/AccountRequestForm";
 import { EmailOtpForm } from "@/components/EmailOtpForm";
 
@@ -18,7 +18,7 @@ export default function LoginPage() {
         <hr style={{ border: 0, borderTop: "1px solid var(--hair)" }} />
         <section className="flex flex-col gap-3">
           <h2 className="eyebrow">Students</h2>
-          <StudentLoginForm />
+          {/* <StudentLoginForm /> Student ID login hidden during internal-tool rollout */}
           <details className="text-sm">
             <summary className="cursor-pointer font-medium" style={{ color: "var(--red)" }}>
               New student? Request an account
