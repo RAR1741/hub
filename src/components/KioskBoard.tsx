@@ -137,7 +137,7 @@ export function KioskBoard({
         <div className="k-brand">
           <span
             className="rounded-md px-[7px] py-[3px] font-[family-name:var(--font-mono)] text-[13px] font-bold tracking-[0.02em]"
-            style={{ background: "#E01926", color: "#ffffff" }}
+            style={{ background: "var(--red)", color: "var(--red-fg)" }}
           >
             1741
           </span>
@@ -151,7 +151,7 @@ export function KioskBoard({
           {nowDate.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })} ·{" "}
           {here.length} here
           {!canAct && (
-            <span className="ml-2" style={{ color: "#8b919a" }}>
+            <span className="ml-2" style={{ color: "var(--muted)" }}>
               · View only
             </span>
           )}
@@ -178,11 +178,11 @@ export function KioskBoard({
         <section className="k-signin">
           <p className="k-title">Tap your name to sign in</p>
           {students.length === 0 ? (
-            <p className="text-sm" style={{ color: "#8b919a" }}>
+            <p className="text-sm" style={{ color: "var(--muted)" }}>
               Everyone active is already signed in.
             </p>
           ) : shownStudents.length === 0 ? (
-            <p className="text-sm" style={{ color: "#8b919a" }}>
+            <p className="text-sm" style={{ color: "var(--muted)" }}>
               No match.
             </p>
           ) : (
@@ -204,11 +204,11 @@ export function KioskBoard({
         <section className="k-here">
           <p className="k-title">On the clock · {here.length}</p>
           {here.length === 0 ? (
-            <p className="text-sm" style={{ color: "#8b919a" }}>
+            <p className="text-sm" style={{ color: "var(--muted)" }}>
               Nobody is signed in yet.
             </p>
           ) : shownHere.length === 0 ? (
-            <p className="text-sm" style={{ color: "#8b919a" }}>
+            <p className="text-sm" style={{ color: "var(--muted)" }}>
               No match.
             </p>
           ) : (
@@ -231,11 +231,11 @@ export function KioskBoard({
         <section className="k-mentors">
           <p className="k-title">Mentor sign in</p>
           {mentors.length === 0 ? (
-            <p className="text-sm" style={{ color: "#8b919a" }}>
+            <p className="text-sm" style={{ color: "var(--muted)" }}>
               All mentors are signed in.
             </p>
           ) : shownMentors.length === 0 ? (
-            <p className="text-sm" style={{ color: "#8b919a" }}>
+            <p className="text-sm" style={{ color: "var(--muted)" }}>
               No match.
             </p>
           ) : (
