@@ -176,6 +176,9 @@ describe("eventFromRow", () => {
       gcalEventId: null,
       gcalMissing: false,
       formId: null,
+      slackChannelId: null,
+      slackChannelName: null,
+      slackArchivedAt: null,
     });
   });
 });

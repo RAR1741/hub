@@ -290,6 +290,9 @@ export type EventRow = {
   gcal_event_id: string | null;
   gcal_missing: boolean;
   form_id: string | null;
+  slack_channel_id?: string | null;
+  slack_channel_name?: string | null;
+  slack_archived_at?: string | null;
 };
 
 export type Event = {
@@ -305,6 +308,9 @@ export type Event = {
   gcalEventId: string | null;
   gcalMissing: boolean;
   formId: string | null;
+  slackChannelId: string | null;
+  slackChannelName: string | null;
+  slackArchivedAt: string | null;
 };
 
 export function eventFromRow(row: EventRow): Event {
@@ -321,6 +327,9 @@ export function eventFromRow(row: EventRow): Event {
     gcalEventId: row.gcal_event_id,
     gcalMissing: row.gcal_missing,
     formId: row.form_id ?? null,
+    slackChannelId: row.slack_channel_id ?? null,
+    slackChannelName: row.slack_channel_name ?? null,
+    slackArchivedAt: row.slack_archived_at ?? null,
   };
 }
 
