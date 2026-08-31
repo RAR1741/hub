@@ -294,6 +294,7 @@ describe("afterEventCreated", () => {
     const db = makeDb([
       { error: null }, // event update (channel id/name)
       { data: { slack_user_id: "U-CREATOR" } }, // person lookup
+      { data: null }, // team_timezone setting lookup (falls back to default)
     ]);
 
     await afterEventCreated(
@@ -301,7 +302,7 @@ describe("afterEventCreated", () => {
       { id: EVENT_ID, name: "Kickoff", createdBy: "creator-1", startsAt: "2026-09-01T00:00:00Z", endsAt: "2026-09-01T02:00:00Z", location: null },
     );
 
-    expect(db.calls).toEqual(["event", "person"]);
+    expect(db.calls).toEqual(["event", "person", "app_setting"]);
     // create, invite, post
     expect(requests).toHaveLength(3);
     expect(requests[1].url).toContain("conversations.invite");

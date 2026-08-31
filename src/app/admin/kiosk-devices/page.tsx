@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
 import { listKioskDevices } from "@/lib/kiosk";
+import { getTeamTimezone } from "@/lib/settings";
 import { KioskDeviceManager } from "@/components/KioskDeviceManager";
 
 export const metadata: Metadata = { title: "Kiosk Devices" };
@@ -11,6 +12,7 @@ export default async function AdminKioskDevicesPage() {
   const viewer = await getViewer();
   if (!hasRole(viewer.role, "admin")) redirect("/");
   const devices = await listKioskDevices();
+  const teamTz = await getTeamTimezone();
   return (
     <main className="flex flex-col gap-6">
       <div className="page-head">
@@ -23,7 +25,7 @@ export default async function AdminKioskDevicesPage() {
         Create a token, then enter it once on the shop tablet at <code>/kiosk/setup</code>.
       </p>
       <section className="card flex flex-col gap-4">
-        <KioskDeviceManager devices={devices} />
+        <KioskDeviceManager devices={devices} teamTz={teamTz} />
       </section>
     </main>
   );

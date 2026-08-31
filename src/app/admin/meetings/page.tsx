@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
 import { listAllMeetings } from "@/lib/meetings";
+import { getTeamTimezone } from "@/lib/settings";
 import { MeetingForm } from "@/components/MeetingForm";
 import { MeetingRow } from "@/components/MeetingRow";
 
@@ -13,6 +14,7 @@ export default async function AdminMeetingsPage() {
   if (!hasRole(viewer.role, "admin")) redirect("/");
 
   const meetings = await listAllMeetings();
+  const teamTz = await getTeamTimezone();
 
   return (
     <main className="flex flex-col gap-6">
@@ -24,7 +26,7 @@ export default async function AdminMeetingsPage() {
       </div>
       <div className="card flex flex-col gap-3">
         <h2 className="text-base font-semibold">Add meeting</h2>
-        <MeetingForm />
+        <MeetingForm teamTz={teamTz} />
       </div>
       <p className="text-[13px] text-[var(--muted)]">
         Editing a <span className="pill role">Google</span>-sourced meeting is temporary — the next
@@ -54,6 +56,7 @@ export default async function AdminMeetingsPage() {
                   startsAt={m.startsAt}
                   endsAt={m.endsAt}
                   isManual={m.gcalEventId === null}
+                  teamTz={teamTz}
                 />
               ))}
             </tbody>

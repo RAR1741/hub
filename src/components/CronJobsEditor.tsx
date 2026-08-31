@@ -6,13 +6,13 @@ import type { CronJob } from "@/lib/cron-jobs";
 
 type RowState = { schedule: string; busy: boolean; status: string | null; error: string | null };
 
-function formatLastRun(job: CronJob): string {
+function formatLastRun(job: CronJob, teamTz: string): string {
   if (!job.lastRunStartedAt) return "never";
-  const when = new Date(job.lastRunStartedAt).toLocaleString();
+  const when = new Date(job.lastRunStartedAt).toLocaleString(undefined, { timeZone: teamTz });
   return job.lastRunStatus ? `${when} (${job.lastRunStatus})` : when;
 }
 
-export function CronJobsEditor({ jobs }: { jobs: CronJob[] }) {
+export function CronJobsEditor({ jobs, teamTz }: { jobs: CronJob[]; teamTz: string }) {
   const [rows, setRows] = useState<Record<number, RowState>>(() =>
     Object.fromEntries(jobs.map((job) => [job.jobid, { schedule: job.schedule, busy: false, status: null, error: null }])),
   );
@@ -57,7 +57,7 @@ export function CronJobsEditor({ jobs }: { jobs: CronJob[] }) {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="font-medium">{job.jobname}</span>
                 <span className="text-[13px] text-[var(--muted)]">
-                  {job.active ? "active" : "inactive"} · last run: {formatLastRun(job)}
+                  {job.active ? "active" : "inactive"} · last run: {formatLastRun(job, teamTz)}
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-2">

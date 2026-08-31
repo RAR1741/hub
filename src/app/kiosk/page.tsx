@@ -6,6 +6,7 @@ import { activeMembersForKiosk, listWhosHere } from "@/lib/sessions";
 import { KioskBoard } from "@/components/KioskBoard";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
+import { getTeamTimezone } from "@/lib/settings";
 
 export const metadata: Metadata = { title: "Kiosk" };
 
@@ -29,14 +30,15 @@ export default async function KioskPage() {
       </main>
     );
   }
-  const [{ students, mentors }, here] = await Promise.all([
+  const [{ students, mentors }, here, teamTz] = await Promise.all([
     activeMembersForKiosk(),
     listWhosHere(),
+    getTeamTimezone(),
   ]);
   const canAct = registered || viewer.role === "admin";
   return (
     <main className="flex min-h-full flex-col p-4 sm:p-6 lg:p-8">
-      <KioskBoard students={students} mentors={mentors} here={here} canAct={canAct} />
+      <KioskBoard students={students} mentors={mentors} here={here} canAct={canAct} teamTz={teamTz} />
     </main>
   );
 }

@@ -7,7 +7,7 @@ import { nameKey } from "./name-match";
 export type AnomalyDecision = "accept" | "reject" | "am" | "pm";
 import { localDateTimeToInstant } from "./tz";
 import { getPeriod } from "./periods";
-import { getSetting } from "./settings";
+import { getTeamTimezone } from "./settings";
 
 export type RoleChange = { name: string; from: string; to: string };
 export type TimeImportSummary = {
@@ -44,7 +44,7 @@ export async function runTimeImport(args: {
   const decisions = args.decisions ?? {};
   const period = await getPeriod(args.periodId, db);
   if (!period) return { error: "period_not_found" };
-  const tz = args.tz ?? (await getSetting<string>("team_timezone", "America/Indiana/Indianapolis", db));
+  const tz = args.tz ?? (await getTeamTimezone(db));
 
   const parsed = parseTimeSheet(args.csv);
   if (parsed.people.length === 0) return { error: parsed.fileIssues[0] ?? "no_data" };

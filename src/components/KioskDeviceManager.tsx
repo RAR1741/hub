@@ -7,9 +7,11 @@ import { Button, Icon } from "@/components/ui";
 function DeviceRow({
   device,
   onFailed,
+  teamTz,
 }: {
   device: { id: string; name: string; lastSeenAt: string | null };
   onFailed: (msg: string) => void;
+  teamTz: string;
 }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(device.name);
@@ -66,7 +68,7 @@ function DeviceRow({
       ) : (
         <span>
           {device.name} — last seen{" "}
-          {device.lastSeenAt ? new Date(device.lastSeenAt).toLocaleString() : "never"}
+          {device.lastSeenAt ? new Date(device.lastSeenAt).toLocaleString(undefined, { timeZone: teamTz }) : "never"}
         </span>
       )}
       {!editing && (
@@ -85,8 +87,10 @@ function DeviceRow({
 
 export function KioskDeviceManager({
   devices,
+  teamTz,
 }: {
   devices: { id: string; name: string; lastSeenAt: string | null }[];
+  teamTz: string;
 }) {
   const [name, setName] = useState("");
   const [newToken, setNewToken] = useState<string | null>(null);
@@ -135,7 +139,7 @@ export function KioskDeviceManager({
       ) : (
         <ul className="flex flex-col divide-y divide-[var(--hair)]">
           {devices.map((d) => (
-            <DeviceRow key={d.id} device={d} onFailed={setStatus} />
+            <DeviceRow key={d.id} device={d} onFailed={setStatus} teamTz={teamTz} />
           ))}
         </ul>
       )}

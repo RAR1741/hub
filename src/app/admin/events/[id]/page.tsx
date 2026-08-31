@@ -9,10 +9,12 @@ import { getFormWithFields, listForms } from "@/lib/forms";
 import { listPeople } from "@/lib/people";
 import { displayName } from "@/lib/people";
 import { listPeriods } from "@/lib/periods";
+import { getTeamTimezone } from "@/lib/settings";
 import { getViewer } from "@/lib/viewer";
 import { EventForm } from "@/components/EventForm";
 import { EventRosterActions, ManualAddPerson } from "@/components/EventRosterActions";
 import { EventUnlinkBanner } from "@/components/EventUnlinkBanner";
+import { EventDeleteButton } from "@/components/EventDeleteButton";
 
 export const metadata: Metadata = { title: "Manage Event" };
 
@@ -31,7 +33,13 @@ export default async function EventRosterPage({
   const event = await getEvent(id);
   if (!event) notFound();
 
-  const [roster, allPeople, periods, forms] = await Promise.all([listEventRoster(id), listPeople(), listPeriods(), listForms()]);
+  const [roster, allPeople, periods, forms, teamTz] = await Promise.all([
+    listEventRoster(id),
+    listPeople(),
+    listPeriods(),
+    listForms(),
+    getTeamTimezone(),
+  ]);
   const rosterIds = new Set(roster.map((r) => r.personId));
   const addable = allPeople
     .filter((p) => p.is_active && !rosterIds.has(p.id))
@@ -68,13 +76,17 @@ export default async function EventRosterPage({
         <div>
           <h1>{event.name}</h1>
           <div className="sub">
-            {new Date(event.startsAt).toLocaleString()} – {new Date(event.endsAt).toLocaleString()}
+            {new Date(event.startsAt).toLocaleString(undefined, { timeZone: teamTz })} –{" "}
+            {new Date(event.endsAt).toLocaleString(undefined, { timeZone: teamTz })}
             {event.location ? ` · ${event.location}` : ""}
           </div>
         </div>
-        <Link href={`/admin/events/${id}/print`} className="btn btn-secondary">
-          Print roster
-        </Link>
+        <div className="flex gap-2">
+          <Link href={`/admin/events/${id}/print`} className="btn btn-secondary">
+            Print roster
+          </Link>
+          <EventDeleteButton eventId={id} eventName={event.name} />
+        </div>
       </div>
 
       {event.gcalMissing && <EventUnlinkBanner eventId={id} />}
@@ -83,7 +95,7 @@ export default async function EventRosterPage({
       <details className="card" open={edit === "1"}>
         <summary className="cursor-pointer font-semibold">Edit event</summary>
         <div className="mt-4">
-          <EventForm periods={periods} forms={forms.map((f) => ({ id: f.id, title: f.title }))} event={event} />
+          <EventForm periods={periods} forms={forms.map((f) => ({ id: f.id, title: f.title }))} event={event} teamTz={teamTz} />
         </div>
       </details>
 

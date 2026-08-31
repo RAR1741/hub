@@ -4,6 +4,7 @@ import Link from "next/link";
 import { hasRole } from "@/lib/authz";
 import { getEvent } from "@/lib/events";
 import { listEventRoster } from "@/lib/event-signups";
+import { getTeamTimezone } from "@/lib/settings";
 import { getViewer } from "@/lib/viewer";
 import { PrintButton } from "@/components/PrintButton";
 
@@ -23,6 +24,7 @@ export default async function EventRosterPrintPage({ params }: { params: Promise
   if (!event) notFound();
 
   const roster = await listEventRoster(id);
+  const teamTz = await getTeamTimezone();
 
   return (
     <main className="flex flex-col gap-6">
@@ -42,7 +44,8 @@ export default async function EventRosterPrintPage({ params }: { params: Promise
       <div className="print-roster">
         <h1>{event.name}</h1>
         <div className="sub">
-          {new Date(event.startsAt).toLocaleString()} – {new Date(event.endsAt).toLocaleString()}
+          {new Date(event.startsAt).toLocaleString(undefined, { timeZone: teamTz })} –{" "}
+          {new Date(event.endsAt).toLocaleString(undefined, { timeZone: teamTz })}
           {event.location ? ` · ${event.location}` : ""}
         </div>
 

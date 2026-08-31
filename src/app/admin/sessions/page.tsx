@@ -5,6 +5,7 @@ import { hasRole } from "@/lib/authz";
 import { getActivePeriod, listPeriods } from "@/lib/periods";
 import { listSessionsForPeriod } from "@/lib/reports";
 import { listPeople, displayName } from "@/lib/people";
+import { getTeamTimezone } from "@/lib/settings";
 import { SessionEditRow } from "@/components/SessionEditRow";
 
 export const metadata: Metadata = { title: "Sessions" };
@@ -24,6 +25,7 @@ export default async function AdminSessionsPage({
   ]);
 
   const active = await getActivePeriod();
+  const teamTz = await getTeamTimezone();
   const periodId = period ?? active?.id ?? periods[0]?.id;
   const sessions = periodId ? await listSessionsForPeriod(periodId, person || undefined) : [];
   const members = peopleRows
@@ -81,6 +83,7 @@ export default async function AdminSessionsPage({
                     note={s.note}
                     excluded={s.excludedFromTotals}
                     label={s.name}
+                    teamTz={teamTz}
                   />
                 ))}
               </tbody>
