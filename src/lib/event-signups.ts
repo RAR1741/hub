@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { displayName } from "./people";
 import { getEvent } from "./events";
+import { afterEventSignup } from "./slack-channels";
+import { slackDepsFromEnv, type SlackDeps } from "./slack";
 
 const UNIQUE_VIOLATION = "23505";
 const FOREIGN_KEY_VIOLATION = "23503";
@@ -10,8 +12,10 @@ export async function signUpForEvent(
   eventId: string,
   personId: string,
   db?: SupabaseClient,
+  slack?: SlackDeps,
 ): Promise<{ ok: boolean; status: number }> {
   const client = db ?? (await import("./db")).getDb();
+  // getEvent selects "*", so event already carries slackChannelId/slackArchivedAt.
   const event = await getEvent(eventId, client);
   if (!event || Date.parse(event.endsAt) <= Date.now()) return { ok: false, status: 409 };
   const { error } = await client.from("event_signup").insert({ event_id: eventId, person_id: personId });
@@ -19,6 +23,16 @@ export async function signUpForEvent(
     if (error.code === UNIQUE_VIOLATION) return { ok: false, status: 409 };
     if (error.code === FOREIGN_KEY_VIOLATION) return { ok: false, status: 400 };
     return { ok: false, status: 500 };
+  }
+  // DB write above already committed; Slack can never change the result below.
+  try {
+    await afterEventSignup(
+      { db: client, slack: slack ?? slackDepsFromEnv() },
+      { id: eventId, slackChannelId: event.slackChannelId, slackArchivedAt: event.slackArchivedAt },
+      personId,
+    );
+  } catch (e) {
+    console.error("signUpForEvent: afterEventSignup threw:", e);
   }
   return { ok: true, status: 201 };
 }

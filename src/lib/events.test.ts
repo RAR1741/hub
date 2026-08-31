@@ -1,5 +1,15 @@
 import { describe, expect, test } from "vitest";
 import { createEvent, deleteEvent, listGcalCandidates, parseEventInput, unlinkEvent, updateEvent } from "./events";
+import type { SlackDeps } from "./slack";
+
+/** A SlackDeps whose every real API call throws — used to prove Slack failures never affect the DB result. */
+const throwingSlack: SlackDeps = {
+  fetch: (() => {
+    throw new Error("boom: slack unreachable");
+  }) as unknown as typeof globalThis.fetch,
+  token: "xoxb-test",
+  isProd: true,
+};
 
 describe("parseEventInput", () => {
   const base = {
@@ -356,6 +366,176 @@ describe("deleteEvent", () => {
   test("ok when the event has no check-ins", async () => {
     expect(await deleteEvent("ev1", fakeDb({ eventExists: true, sessionCount: 0 })))
       .toEqual({ ok: true, status: 200 });
+  });
+});
+
+describe("createEvent — Slack hook never changes the result", () => {
+  function fakeDb(opts: {
+    meeting?: { title: string; starts_at: string; ends_at: string } | null;
+    creatorSlackId?: string | null;
+    captured?: { updatePatch?: Record<string, unknown> };
+  }) {
+    return {
+      from(table: string) {
+        if (table === "meeting") {
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({ data: opts.meeting ?? null, error: null }),
+              }),
+            }),
+          };
+        }
+        if (table === "event") {
+          return {
+            insert: () => ({
+              select: () => ({
+                single: async () => ({ data: { id: "new-event" }, error: null }),
+              }),
+            }),
+            update: (patch: Record<string, unknown>) => {
+              if (opts.captured) opts.captured.updatePatch = patch;
+              return { eq: async () => ({ error: null }) };
+            },
+          };
+        }
+        if (table === "person") {
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({ data: { slack_user_id: opts.creatorSlackId ?? null }, error: null }),
+              }),
+            }),
+          };
+        }
+        throw new Error(`unexpected table ${table}`);
+      },
+    } as never;
+  }
+
+  const input = {
+    name: "Client-supplied name (should be ignored)",
+    periodId: "11111111-1111-1111-1111-111111111111",
+    location: "Gym",
+    description: null,
+    startsAt: "2027-01-01T00:00:00.000Z",
+    endsAt: "2027-01-01T01:00:00.000Z",
+    gcalEventId: "evt-42",
+    formId: null,
+  };
+
+  test("event is still created and the id returned even when every Slack call throws", async () => {
+    const db = fakeDb({
+      meeting: { title: "Scouting Trip", starts_at: "2027-05-01T14:00:00.000Z", ends_at: "2027-05-01T18:00:00.000Z" },
+      creatorSlackId: "U123",
+    });
+    const result = await createEvent(input, "creator-1", db, throwingSlack);
+    expect(result).toEqual({ ok: true, id: "new-event" });
+  });
+
+  test("passes the RESOLVED (gcal-derived) name to the Slack channel, not the raw client name", async () => {
+    const captured: { updatePatch?: Record<string, unknown> } = {};
+    const requests: { url: string; init?: RequestInit }[] = [];
+    const workingSlack: SlackDeps = {
+      fetch: (async (url: string | URL | Request, init?: RequestInit) => {
+        requests.push({ url: String(url), init });
+        if (String(url).includes("conversations.create")) {
+          return new Response(JSON.stringify({ ok: true, channel: { id: "C123" } }), { status: 200 });
+        }
+        return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      }) as unknown as typeof globalThis.fetch,
+      token: "xoxb-test",
+      isProd: true,
+    };
+    const db = fakeDb({
+      meeting: { title: "Scouting Trip", starts_at: "2027-05-01T14:00:00.000Z", ends_at: "2027-05-01T18:00:00.000Z" },
+      captured,
+    });
+    const result = await createEvent(input, "creator-1", db, workingSlack);
+    expect(result).toEqual({ ok: true, id: "new-event" });
+    const createReq = requests.find((r) => r.url.includes("conversations.create"));
+    const body = JSON.parse(createReq!.init!.body as string) as { name: string };
+    // "Scouting Trip" (the meeting title), not "Client-supplied name (should be ignored)"
+    expect(body.name).toBe("e-scouting-trip");
+    expect(captured.updatePatch?.slack_channel_name).toBe("e-scouting-trip");
+  });
+});
+
+describe("updateEvent — Slack hook never changes the result", () => {
+  function fakeDb(opts: { slackChannelId: string | null; slackChannelName: string | null; slackArchivedAt: string | null }) {
+    return {
+      from(table: string) {
+        if (table === "meeting") {
+          return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }) };
+        }
+        if (table === "event") {
+          return {
+            update: () => ({
+              eq: () => ({
+                select: () => ({
+                  maybeSingle: async () => ({
+                    data: {
+                      id: "ev1",
+                      slack_channel_id: opts.slackChannelId,
+                      slack_channel_name: opts.slackChannelName,
+                      slack_archived_at: opts.slackArchivedAt,
+                    },
+                    error: null,
+                  }),
+                }),
+              }),
+            }),
+          };
+        }
+        throw new Error(`unexpected table ${table}`);
+      },
+    } as never;
+  }
+
+  const input = {
+    name: "New Name",
+    periodId: "11111111-1111-1111-1111-111111111111",
+    location: null,
+    description: null,
+    startsAt: "2027-01-01T00:00:00.000Z",
+    endsAt: "2027-01-01T01:00:00.000Z",
+    gcalEventId: null,
+    formId: null,
+  };
+
+  test("update still succeeds when the channel rename throws", async () => {
+    const db = fakeDb({ slackChannelId: "C1", slackChannelName: "e-old-name", slackArchivedAt: null });
+    const result = await updateEvent("ev1", input, db, throwingSlack);
+    expect(result).toEqual({ ok: true, status: 200 });
+  });
+});
+
+describe("deleteEvent — Slack hook never changes the result", () => {
+  function fakeDb(opts: { slackChannelId: string | null }) {
+    return {
+      from(table: string) {
+        if (table === "event") {
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({ data: { id: "ev1", slack_channel_id: opts.slackChannelId }, error: null }),
+              }),
+            }),
+            delete: () => ({ eq: async () => ({ error: null }) }),
+          };
+        }
+        if (table === "session") {
+          return { select: () => ({ eq: () => ({ limit: async () => ({ data: [], error: null }) }) }) };
+        }
+        throw new Error(`unexpected table ${table}`);
+      },
+    } as never;
+  }
+
+  test("delete still succeeds when archiving the channel throws", async () => {
+    const db = fakeDb({ slackChannelId: "C1" });
+    const result = await deleteEvent("ev1", db, throwingSlack);
+    expect(result).toEqual({ ok: true, status: 200 });
   });
 });
 

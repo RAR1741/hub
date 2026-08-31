@@ -2,6 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Event, EventRow } from "./types";
 import { eventFromRow } from "./types";
 import { optString, reqString, reqUuid } from "./validate";
+import { afterEventCreated, afterEventUpdated, archiveChannel } from "./slack-channels";
+import { slackDepsFromEnv, type SlackDeps } from "./slack";
 
 export type EventInput = {
   name: string;
@@ -96,6 +98,7 @@ export async function createEvent(
   input: EventInput,
   creatorId: string,
   db?: SupabaseClient,
+  slack?: SlackDeps,
 ): Promise<{ ok: true; id: string } | { ok: false; status: number }> {
   const client = db ?? (await import("./db")).getDb();
   const resolved = await resolveLinkedFields(input, client);
@@ -116,7 +119,17 @@ export async function createEvent(
     .select("id")
     .single();
   if (error) return { ok: false, status: mapWriteError(error.code) };
-  return { ok: true, id: data.id as string };
+  const id = data.id as string;
+  // DB write above already committed; Slack can never change the result below.
+  try {
+    await afterEventCreated(
+      { db: client, slack: slack ?? slackDepsFromEnv() },
+      { id, name: resolved.name, createdBy: creatorId, startsAt: resolved.startsAt, endsAt: resolved.endsAt, location: input.location },
+    );
+  } catch (e) {
+    console.error("createEvent: afterEventCreated threw:", e);
+  }
+  return { ok: true, id };
 }
 
 export async function listEvents(db?: SupabaseClient): Promise<Event[]> {
@@ -146,6 +159,7 @@ export async function updateEvent(
   id: string,
   input: EventInput,
   db?: SupabaseClient,
+  slack?: SlackDeps,
 ): Promise<{ ok: boolean; status: number }> {
   const client = db ?? (await import("./db")).getDb();
   const resolved = await resolveLinkedFields(input, client);
@@ -168,10 +182,20 @@ export async function updateEvent(
       gcal_missing: false,
     })
     .eq("id", id)
-    .select("id")
+    .select("id, slack_channel_id, slack_channel_name, slack_archived_at")
     .maybeSingle();
   if (error) return { ok: false, status: mapWriteError(error.code) };
   if (!data) return { ok: false, status: 404 };
+  const row = data as { id: string; slack_channel_id: string | null; slack_channel_name: string | null; slack_archived_at: string | null };
+  // DB write above already committed; Slack can never change the result below.
+  try {
+    await afterEventUpdated(
+      { db: client, slack: slack ?? slackDepsFromEnv() },
+      { id, name: resolved.name, slackChannelId: row.slack_channel_id, slackChannelName: row.slack_channel_name, slackArchivedAt: row.slack_archived_at },
+    );
+  } catch (e) {
+    console.error("updateEvent: afterEventUpdated threw:", e);
+  }
   return { ok: true, status: 200 };
 }
 
@@ -184,14 +208,25 @@ export async function updateEvent(
 export async function deleteEvent(
   id: string,
   db?: SupabaseClient,
+  slack?: SlackDeps,
 ): Promise<{ ok: boolean; status: number }> {
   const client = db ?? (await import("./db")).getDb();
-  const { data: exists } = await client.from("event").select("id").eq("id", id).maybeSingle();
+  const { data: exists } = await client.from("event").select("id, slack_channel_id").eq("id", id).maybeSingle();
   if (!exists) return { ok: false, status: 404 };
   const { data: sessions } = await client.from("session").select("id").eq("event_id", id).limit(1);
   if (sessions && sessions.length > 0) return { ok: false, status: 409 };
   const { error } = await client.from("event").delete().eq("id", id);
   if (error) return { ok: false, status: error.code === FOREIGN_KEY_VIOLATION ? 409 : 500 };
+  const channelId = (exists as { id: string; slack_channel_id: string | null }).slack_channel_id;
+  if (channelId) {
+    // Best-effort: the row holding this channel id is gone, so a failure here
+    // just orphans a live channel (manually archivable) — never blocks delete.
+    try {
+      await archiveChannel(slack ?? slackDepsFromEnv(), channelId);
+    } catch (e) {
+      console.error("deleteEvent: archiveChannel threw:", e);
+    }
+  }
   return { ok: true, status: 200 };
 }
 

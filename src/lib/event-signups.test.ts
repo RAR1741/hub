@@ -1,5 +1,15 @@
 import { describe, expect, test } from "vitest";
 import { checkInPerson, listEventRoster, signUpForEvent, signedUpEventIds, uncheckIn } from "./event-signups";
+import type { SlackDeps } from "./slack";
+
+/** A SlackDeps whose every real API call throws — used to prove Slack failures never affect the DB result. */
+const throwingSlack: SlackDeps = {
+  fetch: (() => {
+    throw new Error("boom: slack unreachable");
+  }) as unknown as typeof globalThis.fetch,
+  token: "xoxb-test",
+  isProd: true,
+};
 
 describe("signUpForEvent", () => {
   function fakeDb(opts: { conflict?: boolean; fkViolation?: boolean; eventEnded?: boolean; noEvent?: boolean }) {
@@ -61,6 +71,52 @@ describe("signUpForEvent", () => {
   test("409 when the event has already ended", async () => {
     expect(await signUpForEvent("e1", "p1", fakeDb({ eventEnded: true })))
       .toEqual({ ok: false, status: 409 });
+  });
+});
+
+describe("signUpForEvent — Slack hook never changes the result", () => {
+  function fakeDb(opts: { slackChannelId: string | null; slackArchivedAt: string | null; personSlackId: string | null }) {
+    return {
+      from(table: string) {
+        if (table === "event") {
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: {
+                    id: "e1", period_id: "pd1", name: "Demo", location: null, description: null,
+                    starts_at: "2099-01-01T18:00:00Z", ends_at: "2099-01-01T20:00:00Z",
+                    created_by: "m1", created_at: "2020-01-01T00:00:00Z",
+                    slack_channel_id: opts.slackChannelId, slack_channel_name: null,
+                    slack_archived_at: opts.slackArchivedAt,
+                  },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === "event_signup") {
+          return { insert: async () => ({ error: null }) };
+        }
+        if (table === "person") {
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({ data: { slack_user_id: opts.personSlackId }, error: null }),
+              }),
+            }),
+          };
+        }
+        throw new Error(`unexpected table ${table}`);
+      },
+    } as never;
+  }
+
+  test("signup still succeeds when the Slack invite throws", async () => {
+    const db = fakeDb({ slackChannelId: "C1", slackArchivedAt: null, personSlackId: "U123" });
+    const result = await signUpForEvent("e1", "p1", db, throwingSlack);
+    expect(result).toEqual({ ok: true, status: 201 });
   });
 });
 
