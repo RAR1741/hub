@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui";
 
 export function AccountRequestActions({ requestId }: { requestId: string }) {
   const [studentId, setStudentId] = useState("");
@@ -35,14 +36,17 @@ export function AccountRequestActions({ requestId }: { requestId: string }) {
         value={studentId}
         onChange={(e) => setStudentId(e.target.value)}
       />
-      <button
-        disabled={busy || !studentId.trim()}
+      <Button
+        variant="primary"
+        className="px-3 py-1"
+        disabled={!studentId.trim()}
         onClick={() => act({ action: "approve", studentIdNumber: studentId, role: "student" })}
-        className="btn btn-primary px-3 py-1"
+        pending={busy}
+        pendingLabel="Working…"
       >
-        {busy ? "Working…" : "Approve"}
-      </button>
-      <button disabled={busy} onClick={() => act({ action: "deny" })} className="btn btn-secondary px-3 py-1">Deny</button>
+        Approve
+      </Button>
+      <Button variant="secondary" className="px-3 py-1" disabled={busy} onClick={() => act({ action: "deny" })}>Deny</Button>
       {status && <span role="status" className="text-sm text-[var(--color-muted-fg)]"> {status}</span>}
     </span>
   );
@@ -71,8 +75,8 @@ export function ApplicationActions({ applicationId }: { applicationId: string })
 
   return (
     <span className="inline-flex flex-wrap items-center gap-2">
-      <button disabled={busy} onClick={() => act("approve")} className="btn btn-primary px-3 py-1">{busy ? "Working…" : "Approve"}</button>
-      <button disabled={busy} onClick={() => act("deny")} className="btn btn-secondary px-3 py-1">Deny</button>
+      <Button variant="primary" className="px-3 py-1" onClick={() => act("approve")} pending={busy} pendingLabel="Working…">Approve</Button>
+      <Button variant="secondary" className="px-3 py-1" disabled={busy} onClick={() => act("deny")}>Deny</Button>
       {status && <span role="status" className="text-sm text-[var(--color-muted-fg)]"> {status}</span>}
     </span>
   );
@@ -101,8 +105,8 @@ export function ExcusalRequestActions({ requestId }: { requestId: string }) {
 
   return (
     <span className="inline-flex flex-wrap items-center gap-2">
-      <button disabled={busy} onClick={() => act("approve")} className="btn btn-primary px-3 py-1">{busy ? "Working…" : "Approve"}</button>
-      <button disabled={busy} onClick={() => act("deny")} className="btn btn-secondary px-3 py-1">Deny</button>
+      <Button variant="primary" className="px-3 py-1" onClick={() => act("approve")} pending={busy} pendingLabel="Working…">Approve</Button>
+      <Button variant="secondary" className="px-3 py-1" disabled={busy} onClick={() => act("deny")}>Deny</Button>
       {status && <span role="status" className="text-sm text-[var(--color-muted-fg)]"> {status}</span>}
     </span>
   );

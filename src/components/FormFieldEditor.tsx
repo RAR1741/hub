@@ -212,7 +212,7 @@ export function FormFieldEditor({ formId, fields }: { formId: string; fields: Fi
                   <td>{f.required ? "Yes" : ""}</td>
                   <td>
                     {f.semanticKey === "attending" ? null : (
-                      <Button variant="secondary" className="px-3 py-1" onClick={() => removeField(f.id)}>Delete</Button>
+                      <Button type="button" variant="secondary" className="px-3 py-1" onClick={() => removeField(f.id)}>Delete</Button>
                     )}
                   </td>
                 </tr>
@@ -247,7 +247,7 @@ export function FormFieldEditor({ formId, fields }: { formId: string; fields: Fi
                 <input className="input" placeholder="label" value={o.label} onChange={(e) => updateOption(i, { label: e.target.value })} />
               </div>
             ))}
-            <Button variant="secondary" className="self-start" onClick={() => setOptions((prev) => [...prev, { value: "", label: "" }])}>
+            <Button type="button" variant="secondary" className="self-start" onClick={() => setOptions((prev) => [...prev, { value: "", label: "" }])}>
               Add option
             </Button>
           </div>

@@ -52,7 +52,7 @@ export function EventSignupForm({ eventId, eventName, fields }: Props) {
 
   return (
     <>
-      <Button variant="primary" className="px-3 py-1" onClick={() => setOpen(true)}>
+      <Button type="button" variant="primary" className="px-3 py-1" onClick={() => setOpen(true)}>
         Sign up
       </Button>
       {open && (
@@ -149,7 +149,7 @@ export function EventSignupForm({ eventId, eventName, fields }: Props) {
             ) : null}
 
             <div className="flex justify-end gap-2" style={{ marginTop: "1rem" }}>
-              <Button variant="secondary" onClick={close} disabled={busy}>
+              <Button type="button" variant="secondary" onClick={close} disabled={busy}>
                 Cancel
               </Button>
               <Button variant="primary" type="submit" pending={busy} pendingLabel="Submitting…">

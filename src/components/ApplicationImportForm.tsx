@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ApplicationDecision, ApplicationImportSummary } from "@/lib/application-import-run";
+import { Button } from "@/components/ui";
 
 export function ApplicationImportForm() {
   const [text, setText] = useState("");
@@ -83,12 +84,27 @@ export function ApplicationImportForm() {
           <input ref={fileRef} type="file" accept=".csv,text/csv" className="input" onChange={onFile} />
         </label>
         <div className="flex flex-wrap items-center gap-2">
-          <button type="button" className="btn btn-secondary" onClick={doPreview} disabled={busy || !text.trim()}>
-            {busy && !summary ? "Previewing…" : "Preview"}
-          </button>
-          <button type="button" className="btn btn-primary" onClick={runImport} disabled={busy || !importReady || !allDecided} title={importReady ? undefined : "Preview first"}>
-            {busy && summary === null && importReady ? "Importing…" : "Import"}
-          </button>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={doPreview}
+            disabled={busy || !text.trim()}
+            pending={busy && !summary}
+            pendingLabel="Previewing…"
+          >
+            Preview
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            onClick={runImport}
+            disabled={busy || !importReady || !allDecided}
+            title={importReady ? undefined : "Preview first"}
+            pending={busy && summary === null && importReady}
+            pendingLabel="Importing…"
+          >
+            Import
+          </Button>
           {!importReady && <span className="text-sm text-[var(--muted)]">Preview first — review the summary below before importing.</span>}
           {importReady && !allDecided && <span className="text-sm text-[var(--absent)]">Decide every fuzzy match before importing.</span>}
         </div>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui";
 
 export function MemberManager({
   teamId,
@@ -50,16 +51,22 @@ export function MemberManager({
                 {m.name} {m.isManager ? "(manager)" : ""}
               </span>
               <span className="flex items-center gap-2">
-                <button
+                <Button
+                  variant="secondary"
+                  className="px-3 py-1"
                   disabled={busy}
                   onClick={() => call("POST", { personId: m.personId, isManager: !m.isManager })}
-                  className="btn btn-secondary px-3 py-1"
                 >
                   {m.isManager ? "Remove manager" : "Make manager"}
-                </button>
-                <button disabled={busy} onClick={() => call("DELETE", { personId: m.personId })} className="btn btn-danger px-3 py-1">
+                </Button>
+                <Button
+                  variant="danger"
+                  className="px-3 py-1"
+                  disabled={busy}
+                  onClick={() => call("DELETE", { personId: m.personId })}
+                >
                   Remove
-                </button>
+                </Button>
               </span>
             </li>
           ))}
@@ -75,9 +82,15 @@ export function MemberManager({
             ))}
           </select>
         </label>
-        <button disabled={busy || !personId} onClick={() => call("POST", { personId, isManager: false })} className="btn btn-primary">
-          {busy ? "Working…" : "Add"}
-        </button>
+        <Button
+          variant="primary"
+          disabled={!personId}
+          onClick={() => call("POST", { personId, isManager: false })}
+          pending={busy}
+          pendingLabel="Working…"
+        >
+          Add
+        </Button>
       </div>
       {status && <p role="status" className="text-sm text-[var(--color-muted-fg)]">{status}</p>}
     </section>
