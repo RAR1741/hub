@@ -1504,8 +1504,13 @@
   }
   .sb-scroll {
     flex: 1;
-    min-height: 0;
-    overflow-y: auto;
+    /* No overflow scroll here on purpose: an overflow container computes
+       overflow-x to `auto` as well, which clips the hover flyouts (they sit at
+       left: 100% + 8px, past the sidebar edge) and makes the always-present
+       hidden flyouts add a phantom horizontal scrollbar. The nav is short
+       enough to fit; .sb-foot stays reachable via margin-top: auto.
+       ponytail: a nav taller than the viewport won't scroll to the footer;
+       upgrade to a JS/anchor-positioned popover flyout if that ever bites. */
   }
   .sb-group {
     padding: 9px 8px 1px;

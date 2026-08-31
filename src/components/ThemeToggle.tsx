@@ -71,7 +71,7 @@ export function ThemeToggle() {
     <div
       role="group"
       aria-label="Theme"
-      className="inline-flex gap-0.5 rounded-full border p-[3px]"
+      className="inline-flex self-center gap-0.5 rounded-full border p-[3px]"
       style={{ background: "var(--steel-soft)", borderColor: "var(--hair)" }}
     >
       {options.map((opt) => (
