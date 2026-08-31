@@ -8,6 +8,7 @@ import { KIOSK_COOKIE, verifyKioskToken } from "@/lib/kiosk";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { NavLink } from "@/components/NavLink";
 import { Icon } from "@/components/ui/Icon";
+import { MoreSheet } from "@/components/ui/MoreSheet";
 
 // Admin subpages surfaced in the Admin flyout. Each row is gated to the same
 // role its card requires on /admin (src/app/admin/page.tsx); a mentor must not
@@ -267,7 +268,9 @@ export async function SiteNav() {
       {/* Mobile bottom tab bar — sibling of .sb; CSS shows one or the other by
           breakpoint (see globals.css .app-shell). Same role gates as above,
           collapsed to one primary link per group; the rest live in the More
-          sheet below. The sheet is a <details> so open/close needs no JS. */}
+          sheet below. The sheet's open/close state lives in MoreSheet (a tiny
+          client component that closes it on route change — SiteNav itself
+          never re-renders on soft nav); all gating below stays server-side. */}
       <nav className="tabbar" aria-label="Primary" style={{ gridTemplateColumns: `repeat(${tabCount}, 1fr)` }}>
         {primaryTabs.map((tab) => (
           <NavLink key={tab.href} href={tab.href} exact={tab.exact} className="tab">
@@ -275,7 +278,7 @@ export async function SiteNav() {
             {tab.label}
           </NavLink>
         ))}
-        <details className="more-sheet">
+        <MoreSheet className="more-sheet">
           <summary className="tab">
             {/* Icon component has no "dots" glyph; sliders is the nearest existing icon. */}
             <Icon name="sliders" className="ic" />
@@ -294,6 +297,14 @@ export async function SiteNav() {
               <Link href="/events" className="sheet-i">
                 <Icon name="calendar" className="ic" style={{ color: "var(--hue-team)" }} />
                 Events
+              </Link>
+            )}
+            {isMentor && (
+              // /calendar has no other entry point (desktop-only Events flyout sub-link) —
+              // dropping it here would narrow a mentor's reachable surface vs. desktop.
+              <Link href="/calendar" className="sheet-i">
+                <Icon name="calendar" className="ic" style={{ color: "var(--hue-team)" }} />
+                Calendar
               </Link>
             )}
             {showShopInSheet && (
@@ -330,7 +341,7 @@ export async function SiteNav() {
               </Link>
             )}
           </div>
-        </details>
+        </MoreSheet>
       </nav>
     </>
   );
