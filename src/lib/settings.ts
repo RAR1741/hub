@@ -14,3 +14,9 @@ export async function getSetting<T>(
   if (error || data == null) return fallback;
   return data.value as T;
 }
+
+export const DEFAULT_TEAM_TIMEZONE = "America/Indiana/Indianapolis";
+
+export function getTeamTimezone(db?: SupabaseClient): Promise<string> {
+  return getSetting<string>("team_timezone", DEFAULT_TEAM_TIMEZONE, db);
+}

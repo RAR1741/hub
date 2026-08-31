@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 export type SettingsValues = {
-  teamTimezone: string;
   gcalCalendarId: string;
   autoCloseEnabled: boolean;
   autoCloseHours: number;
@@ -29,7 +28,7 @@ export function SettingsForm({ initial }: { initial: SettingsValues }) {
         body: JSON.stringify(values),
       });
       if (res.ok) { setStatus("Saved."); router.refresh(); }
-      else if (res.status === 400) setStatus("Check the fields (timezone must be a valid IANA zone; hours in range).");
+      else if (res.status === 400) setStatus("Check the fields (hours in range).");
       else setStatus("Save failed.");
     } finally {
       setBusy(false);
@@ -38,10 +37,6 @@ export function SettingsForm({ initial }: { initial: SettingsValues }) {
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-3">
-      <label className="label">Team timezone{" "}
-        <input className="input" value={values.teamTimezone}
-          onChange={(e) => setValues({ ...values, teamTimezone: e.target.value })} required />
-      </label>
       <label className="label">Google Calendar id{" "}
         <input className="input" value={values.gcalCalendarId}
           onChange={(e) => setValues({ ...values, gcalCalendarId: e.target.value })} />

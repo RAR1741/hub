@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { getSetting } from "./settings";
+import { getSetting, getTeamTimezone } from "./settings";
 
 function fakeDb(row: { value: unknown } | null) {
   return {
@@ -23,5 +23,13 @@ describe("getSetting", () => {
 
   test("returns fallback when key missing", async () => {
     expect(await getSetting("team_timezone", "UTC", fakeDb(null))).toBe("UTC");
+  });
+});
+
+describe("getTeamTimezone", () => {
+  test("returns default when row missing", async () => {
+    expect(await getTeamTimezone(fakeDb(null))).toBe(
+      "America/Indiana/Indianapolis",
+    );
   });
 });

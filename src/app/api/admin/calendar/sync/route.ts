@@ -1,5 +1,5 @@
 import { getDb } from "@/lib/db";
-import { getSetting } from "@/lib/settings";
+import { getSetting, getTeamTimezone } from "@/lib/settings";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
 import { secureEqual } from "@/lib/secure-compare";
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const tz = await getSetting<string>("team_timezone", "America/Indiana/Indianapolis", db);
+  const tz = await getTeamTimezone(db);
   try {
     const result = await syncCalendar({ fetch: globalThis.fetch, db, credentials, tz });
     await reportSyncOutcome("calendar_sync", true, { db });
