@@ -16,7 +16,10 @@ type IconName =
   | "tablet"
   | "wrench"
   | "layers"
-  | "sliders";
+  | "sliders"
+  | "sun"
+  | "moon"
+  | "logout";
 const paths: Record<IconName, React.ReactNode> = {
   edit: <path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3z" />,
   trash: <path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13" />,
@@ -85,6 +88,19 @@ const paths: Record<IconName, React.ReactNode> = {
       <path d="M4 7.5h8.5M17.5 7.5H20M4 16.5h2M10.8 16.5H20" />
       <circle cx="15" cy="7.5" r="2.2" />
       <circle cx="8.5" cy="16.5" r="2.2" />
+    </>
+  ),
+  sun: (
+    <>
+      <circle cx="12" cy="12" r="3.75" />
+      <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4" />
+    </>
+  ),
+  moon: <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />,
+  logout: (
+    <>
+      <path d="M9.5 21H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.5" />
+      <path d="m15.5 16.5 4.5-4.5-4.5-4.5M20 12H9.5" />
     </>
   ),
 };

@@ -15,10 +15,12 @@ import { ActivityIndicator } from "@/components/ActivityIndicator";
  */
 export function AppShell({
   sidebar,
+  topbar,
   banner,
   children,
 }: {
   sidebar: React.ReactNode;
+  topbar: React.ReactNode;
   banner: React.ReactNode;
   children: React.ReactNode;
 }) {
@@ -38,6 +40,7 @@ export function AppShell({
     <div className="app-shell">
       {sidebar}
       <div className="app-main-col">
+        {topbar}
         {banner}
         <div
           id="main"

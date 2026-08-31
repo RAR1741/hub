@@ -1458,6 +1458,80 @@
     flex-direction: column;
   }
 
+  /* Desktop top bar — identity cluster (theme, avatar, name/role, sign out),
+     right-aligned. Sticky below the sidebar so it stays as content scrolls.
+     Hidden on mobile (the tab bar's More sheet carries these instead). */
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 48px;
+    padding: 0 14px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--hair);
+    position: sticky;
+    top: 0;
+    z-index: 30;
+  }
+  .tb-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .tb-btn {
+    width: 30px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .tb-btn:hover {
+    color: var(--ink);
+    border-color: var(--hair);
+    background: var(--surface-2);
+  }
+  .tb-btn .ic {
+    width: 16px;
+    height: 16px;
+  }
+  .who {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--muted);
+    text-decoration: none;
+  }
+  .who b {
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .signout {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    color: var(--muted);
+    background: none;
+    border: 0;
+    padding: 4px 6px;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .signout:hover {
+    color: var(--ink);
+    background: var(--surface-2);
+  }
+  .signout .ic {
+    width: 15px;
+    height: 15px;
+  }
+
   /* icons inside nav items — sized here; Icon renders the stroke paths */
   .sbi .ic,
   .rail-i .ic,
@@ -1998,7 +2072,8 @@
     }
     .sb,
     .rail,
-    :root[data-nav="collapsed"] .rail {
+    :root[data-nav="collapsed"] .rail,
+    .topbar {
       display: none;
     }
     .tabbar {
@@ -2023,6 +2098,7 @@
    ========================================================================= */
 @media print {
   nav,
+  .topbar,
   .skip-link,
   .no-print {
     display: none !important;

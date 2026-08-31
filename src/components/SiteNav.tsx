@@ -150,17 +150,6 @@ export async function SiteNav() {
   const isMentor = hasRole(role, "mentor");
   const isAdmin = hasRole(role, "admin");
 
-  const initials = viewer.person
-    ? `${viewer.person.firstName ?? ""} ${viewer.person.lastName ?? ""}`
-        .trim()
-        .split(/\s+/)
-        .map((part) => part[0])
-        .filter(Boolean)
-        .slice(0, 2)
-        .join("")
-        .toUpperCase()
-    : "";
-
   const adminItems = ADMIN_ITEMS.filter((item) => hasRole(role, item.role));
 
   // Flyout sub-links, gated by role. NavItemWithFlyout drops the flyout when a
@@ -302,40 +291,9 @@ export async function SiteNav() {
         )}
       </div>
 
+      {/* Identity (theme toggle, avatar, name/role, sign out) lives in the top
+          bar now — see SiteTopbar. The footer keeps only the collapse control. */}
       <div className="sb-foot">
-        <ThemeToggle />
-        {viewer.person ? (
-          <>
-            <Link href={`/people/${viewer.person.id}`} className="sbi">
-              <span
-                className="grid h-[27px] w-[27px] flex-none place-items-center rounded-full text-[12px] font-bold text-white"
-                style={{ background: "var(--steel)" }}
-                aria-hidden="true"
-              >
-                {initials}
-              </span>
-              <span className="min-w-0 truncate">
-                {viewer.person.firstName} {viewer.person.lastName}
-                <span className="text-[var(--muted)]"> · {viewer.role}</span>
-              </span>
-            </Link>
-            {/* Native POST so sign-out works without client JS; the route
-                clears the student-session + sb-* auth cookies server-side. */}
-            <form action="/api/auth/logout" method="post">
-              <button
-                type="submit"
-                className="sbi w-full cursor-pointer border-0 bg-transparent text-left"
-              >
-                <Icon name="x" className="ic" />
-                Sign out
-              </button>
-            </form>
-          </>
-        ) : (
-          <Link href="/login" className="btn btn-primary">
-            Sign in
-          </Link>
-        )}
         <SidebarToggle variant="collapse" />
       </div>
       </nav>
@@ -378,40 +336,9 @@ export async function SiteNav() {
           />
         )}
 
+        {/* Identity moved to the top bar (SiteTopbar); rail keeps only expand. */}
         <div className="rail-foot">
           <SidebarToggle variant="expand" />
-          {viewer.person ? (
-            <>
-              <Link
-                href={`/people/${viewer.person.id}`}
-                className="rail-i"
-                aria-label={`${viewer.person.firstName} ${viewer.person.lastName} · ${viewer.role}`}
-                title={`${viewer.person.firstName} ${viewer.person.lastName} · ${viewer.role}`}
-              >
-                <span
-                  className="grid h-[27px] w-[27px] flex-none place-items-center rounded-full text-[12px] font-bold text-white"
-                  style={{ background: "var(--steel)" }}
-                  aria-hidden="true"
-                >
-                  {initials}
-                </span>
-              </Link>
-              <form action="/api/auth/logout" method="post">
-                <button
-                  type="submit"
-                  className="rail-i cursor-pointer border-0 bg-transparent"
-                  aria-label="Sign out"
-                  title="Sign out"
-                >
-                  <Icon name="x" className="ic" />
-                </button>
-              </form>
-            </>
-          ) : (
-            <Link href="/login" className="rail-i" aria-label="Sign in" title="Sign in">
-              <Icon name="chevron" className="ic" />
-            </Link>
-          )}
         </div>
       </nav>
 

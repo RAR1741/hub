@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { Archivo, Inter, JetBrains_Mono } from "next/font/google";
 import { SiteNav } from "@/components/SiteNav";
+import { SiteTopbar } from "@/components/SiteTopbar";
 import { SidebarKeyShortcut } from "@/components/SidebarToggle";
 import { MasqueradeBanner } from "@/components/MasqueradeBanner";
 import { AppShell } from "@/components/AppChrome";
@@ -80,7 +81,11 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           Skip to main content
         </a>
         <SidebarKeyShortcut />
-        <AppShell sidebar={<SiteNav />} banner={<MasqueradeBanner />}>
+        <AppShell
+          sidebar={<SiteNav />}
+          topbar={<SiteTopbar />}
+          banner={<MasqueradeBanner />}
+        >
           {children}
         </AppShell>
       </body>
