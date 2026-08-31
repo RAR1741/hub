@@ -1601,11 +1601,27 @@
     transition: opacity 0.12s ease, transform 0.12s ease;
     z-index: 30;
   }
+  /* Open on hover, or on *keyboard* focus (:focus-visible) for keyboard users.
+     Deliberately not :focus-within — a mouse click leaves focus on the nav
+     item, which would pin the flyout open until you clicked elsewhere. */
   .sbi-wrap:hover > .flyout,
-  .sbi-wrap:focus-within > .flyout {
+  .sbi-wrap:has(:focus-visible) > .flyout {
     opacity: 1;
     visibility: visible;
     transform: translateX(0);
+  }
+  /* Invisible bridge across the 8px gap between the nav item and the flyout.
+     Without it the pointer passes over dead space while traveling to the
+     submenu, drops :hover, and the menu closes before you reach it. The
+     bridge is a descendant of the flyout (itself inside .sbi-wrap), so
+     hovering it keeps .sbi-wrap:hover alive the whole way across. */
+  .flyout::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -10px;
+    width: 10px;
   }
   .flyout::before {
     content: "";
