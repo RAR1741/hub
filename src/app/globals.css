@@ -1478,7 +1478,7 @@
     place-items: center;
     background: transparent;
     border: 1px solid transparent;
-    border-radius: 7px;
+    border-radius: 8px;
     color: var(--muted);
     cursor: pointer;
   }
