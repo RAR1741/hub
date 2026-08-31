@@ -1493,6 +1493,12 @@
     top: 0;
     align-self: flex-start;
     height: 100dvh;
+    /* Above the main content column and its sticky table headers (which have no
+       z-index), below the skip link (50) and the modal layer (100). Without
+       this the opaque sticky `.table th` on People/Events/Admin lists — exactly
+       where the flyouts open — paints over an open flyout. .sb becomes a
+       stacking context, so the flyout's z-index:30 orders within it. */
+    z-index: 40;
   }
   .sb-brand {
     display: flex;
@@ -1680,6 +1686,7 @@
     top: 0;
     align-self: flex-start;
     height: 100dvh;
+    z-index: 40; /* same stacking role as .sb — above content, below modals */
   }
   .rail .badge-1741 {
     margin-bottom: 10px;
