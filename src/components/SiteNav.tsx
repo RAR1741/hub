@@ -51,6 +51,7 @@ export async function SiteNav() {
   const role = viewer.role;
   const isStudent = hasRole(role, "student");
   const isMentor = hasRole(role, "mentor");
+  const isAdmin = hasRole(role, "admin");
 
   const initials = viewer.person
     ? `${viewer.person.firstName ?? ""} ${viewer.person.lastName ?? ""}`
@@ -122,12 +123,16 @@ export async function SiteNav() {
                   <NavLink href="/people" className="fly-link" role="menuitem">
                     All people
                   </NavLink>
-                  <NavLink href="/admin/people/duplicates" className="fly-link" role="menuitem">
-                    Duplicates
-                  </NavLink>
-                  <NavLink href="/admin/people/import" className="fly-link" role="menuitem">
-                    Import CSV
-                  </NavLink>
+                  {isAdmin && (
+                    <NavLink href="/admin/people/duplicates" className="fly-link" role="menuitem">
+                      Duplicates
+                    </NavLink>
+                  )}
+                  {isAdmin && (
+                    <NavLink href="/admin/people/import" className="fly-link" role="menuitem">
+                      Import CSV
+                    </NavLink>
+                  )}
                 </div>
               </div>
             )}

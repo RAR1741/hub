@@ -117,7 +117,11 @@ test.describe("admin hub is mentor-scoped", () => {
     const page = await context.newPage();
     await page.goto("/admin");
     expect(new URL(page.url()).pathname).toBe("/admin");
-    await expect(page.getByRole("heading", { name: "Admin", exact: true })).toBeVisible();
+    // Scope to the content column: the sidebar's Admin nav group also has an
+    // "Admin" heading (h5), so match the page's own <h1> heading here.
+    await expect(
+      page.locator("#main").getByRole("heading", { name: "Admin", exact: true }),
+    ).toBeVisible();
 
     // Mentor-visible cards.
     await expect(page.getByRole("link", { name: /Requests/ })).toBeVisible();
@@ -141,8 +145,12 @@ test.describe("admin hub is mentor-scoped", () => {
     const page = await context.newPage();
     await page.goto("/admin");
     expect(new URL(page.url()).pathname).toBe("/admin");
+    // Scope to the content column: the sidebar's Admin flyout also links these
+    // pages for an admin, so a page-wide count would be 2 (card + flyout). The
+    // mentor assertion above stays page-wide (count 0 everywhere is the stronger
+    // authz property, and it verifies the flyout is role-gated too).
     for (const href of ADMIN_ONLY_HREFS) {
-      await expect(page.locator(`a[href="${href}"]`)).toHaveCount(1);
+      await expect(page.locator(`#main a[href="${href}"]`)).toHaveCount(1);
     }
     await context.close();
   });
