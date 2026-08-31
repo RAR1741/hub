@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { cookies } from "next/headers";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
@@ -71,9 +72,16 @@ export async function SiteNav() {
   return (
     <nav className="sb" aria-label="Primary">
       <div className="sb-brand">
-        <Link href="/" className="flex items-center gap-[9px] hover:no-underline">
-          <span className="badge-1741">1741</span>
-          <span className="wordmark text-[var(--ink)]">Red Alert</span>
+        <Link href="/" className="flex items-center hover:no-underline">
+          <span className="flex items-center rounded-md border border-black/5 bg-white px-2 py-1 shadow-sm">
+            <Image
+              src="/redalert-logo.png"
+              alt="Red Alert Robotics 1741"
+              width={116}
+              height={32}
+              priority
+            />
+          </span>
         </Link>
       </div>
 
