@@ -39,8 +39,12 @@ test("an admin imports a time-sheet CSV and sees a result summary", async ({ bro
   // With every anomaly decided, Import enables; run it and see the result summary.
   await expect(page.getByRole("button", { name: "Import" })).toBeEnabled();
   await page.getByRole("button", { name: "Import" }).click();
-  await expect(page.getByRole("heading", { name: "3. Result" })).toBeVisible();
-  // "sessions" text appears both in the status line and as a result pill; match either.
-  await expect(page.getByText(/sessions/).first()).toBeVisible();
+  const resultHeading = page.getByRole("heading", { name: "3. Result" });
+  await expect(resultHeading).toBeVisible();
+  // Scope to the Result section — a page-wide text search also matches the
+  // sidebar's hidden "Flagged sessions" nav flyout link, which is present in
+  // the DOM (just hidden via CSS until hover) since the Mission Control nav.
+  const resultSection = page.locator("section").filter({ has: resultHeading });
+  await expect(resultSection.getByText(/sessions/).first()).toBeVisible();
   await context.close();
 });

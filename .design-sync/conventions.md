@@ -35,6 +35,10 @@ ships (`Icon`).
 - Attendance status (each has a `-fg` pair): `--present` (green), `--excused`
   (blue), `--optional` (grey), `--absent` (orange)
 - Roles: `--role-student`, `--role-mentor`
+- Nav group hues: `--hue-overview` (red), `--hue-shopfloor` (amber/orange), `--hue-team` (blue),
+  `--hue-admin` (purple), each with a light and dark value. The grouped sidebar/rail sets a local
+  `--grp: var(--hue-*)` per group; descendant rules read `var(--grp, <fallback>)` so one rule
+  colors all four groups.
 - `--shadow` (card elevation)
 - Legacy `--color-*` aliases (`--color-brand`, `--color-surface`, …) resolve to
   the above; prefer the short names in new work.
@@ -80,14 +84,34 @@ optional `.bar` goal meter (`<i>` is the fill).
 `.page-head` (title row: `h1`/`h2` + `.sub`).
 
 **Kiosk** — `.kiosk` and its `.kiosk-head`/`.kiosk-body`/`.k-search`/`.k-name`/
-`.k-out`/`.k-here`/`.k-mentors` etc. are **committed dark regardless of theme**
-(an always-on shop tablet). Don't use kiosk classes on themed pages.
+`.k-out`/`.k-here`/`.k-mentors` etc. are **theme-aware** (they use the same `--canvas`/`--surface`/
+`--ink`/`--muted`/`--hair` tokens as the rest of the app, following light/dark/system) but keep
+their own large touch targets and red focus-border treatment for a shared shop-floor tablet. Don't
+use kiosk classes outside `/kiosk` — they're sized for that layout, not general page content.
 
 **Other** — `.team-tree` (pure-CSS org chart: `<ul>`/`<li>` + `.team-tree-card`),
 `.shop-tile` (`.priority-high`/`.priority-low`), `.meet` (meeting list row, `.req`
 tag), `.modal-backdrop`/`.modal-card`/`.modal-row`, `.signup-q`/`.signup-opt`
 (form questions), `.onshape-panel`/`.onshape-part-row` (narrow CAD side panel),
 `.link-btn` (inline text button), `.skeleton-line` (shimmer loading), `.skip-link`.
+
+## React primitives (hub app internals, not part of the synced bundle)
+
+The hub app itself wraps eight of the classes above in typed React components under
+`src/components/ui/` (`Button`, `Card`, `Field`, `Pill`, `Avatar`, `Stat`, `TableWrap`, `Icon`) —
+each just emits the same class names documented here, so it's not a second design vocabulary. Only
+`Icon` ships in this design-sync bundle (see "Key build facts" in NOTES.md for why); the other
+seven are internal typed wrappers, useful context for anyone reading the hub's source but not part
+of what this package exports.
+
+- `Button` — `.btn`, `variant` picks `.btn-primary`/`.btn-secondary`/`.btn-danger`, `icon` adds
+  `.icon`, `pending`/`pendingLabel` for in-flight state.
+- `Card` (+ `Card.Head`) — `.card` / `.card-head`.
+- `Field` — `.label` + wired-up `id`/`aria-describedby`/error text.
+- `Pill` — `.pill` + a `tone` modifier.
+- `Avatar` — `.avatar` + a `role` tint (`student`/`mentor`/`admin`).
+- `Stat` — `.stat`/`.eyebrow`/`.num`/`.bar`.
+- `TableWrap` — `.tablewrap`.
 
 ## The `Icon` component
 
