@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
 import { getDb } from "@/lib/db";
-import { getSetting } from "@/lib/settings";
+import { getSetting, getTeamTimezone } from "@/lib/settings";
 import { listTeams } from "@/lib/teams";
 import { listPeople } from "@/lib/people";
 import { computeAddRecommendations } from "@/lib/drive-group-sync";
@@ -40,10 +40,11 @@ export default async function AdminDriveSyncPage() {
   if (!hasRole(viewer.role, "admin")) redirect("/");
 
   const db = getDb();
-  const [allTeams, lastReport, people] = await Promise.all([
+  const [allTeams, lastReport, people, teamTz] = await Promise.all([
     listTeams(db),
     getSetting<ReconcileResult | null>("drive_last_reconcile", null, db),
     listPeople(undefined, db),
+    getTeamTimezone(db),
   ]);
 
   const linkedTeams = allTeams.filter((t) => t.googleGroupEmail);
@@ -153,12 +154,12 @@ export default async function AdminDriveSyncPage() {
         {!lastReport ? (
           <p className="text-sm text-[var(--muted)]">No reconcile has run yet.</p>
         ) : (
-          <ReconcileReport report={lastReport} nameByEmail={nameByEmail} people={peoplePicker} />
+          <ReconcileReport report={lastReport} nameByEmail={nameByEmail} people={peoplePicker} teamTz={teamTz} />
         )}
       </section>
 
       {lastReport ? (
-        <RecommendedMembers teams={recommendations} ranAt={lastReport.ranAt} />
+        <RecommendedMembers teams={recommendations} ranAt={lastReport.ranAt} teamTz={teamTz} />
       ) : (
         <section className="card flex flex-col gap-2">
           <h2 className="text-base font-semibold">Recommended members</h2>

@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { datetimeLocalToInstant } from "@/lib/tz";
 
 export type MeetingFormValues = { title: string; startsAt: string; endsAt: string };
 
 const EMPTY: MeetingFormValues = { title: "", startsAt: "", endsAt: "" };
 
-export function MeetingForm() {
+export function MeetingForm({ teamTz }: { teamTz: string }) {
   const [values, setValues] = useState<MeetingFormValues>(EMPTY);
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -23,8 +24,8 @@ export function MeetingForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: values.title,
-          startsAt: values.startsAt ? new Date(values.startsAt).toISOString() : "",
-          endsAt: values.endsAt ? new Date(values.endsAt).toISOString() : "",
+          startsAt: values.startsAt ? datetimeLocalToInstant(values.startsAt, teamTz) : "",
+          endsAt: values.endsAt ? datetimeLocalToInstant(values.endsAt, teamTz) : "",
         }),
       });
       if (res.ok) {

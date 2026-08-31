@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
 import { getDb } from "@/lib/db";
-import { getSetting } from "@/lib/settings";
+import { getSetting, getTeamTimezone } from "@/lib/settings";
 import { displayName } from "@/lib/people";
 import type { LinkReport } from "@/lib/slack-link";
 import { SlackLinkPanel } from "@/components/SlackLinkPanel";
@@ -26,12 +26,13 @@ export default async function AdminSlackPage() {
   if (!hasRole(viewer.role, "admin")) redirect("/");
 
   const db = getDb();
-  const [{ data, error }, report] = await Promise.all([
+  const [{ data, error }, report, teamTz] = await Promise.all([
     db
       .from("person")
       .select("id, first_name, last_name, display_name, role, is_active, slack_user_id")
       .order("last_name"),
     getSetting<LinkReport | null>("slack_last_sync_report", null, db),
+    getTeamTimezone(db),
   ]);
   if (error) console.error("admin/slack: person select failed:", error.message);
   const people = (data ?? []) as PersonSlackRow[];
@@ -55,7 +56,7 @@ export default async function AdminSlackPage() {
         <div>
           <h1>Slack linking</h1>
           <div className="sub">
-            Last synced {report ? new Date(report.ranAt).toLocaleString() : "never"} · {linked.length} linked
+            Last synced {report ? new Date(report.ranAt).toLocaleString(undefined, { timeZone: teamTz }) : "never"} · {linked.length} linked
           </div>
         </div>
       </div>

@@ -2,23 +2,16 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-
-function toLocalInput(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  // datetime-local wants YYYY-MM-DDTHH:mm in local time
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
+import { instantToDatetimeLocal, datetimeLocalToInstant } from "@/lib/tz";
 
 export function SessionEditRow({
-  id, timeIn, timeOut, note, excluded, label,
+  id, timeIn, timeOut, note, excluded, label, teamTz,
 }: {
   id: string; timeIn: string; timeOut: string | null; note: string | null;
-  excluded: boolean; label: string;
+  excluded: boolean; label: string; teamTz: string;
 }) {
-  const [tin, setTin] = useState(toLocalInput(timeIn));
-  const [tout, setTout] = useState(toLocalInput(timeOut));
+  const [tin, setTin] = useState(instantToDatetimeLocal(timeIn, teamTz));
+  const [tout, setTout] = useState(timeOut ? instantToDatetimeLocal(timeOut, teamTz) : "");
   const [n, setN] = useState(note ?? "");
   const [exc, setExc] = useState(excluded);
   const [status, setStatus] = useState<string | null>(null);
@@ -40,8 +33,8 @@ export function SessionEditRow({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          timeIn: new Date(tin).toISOString(),
-          timeOut: tout ? new Date(tout).toISOString() : null,
+          timeIn: datetimeLocalToInstant(tin, teamTz),
+          timeOut: tout ? datetimeLocalToInstant(tout, teamTz) : null,
           note: n || undefined,
           excludedFromTotals: exc,
         }),

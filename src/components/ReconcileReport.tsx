@@ -15,10 +15,12 @@ export function ReconcileReport({
   report,
   nameByEmail,
   people,
+  teamTz,
 }: {
   report: ReconcileResult;
   nameByEmail: Record<string, string>;
   people: PickPerson[];
+  teamTz: string;
 }) {
   // The email currently being associated (modal open when non-null).
   const [assocEmail, setAssocEmail] = useState<string | null>(null);
@@ -28,7 +30,7 @@ export function ReconcileReport({
   return (
     <>
       <p className="text-sm text-[var(--muted)]">
-        Ran at <span className="mono">{new Date(report.ranAt).toLocaleString()}</span>
+        Ran at <span className="mono">{new Date(report.ranAt).toLocaleString(undefined, { timeZone: teamTz })}</span>
       </p>
       <div className="flex flex-col gap-4">
         {report.groups.map((g) => (

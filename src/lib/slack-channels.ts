@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { slackDepsFromEnv, type SlackDeps } from "./slack";
+import { getTeamTimezone } from "./settings";
 
 const API = "https://slack.com/api/";
 
@@ -206,8 +207,9 @@ export async function afterEventCreated(deps: { db: SupabaseClient; slack?: Slac
       const creatorSlackId = (creator as { slack_user_id?: string | null } | null)?.slack_user_id ?? null;
       if (creatorSlackId) await inviteToChannel(slack, channel.id, [creatorSlackId]);
     }
+    const teamTz = await getTeamTimezone(deps.db);
     const where = ev.location ? ` at ${ev.location}` : "";
-    const when = `${new Date(ev.startsAt).toLocaleString()} – ${new Date(ev.endsAt).toLocaleString()}`;
+    const when = `${new Date(ev.startsAt).toLocaleString(undefined, { timeZone: teamTz })} – ${new Date(ev.endsAt).toLocaleString(undefined, { timeZone: teamTz })}`;
     await postToEventChannel(slack, channel.id, `:tada: *${ev.name}* — ${when}${where}`);
   } catch (e) {
     console.error("afterEventCreated threw:", e);

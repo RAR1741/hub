@@ -2,17 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { datetimeLocalToInstant, instantToDatetimeLocal } from "@/lib/tz";
 import type { Event, Period } from "@/lib/types";
 
 type GcalCandidate = { id: string; title: string; startsAt: string; endsAt: string };
 
-function toDatetimeLocal(iso: string): string {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-export function EventForm({ periods: allPeriods, forms, event, onSaved }: { periods: Period[]; forms: { id: string; title: string }[]; event?: Event; onSaved?: () => void }) {
+export function EventForm({ periods: allPeriods, forms, event, teamTz, onSaved }: { periods: Period[]; forms: { id: string; title: string }[]; event?: Event; teamTz: string; onSaved?: () => void }) {
   const router = useRouter();
   const today = new Date().toISOString().slice(0, 10);
   const periods = allPeriods.filter((p) => p.endsOn >= today || p.id === event?.periodId);
@@ -20,8 +15,8 @@ export function EventForm({ periods: allPeriods, forms, event, onSaved }: { peri
   const [periodId, setPeriodId] = useState(event?.periodId ?? periods[0]?.id ?? "");
   const [location, setLocation] = useState(event?.location ?? "");
   const [description, setDescription] = useState(event?.description ?? "");
-  const [startsAt, setStartsAt] = useState(event ? toDatetimeLocal(event.startsAt) : "");
-  const [endsAt, setEndsAt] = useState(event ? toDatetimeLocal(event.endsAt) : "");
+  const [startsAt, setStartsAt] = useState(event ? instantToDatetimeLocal(event.startsAt, teamTz) : "");
+  const [endsAt, setEndsAt] = useState(event ? instantToDatetimeLocal(event.endsAt, teamTz) : "");
   const [formId, setFormId] = useState(event?.formId ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,8 +48,8 @@ export function EventForm({ periods: allPeriods, forms, event, onSaved }: { peri
     const candidate = candidates.find((c) => c.id === id);
     if (!candidate) return;
     setName(candidate.title);
-    setStartsAt(toDatetimeLocal(candidate.startsAt));
-    setEndsAt(toDatetimeLocal(candidate.endsAt));
+    setStartsAt(instantToDatetimeLocal(candidate.startsAt, teamTz));
+    setEndsAt(instantToDatetimeLocal(candidate.endsAt, teamTz));
   }
 
   async function submit(e: React.FormEvent) {
@@ -70,8 +65,8 @@ export function EventForm({ periods: allPeriods, forms, event, onSaved }: { peri
           periodId,
           location: location || null,
           description: description || null,
-          startsAt: startsAt ? new Date(startsAt).toISOString() : "",
-          endsAt: endsAt ? new Date(endsAt).toISOString() : "",
+          startsAt: startsAt ? datetimeLocalToInstant(startsAt, teamTz) : "",
+          endsAt: endsAt ? datetimeLocalToInstant(endsAt, teamTz) : "",
           gcalEventId: gcalEventId || null,
           formId: formId || null,
         }),
@@ -105,7 +100,7 @@ export function EventForm({ periods: allPeriods, forms, event, onSaved }: { peri
             <option value="">— Not linked —</option>
             {candidates.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.title} ({new Date(c.startsAt).toLocaleString()})
+                {c.title} ({new Date(c.startsAt).toLocaleString(undefined, { timeZone: teamTz })})
               </option>
             ))}
           </select>
