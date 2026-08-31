@@ -44,6 +44,49 @@ const ADMIN_ITEMS: { label: string; href: string; role: Role }[] = [
 // Per-group signature hue (Task 1 tokens). Typed loosely so the CSS var passes.
 const grp = (hue: string) => ({ ["--grp" as string]: `var(${hue})` }) as React.CSSProperties;
 
+type IconName = Parameters<typeof Icon>[0]["name"];
+
+// A sidebar item with a hover flyout of sub-links. If the viewer's role leaves
+// only a single sub-link that goes to the same place as the item itself, the
+// flyout is pure redundancy — render a plain link (no chevron, no flyout).
+function NavItemWithFlyout({
+  href,
+  icon,
+  label,
+  items,
+}: {
+  href: string;
+  icon: IconName;
+  label: string;
+  items: { label: string; href: string }[];
+}) {
+  const collapse = items.length === 1 && items[0].href === href;
+  if (collapse) {
+    return (
+      <NavLink href={href} className="sbi">
+        <Icon name={icon} className="ic" />
+        {label}
+      </NavLink>
+    );
+  }
+  return (
+    <div className="sbi-wrap">
+      <NavLink href={href} className="sbi" aria-haspopup="true">
+        <Icon name={icon} className="ic" />
+        {label}
+        <Icon name="chevron-down" className="flychev" />
+      </NavLink>
+      <div className="flyout" role="menu">
+        {items.map((item) => (
+          <NavLink key={item.href} href={item.href} className="fly-link" role="menuitem">
+            {item.label}
+          </NavLink>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export async function SiteNav() {
   const token = (await cookies()).get(KIOSK_COOKIE)?.value;
   // Show the Kiosk link on a registered tablet no matter who's logged in, so a
@@ -67,6 +110,22 @@ export async function SiteNav() {
     : "";
 
   const adminItems = ADMIN_ITEMS.filter((item) => hasRole(role, item.role));
+
+  // Flyout sub-links, gated by role. NavItemWithFlyout drops the flyout when a
+  // viewer is left with only the redundant same-as-parent link.
+  const peopleItems = [
+    { label: "All people", href: "/people" },
+    ...(isAdmin
+      ? [
+          { label: "Duplicates", href: "/admin/people/duplicates" },
+          { label: "Import CSV", href: "/admin/people/import" },
+        ]
+      : []),
+  ];
+  const eventsItems = [
+    { label: "Upcoming", href: "/events" },
+    ...(isMentor ? [{ label: "Calendar", href: "/calendar" }] : []),
+  ];
   const showShopFloor = isMentor || kioskRegistered || isStudent;
   const showTeam = isMentor || isStudent;
 
@@ -148,28 +207,7 @@ export async function SiteNav() {
           <div className="sb-group" style={grp("--hue-team")}>
             <h5>Team</h5>
             {isMentor && (
-              <div className="sbi-wrap">
-                <NavLink href="/people" className="sbi" aria-haspopup="true">
-                  <Icon name="users" className="ic" />
-                  People
-                  <Icon name="chevron-down" className="flychev" />
-                </NavLink>
-                <div className="flyout" role="menu">
-                  <NavLink href="/people" className="fly-link" role="menuitem">
-                    All people
-                  </NavLink>
-                  {isAdmin && (
-                    <NavLink href="/admin/people/duplicates" className="fly-link" role="menuitem">
-                      Duplicates
-                    </NavLink>
-                  )}
-                  {isAdmin && (
-                    <NavLink href="/admin/people/import" className="fly-link" role="menuitem">
-                      Import CSV
-                    </NavLink>
-                  )}
-                </div>
-              </div>
+              <NavItemWithFlyout href="/people" icon="users" label="People" items={peopleItems} />
             )}
             {isStudent && (
               <NavLink href="/teams" className="sbi">
@@ -178,23 +216,7 @@ export async function SiteNav() {
               </NavLink>
             )}
             {isStudent && (
-              <div className="sbi-wrap">
-                <NavLink href="/events" className="sbi" aria-haspopup="true">
-                  <Icon name="calendar" className="ic" />
-                  Events
-                  <Icon name="chevron-down" className="flychev" />
-                </NavLink>
-                <div className="flyout" role="menu">
-                  <NavLink href="/events" className="fly-link" role="menuitem">
-                    Upcoming
-                  </NavLink>
-                  {isMentor && (
-                    <NavLink href="/calendar" className="fly-link" role="menuitem">
-                      Calendar
-                    </NavLink>
-                  )}
-                </div>
-              </div>
+              <NavItemWithFlyout href="/events" icon="calendar" label="Events" items={eventsItems} />
             )}
           </div>
         )}
