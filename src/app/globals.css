@@ -370,6 +370,8 @@
     gap: 0.25rem;
   }
 
+  .field-error { display: block; margin-top: 4px; font-size: 12px; color: var(--red); }
+
   .input,
   select.input,
   textarea.input {
