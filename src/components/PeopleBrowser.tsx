@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Icon } from "@/components/Icon";
+import { Icon } from "@/components/ui/Icon";
 import { sortByName } from "@/lib/name-sort";
 import type { Person } from "@/lib/types";
 

@@ -6,7 +6,7 @@ import { hasRole } from "@/lib/authz";
 import { listPeople, displayName } from "@/lib/people";
 import { PersonForm } from "@/components/PersonForm";
 import { ViewAsButton } from "@/components/ViewAsButton";
-import { Icon } from "@/components/Icon";
+import { Icon } from "@/components/ui/Icon";
 
 function initials(name: string): string {
   return name
