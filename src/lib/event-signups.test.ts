@@ -1,5 +1,15 @@
 import { describe, expect, test } from "vitest";
 import { checkInPerson, listEventRoster, signUpForEvent, signedUpEventIds, uncheckIn } from "./event-signups";
+import type { SlackDeps } from "./slack";
+
+/** A SlackDeps whose every real API call throws — used to prove Slack failures never affect the DB result. */
+const throwingSlack: SlackDeps = {
+  fetch: (() => {
+    throw new Error("boom: slack unreachable");
+  }) as unknown as typeof globalThis.fetch,
+  token: "xoxb-test",
+  isProd: true,
+};
 
 describe("signUpForEvent", () => {
   function fakeDb(opts: { conflict?: boolean; fkViolation?: boolean; eventEnded?: boolean; noEvent?: boolean }) {
@@ -64,6 +74,52 @@ describe("signUpForEvent", () => {
   });
 });
 
+describe("signUpForEvent — Slack hook never changes the result", () => {
+  function fakeDb(opts: { slackChannelId: string | null; slackArchivedAt: string | null; personSlackId: string | null }) {
+    return {
+      from(table: string) {
+        if (table === "event") {
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: {
+                    id: "e1", period_id: "pd1", name: "Demo", location: null, description: null,
+                    starts_at: "2099-01-01T18:00:00Z", ends_at: "2099-01-01T20:00:00Z",
+                    created_by: "m1", created_at: "2020-01-01T00:00:00Z",
+                    slack_channel_id: opts.slackChannelId, slack_channel_name: null,
+                    slack_archived_at: opts.slackArchivedAt,
+                  },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === "event_signup") {
+          return { insert: async () => ({ error: null }) };
+        }
+        if (table === "person") {
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({ data: { slack_user_id: opts.personSlackId }, error: null }),
+              }),
+            }),
+          };
+        }
+        throw new Error(`unexpected table ${table}`);
+      },
+    } as never;
+  }
+
+  test("signup still succeeds when the Slack invite throws", async () => {
+    const db = fakeDb({ slackChannelId: "C1", slackArchivedAt: null, personSlackId: "U123" });
+    const result = await signUpForEvent("e1", "p1", db, throwingSlack);
+    expect(result).toEqual({ ok: true, status: 201 });
+  });
+});
+
 describe("checkInPerson", () => {
   function fakeDb(opts: { eventExists: boolean; conflict?: boolean }) {
     return {
@@ -122,8 +178,9 @@ describe("listEventRoster", () => {
             select: () => ({
               eq: async () => ({
                 data: [
-                  { person_id: "p1", person: { id: "p1", first_name: "Ann", last_name: "A", display_name: null, role: "student" } },
-                  { person_id: "p2", person: { id: "p2", first_name: "Bo", last_name: "B", display_name: null, role: "mentor" } },
+                  // p1 is linked and invited; p2 is unlinked (no slack_user_id) and never invited
+                  { person_id: "p1", slack_invited_at: "2026-01-01T00:00:00Z", person: { id: "p1", first_name: "Ann", last_name: "A", display_name: null, role: "student", slack_user_id: "U1" } },
+                  { person_id: "p2", slack_invited_at: null, person: { id: "p2", first_name: "Bo", last_name: "B", display_name: null, role: "mentor", slack_user_id: null } },
                 ],
                 error: null,
               }),
@@ -137,8 +194,8 @@ describe("listEventRoster", () => {
                 eq: async () => ({
                   data: [
                     // p1 signed up AND checked in; p3 checked in without signing up (manual add)
-                    { id: "s1", person_id: "p1", person: { id: "p1", first_name: "Ann", last_name: "A", display_name: null, role: "student" } },
-                    { id: "s2", person_id: "p3", person: { id: "p3", first_name: "Cy", last_name: "C", display_name: null, role: "student" } },
+                    { id: "s1", person_id: "p1", person: { id: "p1", first_name: "Ann", last_name: "A", display_name: null, role: "student", slack_user_id: "U1" } },
+                    { id: "s2", person_id: "p3", person: { id: "p3", first_name: "Cy", last_name: "C", display_name: null, role: "student", slack_user_id: null } },
                   ],
                   error: null,
                 }),
@@ -153,9 +210,9 @@ describe("listEventRoster", () => {
 
   test("merges signups and check-ins, sorted by name", async () => {
     expect(await listEventRoster("e1", fakeDb())).toEqual([
-      { personId: "p1", name: "Ann A", role: "student", signedUp: true, checkedIn: true, sessionId: "s1" },
-      { personId: "p2", name: "Bo B", role: "mentor", signedUp: true, checkedIn: false, sessionId: null },
-      { personId: "p3", name: "Cy C", role: "student", signedUp: false, checkedIn: true, sessionId: "s2" },
+      { personId: "p1", name: "Ann A", role: "student", signedUp: true, checkedIn: true, sessionId: "s1", slackLinked: true, slackInvitedAt: "2026-01-01T00:00:00Z" },
+      { personId: "p2", name: "Bo B", role: "mentor", signedUp: true, checkedIn: false, sessionId: null, slackLinked: false, slackInvitedAt: null },
+      { personId: "p3", name: "Cy C", role: "student", signedUp: false, checkedIn: true, sessionId: "s2", slackLinked: false, slackInvitedAt: null },
     ]);
   });
 });

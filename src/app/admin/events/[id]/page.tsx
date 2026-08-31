@@ -38,6 +38,10 @@ export default async function EventRosterPage({
     .map((p) => ({ id: p.id, name: displayName(p) }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
+  const hasSlackChannel = !!event.slackChannelId && !event.slackArchivedAt;
+  const creator = allPeople.find((p) => p.id === event.createdBy);
+  const creatorUnlinked = hasSlackChannel && creator && !creator.slack_user_id;
+
   const formData = event.formId ? await getFormWithFields(event.formId) : null;
   const responses = event.formId ? await listEventResponses(event.id) : [];
   const attendingField = formData?.fields.find((f) => f.semanticKey === "attending") ?? null;
@@ -74,6 +78,7 @@ export default async function EventRosterPage({
       </div>
 
       {event.gcalMissing && <EventUnlinkBanner eventId={id} />}
+      {creatorUnlinked && <p className="pill error">Event creator isn&apos;t linked to Slack.</p>}
 
       <details className="card" open={edit === "1"}>
         <summary className="cursor-pointer font-semibold">Edit event</summary>
@@ -93,7 +98,12 @@ export default async function EventRosterPage({
             <tbody>
               {roster.map((r) => (
                 <tr key={r.personId}>
-                  <td>{r.name}</td>
+                  <td>
+                    {r.name}
+                    {hasSlackChannel && r.signedUp && (!r.slackLinked || !r.slackInvitedAt) && (
+                      <span className="pill error" style={{ marginLeft: 6 }}>not in Slack channel</span>
+                    )}
+                  </td>
                   <td className="mono">{r.role}</td>
                   <td>{r.signedUp ? "Yes" : ""}</td>
                   <td>{r.checkedIn ? "Yes" : ""}</td>
