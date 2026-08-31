@@ -38,6 +38,12 @@
   --role-student: #4c9df0;
   --role-mentor: #e0a020;
 
+  /* colored-nav group hues (Overview/Shop Floor/Team/Admin) */
+  --hue-overview: var(--red);
+  --hue-shopfloor: #B45309;
+  --hue-team: #2563EB;
+  --hue-admin: #7C3AED;
+
   --shadow: 0 1px 2px rgba(20, 16, 14, 0.04), 0 6px 20px -10px rgba(20, 16, 14, 0.14);
 
   /* legacy token aliases — existing pages reference these; re-pointed at the
@@ -84,6 +90,11 @@
     --optional: #8b93a0;
     --absent: #f0973e;
 
+    --hue-overview: var(--red);
+    --hue-shopfloor: #FBBF24;
+    --hue-team: #60A5FA;
+    --hue-admin: #A78BFA;
+
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 26px -12px rgba(0, 0, 0, 0.6);
     color-scheme: dark;
   }
@@ -112,6 +123,11 @@
   --excused: #5a93ff;
   --optional: #8b93a0;
   --absent: #f0973e;
+
+  --hue-overview: var(--red);
+  --hue-shopfloor: #FBBF24;
+  --hue-team: #60A5FA;
+  --hue-admin: #A78BFA;
 
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 26px -12px rgba(0, 0, 0, 0.6);
   color-scheme: dark;
@@ -778,7 +794,12 @@
     place-items: center;
     font-size: 12px;
     font-weight: 700;
+    border: 1px solid transparent;
   }
+
+  .avatar.role-student { background: color-mix(in srgb, var(--role-student) 20%, var(--surface)); color: var(--role-student); border-color: color-mix(in srgb, var(--role-student) 45%, transparent); }
+  .avatar.role-mentor  { background: color-mix(in srgb, var(--role-mentor) 20%, var(--surface));  color: var(--role-mentor);  border-color: color-mix(in srgb, var(--role-mentor) 45%, transparent); }
+  .avatar.role-admin   { background: var(--red); color: var(--red-fg); border-color: transparent; }
 
   .sid {
     font-family: var(--font-mono);
