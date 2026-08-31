@@ -7,7 +7,7 @@ import { listBuildDays } from "@/lib/build-days";
 import { listExcusals } from "@/lib/excusals";
 import { sessionsForPeriod } from "@/lib/reports";
 import { listPeople, displayName } from "@/lib/people";
-import { getSetting } from "@/lib/settings";
+import { getTeamTimezone } from "@/lib/settings";
 import { attendanceForDate, attendanceSummary } from "@/lib/attendance";
 import { AttendanceCell } from "@/components/AttendanceGridActions";
 
@@ -29,7 +29,7 @@ export default async function CalendarPage() {
     );
   }
 
-  const tz = await getSetting<string>("team_timezone", "America/Indiana/Indianapolis");
+  const tz = await getTeamTimezone();
   const range = { from: period.startsOn, to: period.endsOn };
   const [buildDays, excusals, sessions, peopleRows] = await Promise.all([
     listBuildDays(range),

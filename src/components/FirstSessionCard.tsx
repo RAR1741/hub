@@ -5,7 +5,15 @@ import { useRouter } from "next/navigation";
 
 type SaveOutcome = { kind: "ok" } | { kind: "error"; message: string };
 
-export function FirstSessionCard({ savedAt, expired }: { savedAt: string | null; expired?: boolean }) {
+export function FirstSessionCard({
+  savedAt,
+  expired,
+  teamTz,
+}: {
+  savedAt: string | null;
+  expired?: boolean;
+  teamTz: string;
+}) {
   const [cookie, setCookie] = useState("");
   const [busy, setBusy] = useState(false);
   const [outcome, setOutcome] = useState<SaveOutcome | null>(null);
@@ -43,7 +51,7 @@ export function FirstSessionCard({ savedAt, expired }: { savedAt: string | null;
         {savedAt
           ? expired
             ? "FIRST session expired — paste a fresh cookie to resume."
-            : `FIRST session saved ${new Date(savedAt).toLocaleString()}. Re-paste when sync reports it expired.`
+            : `FIRST session saved ${new Date(savedAt).toLocaleString(undefined, { timeZone: teamTz })}. Re-paste when sync reports it expired.`
           : "No FIRST session saved — paste one to enable syncing."}
       </p>
       <p className="text-sm text-[var(--muted)]">

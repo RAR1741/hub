@@ -27,3 +27,31 @@ export function localDateTimeToInstant(dateIso: string, minutes: number, tz: str
   const offset = tzOffsetMinutes(guessUtc, tz);
   return new Date(guessUtc - offset * 60000).toISOString();
 }
+
+/**
+ * UTC instant ISO string -> local wall-clock "YYYY-MM-DDTHH:mm" in IANA `tz`,
+ * for use as a `datetime-local` input value. Exact: formatting an instant into
+ * a zone is unambiguous. PURE.
+ */
+export function instantToDatetimeLocal(iso: string, tz: string): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(iso));
+  const g = (t: string) => parts.find((p) => p.type === t)?.value;
+  return `${g("year")}-${g("month")}-${g("day")}T${g("hour")}:${g("minute")}`;
+}
+
+/**
+ * Inverse of `instantToDatetimeLocal`: a `datetime-local` input value
+ * ("YYYY-MM-DDTHH:mm") wall-clock in IANA `tz` -> UTC instant ISO string.
+ * Thin wrapper over `localDateTimeToInstant`, so it inherits that function's
+ * DST-transition-hour caveat. PURE.
+ */
+export function datetimeLocalToInstant(value: string, tz: string): string {
+  const [dateIso, time] = value.split("T");
+  const [hh, mm] = time.split(":").map(Number);
+  return localDateTimeToInstant(dateIso, hh * 60 + mm, tz);
+}

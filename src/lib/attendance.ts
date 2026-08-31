@@ -4,7 +4,7 @@ import { periodFromRow } from "./types";
 import { listBuildDays } from "./build-days";
 import { listExcusals } from "./excusals";
 import { sessionsForPeriod } from "./reports";
-import { getSetting } from "./settings";
+import { getTeamTimezone } from "./settings";
 import { displayName, listPeople } from "./people";
 
 /** The team-local YYYY-MM-DD for a UTC instant. en-CA formats as YYYY-MM-DD. */
@@ -125,7 +125,7 @@ export async function attendanceSummaryForPeriod(
     listBuildDays(range, client),
     listExcusals(range, client),
     sessionsForPeriod(periodId, client),
-    getSetting<string>("team_timezone", "America/Indiana/Indianapolis", client),
+    getTeamTimezone(client),
     listPeople(undefined, client),
   ]);
 

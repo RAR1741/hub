@@ -3,12 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
-
-function toLocalInput(iso: string): string {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
+import { instantToDatetimeLocal, datetimeLocalToInstant } from "@/lib/tz";
 
 export function MeetingRow({
   id,
@@ -16,17 +11,19 @@ export function MeetingRow({
   startsAt,
   endsAt,
   isManual,
+  teamTz,
 }: {
   id: string;
   title: string;
   startsAt: string;
   endsAt: string;
   isManual: boolean;
+  teamTz: string;
 }) {
   const [editing, setEditing] = useState(false);
   const [t, setT] = useState(title);
-  const [starts, setStarts] = useState(toLocalInput(startsAt));
-  const [ends, setEnds] = useState(toLocalInput(endsAt));
+  const [starts, setStarts] = useState(instantToDatetimeLocal(startsAt, teamTz));
+  const [ends, setEnds] = useState(instantToDatetimeLocal(endsAt, teamTz));
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const router = useRouter();
@@ -40,8 +37,8 @@ export function MeetingRow({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: t,
-          startsAt: starts ? new Date(starts).toISOString() : "",
-          endsAt: ends ? new Date(ends).toISOString() : "",
+          startsAt: starts ? datetimeLocalToInstant(starts, teamTz) : "",
+          endsAt: ends ? datetimeLocalToInstant(ends, teamTz) : "",
         }),
       });
       if (res.ok) {
@@ -110,8 +107,8 @@ export function MeetingRow({
   return (
     <tr>
       <td>{title}</td>
-      <td>{new Date(startsAt).toLocaleString()}</td>
-      <td>{new Date(endsAt).toLocaleString()}</td>
+      <td>{new Date(startsAt).toLocaleString("en-US", { timeZone: teamTz })}</td>
+      <td>{new Date(endsAt).toLocaleString("en-US", { timeZone: teamTz })}</td>
       <td>
         <span className={`pill ${isManual ? "on" : "role"}`}>{isManual ? "Manual" : "Google"}</span>
       </td>

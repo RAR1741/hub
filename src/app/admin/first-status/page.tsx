@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
 import { getDb } from "@/lib/db";
-import { getSetting } from "@/lib/settings";
+import { getSetting, getTeamTimezone } from "@/lib/settings";
 import { listPeople, displayName } from "@/lib/people";
 import type { FirstSyncReport } from "@/lib/first-sync";
 import { FirstSessionCard } from "@/components/FirstSessionCard";
@@ -18,10 +18,11 @@ export default async function AdminFirstStatusPage() {
   if (!hasRole(viewer.role, "admin")) redirect("/");
 
   const db = getDb();
-  const [people, report, session] = await Promise.all([
+  const [people, report, session, teamTz] = await Promise.all([
     listPeople(undefined, db),
     getSetting<FirstSyncReport | null>("first_last_sync_report", null, db),
     getSetting<{ cookie: string; savedAt: string } | null>("first_session", null, db),
+    getTeamTimezone(db),
   ]);
 
   const staff = people.filter((p) => (p.role === "mentor" || p.role === "admin") && p.is_active);
@@ -46,7 +47,7 @@ export default async function AdminFirstStatusPage() {
         <div>
           <h1>FIRST roster status</h1>
           <div className="sub">
-            Last synced {report ? new Date(report.ranAt).toLocaleString() : "never"}
+            Last synced {report ? new Date(report.ranAt).toLocaleString(undefined, { timeZone: teamTz }) : "never"}
           </div>
         </div>
       </div>
@@ -59,7 +60,7 @@ export default async function AdminFirstStatusPage() {
 
       <section className="card flex flex-col gap-4">
         <h2 className="text-base font-semibold">FIRST session</h2>
-        <FirstSessionCard savedAt={session?.savedAt ?? null} expired={report?.error === "session_expired"} />
+        <FirstSessionCard savedAt={session?.savedAt ?? null} expired={report?.error === "session_expired"} teamTz={teamTz} />
       </section>
 
       <section className="card flex flex-col gap-4">

@@ -8,7 +8,7 @@ import { getActivePeriod } from "@/lib/periods";
 import { personPeriodHours } from "@/lib/reports";
 import { listUpcomingMeetings } from "@/lib/meetings";
 import { listBuildDays } from "@/lib/build-days";
-import { getSetting } from "@/lib/settings";
+import { getSetting, getTeamTimezone } from "@/lib/settings";
 import { hoursGoalProgress } from "@/lib/hours-goal";
 
 export const metadata: Metadata = { title: "Home" };
@@ -41,7 +41,7 @@ export default async function HomePage() {
   );
   // Render times in the team's timezone — on the server `undefined` resolves to
   // the host zone (UTC in prod), which showed the clock hours ahead of local.
-  const teamTz = await getSetting<string>("team_timezone", "America/Indiana/Indianapolis");
+  const teamTz = await getTeamTimezone();
   const now = new Date();
 
   return (

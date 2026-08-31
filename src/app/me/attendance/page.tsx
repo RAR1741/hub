@@ -8,7 +8,7 @@ import { listExcusalRequestsForPerson } from "@/lib/excusal-requests";
 import { personSessions } from "@/lib/reports";
 import { totalHours } from "@/lib/hours";
 import { hoursGoalProgress } from "@/lib/hours-goal";
-import { getSetting } from "@/lib/settings";
+import { getSetting, getTeamTimezone } from "@/lib/settings";
 import { attendanceForDate, attendanceSummary, localDateOf } from "@/lib/attendance";
 import { ExcusalRequestForm } from "@/components/ExcusalRequestForm";
 import { ExcusalRequestList } from "@/components/ExcusalRequestList";
@@ -42,7 +42,7 @@ export default async function MyAttendancePage() {
     );
   }
 
-  const tz = await getSetting<string>("team_timezone", "America/Indiana/Indianapolis");
+  const tz = await getTeamTimezone();
   const hoursGoal = await getSetting<number>("season_hours_goal", 0);
   const range = { from: period.startsOn, to: period.endsOn };
   const [buildDays, allExcusals, sessions, myRequests] = await Promise.all([

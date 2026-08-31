@@ -12,6 +12,7 @@ import { BadgeAwardPanel } from "@/components/BadgeAwardPanel";
 import { RevokeBadgeButton } from "@/components/RevokeBadgeButton";
 import { getGuardiansForPerson } from "@/lib/guardians";
 import { StatusBadge } from "@/components/FirstStatusTable";
+import { getTeamTimezone } from "@/lib/settings";
 
 export const metadata: Metadata = { title: "Person" };
 
@@ -25,10 +26,11 @@ export default async function PersonPage({
   const canViewGuardians = hasRole(viewer.role, "mentor");
   const canEdit = hasRole(viewer.role, "admin");
 
-  const [result, activePeriod, guardians] = await Promise.all([
+  const [result, activePeriod, guardians, teamTz] = await Promise.all([
     getPersonWithTeams(id),
     getActivePeriod(),
     canViewGuardians ? getGuardiansForPerson(id) : Promise.resolve([]),
+    getTeamTimezone(),
   ]);
   if (!result) notFound();
   const { person, teams } = result;
@@ -143,7 +145,7 @@ export default async function PersonPage({
                 {person.firstSyncedAt && (
                   <div className="sm:col-span-3">
                     <dt className="label mb-0">Last synced</dt>
-                    <dd className="text-sm text-[var(--muted)]">{new Date(person.firstSyncedAt).toLocaleString()}</dd>
+                    <dd className="text-sm text-[var(--muted)]">{new Date(person.firstSyncedAt).toLocaleString(undefined, { timeZone: teamTz })}</dd>
                   </div>
                 )}
               </dl>
@@ -196,7 +198,7 @@ export default async function PersonPage({
                 <span className="font-medium">{b.name}</span>
                 {b.note && <span className="text-sm text-[var(--color-muted-fg)]">— {b.note}</span>}
                 <span className="text-sm text-[var(--color-muted-fg)]">
-                  Awarded by {b.awardedByName} on {new Date(b.awardedAt).toLocaleDateString()}
+                  Awarded by {b.awardedByName} on {new Date(b.awardedAt).toLocaleDateString(undefined, { timeZone: teamTz })}
                 </span>
                 {hasRole(viewer.role, "mentor") && (
                   <RevokeBadgeButton personId={person.id} badgeId={b.id} />
@@ -244,8 +246,8 @@ export default async function PersonPage({
             <tbody>
               {sessions.map((s) => (
                 <tr key={s.id}>
-                  <td>{new Date(s.timeIn).toLocaleString()}</td>
-                  <td>{s.timeOut ? new Date(s.timeOut).toLocaleString() : "— open —"}</td>
+                  <td>{new Date(s.timeIn).toLocaleString(undefined, { timeZone: teamTz })}</td>
+                  <td>{s.timeOut ? new Date(s.timeOut).toLocaleString(undefined, { timeZone: teamTz }) : "— open —"}</td>
                   <td className="mono">{s.timeOut ? Math.round(sessionHours(s) * 100) / 100 : ""}</td>
                   <td>{s.source}</td>
                   <td>{s.excludedFromTotals ? "yes" : ""}</td>

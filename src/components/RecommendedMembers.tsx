@@ -9,9 +9,11 @@ type RowState = "idle" | "adding" | "failed";
 export function RecommendedMembers({
   teams,
   ranAt,
+  teamTz,
 }: {
   teams: TeamAddRecommendations[];
   ranAt: string;
+  teamTz: string;
 }) {
   const router = useRouter();
   // key: `${teamId}:${personId}` -> row state
@@ -67,7 +69,7 @@ export function RecommendedMembers({
         <h2 className="text-base font-semibold">Recommended members</h2>
         <p className="text-sm text-[var(--muted)]">
           People with Drive access who are active but not on the team. Based on the sync from{" "}
-          <span className="mono">{new Date(ranAt).toLocaleString()}</span>.
+          <span className="mono">{new Date(ranAt).toLocaleString(undefined, { timeZone: teamTz })}</span>.
         </p>
       </div>
 

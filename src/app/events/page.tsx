@@ -5,6 +5,7 @@ import { hasRole } from "@/lib/authz";
 import { listUpcomingEvents } from "@/lib/events";
 import { signedUpEventIds } from "@/lib/event-signups";
 import { getFormWithFields } from "@/lib/forms";
+import { getTeamTimezone } from "@/lib/settings";
 import { getViewer } from "@/lib/viewer";
 import { EventSignupButton } from "@/components/EventSignupButton";
 import { EventSignupForm } from "@/components/EventSignupForm";
@@ -16,6 +17,7 @@ export default async function EventsPage() {
   if (!viewer.person) redirect("/login");
   const canEdit = hasRole(viewer.role, "mentor");
 
+  const teamTz = await getTeamTimezone();
   const events = await listUpcomingEvents();
   const signedUp = await signedUpEventIds(viewer.person.id, events.map((e) => e.id));
   const forms = await Promise.all(
@@ -45,7 +47,8 @@ export default async function EventsPage() {
                 <div>
                   <div className="font-semibold">{e.name}</div>
                   <div className="sub mono">
-                    {new Date(e.startsAt).toLocaleString()} – {new Date(e.endsAt).toLocaleString()}
+                    {new Date(e.startsAt).toLocaleString(undefined, { timeZone: teamTz })} –{" "}
+                    {new Date(e.endsAt).toLocaleString(undefined, { timeZone: teamTz })}
                     {e.location ? ` · ${e.location}` : ""}
                   </div>
                   {e.description && <div className="text-sm text-[var(--muted)]">{e.description}</div>}

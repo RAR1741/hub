@@ -7,6 +7,7 @@ import {
   listPendingApplications,
 } from "@/lib/requests";
 import { listPendingExcusalRequests } from "@/lib/excusal-requests";
+import { getTeamTimezone } from "@/lib/settings";
 import {
   AccountRequestActions,
   ApplicationActions,
@@ -21,10 +22,11 @@ export default async function AdminRequestsPage() {
   if (!hasRole(viewer.role, "mentor")) redirect("/");
 
   const isAdmin = hasRole(viewer.role, "admin");
-  const [accountRequests, applications, excusalRequests] = await Promise.all([
+  const [accountRequests, applications, excusalRequests, teamTz] = await Promise.all([
     isAdmin ? listPendingAccountRequests() : Promise.resolve([]),
     isAdmin ? listPendingApplications() : Promise.resolve([]),
     listPendingExcusalRequests(),
+    getTeamTimezone(),
   ]);
 
   return (
@@ -54,7 +56,7 @@ export default async function AdminRequestsPage() {
                         <td>{r.first_name} {r.last_name}</td>
                         <td className="mono">{r.grad_year ?? ""}</td>
                         <td>{r.email ?? ""}</td>
-                        <td className="mono">{new Date(r.created_at).toLocaleDateString()}</td>
+                        <td className="mono">{new Date(r.created_at).toLocaleDateString(undefined, { timeZone: teamTz })}</td>
                         <td><AccountRequestActions requestId={r.id} /></td>
                       </tr>
                     ))}
@@ -84,7 +86,7 @@ export default async function AdminRequestsPage() {
                         <td>{a.personName}</td>
                         <td>{a.teamName}</td>
                         <td>{a.message ?? ""}</td>
-                        <td className="mono">{new Date(a.createdAt).toLocaleDateString()}</td>
+                        <td className="mono">{new Date(a.createdAt).toLocaleDateString(undefined, { timeZone: teamTz })}</td>
                         <td><ApplicationActions applicationId={a.id} /></td>
                       </tr>
                     ))}

@@ -52,11 +52,13 @@ export function KioskBoard({
   mentors,
   here,
   canAct,
+  teamTz,
 }: {
   students: Member[];
   mentors: Member[];
   here: Here[];
   canAct: boolean;
+  teamTz: string;
 }) {
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
@@ -147,8 +149,8 @@ export function KioskBoard({
           {flash ?? " "}
         </p>
         <div className="k-now mono">
-          {nowDate.toLocaleDateString(undefined, { weekday: "short" }).toUpperCase()} ·{" "}
-          {nowDate.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })} ·{" "}
+          {nowDate.toLocaleDateString(undefined, { weekday: "short", timeZone: teamTz }).toUpperCase()} ·{" "}
+          {nowDate.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", timeZone: teamTz })} ·{" "}
           {here.length} here
           {!canAct && (
             <span className="ml-2" style={{ color: "#8b919a" }}>

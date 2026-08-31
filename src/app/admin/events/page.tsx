@@ -5,6 +5,7 @@ import { hasRole } from "@/lib/authz";
 import { listEvents } from "@/lib/events";
 import { listForms } from "@/lib/forms";
 import { listPeriods } from "@/lib/periods";
+import { getTeamTimezone } from "@/lib/settings";
 import type { Event, Period } from "@/lib/types";
 import { getViewer } from "@/lib/viewer";
 import { EventForm } from "@/components/EventForm";
@@ -15,7 +16,12 @@ export default async function AdminEventsPage() {
   const viewer = await getViewer();
   if (!hasRole(viewer.role, "mentor")) redirect("/");
 
-  const [events, periods, forms] = await Promise.all([listEvents(), listPeriods(), listForms()]);
+  const [events, periods, forms, teamTz] = await Promise.all([
+    listEvents(),
+    listPeriods(),
+    listForms(),
+    getTeamTimezone(),
+  ]);
   const now = new Date().toISOString();
   const upcoming = events.filter((e) => e.endsAt >= now).sort((a, b) => a.startsAt.localeCompare(b.startsAt));
   const past = events.filter((e) => e.endsAt < now);
@@ -32,17 +38,17 @@ export default async function AdminEventsPage() {
       <details className="card">
         <summary className="cursor-pointer font-semibold">New event</summary>
         <div className="mt-4">
-          <EventForm periods={periods} forms={forms.map((f) => ({ id: f.id, title: f.title }))} />
+          <EventForm periods={periods} forms={forms.map((f) => ({ id: f.id, title: f.title }))} teamTz={teamTz} />
         </div>
       </details>
 
-      <EventTable events={upcoming} periods={periods} emptyLabel="No upcoming events." />
+      <EventTable events={upcoming} periods={periods} emptyLabel="No upcoming events." teamTz={teamTz} />
 
       {past.length > 0 && (
         <details className="card">
           <summary className="cursor-pointer font-semibold">Previous events ({past.length})</summary>
           <div className="mt-4">
-            <EventTable events={past} periods={periods} emptyLabel="No previous events." />
+            <EventTable events={past} periods={periods} emptyLabel="No previous events." teamTz={teamTz} />
           </div>
         </details>
       )}
@@ -50,7 +56,7 @@ export default async function AdminEventsPage() {
   );
 }
 
-function EventTable({ events, periods, emptyLabel }: { events: Event[]; periods: Period[]; emptyLabel: string }) {
+function EventTable({ events, periods, emptyLabel, teamTz }: { events: Event[]; periods: Period[]; emptyLabel: string; teamTz: string }) {
   if (events.length === 0) return <p className="card text-sm text-[var(--muted)]">{emptyLabel}</p>;
   return (
     <div className="tablewrap">
@@ -66,8 +72,8 @@ function EventTable({ events, periods, emptyLabel }: { events: Event[]; periods:
                 <tr key={e.id}>
                   <td>{e.name}</td>
                   <td>{period?.name ?? ""}</td>
-                  <td className="mono">{new Date(e.startsAt).toLocaleString()}</td>
-                  <td className="mono">{new Date(e.endsAt).toLocaleString()}</td>
+                  <td className="mono">{new Date(e.startsAt).toLocaleString(undefined, { timeZone: teamTz })}</td>
+                  <td className="mono">{new Date(e.endsAt).toLocaleString(undefined, { timeZone: teamTz })}</td>
                   <td>{e.location ?? ""}</td>
                   <td className="flex gap-2">
                     <Link href={`/admin/events/${e.id}`} className="btn btn-secondary px-3 py-1">Roster</Link>

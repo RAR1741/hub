@@ -4,7 +4,7 @@ import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
 import { getActivePeriod, listPeriods } from "@/lib/periods";
 import { flaggedSessions } from "@/lib/reports";
-import { getSetting } from "@/lib/settings";
+import { getSetting, getTeamTimezone } from "@/lib/settings";
 import { SessionEditRow } from "@/components/SessionEditRow";
 
 export const metadata: Metadata = { title: "Flagged Sessions" };
@@ -17,11 +17,12 @@ export default async function FlaggedSessionsPage({
   const viewer = await getViewer();
   if (!hasRole(viewer.role, "mentor")) redirect("/");
 
-  const [{ period }, periods, active, maxShift] = await Promise.all([
+  const [{ period }, periods, active, maxShift, teamTz] = await Promise.all([
     searchParams,
     listPeriods(),
     getActivePeriod(),
     getSetting<number>("max_shift_hours", 18),
+    getTeamTimezone(),
   ]);
 
   // Default to the active period, falling back to the newest, so the page still
@@ -72,6 +73,7 @@ export default async function FlaggedSessionsPage({
                     note={f.session.note}
                     excluded={f.session.excludedFromTotals}
                     label={`${f.name} [${[...f.flags, ...(f.overlapping ? ["overlap"] : [])].join(", ")}]`}
+                    teamTz={teamTz}
                   />
                 ))}
               </tbody>

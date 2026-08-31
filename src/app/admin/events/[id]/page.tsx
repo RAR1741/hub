@@ -9,6 +9,7 @@ import { getFormWithFields, listForms } from "@/lib/forms";
 import { listPeople } from "@/lib/people";
 import { displayName } from "@/lib/people";
 import { listPeriods } from "@/lib/periods";
+import { getTeamTimezone } from "@/lib/settings";
 import { getViewer } from "@/lib/viewer";
 import { EventForm } from "@/components/EventForm";
 import { EventRosterActions, ManualAddPerson } from "@/components/EventRosterActions";
@@ -32,7 +33,13 @@ export default async function EventRosterPage({
   const event = await getEvent(id);
   if (!event) notFound();
 
-  const [roster, allPeople, periods, forms] = await Promise.all([listEventRoster(id), listPeople(), listPeriods(), listForms()]);
+  const [roster, allPeople, periods, forms, teamTz] = await Promise.all([
+    listEventRoster(id),
+    listPeople(),
+    listPeriods(),
+    listForms(),
+    getTeamTimezone(),
+  ]);
   const rosterIds = new Set(roster.map((r) => r.personId));
   const addable = allPeople
     .filter((p) => p.is_active && !rosterIds.has(p.id))
@@ -69,7 +76,8 @@ export default async function EventRosterPage({
         <div>
           <h1>{event.name}</h1>
           <div className="sub">
-            {new Date(event.startsAt).toLocaleString()} – {new Date(event.endsAt).toLocaleString()}
+            {new Date(event.startsAt).toLocaleString(undefined, { timeZone: teamTz })} –{" "}
+            {new Date(event.endsAt).toLocaleString(undefined, { timeZone: teamTz })}
             {event.location ? ` · ${event.location}` : ""}
           </div>
         </div>
@@ -87,7 +95,7 @@ export default async function EventRosterPage({
       <details className="card" open={edit === "1"}>
         <summary className="cursor-pointer font-semibold">Edit event</summary>
         <div className="mt-4">
-          <EventForm periods={periods} forms={forms.map((f) => ({ id: f.id, title: f.title }))} event={event} />
+          <EventForm periods={periods} forms={forms.map((f) => ({ id: f.id, title: f.title }))} event={event} teamTz={teamTz} />
         </div>
       </details>
 
