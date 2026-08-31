@@ -13,6 +13,7 @@ import { getViewer } from "@/lib/viewer";
 import { EventForm } from "@/components/EventForm";
 import { EventRosterActions, ManualAddPerson } from "@/components/EventRosterActions";
 import { EventUnlinkBanner } from "@/components/EventUnlinkBanner";
+import { EventDeleteButton } from "@/components/EventDeleteButton";
 
 export const metadata: Metadata = { title: "Manage Event" };
 
@@ -72,9 +73,12 @@ export default async function EventRosterPage({
             {event.location ? ` · ${event.location}` : ""}
           </div>
         </div>
-        <Link href={`/admin/events/${id}/print`} className="btn btn-secondary">
-          Print roster
-        </Link>
+        <div className="flex gap-2">
+          <Link href={`/admin/events/${id}/print`} className="btn btn-secondary">
+            Print roster
+          </Link>
+          <EventDeleteButton eventId={id} eventName={event.name} />
+        </div>
       </div>
 
       {event.gcalMissing && <EventUnlinkBanner eventId={id} />}
