@@ -1054,19 +1054,19 @@
   }
 
   /* ---------------------------------------------------------------------
-     Kiosk (committed dark regardless of theme)
+     Kiosk (theme-aware — follows light/dark/system via tokens)
      --------------------------------------------------------------------- */
   .kiosk {
-    background: #101114;
-    color: #f3f1ec;
+    background: var(--canvas);
+    color: var(--ink);
     border-radius: 14px;
-    border: 1px solid #23262c;
+    border: 1px solid var(--hair);
     overflow: hidden;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 26px -12px rgba(0, 0, 0, 0.6);
+    box-shadow: var(--shadow);
   }
 
   .kiosk .hazard {
-    background: #e01926;
+    background: var(--red);
     opacity: 1;
   }
 
@@ -1077,7 +1077,7 @@
     flex-wrap: wrap;
     gap: 10px;
     padding: 16px 20px;
-    border-bottom: 1px solid #23262c;
+    border-bottom: 1px solid var(--hair);
   }
 
   .kiosk-head .k-brand {
@@ -1092,7 +1092,7 @@
 
   .kiosk-head .k-now {
     font-size: 13px;
-    color: #9aa0a8;
+    color: var(--muted);
   }
 
   .kiosk-head .k-flash {
@@ -1107,8 +1107,8 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    background: #e01926;
-    color: #ffffff;
+    background: var(--red);
+    color: var(--red-fg);
   }
 
   .kiosk-search-row {
@@ -1120,22 +1120,22 @@
     font: inherit;
     font-size: 17px;
     font-weight: 600;
-    background: #1b1e23;
-    border: 1px solid #2a2e35;
-    color: #f3f1ec;
+    background: var(--surface-2);
+    border: 1px solid var(--hair);
+    color: var(--ink);
     border-radius: 11px;
     padding: 14px 16px;
     min-height: 52px;
   }
 
   .k-search::placeholder {
-    color: #8b919a;
+    color: var(--muted);
     font-weight: 500;
   }
 
   .k-search:focus-visible {
     outline: none;
-    border-color: #e01926;
+    border-color: var(--red);
   }
 
   .kiosk-body {
@@ -1150,13 +1150,13 @@
 
   .k-here {
     padding: 18px 20px;
-    background: #0b0c0e;
-    border-left: 1px solid #23262c;
+    background: var(--surface-2);
+    border-left: 1px solid var(--hair);
   }
 
   .k-mentors {
     padding: 18px 20px;
-    border-left: 1px solid #23262c;
+    border-left: 1px solid var(--hair);
   }
 
   .k-mentor-list {
@@ -1170,7 +1170,7 @@
     letter-spacing: 0.16em;
     text-transform: uppercase;
     font-weight: 800;
-    color: #8b919a;
+    color: var(--muted);
     margin: 0 0 14px;
   }
 
@@ -1182,9 +1182,9 @@
 
   .k-name {
     font: inherit;
-    background: #1b1e23;
-    border: 1px solid #2a2e35;
-    color: #f3f1ec;
+    background: var(--surface-2);
+    border: 1px solid var(--hair);
+    color: var(--ink);
     border-radius: 11px;
     padding: 16px 10px;
     font-weight: 700;
@@ -1198,7 +1198,7 @@
 
   .k-name:hover,
   .k-name:focus-visible {
-    border-color: #e01926;
+    border-color: var(--red);
   }
 
   .k-name:disabled {
@@ -1213,9 +1213,9 @@
     justify-content: space-between;
     gap: 10px;
     font: inherit;
-    background: #16181c;
-    border: 1px solid #2a2e35;
-    color: #f3f1ec;
+    background: var(--surface);
+    border: 1px solid var(--hair);
+    color: var(--ink);
     border-radius: 11px;
     padding: 13px 15px;
     margin-bottom: 10px;
@@ -1229,13 +1229,13 @@
 
   .k-out .kt {
     font-size: 14px;
-    color: #35c878;
+    color: var(--present);
     font-weight: 700;
   }
 
   .k-out:hover,
   .k-out:focus-visible {
-    border-color: #e01926;
+    border-color: var(--red);
   }
 
   .k-out:disabled {
@@ -1257,7 +1257,7 @@
     .k-here,
     .k-mentors {
       border-left: 0;
-      border-top: 1px solid #23262c;
+      border-top: 1px solid var(--hair);
     }
   }
 
