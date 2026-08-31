@@ -1459,6 +1459,336 @@
     }
   }
 
+  /* ---------------------------------------------------------------------
+     App shell — grouped left sidebar (Mission Control). Ported from
+     docs/design/mission-control-mockup.html. Each .sb-group sets --grp to
+     one of the --hue-* tokens; descendant rules read var(--grp, fallback)
+     for the group's header, item icon, active tick, and faint active tint.
+
+     Task 12 will add a mobile bottom bar under a max-width breakpoint here;
+     for now the sidebar stays visible at every width (nav is never lost).
+     --------------------------------------------------------------------- */
+  .app-shell {
+    display: flex;
+    min-height: 100dvh;
+    align-items: stretch;
+  }
+  .app-main-col {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* icons inside nav items — sized here; Icon renders the stroke paths */
+  .sbi .ic,
+  .rail-i .ic,
+  .rail-fly .fly-head .ic {
+    width: 16px;
+    height: 16px;
+    flex: none;
+  }
+
+  /* sidebar (expanded) */
+  .sb {
+    width: 208px;
+    flex: none;
+    background: var(--surface-2);
+    border-right: 1px solid var(--hair);
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    height: 100dvh;
+  }
+  .sb-brand {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 13px 14px 11px;
+  }
+  .badge-1741 {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.02em;
+    color: var(--red-fg);
+    background: var(--red);
+    padding: 2px 6px;
+    border-radius: 6px;
+  }
+  .wordmark {
+    font-weight: 700;
+    font-size: 13.5px;
+    letter-spacing: -0.01em;
+  }
+  .sb-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+  .sb-group {
+    padding: 9px 8px 1px;
+  }
+  .sb-group h5 {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--grp, var(--muted));
+    margin: 0 0 4px 8px;
+  }
+  .sbi-wrap {
+    position: relative;
+  }
+  .sbi {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px 6px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+    text-decoration: none;
+  }
+  .sbi:hover {
+    color: var(--ink);
+    background: var(--sunken);
+    text-decoration: none;
+  }
+  .sbi .ic {
+    color: color-mix(in srgb, var(--grp, var(--muted)) 78%, var(--muted));
+    opacity: 0.85;
+  }
+  .sbi.active .ic {
+    opacity: 1;
+  }
+  .sbi.active {
+    color: var(--ink);
+    background: color-mix(in srgb, var(--grp, var(--red)) 10%, var(--sunken));
+    font-weight: 600;
+  }
+  .sbi.active::before {
+    content: "";
+    position: absolute;
+    left: -8px;
+    top: 6px;
+    bottom: 6px;
+    width: 2px;
+    border-radius: 2px;
+    background: var(--grp, var(--red));
+  }
+  .sbi .flychev {
+    margin-left: auto;
+    width: 11px;
+    height: 11px;
+    flex: none;
+    color: var(--muted);
+    opacity: 0.7;
+  }
+  .sb-foot {
+    margin-top: auto;
+    border-top: 1px solid var(--hair);
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  /* ---- flyout submenus (sidebar) — pure CSS via :hover / :focus-within ---- */
+  .flyout {
+    position: absolute;
+    left: calc(100% + 8px);
+    top: -6px;
+    min-width: 196px;
+    background: var(--surface);
+    border: 1px solid var(--hair);
+    border-radius: 8px;
+    padding: 5px;
+    box-shadow: 0 10px 28px -10px rgba(10, 10, 12, 0.28),
+      0 0 0 1px rgba(10, 10, 12, 0.02);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(-4px);
+    transition: opacity 0.12s ease, transform 0.12s ease;
+    z-index: 30;
+  }
+  .sbi-wrap:hover > .flyout,
+  .sbi-wrap:focus-within > .flyout {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(0);
+  }
+  .flyout::before {
+    content: "";
+    position: absolute;
+    left: -6px;
+    top: 14px;
+    width: 12px;
+    height: 12px;
+    background: var(--surface);
+    border-left: 1px solid var(--hair);
+    border-bottom: 1px solid var(--hair);
+    transform: rotate(45deg);
+    border-radius: 0 0 0 2px;
+  }
+  .fly-title {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--grp, var(--muted));
+    padding: 5px 9px 6px;
+  }
+  .fly-link {
+    position: relative;
+    display: block;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--ink);
+    text-decoration: none;
+    padding: 6px 9px;
+    border-radius: 6px;
+  }
+  .fly-link:hover,
+  .fly-link:focus-visible {
+    background: var(--sunken);
+    text-decoration: none;
+  }
+  .fly-scroll {
+    max-height: 264px;
+    overflow-y: auto;
+  }
+  .fly-scroll::-webkit-scrollbar {
+    width: 8px;
+  }
+  .fly-scroll::-webkit-scrollbar-thumb {
+    background: var(--hair-strong);
+    border-radius: 4px;
+  }
+
+  /* ---- icon rail (collapsed sidebar) — CSS ported for a later collapse
+     toggle (see task-11 report); not yet wired to a control ---- */
+  .rail {
+    width: 52px;
+    flex: none;
+    background: var(--surface-2);
+    border-right: 1px solid var(--hair);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 12px 0 8px;
+    gap: 2px;
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    height: 100dvh;
+  }
+  .rail .badge-1741 {
+    margin-bottom: 10px;
+  }
+  .rail-i-wrap {
+    position: relative;
+  }
+  .rail-i {
+    position: relative;
+    width: 36px;
+    height: 32px;
+    display: grid;
+    place-items: center;
+    border-radius: 6px;
+    color: var(--muted);
+    text-decoration: none;
+  }
+  .rail-i:hover {
+    color: var(--ink);
+    background: var(--sunken);
+  }
+  .rail-i .ic {
+    width: 16px;
+    height: 16px;
+    color: color-mix(in srgb, var(--grp, var(--muted)) 78%, var(--muted));
+    opacity: 0.85;
+  }
+  .rail-i.active .ic {
+    opacity: 1;
+  }
+  .rail-i.active {
+    color: var(--ink);
+    background: color-mix(in srgb, var(--grp, var(--red)) 10%, var(--sunken));
+  }
+  .rail-i.active::before {
+    content: "";
+    position: absolute;
+    left: -8px;
+    top: 7px;
+    bottom: 7px;
+    width: 2px;
+    border-radius: 2px;
+    background: var(--grp, var(--red));
+  }
+  .rail-sep {
+    width: 24px;
+    height: 1px;
+    background: var(--hair);
+    margin: 6px 0;
+  }
+  .rail-foot {
+    margin-top: auto;
+  }
+  .rail-fly {
+    position: absolute;
+    left: 46px;
+    top: -6px;
+    min-width: 190px;
+    background: var(--surface);
+    border: 1px solid var(--hair);
+    border-radius: 8px;
+    padding: 5px;
+    box-shadow: 0 10px 28px -10px rgba(10, 10, 12, 0.28),
+      0 0 0 1px rgba(10, 10, 12, 0.02);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(-4px);
+    transition: opacity 0.12s ease, transform 0.12s ease;
+    z-index: 30;
+  }
+  .rail-i-wrap:hover > .rail-fly,
+  .rail-i-wrap:focus-within > .rail-fly {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(0);
+  }
+  .rail-fly::before {
+    content: "";
+    position: absolute;
+    left: -6px;
+    top: 14px;
+    width: 12px;
+    height: 12px;
+    background: var(--surface);
+    border-left: 1px solid var(--hair);
+    border-bottom: 1px solid var(--hair);
+    transform: rotate(45deg);
+  }
+  .rail-fly .fly-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12.5px;
+    font-weight: 650;
+    color: var(--ink);
+    padding: 5px 9px 6px;
+  }
+  .rail-fly .fly-head .ic {
+    color: var(--grp, var(--muted));
+  }
+
 
 /* =========================================================================
    Print (issue #54 — event roster print page)
