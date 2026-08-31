@@ -14,20 +14,21 @@ export function Field({
   const reactId = useId();
   const controlId = htmlFor ?? reactId;
   const errorId = error ? `${controlId}-error` : undefined;
+  const isElement = isValidElement<{ id?: string; "aria-describedby"?: string }>(children);
+  const childId = isElement ? (children.props.id ?? controlId) : controlId;
 
-  const control =
-    isValidElement<{ id?: string; "aria-describedby"?: string }>(children)
-      ? cloneElement(children, {
-          id: children.props.id ?? controlId,
-          "aria-describedby":
-            [children.props["aria-describedby"], errorId]
-              .filter(Boolean)
-              .join(" ") || undefined,
-        })
-      : children;
+  const control = isElement
+    ? cloneElement(children, {
+        id: childId,
+        "aria-describedby":
+          [children.props["aria-describedby"], errorId]
+            .filter(Boolean)
+            .join(" ") || undefined,
+      })
+    : children;
 
   return (
-    <label className="label" htmlFor={controlId}>
+    <label className="label" htmlFor={childId}>
       {label}
       {control}
       {error ? (
