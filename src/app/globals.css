@@ -1457,8 +1457,8 @@
      one of the --hue-* tokens; descendant rules read var(--grp, fallback)
      for the group's header, item icon, active tick, and faint active tint.
 
-     Task 12 will add a mobile bottom bar under a max-width breakpoint here;
-     for now the sidebar stays visible at every width (nav is never lost).
+     Below 768px .sb hides and .tabbar (+ its More sheet) takes over — see
+     the mobile breakpoint after the icon rail rules below.
      --------------------------------------------------------------------- */
   .app-shell {
     display: flex;
@@ -1515,11 +1515,6 @@
     background: var(--red);
     padding: 2px 6px;
     border-radius: 6px;
-  }
-  .wordmark {
-    font-weight: 700;
-    font-size: 13.5px;
-    letter-spacing: -0.01em;
   }
   .sb-scroll {
     flex: 1;
@@ -1786,6 +1781,159 @@
   }
   .rail-fly .fly-head .ic {
     color: var(--grp, var(--muted));
+  }
+
+  /* ---- mobile bottom tab bar + More sheet (Task 12) ----------------------
+     Ported from mission-control-mockup.html's .tabbar/.tab/.sheet-* rules.
+     The mockup's --sunken and --hair-strong tokens don't exist in this repo;
+     mapped to --surface-2 and --hair respectively (see task-12 brief). The
+     sheet is a <details>/<summary> so it opens/closes with no client JS. */
+  .tabbar {
+    display: none;
+    grid-template-columns: repeat(5, 1fr);
+    border-top: 1px solid var(--hair);
+    background: var(--surface);
+    padding: 4px 4px calc(4px + env(safe-area-inset-bottom, 10px));
+  }
+  .tab {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-height: 48px;
+    padding: 7px 2px 4px;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    font-size: 9.5px;
+    font-weight: 600;
+    border-radius: 8px;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .tab .ic {
+    width: 20px;
+    height: 20px;
+    flex: none;
+  }
+  .tab.active {
+    color: var(--ink);
+  }
+  .tab.active::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 18px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--red);
+  }
+  .more-sheet summary.tab {
+    list-style: none;
+  }
+  .more-sheet summary.tab::-webkit-details-marker {
+    display: none;
+  }
+  .more-sheet[open] summary.tab {
+    color: var(--ink);
+  }
+  .sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: var(--tabbar-h);
+    background: var(--surface);
+    border-top: 1px solid var(--hair);
+    border-radius: 16px 16px 0 0;
+    padding: 8px 10px calc(14px + env(safe-area-inset-bottom, 0px));
+    max-height: 70dvh;
+    overflow-y: auto;
+    z-index: 41; /* above .tabbar (z-index:40, set in the breakpoint below) */
+  }
+  .sheet .handle {
+    width: 34px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--hair);
+    margin: 4px auto 10px;
+  }
+  .sheet h6 {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 4px 8px;
+  }
+  .sheet-i {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 44px;
+    background: none;
+    border: 0;
+    text-align: left;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--ink);
+    padding: 11px 10px;
+    border-radius: 8px;
+    text-decoration: none;
+  }
+  .sheet-i:hover {
+    background: var(--surface-2);
+    text-decoration: none;
+  }
+  .sheet-i .ic {
+    width: 18px;
+    height: 18px;
+    flex: none;
+    color: var(--muted);
+  }
+  .sheet-i .pill {
+    margin-left: auto;
+  }
+  .sheet-sep {
+    height: 1px;
+    background: var(--hair);
+    margin: 8px 6px;
+  }
+  .sheet-theme {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 10px 2px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  @media (max-width: 768px) {
+    /* Shared by .tabbar (bottom offset for .sheet) and .app-main-col (bottom
+       padding so content isn't hidden behind the fixed bar) — both are
+       descendants of .app-shell, so the custom property cascades to both. */
+    .app-shell {
+      --tabbar-h: calc(56px + env(safe-area-inset-bottom, 0px));
+    }
+    .sb {
+      display: none;
+    }
+    .tabbar {
+      display: grid;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 40;
+    }
+    .app-main-col {
+      padding-bottom: var(--tabbar-h);
+    }
   }
 }
 

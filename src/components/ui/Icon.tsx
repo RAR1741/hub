@@ -92,9 +92,11 @@ const paths: Record<IconName, React.ReactNode> = {
 export function Icon({
   name,
   className,
+  style,
 }: {
   name: IconName;
   className?: string;
+  style?: React.CSSProperties;
 }) {
   return (
     <svg
@@ -105,6 +107,7 @@ export function Icon({
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
+      style={style}
       aria-hidden="true"
       focusable="false"
     >

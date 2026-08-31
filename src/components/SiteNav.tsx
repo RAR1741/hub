@@ -69,8 +69,34 @@ export async function SiteNav() {
   const showShopFloor = isMentor || kioskRegistered || isStudent;
   const showTeam = isMentor || isStudent;
 
+  // ---- mobile bottom tab bar: same role gates as the sidebar above, just
+  // collapsed to one primary link per group (the rest live in the More sheet). ----
+  const shopPrimary = isMentor || kioskRegistered
+    ? { label: "Kiosk", href: "/kiosk", icon: "tablet" as const }
+    : isStudent
+      ? { label: "Shop", href: "/shop", icon: "wrench" as const }
+      : null;
+  const teamPrimary = isMentor
+    ? { label: "People", href: "/people", icon: "users" as const }
+    : isStudent
+      ? { label: "Teams", href: "/teams", icon: "layers" as const }
+      : null;
+  const primaryTabs: { label: string; href: string; icon: Parameters<typeof Icon>[0]["name"]; exact?: boolean }[] = [
+    { label: "Home", href: "/", icon: "home", exact: true },
+    ...(shopPrimary ? [shopPrimary] : []),
+    ...(teamPrimary ? [teamPrimary] : []),
+    { label: "Leaderboard", href: "/leaderboard", icon: "chart" },
+  ];
+  const tabCount = primaryTabs.length + 1; // + the More tab
+
+  // Whatever a primary slot didn't claim still needs a home in the sheet.
+  const showShopInSheet = isStudent && shopPrimary?.href !== "/shop";
+  const showTeamsInSheet = isStudent && teamPrimary?.href !== "/teams";
+  const showEventsInSheet = isStudent;
+
   return (
-    <nav className="sb" aria-label="Primary">
+    <>
+      <nav className="sb" aria-label="Primary">
       <div className="sb-brand">
         <Link href="/" className="flex items-center hover:no-underline">
           <span className="flex items-center rounded-md border border-black/5 bg-white px-2 py-1 shadow-sm">
@@ -236,6 +262,76 @@ export async function SiteNav() {
           </Link>
         )}
       </div>
-    </nav>
+      </nav>
+
+      {/* Mobile bottom tab bar — sibling of .sb; CSS shows one or the other by
+          breakpoint (see globals.css .app-shell). Same role gates as above,
+          collapsed to one primary link per group; the rest live in the More
+          sheet below. The sheet is a <details> so open/close needs no JS. */}
+      <nav className="tabbar" aria-label="Primary" style={{ gridTemplateColumns: `repeat(${tabCount}, 1fr)` }}>
+        {primaryTabs.map((tab) => (
+          <NavLink key={tab.href} href={tab.href} exact={tab.exact} className="tab">
+            <Icon name={tab.icon} className="ic" />
+            {tab.label}
+          </NavLink>
+        ))}
+        <details className="more-sheet">
+          <summary className="tab">
+            {/* Icon component has no "dots" glyph; sliders is the nearest existing icon. */}
+            <Icon name="sliders" className="ic" />
+            More
+          </summary>
+          <div className="sheet">
+            <div className="handle" />
+            <h6>More</h6>
+            {showTeamsInSheet && (
+              <Link href="/teams" className="sheet-i">
+                <Icon name="layers" className="ic" style={{ color: "var(--hue-team)" }} />
+                Teams
+              </Link>
+            )}
+            {showEventsInSheet && (
+              <Link href="/events" className="sheet-i">
+                <Icon name="calendar" className="ic" style={{ color: "var(--hue-team)" }} />
+                Events
+              </Link>
+            )}
+            {showShopInSheet && (
+              <Link href="/shop" className="sheet-i">
+                <Icon name="wrench" className="ic" style={{ color: "var(--hue-shopfloor)" }} />
+                Shop
+              </Link>
+            )}
+            {isMentor && (
+              <Link href="/admin" className="sheet-i">
+                <Icon name="sliders" className="ic" style={{ color: "var(--hue-admin)" }} />
+                Admin
+                <span className="pill admin">Admin</span>
+              </Link>
+            )}
+            <div className="sheet-sep" />
+            <div className="sheet-theme">
+              Theme
+              <ThemeToggle />
+            </div>
+            {viewer.person ? (
+              <form action="/api/auth/logout" method="post">
+                <button
+                  type="submit"
+                  className="sheet-i w-full cursor-pointer border-0 bg-transparent"
+                >
+                  <Icon name="x" className="ic" />
+                  Sign out
+                </button>
+              </form>
+            ) : (
+              <Link href="/login" className="sheet-i">
+                Sign in
+              </Link>
+            )}
+          </div>
+        </details>
+      </nav>
+    </>
   );
 }
