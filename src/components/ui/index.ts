@@ -5,3 +5,4 @@ export { Pill } from "./Pill";
 export { Avatar } from "./Avatar";
 export { TableWrap } from "./TableWrap";
 export { Field } from "./Field";
+export { Stat } from "./Stat";
