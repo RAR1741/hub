@@ -7,6 +7,7 @@ import type { Role } from "@/lib/types";
 import { KIOSK_COOKIE, verifyKioskToken } from "@/lib/kiosk";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { NavLink } from "@/components/NavLink";
+import { SidebarToggle } from "@/components/SidebarToggle";
 import { Icon } from "@/components/ui/Icon";
 import { MoreSheet } from "@/components/ui/MoreSheet";
 
@@ -82,6 +83,57 @@ function NavItemWithFlyout({
             {item.label}
           </NavLink>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// A single icon in the collapsed rail. Icon-only items get a native `title`
+// tooltip; items with sub-links get the same hover flyout as the expanded nav
+// (with a label header, since the icon alone carries no text). Honors the same
+// redundant-single-item collapse rule as NavItemWithFlyout.
+function RailItem({
+  href,
+  icon,
+  label,
+  hue,
+  exact,
+  items,
+  scroll,
+}: {
+  href: string;
+  icon: IconName;
+  label: string;
+  hue: string;
+  exact?: boolean;
+  items?: { label: string; href: string }[];
+  scroll?: boolean;
+}) {
+  const showFlyout =
+    !!items && (items.length > 1 || (items.length === 1 && items[0].href !== href));
+  if (!showFlyout) {
+    return (
+      <NavLink href={href} exact={exact} className="rail-i" aria-label={label} title={label} style={grp(hue)}>
+        <Icon name={icon} className="ic" />
+      </NavLink>
+    );
+  }
+  const links = items!.map((item) => (
+    <NavLink key={item.href} href={item.href} className="fly-link" role="menuitem">
+      {item.label}
+    </NavLink>
+  ));
+  return (
+    <div className="rail-i-wrap" style={grp(hue)}>
+      <NavLink href={href} exact={exact} className="rail-i" aria-label={label} title={label} aria-haspopup="true">
+        <Icon name={icon} className="ic" />
+      </NavLink>
+      <div className="rail-fly" role="menu">
+        <div className="fly-head">
+          <Icon name={icon} className="ic" />
+          {label}
+        </div>
+        {scroll ? <div className="fly-scroll">{links}</div> : links}
       </div>
     </div>
   );
@@ -284,7 +336,83 @@ export async function SiteNav() {
             Sign in
           </Link>
         )}
+        <SidebarToggle variant="collapse" />
       </div>
+      </nav>
+
+      {/* Collapsed icon rail — sibling of .sb; CSS shows exactly one of the two
+          based on <html data-nav>. Same role gates and same redundant-flyout
+          rule as the expanded nav, just icon-only with hover flyouts. Hidden on
+          mobile (the tab bar wins there). */}
+      <nav className="rail" aria-label="Primary (collapsed)">
+        <span className="badge-1741" aria-hidden="true">1741</span>
+
+        {/* Overview */}
+        <RailItem href="/" exact icon="home" label="Home" hue="--hue-overview" />
+        <RailItem href="/leaderboard" icon="chart" label="Leaderboard" hue="--hue-overview" />
+
+        {showShopFloor && <div className="rail-sep" />}
+        {(isMentor || kioskRegistered) && (
+          <RailItem href="/kiosk" icon="tablet" label="Kiosk" hue="--hue-shopfloor" />
+        )}
+        {isStudent && <RailItem href="/shop" icon="wrench" label="Shop" hue="--hue-shopfloor" />}
+
+        {showTeam && <div className="rail-sep" />}
+        {isMentor && (
+          <RailItem href="/people" icon="users" label="People" hue="--hue-team" items={peopleItems} />
+        )}
+        {isStudent && <RailItem href="/teams" icon="layers" label="Teams" hue="--hue-team" />}
+        {isStudent && (
+          <RailItem href="/events" icon="calendar" label="Events" hue="--hue-team" items={eventsItems} />
+        )}
+
+        {isMentor && <div className="rail-sep" />}
+        {isMentor && (
+          <RailItem
+            href="/admin"
+            icon="sliders"
+            label="Admin"
+            hue="--hue-admin"
+            items={adminItems}
+            scroll
+          />
+        )}
+
+        <div className="rail-foot">
+          <SidebarToggle variant="expand" />
+          {viewer.person ? (
+            <>
+              <Link
+                href={`/people/${viewer.person.id}`}
+                className="rail-i"
+                aria-label={`${viewer.person.firstName} ${viewer.person.lastName} · ${viewer.role}`}
+                title={`${viewer.person.firstName} ${viewer.person.lastName} · ${viewer.role}`}
+              >
+                <span
+                  className="grid h-[27px] w-[27px] flex-none place-items-center rounded-full text-[12px] font-bold text-white"
+                  style={{ background: "var(--steel)" }}
+                  aria-hidden="true"
+                >
+                  {initials}
+                </span>
+              </Link>
+              <form action="/api/auth/logout" method="post">
+                <button
+                  type="submit"
+                  className="rail-i cursor-pointer border-0 bg-transparent"
+                  aria-label="Sign out"
+                  title="Sign out"
+                >
+                  <Icon name="x" className="ic" />
+                </button>
+              </form>
+            </>
+          ) : (
+            <Link href="/login" className="rail-i" aria-label="Sign in" title="Sign in">
+              <Icon name="chevron" className="ic" />
+            </Link>
+          )}
+        </div>
       </nav>
 
       {/* Mobile bottom tab bar — sibling of .sb; CSS shows one or the other by
