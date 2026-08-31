@@ -178,8 +178,9 @@ describe("listEventRoster", () => {
             select: () => ({
               eq: async () => ({
                 data: [
-                  { person_id: "p1", person: { id: "p1", first_name: "Ann", last_name: "A", display_name: null, role: "student" } },
-                  { person_id: "p2", person: { id: "p2", first_name: "Bo", last_name: "B", display_name: null, role: "mentor" } },
+                  // p1 is linked and invited; p2 is unlinked (no slack_user_id) and never invited
+                  { person_id: "p1", slack_invited_at: "2026-01-01T00:00:00Z", person: { id: "p1", first_name: "Ann", last_name: "A", display_name: null, role: "student", slack_user_id: "U1" } },
+                  { person_id: "p2", slack_invited_at: null, person: { id: "p2", first_name: "Bo", last_name: "B", display_name: null, role: "mentor", slack_user_id: null } },
                 ],
                 error: null,
               }),
@@ -193,8 +194,8 @@ describe("listEventRoster", () => {
                 eq: async () => ({
                   data: [
                     // p1 signed up AND checked in; p3 checked in without signing up (manual add)
-                    { id: "s1", person_id: "p1", person: { id: "p1", first_name: "Ann", last_name: "A", display_name: null, role: "student" } },
-                    { id: "s2", person_id: "p3", person: { id: "p3", first_name: "Cy", last_name: "C", display_name: null, role: "student" } },
+                    { id: "s1", person_id: "p1", person: { id: "p1", first_name: "Ann", last_name: "A", display_name: null, role: "student", slack_user_id: "U1" } },
+                    { id: "s2", person_id: "p3", person: { id: "p3", first_name: "Cy", last_name: "C", display_name: null, role: "student", slack_user_id: null } },
                   ],
                   error: null,
                 }),
@@ -209,9 +210,9 @@ describe("listEventRoster", () => {
 
   test("merges signups and check-ins, sorted by name", async () => {
     expect(await listEventRoster("e1", fakeDb())).toEqual([
-      { personId: "p1", name: "Ann A", role: "student", signedUp: true, checkedIn: true, sessionId: "s1" },
-      { personId: "p2", name: "Bo B", role: "mentor", signedUp: true, checkedIn: false, sessionId: null },
-      { personId: "p3", name: "Cy C", role: "student", signedUp: false, checkedIn: true, sessionId: "s2" },
+      { personId: "p1", name: "Ann A", role: "student", signedUp: true, checkedIn: true, sessionId: "s1", slackLinked: true, slackInvitedAt: "2026-01-01T00:00:00Z" },
+      { personId: "p2", name: "Bo B", role: "mentor", signedUp: true, checkedIn: false, sessionId: null, slackLinked: false, slackInvitedAt: null },
+      { personId: "p3", name: "Cy C", role: "student", signedUp: false, checkedIn: true, sessionId: "s2", slackLinked: false, slackInvitedAt: null },
     ]);
   });
 });

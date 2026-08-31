@@ -52,7 +52,14 @@ export async function cancelEventSignup(
   return { ok: true, status: 200 };
 }
 
-type PersonLite = { id: string; first_name: string; last_name: string; display_name: string | null; role: string };
+type PersonLite = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  display_name: string | null;
+  role: string;
+  slack_user_id?: string | null;
+};
 
 export type RosterEntry = {
   personId: string;
@@ -61,6 +68,8 @@ export type RosterEntry = {
   signedUp: boolean;
   checkedIn: boolean;
   sessionId: string | null;
+  slackLinked: boolean;
+  slackInvitedAt: string | null;
 };
 
 /**
@@ -73,8 +82,11 @@ export type RosterEntry = {
 export async function listEventRoster(eventId: string, db?: SupabaseClient): Promise<RosterEntry[]> {
   const client = db ?? (await import("./db")).getDb();
   const [{ data: signups, error: signupError }, { data: sessions, error: sessionError }] = await Promise.all([
-    client.from("event_signup").select("person_id, person(id, first_name, last_name, display_name, role)").eq("event_id", eventId),
-    client.from("session").select("id, person_id, person!person_id(id, first_name, last_name, display_name, role)").eq("event_id", eventId).eq("source", "event"),
+    client
+      .from("event_signup")
+      .select("person_id, slack_invited_at, person(id, first_name, last_name, display_name, role, slack_user_id)")
+      .eq("event_id", eventId),
+    client.from("session").select("id, person_id, person!person_id(id, first_name, last_name, display_name, role, slack_user_id)").eq("event_id", eventId).eq("source", "event"),
   ]);
   if (signupError) console.error("listEventRoster: signup query failed", signupError);
   if (sessionError) console.error("listEventRoster: session query failed", sessionError);
@@ -83,7 +95,16 @@ export async function listEventRoster(eventId: string, db?: SupabaseClient): Pro
   for (const s of signups ?? []) {
     if (!s.person) continue;
     const p = s.person as unknown as PersonLite;
-    entries.set(p.id, { personId: p.id, name: displayName(p), role: p.role, signedUp: true, checkedIn: false, sessionId: null });
+    entries.set(p.id, {
+      personId: p.id,
+      name: displayName(p),
+      role: p.role,
+      signedUp: true,
+      checkedIn: false,
+      sessionId: null,
+      slackLinked: !!p.slack_user_id,
+      slackInvitedAt: (s.slack_invited_at as string | null) ?? null,
+    });
   }
   for (const s of sessions ?? []) {
     if (!s.person) continue;
@@ -93,7 +114,16 @@ export async function listEventRoster(eventId: string, db?: SupabaseClient): Pro
       existing.checkedIn = true;
       existing.sessionId = s.id as string;
     } else {
-      entries.set(p.id, { personId: p.id, name: displayName(p), role: p.role, signedUp: false, checkedIn: true, sessionId: s.id as string });
+      entries.set(p.id, {
+        personId: p.id,
+        name: displayName(p),
+        role: p.role,
+        signedUp: false,
+        checkedIn: true,
+        sessionId: s.id as string,
+        slackLinked: !!p.slack_user_id,
+        slackInvitedAt: null,
+      });
     }
   }
   return [...entries.values()].sort((a, b) => a.name.localeCompare(b.name));
