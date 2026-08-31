@@ -37,7 +37,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Discarding work still requires the user's explicit typed `discard` — that path is unchanged.
 - **`master` auto-deploys to production** (Vercel, on every push). Merging a PR is a production
   deploy.
-- Schema changes reach prod via `supabase db push` of the committed migration — see
+- Schema changes auto-apply to prod on merge to `master` via the **Supabase GitHub integration**
+  (the "Supabase Preview" check on PRs) — no manual `supabase db push`. See
   [Database & migrations](#database--migrations) below.
 
 ## Running commands
@@ -88,12 +89,17 @@ Google OAuth.
 
 - Every schema change is a committed migration file under `supabase/migrations/`, replayed
   verbatim to every environment. Never hand-run ad-hoc SQL for a schema change.
-- **Never edit an already-applied migration in place.** `supabase db push` tracks by version
+- **Schema changes deploy automatically:** merging a PR to `master` triggers the Supabase GitHub
+  integration to apply any new migrations to the prod database (the "Supabase Preview" check on
+  PRs is that integration). You do **not** run `supabase db push` by hand — merging is the deploy.
+  (The one-time `db push` in `docs/setup/deploy.md` is the initial project bootstrap only.)
+- **Never edit an already-applied migration in place.** The migration history tracks by version
   (timestamp), not content, so an edit to an applied file is silently skipped. A correction is
   always a NEW migration file.
 - Don't apply repo migrations with the Supabase MCP `apply_migration` tool — it stamps its own
-  version and drifts prod's history from the committed files. Use `supabase db push`.
-  (`apply_migration` is only for genuinely one-off prod-only SQL that will never be a repo file.)
+  version and drifts prod's history from the committed files. Just commit the migration and let
+  the merge deploy it. (`apply_migration` is only for genuinely one-off prod-only SQL that will
+  never be a repo file.)
 - Tables use RLS with **zero policies** (service-role-only by design). Don't add policies or try
   to "fix" the `rls_enabled_no_policy` advisories — they're expected. A new table needs a
   service_role GRANT migration, or every query 42501s on a fresh DB.
