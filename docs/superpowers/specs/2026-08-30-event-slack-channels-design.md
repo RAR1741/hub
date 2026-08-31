@@ -268,7 +268,7 @@ no-ops (same failure mode as first-sync — see memory/dev-notes).
 | Case | Behavior |
 | --- | --- |
 | Rename while channel archived | `afterEventUpdated`/sweep skip archived channels outright (`slack_archived_at` set); a raced `is_archived` API error is logged and skipped. Stored name may go stale on an archived channel — harmless. |
-| Event deleted | Best-effort archive first (§4); failure logs and proceeds with delete (orphaned live channel is the cost of a Slack outage at delete time — rare, manually archivable). |
+| Event deleted | Delete succeeds first, then best-effort archive (§4); archive failure logs and is otherwise ignored (orphaned live channel is the cost of a Slack outage at delete time — rare, manually archivable). |
 | Duplicate event names / next season's recurring event vs archived `e-kickoff` | `name_taken` → deterministic uuid suffix (§2). Expected flow. |
 | Signup after event ended | Can't happen — 409 upstream (`src/lib/event-signups.ts:16`). |
 | Person left the channel, still signed up | `slack_invited_at` already set ⇒ sweep won't re-invite. Public channel ⇒ they can rejoin. Deliberate: leaving is a user choice we don't fight. |

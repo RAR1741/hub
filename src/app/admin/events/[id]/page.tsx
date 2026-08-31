@@ -100,7 +100,7 @@ export default async function EventRosterPage({
                 <tr key={r.personId}>
                   <td>
                     {r.name}
-                    {hasSlackChannel && (!r.slackLinked || !r.slackInvitedAt) && (
+                    {hasSlackChannel && r.signedUp && (!r.slackLinked || !r.slackInvitedAt) && (
                       <span className="pill error" style={{ marginLeft: 6 }}>not in Slack channel</span>
                     )}
                   </td>

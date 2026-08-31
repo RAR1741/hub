@@ -322,6 +322,39 @@ describe("afterEventCreated", () => {
 
     expect(requests.some((r) => r.url.includes("conversations.invite"))).toBe(false);
   });
+
+  test("persist failure archives the just-created channel and skips invite/post", async () => {
+    const { fetchFn, requests } = fakeFetch([
+      { status: 200, body: { ok: true, channel: { id: "C1" } } }, // conversations.create
+      { status: 200, body: { ok: true } }, // conversations.archive (cleanup)
+    ]);
+    const db = makeDb([{ error: { message: "db down" } }]); // event update fails
+
+    await afterEventCreated(
+      { db: db as never, slack: fakeSlackDeps(fetchFn) },
+      { id: EVENT_ID, name: "Kickoff", createdBy: "creator-1", startsAt: "2026-09-01T00:00:00Z", endsAt: "2026-09-01T02:00:00Z", location: null },
+    );
+
+    expect(db.calls).toEqual(["event"]);
+    expect(requests).toHaveLength(2);
+    expect(requests[1].url).toContain("conversations.archive");
+  });
+
+  test("person lookup error: skips invite, still posts kickoff message", async () => {
+    const { fetchFn, requests } = fakeFetch([
+      { status: 200, body: { ok: true, channel: { id: "C1" } } }, // conversations.create
+      { status: 200, body: { ok: true } }, // chat.postMessage
+    ]);
+    const db = makeDb([{ error: null }, { data: null, error: { message: "lookup failed" } }]);
+
+    await afterEventCreated(
+      { db: db as never, slack: fakeSlackDeps(fetchFn) },
+      { id: EVENT_ID, name: "Kickoff", createdBy: "creator-1", startsAt: "2026-09-01T00:00:00Z", endsAt: "2026-09-01T02:00:00Z", location: null },
+    );
+
+    expect(requests.some((r) => r.url.includes("conversations.invite"))).toBe(false);
+    expect(requests.some((r) => r.url.includes("chat.postMessage"))).toBe(true);
+  });
 });
 
 describe("afterEventUpdated", () => {
@@ -397,6 +430,14 @@ describe("afterEventSignup", () => {
     await afterEventSignup({ db: db as never, slack: fakeSlackDeps(fetchFn) }, { id: EVENT_ID, slackChannelId: null, slackArchivedAt: null }, "person-1");
     expect(requests).toHaveLength(0);
     expect(db.calls).toEqual([]);
+  });
+
+  test("person lookup error: no-op, no invite call", async () => {
+    const { fetchFn, requests } = fakeFetch();
+    const db = makeDb([{ data: null, error: { message: "lookup failed" } }]);
+    await afterEventSignup({ db: db as never, slack: fakeSlackDeps(fetchFn) }, { id: EVENT_ID, slackChannelId: "C1", slackArchivedAt: null }, "person-1");
+    expect(requests).toHaveLength(0);
+    expect(db.calls).toEqual(["person"]);
   });
 });
 

@@ -189,13 +189,26 @@ export async function afterEventCreated(deps: { db: SupabaseClient; slack?: Slac
       .eq("id", ev.id);
     if (error) {
       console.error("afterEventCreated: persisting channel id/name failed:", error);
+      // The channel now exists in Slack but the DB never learned its id, so the
+      // nightly sweep can never find it to archive later. Best-effort clean it
+      // up now rather than leak a live untracked channel.
+      try {
+        await archiveChannel(slack, channel.id);
+      } catch (e) {
+        console.error("afterEventCreated: cleanup archive threw:", e);
+      }
       return;
     }
-    const { data: creator } = await deps.db.from("person").select("slack_user_id").eq("id", ev.createdBy).maybeSingle();
-    const creatorSlackId = (creator as { slack_user_id?: string | null } | null)?.slack_user_id ?? null;
-    if (creatorSlackId) await inviteToChannel(slack, channel.id, [creatorSlackId]);
+    const { data: creator, error: creatorError } = await deps.db.from("person").select("slack_user_id").eq("id", ev.createdBy).maybeSingle();
+    if (creatorError) {
+      console.error("afterEventCreated: person lookup failed:", creatorError);
+    } else {
+      const creatorSlackId = (creator as { slack_user_id?: string | null } | null)?.slack_user_id ?? null;
+      if (creatorSlackId) await inviteToChannel(slack, channel.id, [creatorSlackId]);
+    }
     const where = ev.location ? ` at ${ev.location}` : "";
-    await postToEventChannel(slack, channel.id, `:tada: *${ev.name}* — ${ev.startsAt} to ${ev.endsAt}${where}`);
+    const when = `${new Date(ev.startsAt).toLocaleString()} – ${new Date(ev.endsAt).toLocaleString()}`;
+    await postToEventChannel(slack, channel.id, `:tada: *${ev.name}* — ${when}${where}`);
   } catch (e) {
     console.error("afterEventCreated threw:", e);
   }
@@ -232,7 +245,11 @@ export async function afterEventSignup(deps: { db: SupabaseClient; slack?: Slack
   if (!ev.slackChannelId || ev.slackArchivedAt) return;
   const slack = deps.slack ?? slackDepsFromEnv();
   try {
-    const { data: person } = await deps.db.from("person").select("slack_user_id").eq("id", personId).maybeSingle();
+    const { data: person, error: personError } = await deps.db.from("person").select("slack_user_id").eq("id", personId).maybeSingle();
+    if (personError) {
+      console.error("afterEventSignup: person lookup failed:", personError);
+      return;
+    }
     const slackUserId = (person as { slack_user_id?: string | null } | null)?.slack_user_id ?? null;
     if (!slackUserId) return;
     const ok = await inviteToChannel(slack, ev.slackChannelId, [slackUserId]);
