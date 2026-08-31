@@ -53,28 +53,6 @@
   --hue-admin: #7C3AED;
 
   --shadow: 0 1px 2px rgba(20, 16, 14, 0.04), 0 6px 20px -10px rgba(20, 16, 14, 0.14);
-
-  /* legacy token aliases — existing pages reference these; re-pointed at the
-     tokens above so every screen picks up the new palette immediately, even
-     before it's individually restyled. */
-  --color-canvas: var(--canvas);
-  --color-surface: var(--surface);
-  --color-border: var(--hair);
-  --color-fg: var(--ink);
-  --color-muted: var(--muted);
-  --color-muted-fg: var(--muted);
-  --color-brand: var(--red);
-  --color-brand-hover: var(--red-press);
-  --color-brand-active: var(--red-press);
-  --color-brand-fg: var(--red-fg);
-  --color-present: var(--present);
-  --color-present-fg: var(--present-fg);
-  --color-excused: var(--excused);
-  --color-excused-fg: var(--excused-fg);
-  --color-optional: var(--optional);
-  --color-optional-fg: var(--optional-fg);
-  --color-absent: var(--absent);
-  --color-absent-fg: var(--absent-fg);
 }
 
 @media (prefers-color-scheme: dark) {

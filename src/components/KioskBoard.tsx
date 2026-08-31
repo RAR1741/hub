@@ -36,7 +36,7 @@ export function KioskSetupForm() {
         Register this tablet
       </button>
       {status && (
-        <p role="alert" className="text-sm font-medium text-[var(--color-absent)]">
+        <p role="alert" className="text-sm font-medium text-[var(--absent)]">
           {status}
         </p>
       )}

@@ -120,10 +120,10 @@ export function PersonForm({
       <label className="label">Zip <input className="input" value={values.zip} onChange={(e) => set("zip", e.target.value)} /></label>
       <label className="label">Ethnicity <input className="input" value={values.ethnicity} onChange={(e) => set("ethnicity", e.target.value)} /></label>
       <label className="label">Race <input className="input" value={values.race} onChange={(e) => set("race", e.target.value)} /></label>
-      <label className="label">Interests <span className="text-xs text-[var(--color-muted-fg)]">(comma-separated)</span> <input className="input" value={values.interests} onChange={(e) => set("interests", e.target.value)} /></label>
-      <label className="flex items-center gap-2 text-sm font-medium text-[var(--color-muted-fg)]">Active <input type="checkbox" checked={values.isActive} onChange={(e) => set("isActive", e.target.checked)} /></label>
+      <label className="label">Interests <span className="text-xs text-[var(--muted)]">(comma-separated)</span> <input className="input" value={values.interests} onChange={(e) => set("interests", e.target.value)} /></label>
+      <label className="flex items-center gap-2 text-sm font-medium text-[var(--muted)]">Active <input type="checkbox" checked={values.isActive} onChange={(e) => set("isActive", e.target.checked)} /></label>
       <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? "Saving…" : personId ? "Save changes" : "Create person"}</button>
-      {status && <p role="status" className="text-sm text-[var(--color-muted-fg)]">{status}</p>}
+      {status && <p role="status" className="text-sm text-[var(--muted)]">{status}</p>}
     </form>
   );
 }

@@ -18,9 +18,9 @@ export default async function KioskPage() {
         <div className="hazard w-full max-w-md rounded-t-xl" />
         <div className="card w-full max-w-md">
           <h1 className="text-3xl font-bold tracking-tight">Kiosk</h1>
-          <p className="mt-3 text-lg text-[var(--color-muted-fg)]">
+          <p className="mt-3 text-lg text-[var(--muted)]">
             This tablet isn&apos;t registered.{" "}
-            <Link href="/kiosk/setup" className="font-semibold text-[var(--color-brand)]">
+            <Link href="/kiosk/setup" className="font-semibold text-[var(--red)]">
               Set it up
             </Link>
             .

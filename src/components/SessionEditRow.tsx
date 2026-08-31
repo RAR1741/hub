@@ -77,7 +77,7 @@ export function SessionEditRow({
       <td className="flex items-center gap-2">
         <Button variant="primary" className="px-3 py-1" onClick={save} pending={busy} pendingLabel="Saving…">Save</Button>
         <Button variant="danger" className="px-3 py-1" onClick={remove} pending={busy} pendingLabel="Deleting…">Delete</Button>
-        {status && <span role="status" className="text-sm text-[var(--color-muted-fg)]"> {status}</span>}
+        {status && <span role="status" className="text-sm text-[var(--muted)]"> {status}</span>}
       </td>
     </tr>
   );

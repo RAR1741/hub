@@ -46,7 +46,7 @@ export function CronJobsEditor({ jobs }: { jobs: CronJob[] }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-[13px] text-[var(--color-muted-fg)]">
+      <p className="text-[13px] text-[var(--muted)]">
         Schedules run in UTC, using standard 5-field cron syntax (minute hour day month weekday).
       </p>
       <div className="flex flex-col gap-4">
@@ -75,7 +75,7 @@ export function CronJobsEditor({ jobs }: { jobs: CronJob[] }) {
                   {row.busy ? "Saving…" : "Save"}
                 </button>
               </div>
-              {row.status && <p role="status" className="text-sm text-[var(--color-muted-fg)]">{row.status}</p>}
+              {row.status && <p role="status" className="text-sm text-[var(--muted)]">{row.status}</p>}
               {row.error && <p role="status" className="text-sm text-[var(--red)]">{row.error}</p>}
             </div>
           );

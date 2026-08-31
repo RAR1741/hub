@@ -81,12 +81,12 @@ export function BadgeForm({
           ))}
         </select>
       </label>
-      <label className="flex items-center gap-2 text-sm font-medium text-[var(--color-muted-fg)]">
+      <label className="flex items-center gap-2 text-sm font-medium text-[var(--muted)]">
         <input type="checkbox" checked={values.allowSelfAward} onChange={(e) => setValues({ ...values, allowSelfAward: e.target.checked })} />
         Allow self-award
       </label>
       <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? "Saving…" : badgeId ? "Save changes" : "Create badge"}</button>
-      {status && <p role="status" className="text-sm text-[var(--color-muted-fg)]">{status}</p>}
+      {status && <p role="status" className="text-sm text-[var(--muted)]">{status}</p>}
     </form>
   );
 }

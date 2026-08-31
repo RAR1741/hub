@@ -33,7 +33,7 @@ export default async function AdminBadgesPage() {
       <section className="card flex flex-col gap-3">
         <h2 className="text-base font-semibold">All badges</h2>
         {badges.length === 0 ? (
-          <p className="text-sm text-[var(--color-muted-fg)]">No badges yet — create the first one above.</p>
+          <p className="text-sm text-[var(--muted)]">No badges yet — create the first one above.</p>
         ) : (
           <ul className="flex flex-col gap-2">
             {badges.map((b) => (

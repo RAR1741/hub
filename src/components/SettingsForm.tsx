@@ -46,7 +46,7 @@ export function SettingsForm({ initial }: { initial: SettingsValues }) {
         <input className="input" value={values.gcalCalendarId}
           onChange={(e) => setValues({ ...values, gcalCalendarId: e.target.value })} />
       </label>
-      <label className="flex items-center gap-2 text-sm font-medium text-[var(--color-muted-fg)]">
+      <label className="flex items-center gap-2 text-sm font-medium text-[var(--muted)]">
         <input type="checkbox" checked={values.autoCloseEnabled}
           onChange={(e) => setValues({ ...values, autoCloseEnabled: e.target.checked })} />
         Auto-close stale open sessions overnight
@@ -66,7 +66,7 @@ export function SettingsForm({ initial }: { initial: SettingsValues }) {
           onChange={(e) => setValues({ ...values, seasonHoursGoal: Number(e.target.value) })} required />
       </label>
       <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? "Saving…" : "Save settings"}</button>
-      {status && <p role="status" className="text-sm text-[var(--color-muted-fg)]">{status}</p>}
+      {status && <p role="status" className="text-sm text-[var(--muted)]">{status}</p>}
     </form>
   );
 }

@@ -42,9 +42,9 @@ export function MemberManager({
     <section className="flex flex-col gap-4">
       <h2 className="text-xl font-semibold">Members ({members.length})</h2>
       {members.length === 0 ? (
-        <p className="text-sm text-[var(--color-muted-fg)]">No members yet — add one below.</p>
+        <p className="text-sm text-[var(--muted)]">No members yet — add one below.</p>
       ) : (
-        <ul className="flex flex-col divide-y divide-[var(--color-border)]">
+        <ul className="flex flex-col divide-y divide-[var(--hair)]">
           {members.map((m) => (
             <li key={m.personId} className="flex items-center justify-between gap-3 py-2 text-sm">
               <span>
@@ -92,7 +92,7 @@ export function MemberManager({
           Add
         </Button>
       </div>
-      {status && <p role="status" className="text-sm text-[var(--color-muted-fg)]">{status}</p>}
+      {status && <p role="status" className="text-sm text-[var(--muted)]">{status}</p>}
     </section>
   );
 }

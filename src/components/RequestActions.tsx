@@ -47,7 +47,7 @@ export function AccountRequestActions({ requestId }: { requestId: string }) {
         Approve
       </Button>
       <Button variant="secondary" className="px-3 py-1" disabled={busy} onClick={() => act({ action: "deny" })}>Deny</Button>
-      {status && <span role="status" className="text-sm text-[var(--color-muted-fg)]"> {status}</span>}
+      {status && <span role="status" className="text-sm text-[var(--muted)]"> {status}</span>}
     </span>
   );
 }
@@ -77,7 +77,7 @@ export function ApplicationActions({ applicationId }: { applicationId: string })
     <span className="inline-flex flex-wrap items-center gap-2">
       <Button variant="primary" className="px-3 py-1" onClick={() => act("approve")} pending={busy} pendingLabel="Working…">Approve</Button>
       <Button variant="secondary" className="px-3 py-1" disabled={busy} onClick={() => act("deny")}>Deny</Button>
-      {status && <span role="status" className="text-sm text-[var(--color-muted-fg)]"> {status}</span>}
+      {status && <span role="status" className="text-sm text-[var(--muted)]"> {status}</span>}
     </span>
   );
 }
@@ -107,7 +107,7 @@ export function ExcusalRequestActions({ requestId }: { requestId: string }) {
     <span className="inline-flex flex-wrap items-center gap-2">
       <Button variant="primary" className="px-3 py-1" onClick={() => act("approve")} pending={busy} pendingLabel="Working…">Approve</Button>
       <Button variant="secondary" className="px-3 py-1" disabled={busy} onClick={() => act("deny")}>Deny</Button>
-      {status && <span role="status" className="text-sm text-[var(--color-muted-fg)]"> {status}</span>}
+      {status && <span role="status" className="text-sm text-[var(--muted)]"> {status}</span>}
     </span>
   );
 }

@@ -35,7 +35,7 @@ export function WhosHere({ initial }: { initial: Entry[] }) {
       </div>
       <div role="status">
         {here.length === 0 ? (
-          <p className="p-4 text-sm text-[var(--color-muted-fg)]">Nobody is signed in.</p>
+          <p className="p-4 text-sm text-[var(--muted)]">Nobody is signed in.</p>
         ) : (
           here.map((h, i) => (
             <div key={`${h.name}-${h.since}`} className="pit-row">

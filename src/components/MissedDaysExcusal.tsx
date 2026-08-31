@@ -26,7 +26,7 @@ export function MissedDaysExcusal({
             ) : (
               <button
                 type="button"
-                className="text-sm font-medium text-[var(--color-brand)]"
+                className="text-sm font-medium text-[var(--red)]"
                 onClick={() => setSelectedDate(date)}
               >
                 Request excusal

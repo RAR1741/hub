@@ -49,7 +49,7 @@ export function PeriodForm({
       <label className="label">Starts <input className="input" type="date" value={values.startsOn} onChange={(e) => setValues({ ...values, startsOn: e.target.value })} required /></label>
       <label className="label">Ends <input className="input" type="date" value={values.endsOn} onChange={(e) => setValues({ ...values, endsOn: e.target.value })} required /></label>
       <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? "Saving…" : periodId ? "Save changes" : "Create period"}</button>
-      {status && <p role="status" className="text-sm text-[var(--color-muted-fg)]">{status}</p>}
+      {status && <p role="status" className="text-sm text-[var(--muted)]">{status}</p>}
     </form>
   );
 }

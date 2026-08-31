@@ -67,26 +67,26 @@ export default async function HomePage() {
         <>
           <div className="card flex flex-wrap items-center justify-between gap-4">
             <div>
-              <p className="text-[var(--color-muted-fg)]">
+              <p className="text-[var(--muted)]">
                 Signed in as{" "}
-                <span className="font-medium text-[var(--color-fg)]">
+                <span className="font-medium text-[var(--ink)]">
                   {viewer.person.firstName} {viewer.person.lastName}
                 </span>{" "}
                 ({viewer.role})
               </p>
               <nav aria-label="Quick links" className="mt-3 flex flex-wrap gap-4">
                 {hasRole(viewer.role, "mentor") && (
-                  <Link href="/people" className="text-sm font-medium text-[var(--color-brand)]">
+                  <Link href="/people" className="text-sm font-medium text-[var(--red)]">
                     People
                   </Link>
                 )}
-                <Link href="/teams" className="text-sm font-medium text-[var(--color-brand)]">
+                <Link href="/teams" className="text-sm font-medium text-[var(--red)]">
                   Teams
                 </Link>
-                <Link href={`/people/${viewer.person.id}`} className="text-sm font-medium text-[var(--color-brand)]">
+                <Link href={`/people/${viewer.person.id}`} className="text-sm font-medium text-[var(--red)]">
                   My profile
                 </Link>
-                <Link href="/me/attendance" className="text-sm font-medium text-[var(--color-brand)]">
+                <Link href="/me/attendance" className="text-sm font-medium text-[var(--red)]">
                   My attendance
                 </Link>
               </nav>
@@ -118,9 +118,9 @@ export default async function HomePage() {
           </div>
         </>
       ) : (
-        <p className="card text-[var(--color-muted-fg)]">
+        <p className="card text-[var(--muted)]">
           Browsing as guest.{" "}
-          <Link href="/login" className="font-medium text-[var(--color-brand)]">
+          <Link href="/login" className="font-medium text-[var(--red)]">
             Sign in
           </Link>
         </p>
@@ -132,7 +132,7 @@ export default async function HomePage() {
           <span className="count">{upcoming.length}</span>
         </div>
         {upcoming.length === 0 ? (
-          <p className="p-4 text-sm text-[var(--color-muted-fg)]">
+          <p className="p-4 text-sm text-[var(--muted)]">
             No upcoming meetings scheduled.
           </p>
         ) : (
