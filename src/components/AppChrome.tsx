@@ -4,30 +4,49 @@ import { usePathname } from "next/navigation";
 import { ActivityIndicator } from "@/components/ActivityIndicator";
 
 /**
- * Hides the global hub chrome (nav, masquerade banner) on the /onshape panel
- * routes — that panel is a ~350px iframe embedded in Onshape and must render
- * clean. `usePathname()` is SSR-consistent in the App Router, so server and
- * client agree on the omission and there's no hydration mismatch.
+ * App shell: grouped left sidebar beside the main content column. The /onshape
+ * panel routes render clean (no sidebar, no banner) — that panel is a ~350px
+ * iframe embedded in Onshape. `usePathname()` is SSR-consistent in the App
+ * Router, so server and client agree on the omission (no hydration mismatch).
+ *
+ * `sidebar` and `banner` are passed as props (rendered on the server) so the
+ * async server components (SiteNav, MasqueradeBanner) compose into this client
+ * shell without becoming client components themselves.
  */
-export function AppChrome({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  if (pathname === "/onshape" || pathname?.startsWith("/onshape/")) return null;
-  return (
-    <>
-      {children}
-      <ActivityIndicator />
-    </>
-  );
-}
-
-/** Same panel-route check for the `#main` content wrapper — the onshape
- * panel wants full narrow width, not the hub's centered max-width column. */
-export function MainWrapper({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  sidebar,
+  banner,
+  children,
+}: {
+  sidebar: React.ReactNode;
+  banner: React.ReactNode;
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
   const isPanel = pathname === "/onshape" || pathname?.startsWith("/onshape/");
+
+  if (isPanel) {
+    // Onshape panel: full narrow width, no hub chrome.
+    return (
+      <div id="main" className="flex flex-1 flex-col">
+        {children}
+      </div>
+    );
+  }
+
   return (
-    <div id="main" className={isPanel ? "flex-1 flex flex-col" : "mx-auto w-full max-w-6xl flex-1 px-4 py-6 flex flex-col"}>
-      {children}
+    <div className="app-shell">
+      {sidebar}
+      <div className="app-main-col">
+        {banner}
+        <div
+          id="main"
+          className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-6"
+        >
+          {children}
+        </div>
+      </div>
+      <ActivityIndicator />
     </div>
   );
 }

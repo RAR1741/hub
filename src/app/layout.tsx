@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { Archivo, Inter, JetBrains_Mono } from "next/font/google";
 import { SiteNav } from "@/components/SiteNav";
 import { MasqueradeBanner } from "@/components/MasqueradeBanner";
-import { AppChrome, MainWrapper } from "@/components/AppChrome";
+import { AppShell } from "@/components/AppChrome";
 import "./globals.css";
 
 const archivo = Archivo({
@@ -69,11 +69,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <a href="#main" className="skip-link">
           Skip to main content
         </a>
-        <AppChrome>
-          <SiteNav />
-          <MasqueradeBanner />
-        </AppChrome>
-        <MainWrapper>{children}</MainWrapper>
+        <AppShell sidebar={<SiteNav />} banner={<MasqueradeBanner />}>
+          {children}
+        </AppShell>
       </body>
     </html>
   );
