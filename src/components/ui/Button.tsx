@@ -16,6 +16,7 @@ export function Button({
   className = "",
   children,
   disabled,
+  type = "button",
   ...rest
 }: {
   variant?: Variant;
@@ -28,7 +29,7 @@ export function Button({
     .filter(Boolean)
     .join(" ");
   return (
-    <button className={cls} disabled={disabled || pending} {...rest}>
+    <button className={cls} type={type} disabled={disabled || pending} {...rest}>
       {pending ? pendingLabel ?? children : children}
     </button>
   );

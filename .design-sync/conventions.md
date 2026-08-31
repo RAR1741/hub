@@ -40,8 +40,8 @@ ships (`Icon`).
   `--grp: var(--hue-*)` per group; descendant rules read `var(--grp, <fallback>)` so one rule
   colors all four groups.
 - `--shadow` (card elevation)
-- Legacy `--color-*` aliases (`--color-brand`, `--color-surface`, …) resolve to
-  the above; prefer the short names in new work.
+- The legacy `--color-*` aliases (`--color-brand`, `--color-surface`, …) have been retired; use
+  the short token names above.
 
 ## Component classes
 

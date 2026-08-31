@@ -1,4 +1,4 @@
-import { cloneElement, isValidElement, useId, type ReactNode } from "react";
+import { Fragment, cloneElement, isValidElement, useId, type ReactNode } from "react";
 
 export function Field({
   label,
@@ -28,14 +28,16 @@ export function Field({
     : children;
 
   return (
-    <label className="label" htmlFor={childId}>
-      {label}
-      {control}
+    <Fragment>
+      <label className="label" htmlFor={childId}>
+        {label}
+        {control}
+      </label>
       {error ? (
         <span id={errorId} role="alert" className="field-error">
           {error}
         </span>
       ) : null}
-    </label>
+    </Fragment>
   );
 }

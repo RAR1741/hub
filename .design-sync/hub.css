@@ -1536,7 +1536,7 @@
   }
   .sbi:hover {
     color: var(--ink);
-    background: var(--sunken);
+    background: var(--surface-2);
     text-decoration: none;
   }
   .sbi .ic {
@@ -1548,7 +1548,7 @@
   }
   .sbi.active {
     color: var(--ink);
-    background: color-mix(in srgb, var(--grp, var(--red)) 10%, var(--sunken));
+    background: color-mix(in srgb, var(--grp, var(--red)) 10%, var(--surface-2));
     font-weight: 600;
   }
   .sbi.active::before {
@@ -1636,7 +1636,7 @@
   }
   .fly-link:hover,
   .fly-link:focus-visible {
-    background: var(--sunken);
+    background: var(--surface-2);
     text-decoration: none;
   }
   .fly-scroll {
@@ -1647,7 +1647,7 @@
     width: 8px;
   }
   .fly-scroll::-webkit-scrollbar-thumb {
-    background: var(--hair-strong);
+    background: var(--hair);
     border-radius: 4px;
   }
 
@@ -1687,7 +1687,7 @@
   }
   .rail-i:hover {
     color: var(--ink);
-    background: var(--sunken);
+    background: var(--surface-2);
   }
   .rail-i .ic {
     width: 16px;
@@ -1700,7 +1700,7 @@
   }
   .rail-i.active {
     color: var(--ink);
-    background: color-mix(in srgb, var(--grp, var(--red)) 10%, var(--sunken));
+    background: color-mix(in srgb, var(--grp, var(--red)) 10%, var(--surface-2));
   }
   .rail-i.active::before {
     content: "";

@@ -271,7 +271,7 @@ export async function SiteNav() {
           sheet below. The sheet's open/close state lives in MoreSheet (a tiny
           client component that closes it on route change — SiteNav itself
           never re-renders on soft nav); all gating below stays server-side. */}
-      <nav className="tabbar" aria-label="Primary" style={{ gridTemplateColumns: `repeat(${tabCount}, 1fr)` }}>
+      <nav className="tabbar" aria-label="Primary (mobile)" style={{ gridTemplateColumns: `repeat(${tabCount}, 1fr)` }}>
         {primaryTabs.map((tab) => (
           <NavLink key={tab.href} href={tab.href} exact={tab.exact} className="tab">
             <Icon name={tab.icon} className="ic" />
