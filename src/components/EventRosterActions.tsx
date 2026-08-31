@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { RosterEntry } from "@/lib/event-signups";
+import { Button } from "@/components/ui";
 
 export function EventRosterActions({ eventId, entry }: { eventId: string; entry: RosterEntry }) {
   const router = useRouter();
@@ -39,13 +40,25 @@ export function EventRosterActions({ eventId, entry }: { eventId: string; entry:
   }
 
   return entry.checkedIn ? (
-    <button disabled={busy} onClick={uncheck} className="btn btn-secondary px-3 py-1">
-      {busy ? "Working…" : "Undo check-in"}
-    </button>
+    <Button
+      variant="secondary"
+      className="px-3 py-1"
+      onClick={uncheck}
+      pending={busy}
+      pendingLabel="Working…"
+    >
+      Undo check-in
+    </Button>
   ) : (
-    <button disabled={busy} onClick={checkIn} className="btn btn-primary px-3 py-1">
-      {busy ? "Working…" : "Check in"}
-    </button>
+    <Button
+      variant="primary"
+      className="px-3 py-1"
+      onClick={checkIn}
+      pending={busy}
+      pendingLabel="Working…"
+    >
+      Check in
+    </Button>
   );
 }
 
@@ -93,9 +106,15 @@ export function ManualAddPerson({
       >
         {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
       </select>
-      <button disabled={busy} onClick={add} className="btn btn-primary px-3 py-1">
-        {busy ? "Working…" : "Add & check in"}
-      </button>
+      <Button
+        variant="primary"
+        className="px-3 py-1"
+        onClick={add}
+        pending={busy}
+        pendingLabel="Working…"
+      >
+        Add & check in
+      </Button>
     </div>
   );
 }

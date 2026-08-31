@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { FieldWithOptions } from "@/lib/forms";
 import type { FormFieldType } from "@/lib/types";
+import { Button } from "@/components/ui";
 
 const FIELD_TYPES: { value: FormFieldType; label: string }[] = [
   { value: "single_select", label: "Single select" },
@@ -77,9 +78,9 @@ export function CreateFormForm() {
         </label>
       )}
       {error && <p className="text-sm text-[var(--red)]">{error}</p>}
-      <button type="submit" disabled={busy} className="btn btn-primary self-start">
-        {busy ? "Creating…" : "Create form"}
-      </button>
+      <Button type="submit" variant="primary" className="self-start" pending={busy} pendingLabel="Creating…">
+        Create form
+      </Button>
     </form>
   );
 }
@@ -127,9 +128,9 @@ export function FormSettingsForm({ formId, title: initialTitle, description: ini
         </select>
       </label>
       {error && <p className="text-sm text-[var(--red)]">{error}</p>}
-      <button type="submit" disabled={busy} className="btn btn-primary self-start">
-        {busy ? "Saving…" : "Save changes"}
-      </button>
+      <Button type="submit" variant="primary" className="self-start" pending={busy} pendingLabel="Saving…">
+        Save changes
+      </Button>
     </form>
   );
 }
@@ -211,7 +212,7 @@ export function FormFieldEditor({ formId, fields }: { formId: string; fields: Fi
                   <td>{f.required ? "Yes" : ""}</td>
                   <td>
                     {f.semanticKey === "attending" ? null : (
-                      <button type="button" className="btn btn-secondary px-3 py-1" onClick={() => removeField(f.id)}>Delete</button>
+                      <Button variant="secondary" className="px-3 py-1" onClick={() => removeField(f.id)}>Delete</Button>
                     )}
                   </td>
                 </tr>
@@ -246,16 +247,16 @@ export function FormFieldEditor({ formId, fields }: { formId: string; fields: Fi
                 <input className="input" placeholder="label" value={o.label} onChange={(e) => updateOption(i, { label: e.target.value })} />
               </div>
             ))}
-            <button type="button" className="btn btn-secondary self-start" onClick={() => setOptions((prev) => [...prev, { value: "", label: "" }])}>
+            <Button variant="secondary" className="self-start" onClick={() => setOptions((prev) => [...prev, { value: "", label: "" }])}>
               Add option
-            </button>
+            </Button>
           </div>
         )}
 
         {error && <p className="text-sm text-[var(--red)]">{error}</p>}
-        <button type="submit" disabled={busy} className="btn btn-primary self-start">
-          {busy ? "Adding…" : "Add field"}
-        </button>
+        <Button type="submit" variant="primary" className="self-start" pending={busy} pendingLabel="Adding…">
+          Add field
+        </Button>
       </form>
     </div>
   );

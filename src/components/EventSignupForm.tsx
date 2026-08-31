@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { FieldWithOptions } from "@/lib/forms";
+import { Button } from "@/components/ui";
 
 type Props = { eventId: string; eventName: string; fields: FieldWithOptions[] };
 
@@ -51,9 +52,9 @@ export function EventSignupForm({ eventId, eventName, fields }: Props) {
 
   return (
     <>
-      <button type="button" className="btn btn-primary px-3 py-1" onClick={() => setOpen(true)}>
+      <Button variant="primary" className="px-3 py-1" onClick={() => setOpen(true)}>
         Sign up
-      </button>
+      </Button>
       {open && (
         <div
           className="modal-backdrop"
@@ -148,12 +149,12 @@ export function EventSignupForm({ eventId, eventName, fields }: Props) {
             ) : null}
 
             <div className="flex justify-end gap-2" style={{ marginTop: "1rem" }}>
-              <button type="button" className="btn btn-secondary" onClick={close} disabled={busy}>
+              <Button variant="secondary" onClick={close} disabled={busy}>
                 Cancel
-              </button>
-              <button className="btn btn-primary" type="submit" disabled={busy}>
-                {busy ? "Submitting…" : "Submit"}
-              </button>
+              </Button>
+              <Button variant="primary" type="submit" pending={busy} pendingLabel="Submitting…">
+                Submit
+              </Button>
             </div>
           </form>
         </div>

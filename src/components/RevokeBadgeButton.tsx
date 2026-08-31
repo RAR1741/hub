@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui";
 
 export function RevokeBadgeButton({
   personId,
@@ -32,9 +33,15 @@ export function RevokeBadgeButton({
 
   return (
     <span className="inline-flex items-center gap-2">
-      <button onClick={revoke} className="btn btn-secondary px-2 py-0.5 text-sm" disabled={busy}>
-        {busy ? "Revoking…" : "Revoke"}
-      </button>
+      <Button
+        variant="secondary"
+        className="px-2 py-0.5 text-sm"
+        onClick={revoke}
+        pending={busy}
+        pendingLabel="Revoking…"
+      >
+        Revoke
+      </Button>
       {status && <span role="status" className="text-sm text-[var(--color-muted-fg)]">{status}</span>}
     </span>
   );
