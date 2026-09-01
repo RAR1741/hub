@@ -307,6 +307,9 @@ describe("afterEventCreated", () => {
     expect(requests).toHaveLength(3);
     expect(requests[1].url).toContain("conversations.invite");
     expect(bodyOf(requests[1]).users).toBe("U-CREATOR");
+    // kickoff message links the events page for sign-ups
+    expect(requests[2].url).toContain("chat.postMessage");
+    expect(bodyOf(requests[2]).text).toContain("<https://hub.redalert1741.org/events|Sign up here!>");
   });
 
   test("unlinked creator: channel still created, no invite call", async () => {

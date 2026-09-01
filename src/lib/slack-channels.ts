@@ -210,7 +210,8 @@ export async function afterEventCreated(deps: { db: SupabaseClient; slack?: Slac
     const teamTz = await getTeamTimezone(deps.db);
     const where = ev.location ? ` at ${ev.location}` : "";
     const when = `${new Date(ev.startsAt).toLocaleString(undefined, { timeZone: teamTz })} – ${new Date(ev.endsAt).toLocaleString(undefined, { timeZone: teamTz })}`;
-    await postToEventChannel(slack, channel.id, `:tada: *${ev.name}* — ${when}${where}`);
+    const signup = `:memo: <https://hub.redalert1741.org/events|Sign up here!>`;
+    await postToEventChannel(slack, channel.id, `:tada: *${ev.name}* — ${when}${where}\n${signup}`);
   } catch (e) {
     console.error("afterEventCreated threw:", e);
   }
