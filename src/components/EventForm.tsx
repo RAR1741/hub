@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { datetimeLocalToInstant, instantToDatetimeLocal } from "@/lib/tz";
 import type { Event, Period } from "@/lib/types";
@@ -24,7 +24,7 @@ export function EventForm({ periods: allPeriods, forms, event, teamTz, onSaved }
   const [candidates, setCandidates] = useState<GcalCandidate[]>([]);
   const [gcalEventId, setGcalEventId] = useState(event?.gcalEventId ?? "");
 
-  useEffect(() => {
+  const loadCandidates = useCallback(() => {
     // Editing a linked event: exclude its OWN claim so the calendar event
     // it's already linked to still shows up as a selectable candidate,
     // instead of being filtered out as "claimed by another event."
@@ -36,6 +36,8 @@ export function EventForm({ periods: allPeriods, forms, event, teamTz, onSaved }
       .then((json) => setCandidates(json.candidates ?? []))
       .catch(() => setCandidates([]));
   }, [event]);
+
+  useEffect(() => loadCandidates(), [loadCandidates]);
 
   function pickCandidate(id: string) {
     setGcalEventId(id);
@@ -79,6 +81,7 @@ export function EventForm({ periods: allPeriods, forms, event, teamTz, onSaved }
           setStartsAt("");
           setEndsAt("");
           setGcalEventId("");
+          loadCandidates(); // drop the just-attached calendar event from the picker
         }
         router.refresh();
         onSaved?.();
