@@ -48,7 +48,7 @@ export default async function EventsPage() {
             return (
               <div key={e.id} className="card flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <div className="font-semibold">{e.name}</div>
+                  <Link href={`/events/${e.id}`} className="font-semibold hover:underline">{e.name}</Link>
                   <div className="sub mono">
                     {new Date(e.startsAt).toLocaleString(undefined, { timeZone: teamTz })} –{" "}
                     {new Date(e.endsAt).toLocaleString(undefined, { timeZone: teamTz })}
