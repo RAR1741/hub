@@ -32,6 +32,9 @@ export default async function EventsPage() {
           <h1>Events</h1>
           <div className="sub">Sign up for upcoming outreach, demos, and training.</div>
         </div>
+        {canEdit && (
+          <Link href="/admin/events" className="btn btn-primary px-3 py-1">New Event</Link>
+        )}
       </div>
 
       {events.length === 0 ? (
