@@ -40,6 +40,88 @@
         ],
         "createdAt": "2026-08-28T04:14:41.695Z",
         "reason": "13px is the established Card hint (text-[13px] text-[var(--muted)]) convention already used throughout src/app/admin/page.tsx; the cron admin page/editor reuse it for consistency."
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "12px",
+        "files": [
+          "src/app/globals.css",
+          "src/components/SiteNav.tsx"
+        ],
+        "createdAt": "2026-08-31T08:42:15.189Z",
+        "reason": "Mission Control sidebar/rail/badge work (#213): the .badge-1741 team-number chip, Field's inline .field-error text, and SiteNav's footer avatar-initials circle reuse the existing 12px small-text step already present elsewhere in globals.css (avatar initials, kiosk labels). Adding 12px to DESIGN.md's documented type ramp is a separate design-system task."
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "13px",
+        "files": [
+          "src/app/globals.css"
+        ],
+        "createdAt": "2026-08-31T08:42:15.245Z",
+        "reason": "Mission Control sidebar nav-item labels (.sbi) and the mobile More-sheet theme row (.sheet-theme) reuse the existing 13px small-text step already used elsewhere in globals.css (e.g. kiosk .k-now, .sid). Documenting 13px on DESIGN.md's ramp is a separate design-system task."
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "12.5px",
+        "files": [
+          "src/app/globals.css"
+        ],
+        "createdAt": "2026-08-31T08:42:15.301Z",
+        "reason": "Mission Control sidebar flyout links (.fly-link) and the collapsed-rail flyout heading (.rail-fly .fly-head) reuse the 12.5px step already established in globals.css (e.g. pit-row sub-labels). Adding 12.5px to DESIGN.md's ramp is a separate design-system task."
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "9.5px",
+        "files": [
+          "src/app/globals.css"
+        ],
+        "createdAt": "2026-08-31T08:42:15.358Z",
+        "reason": "Mission Control sidebar group headers (.sb-group h5), mobile tab labels (.tab), and the More-sheet section headers (.sheet h6) reuse the 9.5px micro-label step already established in globals.css. Documenting 9.5px on DESIGN.md's ramp is a separate design-system task."
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "9px",
+        "files": [
+          "src/app/globals.css"
+        ],
+        "createdAt": "2026-08-31T08:42:15.414Z",
+        "reason": "Mission Control sidebar flyout section title (.fly-title) uses a 9px micro-label, one step below the sidebar's existing 9.5px group headers, for a nested-menu visual hierarchy. Adding 9px to DESIGN.md's ramp is a separate design-system task."
+      },
+      {
+        "rule": "design-system-radius",
+        "value": "2px",
+        "files": [
+          "src/app/globals.css"
+        ],
+        "createdAt": "2026-08-31T08:42:15.472Z",
+        "reason": "Mission Control sidebar/rail active-tick indicators (.sbi.active::before, .rail-i.active::before, .tab.active::before), the sheet drag-handle, and the flyout-arrow corner reuse the existing 2px micro-radius already used elsewhere in globals.css (e.g. status-strip dot). Adding 2px to DESIGN.md's documented radius ramp is a separate design-system task."
+      },
+      {
+        "rule": "design-system-radius",
+        "value": "4px",
+        "files": [
+          "src/app/globals.css"
+        ],
+        "createdAt": "2026-08-31T08:42:15.528Z",
+        "reason": "Mission Control sidebar flyout scrollbar thumb (.fly-scroll::-webkit-scrollbar-thumb) uses a small 4px radius appropriate to its 8px-wide scrollbar track. Adding 4px to DESIGN.md's radius ramp is a separate design-system task."
+      },
+      {
+        "rule": "design-system-radius",
+        "value": "6px",
+        "files": [
+          "src/app/globals.css"
+        ],
+        "createdAt": "2026-08-31T08:42:15.589Z",
+        "reason": "Mission Control sidebar nav items (.sbi, .badge-1741, .fly-link, .rail-i) use a 6px radius, one step below DESIGN.md's documented 8px sm radius, for compact in-sidebar controls. Adding 6px to DESIGN.md's ramp is a separate design-system task."
+      },
+      {
+        "rule": "design-system-radius",
+        "value": "16px",
+        "files": [
+          "src/app/globals.css"
+        ],
+        "createdAt": "2026-08-31T08:42:15.648Z",
+        "reason": "The mobile More-sheet (.sheet) uses a 16px top-corner radius for its bottom-sheet presentation, one step above DESIGN.md's documented 11-14px card/modal range, matching common bottom-sheet conventions. Adding 16px to DESIGN.md's ramp is a separate design-system task."
       }
     ]
   }

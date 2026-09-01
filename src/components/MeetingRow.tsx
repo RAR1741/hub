@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Icon } from "@/components/Icon";
+import { Button, Icon } from "@/components/ui";
 import { instantToDatetimeLocal, datetimeLocalToInstant } from "@/lib/tz";
 
 export function MeetingRow({
@@ -91,9 +91,9 @@ export function MeetingRow({
                 onChange={(e) => setEnds(e.target.value)}
               />
             </label>
-            <button onClick={save} className="btn btn-primary" disabled={busy}>
-              {busy ? "Saving…" : "Save"}
-            </button>
+            <Button variant="primary" onClick={save} pending={busy} pendingLabel="Saving…">
+              Save
+            </Button>
             <button onClick={() => setEditing(false)} className="btn" disabled={busy}>
               Cancel
             </button>

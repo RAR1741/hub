@@ -44,7 +44,7 @@ export default async function AdminTeamsPage() {
       <section className="card flex flex-col gap-3">
         <h2 className="text-base font-semibold">Team tree</h2>
         {teams.length === 0 ? (
-          <p className="text-sm text-[var(--color-muted-fg)]">No teams yet — create the first one above.</p>
+          <p className="text-sm text-[var(--muted)]">No teams yet — create the first one above.</p>
         ) : (
           <TeamTreeView roots={buildTeamTree(teams)} renderNode={renderNode} />
         )}

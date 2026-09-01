@@ -57,5 +57,9 @@ intentionally excluded.
 - **Component picker shows essentially one card (Icon).** That's expected and honest for
   this repo — the value is `styles.css` + the README/conventions header + guidelines
   (`docs/design/ui-system.md`), not a component gallery.
-- **Kiosk classes (`.kiosk*`) are committed-dark by design** — they don't follow the
-  theme. Don't "fix" them to be theme-aware.
+- **Kiosk classes (`.kiosk*`) are now theme-aware (as of the Mission Control redesign, #213).**
+  They used to be committed-dark by design; that's no longer true — they follow light/dark/system
+  via the standard `--canvas`/`--surface`/`--ink`/`--muted`/`--hair` tokens like the rest of the
+  app. They still keep kiosk-specific large touch targets and a red focus-border treatment. If a
+  future change reverts them to fixed-dark, update this note and `docs/design/ui-system.md` /
+  `conventions.md` / `DESIGN.md` again to match.

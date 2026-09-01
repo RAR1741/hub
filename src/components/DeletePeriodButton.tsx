@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Icon } from "@/components/Icon";
+import { Icon } from "@/components/ui/Icon";
 
 export function DeletePeriodButton({ periodId, name }: { periodId: string; name: string }) {
   const [status, setStatus] = useState<string | null>(null);

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
-import { Icon } from "@/components/Icon";
+import { Icon } from "@/components/ui/Icon";
 import { listPeople } from "@/lib/people";
 import { listTeams } from "@/lib/teams";
 import { listPeriods, getActivePeriod } from "@/lib/periods";

@@ -38,29 +38,13 @@
   --role-student: #4c9df0;
   --role-mentor: #e0a020;
 
-  --shadow: 0 1px 2px rgba(20, 16, 14, 0.04), 0 6px 20px -10px rgba(20, 16, 14, 0.14);
+  /* colored-nav group hues (Overview/Shop Floor/Team/Admin) */
+  --hue-overview: var(--red);
+  --hue-shopfloor: #B45309;
+  --hue-team: #2563EB;
+  --hue-admin: #7C3AED;
 
-  /* legacy token aliases — existing pages reference these; re-pointed at the
-     tokens above so every screen picks up the new palette immediately, even
-     before it's individually restyled. */
-  --color-canvas: var(--canvas);
-  --color-surface: var(--surface);
-  --color-border: var(--hair);
-  --color-fg: var(--ink);
-  --color-muted: var(--muted);
-  --color-muted-fg: var(--muted);
-  --color-brand: var(--red);
-  --color-brand-hover: var(--red-press);
-  --color-brand-active: var(--red-press);
-  --color-brand-fg: var(--red-fg);
-  --color-present: var(--present);
-  --color-present-fg: var(--present-fg);
-  --color-excused: var(--excused);
-  --color-excused-fg: var(--excused-fg);
-  --color-optional: var(--optional);
-  --color-optional-fg: var(--optional-fg);
-  --color-absent: var(--absent);
-  --color-absent-fg: var(--absent-fg);
+  --shadow: 0 1px 2px rgba(20, 16, 14, 0.04), 0 6px 20px -10px rgba(20, 16, 14, 0.14);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -83,6 +67,11 @@
     --excused: #5a93ff;
     --optional: #8b93a0;
     --absent: #f0973e;
+
+    --hue-overview: var(--red);
+    --hue-shopfloor: #FBBF24;
+    --hue-team: #60A5FA;
+    --hue-admin: #A78BFA;
 
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 26px -12px rgba(0, 0, 0, 0.6);
     color-scheme: dark;
@@ -112,6 +101,11 @@
   --excused: #5a93ff;
   --optional: #8b93a0;
   --absent: #f0973e;
+
+  --hue-overview: var(--red);
+  --hue-shopfloor: #FBBF24;
+  --hue-team: #60A5FA;
+  --hue-admin: #A78BFA;
 
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 26px -12px rgba(0, 0, 0, 0.6);
   color-scheme: dark;
@@ -353,6 +347,8 @@
     flex-direction: column;
     gap: 0.25rem;
   }
+
+  .field-error { display: block; margin-top: 4px; font-size: 12px; color: var(--red); }
 
   .input,
   select.input,
@@ -778,7 +774,12 @@
     place-items: center;
     font-size: 12px;
     font-weight: 700;
+    border: 1px solid transparent;
   }
+
+  .avatar.role-student { background: color-mix(in srgb, var(--role-student) 20%, var(--surface)); color: var(--role-student); border-color: color-mix(in srgb, var(--role-student) 45%, transparent); }
+  .avatar.role-mentor  { background: color-mix(in srgb, var(--role-mentor) 20%, var(--surface));  color: var(--role-mentor);  border-color: color-mix(in srgb, var(--role-mentor) 45%, transparent); }
+  .avatar.role-admin   { background: var(--red); color: var(--red-fg); border-color: transparent; }
 
   .sid {
     font-family: var(--font-mono);
@@ -1031,19 +1032,19 @@
   }
 
   /* ---------------------------------------------------------------------
-     Kiosk (committed dark regardless of theme)
+     Kiosk (theme-aware — follows light/dark/system via tokens)
      --------------------------------------------------------------------- */
   .kiosk {
-    background: #101114;
-    color: #f3f1ec;
+    background: var(--canvas);
+    color: var(--ink);
     border-radius: 14px;
-    border: 1px solid #23262c;
+    border: 1px solid var(--hair);
     overflow: hidden;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 26px -12px rgba(0, 0, 0, 0.6);
+    box-shadow: var(--shadow);
   }
 
   .kiosk .hazard {
-    background: #e01926;
+    background: var(--red);
     opacity: 1;
   }
 
@@ -1054,7 +1055,7 @@
     flex-wrap: wrap;
     gap: 10px;
     padding: 16px 20px;
-    border-bottom: 1px solid #23262c;
+    border-bottom: 1px solid var(--hair);
   }
 
   .kiosk-head .k-brand {
@@ -1069,7 +1070,7 @@
 
   .kiosk-head .k-now {
     font-size: 13px;
-    color: #9aa0a8;
+    color: var(--muted);
   }
 
   .kiosk-head .k-flash {
@@ -1084,8 +1085,8 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    background: #e01926;
-    color: #ffffff;
+    background: var(--red);
+    color: var(--red-fg);
   }
 
   .kiosk-search-row {
@@ -1097,22 +1098,22 @@
     font: inherit;
     font-size: 17px;
     font-weight: 600;
-    background: #1b1e23;
-    border: 1px solid #2a2e35;
-    color: #f3f1ec;
+    background: var(--surface-2);
+    border: 1px solid var(--hair);
+    color: var(--ink);
     border-radius: 11px;
     padding: 14px 16px;
     min-height: 52px;
   }
 
   .k-search::placeholder {
-    color: #8b919a;
+    color: var(--muted);
     font-weight: 500;
   }
 
   .k-search:focus-visible {
     outline: none;
-    border-color: #e01926;
+    border-color: var(--red);
   }
 
   .kiosk-body {
@@ -1127,13 +1128,13 @@
 
   .k-here {
     padding: 18px 20px;
-    background: #0b0c0e;
-    border-left: 1px solid #23262c;
+    background: var(--surface-2);
+    border-left: 1px solid var(--hair);
   }
 
   .k-mentors {
     padding: 18px 20px;
-    border-left: 1px solid #23262c;
+    border-left: 1px solid var(--hair);
   }
 
   .k-mentor-list {
@@ -1147,7 +1148,7 @@
     letter-spacing: 0.16em;
     text-transform: uppercase;
     font-weight: 800;
-    color: #8b919a;
+    color: var(--muted);
     margin: 0 0 14px;
   }
 
@@ -1159,9 +1160,9 @@
 
   .k-name {
     font: inherit;
-    background: #1b1e23;
-    border: 1px solid #2a2e35;
-    color: #f3f1ec;
+    background: var(--surface-2);
+    border: 1px solid var(--hair);
+    color: var(--ink);
     border-radius: 11px;
     padding: 16px 10px;
     font-weight: 700;
@@ -1175,7 +1176,7 @@
 
   .k-name:hover,
   .k-name:focus-visible {
-    border-color: #e01926;
+    border-color: var(--red);
   }
 
   .k-name:disabled {
@@ -1190,9 +1191,9 @@
     justify-content: space-between;
     gap: 10px;
     font: inherit;
-    background: #16181c;
-    border: 1px solid #2a2e35;
-    color: #f3f1ec;
+    background: var(--surface);
+    border: 1px solid var(--hair);
+    color: var(--ink);
     border-radius: 11px;
     padding: 13px 15px;
     margin-bottom: 10px;
@@ -1206,13 +1207,13 @@
 
   .k-out .kt {
     font-size: 14px;
-    color: #35c878;
+    color: var(--present);
     font-weight: 700;
   }
 
   .k-out:hover,
   .k-out:focus-visible {
-    border-color: #e01926;
+    border-color: var(--red);
   }
 
   .k-out:disabled {
@@ -1234,7 +1235,7 @@
     .k-here,
     .k-mentors {
       border-left: 0;
-      border-top: 1px solid #23262c;
+      border-top: 1px solid var(--hair);
     }
   }
 
@@ -1427,6 +1428,658 @@
       background-position: 0 50%;
     }
   }
+
+  /* ---------------------------------------------------------------------
+     App shell — grouped left sidebar (Mission Control). Ported from
+     docs/design/mission-control-mockup.html. Each .sb-group sets --grp to
+     one of the --hue-* tokens; descendant rules read var(--grp, fallback)
+     for the group's header, item icon, active tick, and faint active tint.
+
+     Below 768px .sb hides and .tabbar (+ its More sheet) takes over — see
+     the mobile breakpoint after the icon rail rules below.
+     --------------------------------------------------------------------- */
+  .app-shell {
+    display: flex;
+    min-height: 100dvh;
+    align-items: stretch;
+  }
+  .app-main-col {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Desktop top bar — identity cluster (theme, avatar, name/role, sign out),
+     right-aligned. Sticky below the sidebar so it stays as content scrolls.
+     Hidden on mobile (the tab bar's More sheet carries these instead). */
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 48px;
+    padding: 0 14px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--hair);
+    position: sticky;
+    top: 0;
+    z-index: 30;
+  }
+  .tb-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .tb-btn {
+    width: 30px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .tb-btn:hover {
+    color: var(--ink);
+    border-color: var(--hair);
+    background: var(--surface-2);
+  }
+  .tb-btn .ic {
+    width: 16px;
+    height: 16px;
+  }
+  .who {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--muted);
+    text-decoration: none;
+  }
+  .who b {
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .signout {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    color: var(--muted);
+    background: none;
+    border: 0;
+    padding: 4px 6px;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .signout:hover {
+    color: var(--ink);
+    background: var(--surface-2);
+  }
+  .signout .ic {
+    width: 15px;
+    height: 15px;
+  }
+
+  /* icons inside nav items — sized here; Icon renders the stroke paths */
+  .sbi .ic,
+  .rail-i .ic,
+  .rail-fly .fly-head .ic {
+    width: 16px;
+    height: 16px;
+    flex: none;
+  }
+
+  /* sidebar (expanded) */
+  .sb {
+    width: 208px;
+    flex: none;
+    background: var(--surface-2);
+    border-right: 1px solid var(--hair);
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    height: 100dvh;
+    /* Above the main content column and its sticky table headers (which have no
+       z-index), below the skip link (50) and the modal layer (100). Without
+       this the opaque sticky `.table th` on People/Events/Admin lists — exactly
+       where the flyouts open — paints over an open flyout. .sb becomes a
+       stacking context, so the flyout's z-index:30 orders within it. */
+    z-index: 40;
+  }
+  .sb-brand {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 13px 14px 11px;
+  }
+  .badge-1741 {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.02em;
+    color: var(--red-fg);
+    background: var(--red);
+    padding: 2px 6px;
+    border-radius: 6px;
+  }
+  .sb-scroll {
+    flex: 1;
+    /* No overflow scroll here on purpose: an overflow container computes
+       overflow-x to `auto` as well, which clips the hover flyouts (they sit at
+       left: 100% + 8px, past the sidebar edge) and makes the always-present
+       hidden flyouts add a phantom horizontal scrollbar. The nav is short
+       enough to fit; .sb-foot stays reachable via margin-top: auto.
+       ponytail: a nav taller than the viewport won't scroll to the footer;
+       upgrade to a JS/anchor-positioned popover flyout if that ever bites. */
+  }
+  .sb-group {
+    padding: 9px 8px 1px;
+  }
+  .sb-group h5 {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--grp, var(--muted));
+    margin: 0 0 4px 8px;
+  }
+  .sbi-wrap {
+    position: relative;
+  }
+  .sbi {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px 6px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+    text-decoration: none;
+  }
+  .sbi:hover {
+    color: var(--ink);
+    background: var(--surface-2);
+    text-decoration: none;
+  }
+  .sbi .ic {
+    color: color-mix(in srgb, var(--grp, var(--muted)) 78%, var(--muted));
+    opacity: 0.85;
+  }
+  .sbi.active .ic {
+    opacity: 1;
+  }
+  .sbi.active {
+    color: var(--ink);
+    background: color-mix(in srgb, var(--grp, var(--red)) 10%, var(--surface-2));
+    font-weight: 600;
+  }
+  .sbi.active::before {
+    content: "";
+    position: absolute;
+    left: -8px;
+    top: 6px;
+    bottom: 6px;
+    width: 2px;
+    border-radius: 2px;
+    background: var(--grp, var(--red));
+  }
+  .sbi .flychev {
+    margin-left: auto;
+    width: 11px;
+    height: 11px;
+    flex: none;
+    color: var(--muted);
+    opacity: 0.7;
+  }
+  .sb-foot {
+    margin-top: auto;
+    border-top: 1px solid var(--hair);
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  /* ---- flyout submenus (sidebar) — pure CSS via :hover / :focus-within ---- */
+  .flyout {
+    position: absolute;
+    left: calc(100% + 8px);
+    top: -6px;
+    min-width: 196px;
+    background: var(--surface);
+    border: 1px solid var(--hair);
+    border-radius: 8px;
+    padding: 5px;
+    box-shadow: 0 10px 28px -10px rgba(10, 10, 12, 0.28),
+      0 0 0 1px rgba(10, 10, 12, 0.02);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(-4px);
+    transition: opacity 0.12s ease, transform 0.12s ease;
+    z-index: 30;
+  }
+  /* Open on hover, or on *keyboard* focus (:focus-visible) for keyboard users.
+     Deliberately not :focus-within — a mouse click leaves focus on the nav
+     item, which would pin the flyout open until you clicked elsewhere. */
+  .sbi-wrap:hover > .flyout,
+  .sbi-wrap:has(:focus-visible) > .flyout {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(0);
+  }
+  /* Invisible bridge across the 8px gap between the nav item and the flyout.
+     Without it the pointer passes over dead space while traveling to the
+     submenu, drops :hover, and the menu closes before you reach it. The
+     bridge is a descendant of the flyout (itself inside .sbi-wrap), so
+     hovering it keeps .sbi-wrap:hover alive the whole way across. */
+  .flyout::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -10px;
+    width: 10px;
+  }
+  .flyout::before {
+    content: "";
+    position: absolute;
+    left: -6px;
+    top: 14px;
+    width: 12px;
+    height: 12px;
+    background: var(--surface);
+    border-left: 1px solid var(--hair);
+    border-bottom: 1px solid var(--hair);
+    transform: rotate(45deg);
+    border-radius: 0 0 0 2px;
+  }
+  .fly-title {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--grp, var(--muted));
+    padding: 5px 9px 6px;
+  }
+  .fly-link {
+    position: relative;
+    display: block;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--ink);
+    text-decoration: none;
+    padding: 6px 9px;
+    border-radius: 6px;
+  }
+  .fly-link:hover,
+  .fly-link:focus-visible {
+    background: var(--surface-2);
+    text-decoration: none;
+  }
+  .fly-scroll {
+    max-height: 264px;
+    overflow-y: auto;
+  }
+  .fly-scroll::-webkit-scrollbar {
+    width: 8px;
+  }
+  .fly-scroll::-webkit-scrollbar-thumb {
+    background: var(--hair);
+    border-radius: 4px;
+  }
+
+  /* ---- icon rail (collapsed sidebar) — the .sb/.rail pair are both always in
+     the DOM; <html data-nav="collapsed"> (SidebarToggle) picks which shows.
+     Absent attribute → expanded (.sb), so the rail is hidden by default. ---- */
+  :root[data-nav="collapsed"] .sb {
+    display: none;
+  }
+  :root[data-nav="collapsed"] .rail {
+    display: flex;
+  }
+  .rail {
+    width: 52px;
+    flex: none;
+    background: var(--surface-2);
+    border-right: 1px solid var(--hair);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    padding: 12px 0 8px;
+    gap: 2px;
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    height: 100dvh;
+    z-index: 40; /* same stacking role as .sb — above content, below modals */
+  }
+  .rail .badge-1741 {
+    margin-bottom: 10px;
+  }
+  .rail-i-wrap {
+    position: relative;
+  }
+  .rail-i {
+    position: relative;
+    width: 36px;
+    height: 32px;
+    display: grid;
+    place-items: center;
+    border-radius: 6px;
+    color: var(--muted);
+    text-decoration: none;
+  }
+  .rail-i:hover {
+    color: var(--ink);
+    background: var(--surface-2);
+  }
+  .rail-i .ic {
+    width: 16px;
+    height: 16px;
+    color: color-mix(in srgb, var(--grp, var(--muted)) 78%, var(--muted));
+    opacity: 0.85;
+  }
+  .rail-i.active .ic {
+    opacity: 1;
+  }
+  .rail-i.active {
+    color: var(--ink);
+    background: color-mix(in srgb, var(--grp, var(--red)) 10%, var(--surface-2));
+  }
+  .rail-i.active::before {
+    content: "";
+    position: absolute;
+    left: -8px;
+    top: 7px;
+    bottom: 7px;
+    width: 2px;
+    border-radius: 2px;
+    background: var(--grp, var(--red));
+  }
+  .rail-sep {
+    width: 24px;
+    height: 1px;
+    background: var(--hair);
+    margin: 6px 0;
+  }
+  .rail-foot {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+  /* The sign-out <button> reuses .rail-i but needs the native chrome cleared. */
+  button.rail-i {
+    border: 0;
+    background: none;
+    cursor: pointer;
+  }
+  .rail-foot form {
+    display: flex;
+  }
+  /* Collapse control in the expanded footer — full-width, muted, matches the
+     .sbi resting look with a keyboard-hint chip. */
+  .sb-collapse {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 6px 8px 6px 10px;
+    border: 0;
+    background: none;
+    border-radius: 6px;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .sb-collapse:hover {
+    color: var(--ink);
+    background: var(--surface-2);
+  }
+  .sb-collapse .ic {
+    width: 15px;
+    height: 15px;
+    flex: none;
+  }
+  .sb-collapse kbd {
+    margin-left: auto;
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: 11px;
+    line-height: 1;
+    color: var(--muted);
+    background: var(--surface);
+    border: 1px solid var(--hair);
+    border-radius: 4px;
+    padding: 2px 5px;
+  }
+  .rail-fly {
+    position: absolute;
+    left: 46px;
+    top: -6px;
+    min-width: 190px;
+    background: var(--surface);
+    border: 1px solid var(--hair);
+    border-radius: 8px;
+    padding: 5px;
+    box-shadow: 0 10px 28px -10px rgba(10, 10, 12, 0.28),
+      0 0 0 1px rgba(10, 10, 12, 0.02);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(-4px);
+    transition: opacity 0.12s ease, transform 0.12s ease;
+    z-index: 30;
+  }
+  /* Open on hover or *keyboard* focus only (not :focus-within — a mouse click
+     would pin it open until you clicked away; matches the .flyout behavior). */
+  .rail-i-wrap:hover > .rail-fly,
+  .rail-i-wrap:has(:focus-visible) > .rail-fly {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(0);
+  }
+  /* Invisible bridge across the 10px gap (rail-i is 36px, rail-fly at 46px) so
+     the pointer keeps :hover while traveling to the submenu. ::before is the
+     arrow, so this rides on ::after. */
+  .rail-fly::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -10px;
+    width: 10px;
+  }
+  .rail-fly::before {
+    content: "";
+    position: absolute;
+    left: -6px;
+    top: 14px;
+    width: 12px;
+    height: 12px;
+    background: var(--surface);
+    border-left: 1px solid var(--hair);
+    border-bottom: 1px solid var(--hair);
+    transform: rotate(45deg);
+  }
+  .rail-fly .fly-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12.5px;
+    font-weight: 650;
+    color: var(--ink);
+    padding: 5px 9px 6px;
+  }
+  .rail-fly .fly-head .ic {
+    color: var(--grp, var(--muted));
+  }
+
+  /* ---- mobile bottom tab bar + More sheet (Task 12) ----------------------
+     Ported from mission-control-mockup.html's .tabbar/.tab/.sheet-* rules.
+     The mockup's --sunken and --hair-strong tokens don't exist in this repo;
+     mapped to --surface-2 and --hair respectively (see task-12 brief). The
+     sheet is a <details>/<summary> so it opens/closes with no client JS. */
+  .tabbar {
+    display: none;
+    grid-template-columns: repeat(5, 1fr);
+    border-top: 1px solid var(--hair);
+    background: var(--surface);
+    padding: 4px 4px calc(4px + env(safe-area-inset-bottom, 10px));
+  }
+  .tab {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-height: 48px;
+    padding: 7px 2px 4px;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    font-size: 9.5px;
+    font-weight: 600;
+    border-radius: 8px;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .tab .ic {
+    width: 20px;
+    height: 20px;
+    flex: none;
+  }
+  .tab.active {
+    color: var(--ink);
+  }
+  .tab.active::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 18px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--red);
+  }
+  .more-sheet summary.tab {
+    list-style: none;
+  }
+  .more-sheet summary.tab::-webkit-details-marker {
+    display: none;
+  }
+  .more-sheet[open] summary.tab {
+    color: var(--ink);
+  }
+  .sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: var(--tabbar-h);
+    background: var(--surface);
+    border-top: 1px solid var(--hair);
+    border-radius: 16px 16px 0 0;
+    padding: 8px 10px calc(14px + env(safe-area-inset-bottom, 0px));
+    max-height: 70dvh;
+    overflow-y: auto;
+    z-index: 41; /* above .tabbar (z-index:40, set in the breakpoint below) */
+  }
+  .sheet .handle {
+    width: 34px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--hair);
+    margin: 4px auto 10px;
+  }
+  .sheet h6 {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 4px 8px;
+  }
+  .sheet-i {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 44px;
+    background: none;
+    border: 0;
+    text-align: left;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--ink);
+    padding: 11px 10px;
+    border-radius: 8px;
+    text-decoration: none;
+  }
+  .sheet-i:hover {
+    background: var(--surface-2);
+    text-decoration: none;
+  }
+  .sheet-i .ic {
+    width: 18px;
+    height: 18px;
+    flex: none;
+    color: var(--muted);
+  }
+  .sheet-i .pill {
+    margin-left: auto;
+  }
+  .sheet-sep {
+    height: 1px;
+    background: var(--hair);
+    margin: 8px 6px;
+  }
+  .sheet-theme {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 10px 2px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  @media (max-width: 768px) {
+    /* Shared by .tabbar (bottom offset for .sheet) and .app-main-col (bottom
+       padding so content isn't hidden behind the fixed bar) — both are
+       descendants of .app-shell, so the custom property cascades to both. */
+    .app-shell {
+      --tabbar-h: calc(56px + env(safe-area-inset-bottom, 0px));
+    }
+    .sb,
+    .rail,
+    :root[data-nav="collapsed"] .rail,
+    .topbar {
+      display: none;
+    }
+    .tabbar {
+      display: grid;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 40;
+    }
+    .app-main-col {
+      padding-bottom: var(--tabbar-h);
+    }
+  }
 }
 
 /* =========================================================================
@@ -1437,6 +2090,7 @@
    ========================================================================= */
 @media print {
   nav,
+  .topbar,
   .skip-link,
   .no-print {
     display: none !important;

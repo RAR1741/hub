@@ -196,8 +196,8 @@ export default async function PersonPage({
                   aria-hidden="true"
                 />
                 <span className="font-medium">{b.name}</span>
-                {b.note && <span className="text-sm text-[var(--color-muted-fg)]">— {b.note}</span>}
-                <span className="text-sm text-[var(--color-muted-fg)]">
+                {b.note && <span className="text-sm text-[var(--muted)]">— {b.note}</span>}
+                <span className="text-sm text-[var(--muted)]">
                   Awarded by {b.awardedByName} on {new Date(b.awardedAt).toLocaleDateString(undefined, { timeZone: teamTz })}
                 </span>
                 {hasRole(viewer.role, "mentor") && (

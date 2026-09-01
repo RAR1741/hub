@@ -47,7 +47,7 @@ export function GenerateSeasonPeriodsForm({ currentYear }: { currentYear: number
       <button type="submit" className="btn btn-primary" disabled={busy}>
         {busy ? "Generating…" : "Generate periods"}
       </button>
-      {status && <p role="status" className="text-sm text-[var(--color-muted-fg)]">{status}</p>}
+      {status && <p role="status" className="text-sm text-[var(--muted)]">{status}</p>}
     </form>
   );
 }

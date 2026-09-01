@@ -28,7 +28,7 @@ export function DeleteBadgeButton({ badgeId }: { badgeId: string }) {
   return (
     <p>
       <button onClick={remove} className="btn btn-danger" disabled={busy}>{busy ? "Deleting…" : "Delete badge"}</button>
-      {status && <span role="status" className="text-sm text-[var(--color-muted-fg)]"> {status}</span>}
+      {status && <span role="status" className="text-sm text-[var(--muted)]"> {status}</span>}
     </p>
   );
 }

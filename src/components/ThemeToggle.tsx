@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { Icon } from "@/components/ui/Icon";
 
 type Theme = "light" | "dark";
 
@@ -58,43 +59,21 @@ function setTheme(mode: Theme) {
   for (const listener of listeners) listener();
 }
 
+// Single sun/moon icon button. The icon shows the theme you'd switch TO: a moon
+// while light, a sun while dark. One click sets an explicit choice (light↔dark),
+// leaving the "follow the OS" state only ever entered by never having clicked.
 export function ThemeToggle() {
   const mode = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-
-  const options: { key: Theme; label: string }[] = [
-    { key: "light", label: "Light" },
-    { key: "dark", label: "Dark" },
-  ];
-
+  const next: Theme = mode === "dark" ? "light" : "dark";
   return (
-
-    <div
-      role="group"
-      aria-label="Theme"
-      className="inline-flex gap-0.5 rounded-full border p-[3px]"
-      style={{ background: "var(--steel-soft)", borderColor: "var(--hair)" }}
+    <button
+      type="button"
+      className="tb-btn"
+      onClick={() => setTheme(next)}
+      aria-label={`Switch to ${next} mode`}
+      title={`Switch to ${next} mode`}
     >
-      {options.map((opt) => (
-        <button
-          key={opt.key}
-          type="button"
-          aria-pressed={mode === opt.key}
-          onClick={() => setTheme(opt.key)}
-          className="rounded-full px-3 py-1.5 text-xs font-semibold"
-          style={
-            mode === opt.key
-              ? {
-                  background: "var(--surface)",
-                  color: "var(--ink)",
-                  boxShadow: "var(--shadow)",
-                }
-              : { background: "transparent", color: "var(--muted)" }
-          }
-        >
-          {opt.label}
-        </button>
-      ))}
-    </div>
-
+      <Icon name={mode === "dark" ? "sun" : "moon"} className="ic" />
+    </button>
   );
 }

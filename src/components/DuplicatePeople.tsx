@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CandidatePair, PersonCard, RejectedPair } from "@/lib/merge-people";
+import { Button } from "@/components/ui";
 
 function fullName(p: PersonCard): string {
   return `${p.firstName} ${p.lastName}`.trim();
@@ -134,14 +135,15 @@ function DuplicatePair({ pair }: { pair: CandidatePair }) {
             undone.
           </p>
           <div className="flex gap-2">
-            <button
+            <Button
               type="button"
-              className="btn btn-danger"
-              disabled={busy}
+              variant="danger"
               onClick={confirmMerge}
+              pending={busy}
+              pendingLabel="Merging…"
             >
-              {busy ? "Merging…" : "Confirm merge"}
-            </button>
+              Confirm merge
+            </Button>
             <button
               type="button"
               className="btn"

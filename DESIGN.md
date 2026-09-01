@@ -85,8 +85,9 @@ dashboard. Warm-neutral "shop paper" surfaces hold the page; Red Alert red is th
 signal reserved for brand and primary action; a cool steel secondary handles quieter structural
 UI (badges, counts, borders-on-hover); and every number that matters — hours, percentages, IDs,
 timestamps, live clock-in durations — renders in a monospace, tabular-nums readout, so it feels
-measured rather than typeset. The kiosk (`/kiosk`) pushes this furthest: it's committed dark
-regardless of theme, because it's an always-on shop tablet, not a themed page a person configures.
+measured rather than typeset. The kiosk (`/kiosk`) pushes this furthest with an always-on shop-tablet
+posture — large touch targets, its own red focus-border treatment — but it follows the same
+light/dark/system theming as the rest of the app, rather than a page a person configures separately.
 
 The system is functional first: dense admin tables, role-gated CRUD, and status pills carry more
 of the visual weight than decoration does. Personality lives in specific, repeated details — the
@@ -98,7 +99,8 @@ hazard stripe, the pit board, the live pulsing status dot — not in broad ornam
 - Mono, tabular-numeric readouts for every quantitative value (hours, counts, IDs, durations).
 - Mostly flat surfaces with tonal layering (canvas → surface → surface-2) for depth; shadow is a
   light ambient touch, not a structural signal.
-- The kiosk is intentionally always-dark — a shop-floor instrument, not a themed screen.
+- The kiosk is a shop-floor instrument (large touch targets, its own red focus-border treatment)
+  that follows the same light/dark/system theming as the rest of the app.
 - Full light/dark/system theming via a `data-theme` attribute, with an inline pre-paint script to
   avoid a flash of the wrong theme.
 
@@ -140,6 +142,9 @@ app.
 ### Roster role colors
 - **Role: Student** (`#4c9df0`) and **Role: Mentor** (`#e0a020`) — kept in sync with
   `ROLE_COLORS` in `src/lib/roster-colors.ts`; do not edit one without the other.
+- **Role-tinted avatars**: `.avatar.role-student`/`.avatar.role-mentor` tint the initials-circle
+  fill/border toward the matching role color via `color-mix`; `.avatar.role-admin` uses the solid
+  brand red, since admin has no dedicated role color.
 
 ### Named Rules
 **The One Red Rule.** Red is brand and primary-action only — it never appears as a generic
@@ -208,15 +213,18 @@ system expresses "this is above that."
 
 Rounded, not sharp: 8–9px radii on inputs, buttons, and search fields; 11–14px on cards, tables,
 modals, and the kiosk shell; fully circular (`999px`) on pills, badges, and the avatar/live-dot.
-Borders are a single 1px hairline (`--hair` in themed contexts, a fixed dark equivalent in the
-kiosk) — never a heavier or colored border at rest. The one deliberate non-rounded geometric
+Borders are a single 1px hairline (`--hair`, including in the kiosk, which now themes like the
+rest of the app) — never a heavier or colored border at rest. The one deliberate non-rounded geometric
 device is the **hazard stripe** (`.hazard`): a flat 4px bar of solid red at the top of the app
 shell and the kiosk, with no radius, reading as a warning strip rather than a decorative band.
 
 ## Components
 
 Buttons, cards, and inputs feel **tactile and instrumented** — confident, slightly mechanical
-touch targets that read like a control panel, with mono readouts standing in for gauges.
+touch targets that read like a control panel, with mono readouts standing in for gauges. Eight
+typed React primitives in `src/components/ui/` (`Button`, `Card`, `Field`, `Pill`, `Avatar`,
+`Stat`, `TableWrap`, `Icon`) wrap the classes documented below — see `docs/design/ui-system.md`
+and the `/styleguide` route for the full reference.
 
 ### Buttons
 - **Shape:** 9px radius, 1px border, 8px/14px padding, 650-weight 13.5px label.
@@ -256,11 +264,12 @@ clearest expression of the control-panel metaphor — a roster that reads like a
 not a table.
 
 ### Kiosk
-Committed dark regardless of theme (background `#101114`, near-white text `#f3f1ec`) — an
-always-on shop tablet, not a themed screen. Search and name buttons are large (min-height 52–58px)
-for touch-first, low-friction use at a shared shop-floor device; focus/hover on kiosk controls
-switches the border to red rather than using the app's standard focus-ring treatment, since the
-kiosk supplies its own fixed dark chrome.
+Theme-aware: the kiosk shell, search field, and name/out buttons use the same `--canvas`/
+`--surface`/`--surface-2`/`--ink`/`--muted`/`--hair` tokens as the rest of the app, so it follows
+light/dark/system like any other page. Search and name buttons stay large (min-height 52–58px) for
+touch-first, low-friction use at a shared shop-floor device; focus/hover on kiosk controls switches
+the border to red rather than using the app's standard focus-ring treatment, since the kiosk is a
+dedicated always-on tablet, not a page a person configures.
 
 ## Do's and Don'ts
 
@@ -269,7 +278,7 @@ kiosk supplies its own fixed dark chrome.
 - **Do** render every quantitative value — hours, percentages, IDs, durations, timestamps — in
   the mono font with tabular-nums (The Mono-Numbers Rule).
 - **Do** reach for the next canvas/surface/surface-2 tonal step before adding a heavier shadow.
-- **Do** keep kiosk touch targets large and the kiosk dark regardless of theme.
+- **Do** keep kiosk touch targets large; the kiosk now follows the app's light/dark/system theme.
 - **Do** give every interactive control a visible `:focus-visible` outline (inherited from the
   global rule) and respect `prefers-reduced-motion`.
 
@@ -279,6 +288,7 @@ kiosk supplies its own fixed dark chrome.
   is ambient, not structural.
 - **Don't** style numeric readouts in the body or display font — that's reserved for the mono
   face.
-- **Don't** theme the kiosk to follow light/dark — it's fixed dark by design.
+- **Don't** reintroduce hardcoded hex colors in the kiosk — it themes via tokens now, same as
+  every other page.
 - **Don't** invent a fifth attendance-status color; present/excused/optional/absent is a closed,
   semantically fixed set.

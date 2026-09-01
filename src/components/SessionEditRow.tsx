@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui";
 import { instantToDatetimeLocal, datetimeLocalToInstant } from "@/lib/tz";
 
 export function SessionEditRow({
@@ -67,9 +68,9 @@ export function SessionEditRow({
       <td><input className="input w-36" aria-label={`Note for ${label}`} value={n} onChange={(e) => setN(e.target.value)} placeholder="note" /></td>
       <td><input type="checkbox" aria-label={`Exclude ${label} from totals`} checked={exc} onChange={(e) => setExc(e.target.checked)} /></td>
       <td className="flex items-center gap-2">
-        <button onClick={save} className="btn btn-primary px-3 py-1" disabled={busy}>{busy ? "Saving…" : "Save"}</button>
-        <button onClick={remove} className="btn btn-danger px-3 py-1" disabled={busy}>{busy ? "Deleting…" : "Delete"}</button>
-        {status && <span role="status" className="text-sm text-[var(--color-muted-fg)]"> {status}</span>}
+        <Button variant="primary" className="px-3 py-1" onClick={save} pending={busy} pendingLabel="Saving…">Save</Button>
+        <Button variant="danger" className="px-3 py-1" onClick={remove} pending={busy} pendingLabel="Deleting…">Delete</Button>
+        {status && <span role="status" className="text-sm text-[var(--muted)]"> {status}</span>}
       </td>
     </tr>
   );

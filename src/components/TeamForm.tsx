@@ -77,7 +77,7 @@ export function TeamForm({
           value={values.googleGroupEmail}
           onChange={(e) => setValues({ ...values, googleGroupEmail: e.target.value })}
         />
-        <span className="text-sm text-[var(--color-muted-fg)]">
+        <span className="text-sm text-[var(--muted)]">
           Members of this team are synced into this Workspace group. Leave blank to disable.
         </span>
       </label>
@@ -89,7 +89,7 @@ export function TeamForm({
         </select>
       </label>
       <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? "Saving…" : teamId ? "Save changes" : "Create team"}</button>
-      {status && <p role="status" className="text-sm text-[var(--color-muted-fg)]">{status}</p>}
+      {status && <p role="status" className="text-sm text-[var(--muted)]">{status}</p>}
     </form>
   );
 }

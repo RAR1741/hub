@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { anomalyKey, parseTimeSheet } from "@/lib/time-import";
 import type { TimeImportSummary } from "@/lib/time-import-run";
+import { Button } from "@/components/ui";
 
 type PeriodOpt = { id: string; name: string; isActive: boolean; startsOn: string; endsOn: string };
 
@@ -135,12 +136,27 @@ export function TimeImportForm({ periods }: { periods: PeriodOpt[] }) {
           <input ref={fileRef} type="file" accept=".csv,text/csv" className="input" onChange={onFile} />
         </label>
         <div className="flex flex-wrap items-center gap-2">
-          <button type="button" className="btn btn-secondary" onClick={doPreview} disabled={busy || !text.trim() || !periodId}>
-            {busy && !summary ? "Previewing…" : "Preview"}
-          </button>
-          <button type="button" className="btn btn-primary" onClick={runImport} disabled={busy || !importReady || !allDecided} title={importReady ? undefined : "Preview first"}>
-            {busy && summary === null && importReady ? "Importing…" : "Import"}
-          </button>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={doPreview}
+            disabled={busy || !text.trim() || !periodId}
+            pending={busy && !summary}
+            pendingLabel="Previewing…"
+          >
+            Preview
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            onClick={runImport}
+            disabled={busy || !importReady || !allDecided}
+            title={importReady ? undefined : "Preview first"}
+            pending={busy && summary === null && importReady}
+            pendingLabel="Importing…"
+          >
+            Import
+          </Button>
           {!importReady && <span className="text-sm text-[var(--muted)]">Preview first — review the summary below before importing.</span>}
           {importReady && !allDecided && <span className="text-sm text-[var(--absent)]">Decide every flagged session (accept or reject) before importing.</span>}
         </div>

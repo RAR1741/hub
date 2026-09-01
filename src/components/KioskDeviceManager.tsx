@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Icon } from "@/components/Icon";
+import { Button, Icon } from "@/components/ui";
 
 function DeviceRow({
   device,
@@ -58,9 +58,9 @@ function DeviceRow({
             onChange={(e) => setName(e.target.value)}
             aria-label={`Rename ${device.name}`}
           />
-          <button onClick={rename} className="btn btn-primary px-3 py-1" disabled={busy}>
-            {busy ? "Saving…" : "Save"}
-          </button>
+          <Button variant="primary" className="px-3 py-1" onClick={rename} pending={busy} pendingLabel="Saving…">
+            Save
+          </Button>
           <button onClick={() => { setEditing(false); setName(device.name); }} className="btn px-3 py-1" disabled={busy}>
             Cancel
           </button>
@@ -123,9 +123,9 @@ export function KioskDeviceManager({
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end gap-3">
         <label className="label">New device name <input className="input" value={name} onChange={(e) => setName(e.target.value)} /></label>
-        <button disabled={creating || !name.trim()} onClick={create} className="btn btn-primary">
-          {creating ? "Creating…" : "Create"}
-        </button>
+        <Button variant="primary" disabled={!name.trim()} onClick={create} pending={creating} pendingLabel="Creating…">
+          Create
+        </Button>
       </div>
       {newToken && (
         <p role="status" className="text-sm text-[var(--muted)]">

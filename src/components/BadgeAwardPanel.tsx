@@ -61,7 +61,7 @@ export function BadgeAwardPanel({
       <button type="submit" className="btn btn-primary" disabled={busy}>
         {busy ? "Awarding…" : "Award badge"}
       </button>
-      {status && <p role="status" className="text-sm text-[var(--color-muted-fg)]">{status}</p>}
+      {status && <p role="status" className="text-sm text-[var(--muted)]">{status}</p>}
     </form>
   );
 }
