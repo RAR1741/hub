@@ -2,6 +2,7 @@ import { describe, expect, test, vi } from "vitest";
 import { generateKeyPairSync } from "node:crypto";
 import {
   deleteTeamMembership,
+  getUserByLogin,
   listPendingTeamInvitations,
   listTeamMembers,
   putTeamMembership,
@@ -122,5 +123,23 @@ describe("deleteTeamMembership", () => {
     const deps = depsWith(() => new Response(null, { status: 204 }));
     const result = await deleteTeamMembership(deps, "software", "octocat");
     expect(result).toEqual({ ok: true, status: 204 });
+  });
+});
+
+describe("getUserByLogin", () => {
+  test("returns the user's id and login", async () => {
+    const deps = depsWith((url) => {
+      expect(url).toBe("https://api.github.com/users/octocat");
+      return jsonResponse({ id: 42, login: "octocat" });
+    });
+
+    const result = await getUserByLogin(deps, "octocat");
+    expect(result).toEqual({ ok: true, user: { id: 42, login: "octocat" } });
+  });
+
+  test("returns not-ok with status on 404", async () => {
+    const deps = depsWith(() => jsonResponse({ message: "Not Found" }, 404));
+    const result = await getUserByLogin(deps, "ghost");
+    expect(result).toEqual({ ok: false, status: 404 });
   });
 });
