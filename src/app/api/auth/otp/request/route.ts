@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { gmailCredentialsFromEnv, sendMail } from "@/lib/gmail";
+import { renderEmail } from "@/lib/email-template";
 import { formatOtpCode, generateOtpCode, hashOtpCode, OTP_TTL_MINUTES } from "@/lib/otp";
 import { reqString } from "@/lib/validate";
 import { clientIp, otpEmailLimiter, otpRequestLimiter } from "@/lib/rate-limit";
@@ -64,14 +65,13 @@ export async function POST(request: Request) {
     const credentials = gmailCredentialsFromEnv();
     if (credentials) {
       try {
-        await sendMail(
-          { fetch, credentials },
-          {
-            to: email,
-            subject: "Your 1741 Hub sign-in code",
-            text: `Your sign-in code is ${formatOtpCode(code)}. It expires in ${OTP_TTL_MINUTES} minutes.`,
-          },
-        );
+        const { html, text } = renderEmail({
+          heading: "Your sign-in code",
+          paragraphs: [`Enter this code on the 1741 Hub sign-in page. It expires in ${OTP_TTL_MINUTES} minutes.`],
+          code: formatOtpCode(code),
+          footerNote: "If you didn't request this code, you can ignore this email.",
+        });
+        await sendMail({ fetch, credentials }, { to: email, subject: "Your 1741 Hub sign-in code", text, html });
       } catch (err) {
         console.error("otp email send failed", err);
       }
