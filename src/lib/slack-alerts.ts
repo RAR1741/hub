@@ -2,12 +2,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSetting } from "./settings";
 import { postChannelMessage, slackDepsFromEnv, type SlackDeps } from "./slack";
 
-export type AlertSource = "first_sync" | "calendar_sync" | "drive_sync";
+export type AlertSource = "first_sync" | "calendar_sync" | "drive_sync" | "github_sync";
 
 const LABELS: Record<AlertSource, string> = {
   first_sync: "FIRST roster sync",
   calendar_sync: "Google Calendar sync",
   drive_sync: "Google Drive group sync",
+  github_sync: "GitHub team sync",
 };
 
 /**

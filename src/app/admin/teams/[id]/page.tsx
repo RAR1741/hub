@@ -50,6 +50,7 @@ export default async function AdminTeamPage({
             description: team.description ?? "",
             joinMode: team.joinMode,
             googleGroupEmail: team.googleGroupEmail ?? "",
+            githubTeamSlug: team.githubTeamSlug ?? "",
           }}
         />
       </section>

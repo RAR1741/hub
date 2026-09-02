@@ -45,11 +45,11 @@ A pg_cron job (`slack-mentor-reminders-weekly`) runs this on `0 23 * * 4` — Th
 ## Sync-failure alerts
 
 `reportSyncOutcome()` (`src/lib/slack-alerts.ts`) posts to `#hub-admin-alerts` when the FIRST,
-Google Calendar, or Google Drive-group sync jobs fail or recover — called from each sync route
-(`api/admin/first/sync`, `api/admin/calendar/sync`, `api/admin/drive-group/sync`). It only posts on
-a health **transition** (ok→failing or failing→ok), tracked per source in
-`app_setting.slack_alert_state_<source>`, so an ongoing outage on the 15-minute FIRST sync doesn't
-spam ~96 alerts/day. State only advances once the alert is actually delivered, so a failure during
+Google Calendar, Google Drive-group, or GitHub team sync jobs fail or recover — called from each sync
+route (`api/admin/first/sync`, `api/admin/calendar/sync`, `api/admin/drive-group/sync`,
+`api/admin/github-team/sync`). It only posts on a health **transition** (ok→failing or failing→ok), tracked
+per source in `app_setting.slack_alert_state_<source>`, so an ongoing outage on the 15-minute FIRST sync
+doesn't spam ~96 alerts/day. State only advances once the alert is actually delivered, so a failure during
 an unconfigured-token window still gets reported once the token comes back.
 
 ## Sending

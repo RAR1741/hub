@@ -8,7 +8,7 @@ import { listTeams } from "@/lib/teams";
 import { listPeople } from "@/lib/people";
 import { computeAddRecommendations } from "@/lib/drive-group-sync";
 import type { ReconcileResult } from "@/lib/drive-group-sync";
-import { DriveSyncPanel } from "@/components/DriveSyncPanel";
+import { SyncNowPanel } from "@/components/SyncNowPanel";
 import { ReconcileReport } from "@/components/ReconcileReport";
 import { RecommendedMembers } from "@/components/RecommendedMembers";
 
@@ -112,7 +112,7 @@ export default async function AdminDriveSyncPage() {
       </div>
 
       <section className="card flex flex-col gap-4">
-        <DriveSyncPanel />
+        <SyncNowPanel endpoint="/api/admin/drive-group/sync" noun="Drive group" />
         <p className="text-sm text-[var(--muted)]">
           Reconcile adds missing members. Nobody is removed automatically — review the &ldquo;would be
           removed&rdquo; list below.
@@ -159,7 +159,12 @@ export default async function AdminDriveSyncPage() {
       </section>
 
       {lastReport ? (
-        <RecommendedMembers teams={recommendations} ranAt={lastReport.ranAt} teamTz={teamTz} />
+        <RecommendedMembers
+          teams={recommendations}
+          ranAt={lastReport.ranAt}
+          teamTz={teamTz}
+          description="People with Drive access who are active but not on the team."
+        />
       ) : (
         <section className="card flex flex-col gap-2">
           <h2 className="text-base font-semibold">Recommended members</h2>

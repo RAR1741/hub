@@ -32,6 +32,8 @@ export type PersonRow = {
   first_training_status?: string | null;
   first_synced_at?: string | null;
   slack_user_id?: string | null;
+  github_login?: string | null;
+  github_user_id?: number | null;
 };
 
 export type Person = {
@@ -65,6 +67,8 @@ export type Person = {
   firstTrainingStatus: string | null;
   firstSyncedAt: string | null;
   slackUserId?: string | null;
+  githubLogin?: string | null;
+  githubUserId?: number | null;
 };
 
 export function personFromRow(row: PersonRow): Person {
@@ -99,6 +103,8 @@ export function personFromRow(row: PersonRow): Person {
     firstTrainingStatus: row.first_training_status ?? null,
     firstSyncedAt: row.first_synced_at ?? null,
     slackUserId: row.slack_user_id ?? null,
+    githubLogin: row.github_login ?? null,
+    githubUserId: row.github_user_id ?? null,
   };
 }
 
@@ -111,6 +117,7 @@ export type TeamRow = {
   description: string | null;
   join_mode: JoinMode;
   google_group_email: string | null;
+  github_team_slug: string | null;
 };
 
 export type Team = {
@@ -120,6 +127,7 @@ export type Team = {
   description: string | null;
   joinMode: JoinMode;
   googleGroupEmail: string | null;
+  githubTeamSlug: string | null;
 };
 
 export function teamFromRow(row: TeamRow): Team {
@@ -130,6 +138,7 @@ export function teamFromRow(row: TeamRow): Team {
     description: row.description,
     joinMode: row.join_mode,
     googleGroupEmail: row.google_group_email,
+    githubTeamSlug: row.github_team_slug,
   };
 }
 

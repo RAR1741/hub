@@ -23,6 +23,7 @@ describe("teamFromRow", () => {
       description: "Software",
       join_mode: "open",
       google_group_email: null,
+      github_team_slug: null,
     };
     expect(teamFromRow(row)).toEqual({
       id: "t1",
@@ -31,6 +32,7 @@ describe("teamFromRow", () => {
       description: "Software",
       joinMode: "open",
       googleGroupEmail: null,
+      githubTeamSlug: null,
     });
   });
 });

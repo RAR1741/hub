@@ -168,7 +168,7 @@ export async function syncMembershipChange(
   }
 }
 
-export type AddRecommendation = { personId: string; name: string; emails: string[] };
+export type AddRecommendation = { personId: string; name: string; labels: string[] };
 export type TeamAddRecommendations = {
   teamId: string;
   teamName: string;
@@ -204,9 +204,9 @@ export function computeAddRecommendations(
       if (members.has(person.personId)) continue;
       const existing = byPerson.get(person.personId);
       if (existing) {
-        existing.emails.push(email);
+        existing.labels.push(email);
       } else {
-        byPerson.set(person.personId, { personId: person.personId, name: person.name, emails: [email] });
+        byPerson.set(person.personId, { personId: person.personId, name: person.name, labels: [email] });
       }
     }
     if (byPerson.size === 0) continue;

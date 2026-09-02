@@ -9,6 +9,7 @@ export type TeamFormValues = {
   description: string;
   joinMode: string;
   googleGroupEmail: string;
+  githubTeamSlug: string;
 };
 
 export function TeamForm({
@@ -21,7 +22,7 @@ export function TeamForm({
   teamId?: string; // present = edit
 }) {
   const EMPTY: TeamFormValues = {
-    name: "", parentTeamId: "", description: "", joinMode: "admin_only", googleGroupEmail: "",
+    name: "", parentTeamId: "", description: "", joinMode: "admin_only", googleGroupEmail: "", githubTeamSlug: "",
   };
   const [values, setValues] = useState<TeamFormValues>(initial ?? EMPTY);
   const [status, setStatus] = useState<string | null>(null);
@@ -42,6 +43,7 @@ export function TeamForm({
           description: values.description || undefined,
           joinMode: values.joinMode,
           googleGroupEmail: values.googleGroupEmail || undefined,
+          githubTeamSlug: values.githubTeamSlug || undefined,
         }),
       });
       if (res.ok) {
@@ -80,6 +82,15 @@ export function TeamForm({
         <span className="text-sm text-[var(--muted)]">
           Members of this team are synced into this Workspace group. Leave blank to disable.
         </span>
+      </label>
+      <label className="label">GitHub team slug
+        <input
+          className="input"
+          type="text"
+          placeholder="software"
+          value={values.githubTeamSlug}
+          onChange={(e) => setValues({ ...values, githubTeamSlug: e.target.value })}
+        />
       </label>
       <label className="label">Join mode{" "}
         <select className="input" value={values.joinMode} onChange={(e) => setValues({ ...values, joinMode: e.target.value })}>

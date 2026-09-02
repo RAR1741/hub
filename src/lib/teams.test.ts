@@ -4,7 +4,7 @@ import { teamFromRow } from "./types";
 import type { Team } from "./types";
 
 const team = (id: string, name: string, parentTeamId: string | null): Team => ({
-  id, name, parentTeamId, description: null, joinMode: "admin_only", googleGroupEmail: null,
+  id, name, parentTeamId, description: null, joinMode: "admin_only", googleGroupEmail: null, githubTeamSlug: null,
 });
 
 describe("buildTeamTree", () => {
@@ -35,7 +35,7 @@ describe("parseTeamInput", () => {
       parseTeamInput({ name: " Pit Crew ", joinMode: "open" }),
     ).toEqual({
       name: "Pit Crew", parentTeamId: null, description: null, joinMode: "open",
-      googleGroupEmail: null,
+      googleGroupEmail: null, githubTeamSlug: null,
     });
   });
   test.each([
@@ -68,13 +68,35 @@ describe("parseTeamInput", () => {
   test("googleGroupEmail rejects non-string values", () => {
     expect(parseTeamInput({ name: "X", joinMode: "open", googleGroupEmail: 42 })).toBeNull();
   });
+
+  test("githubTeamSlug absent is fine", () => {
+    const result = parseTeamInput({ name: "X", joinMode: "open" });
+    expect(result?.githubTeamSlug).toBeNull();
+  });
+
+  test("githubTeamSlug blank string becomes null", () => {
+    const result = parseTeamInput({ name: "X", joinMode: "open", githubTeamSlug: "  " });
+    expect(result?.githubTeamSlug).toBeNull();
+  });
+
+  test("githubTeamSlug is lowercased", () => {
+    const result = parseTeamInput({ name: "X", joinMode: "open", githubTeamSlug: "Software" });
+    expect(result?.githubTeamSlug).toBe("software");
+  });
+
+  test.each([
+    ["Bad Slug!"],
+    ["-leading-hyphen"],
+  ])("rejects invalid githubTeamSlug %j", (slug) => {
+    expect(parseTeamInput({ name: "X", joinMode: "open", githubTeamSlug: slug })).toBeNull();
+  });
 });
 
 describe("teamFromRow", () => {
   test("maps google_group_email column", () => {
     const t = teamFromRow({
       id: "t1", name: "Pit Crew", parent_team_id: null, description: null,
-      join_mode: "admin_only", google_group_email: "pit-crew@redalert1741.org",
+      join_mode: "admin_only", google_group_email: "pit-crew@redalert1741.org", github_team_slug: null,
     });
     expect(t.googleGroupEmail).toBe("pit-crew@redalert1741.org");
   });
@@ -82,7 +104,7 @@ describe("teamFromRow", () => {
   test("maps null google_group_email", () => {
     const t = teamFromRow({
       id: "t1", name: "Pit Crew", parent_team_id: null, description: null,
-      join_mode: "admin_only", google_group_email: null,
+      join_mode: "admin_only", google_group_email: null, github_team_slug: null,
     });
     expect(t.googleGroupEmail).toBeNull();
   });
@@ -90,7 +112,7 @@ describe("teamFromRow", () => {
 
 describe("joinAction", () => {
   const t = (joinMode: Team["joinMode"]): Team => ({
-    id: "t1", name: "T", parentTeamId: null, description: null, joinMode, googleGroupEmail: null,
+    id: "t1", name: "T", parentTeamId: null, description: null, joinMode, googleGroupEmail: null, githubTeamSlug: null,
   });
 
   test("existing member", () => {
