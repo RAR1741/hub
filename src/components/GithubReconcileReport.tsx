@@ -3,9 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { GithubReconcileResult } from "@/lib/github-team-sync";
+import type { GithubUser } from "@/lib/github-teams";
 
 type PickPerson = { id: string; name: string };
-type GithubUser = { id: number; login: string };
 
 /**
  * Renders the last GitHub team reconcile report. Logins resolve to hub names

@@ -140,7 +140,9 @@ export default async function AdminGithubSyncPage() {
           <GithubReconcileReport
             report={lastReport}
             nameByLogin={nameByLogin}
-            people={people.map((p) => ({ id: p.id, name: `${p.first_name} ${p.last_name}` }))}
+            people={people
+              .map((p) => ({ id: p.id, name: `${p.first_name} ${p.last_name}` }))
+              .sort((a, b) => a.name.localeCompare(b.name))}
           />
         )}
       </section>
