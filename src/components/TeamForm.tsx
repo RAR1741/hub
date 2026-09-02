@@ -47,9 +47,13 @@ export function TeamForm({
         }),
       });
       if (res.ok) {
-        setStatus("Saved.");
-        router.refresh();
-        if (!teamId) setValues(EMPTY);
+        if (teamId) {
+          setStatus("Saved.");
+          router.refresh();
+        } else {
+          const { id } = (await res.json()) as { id: string };
+          router.push(`/admin/teams/${id}`);
+        }
       } else if (res.status === 409) {
         setStatus("A team with that name already exists.");
       } else {

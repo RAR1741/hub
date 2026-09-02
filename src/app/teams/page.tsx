@@ -67,6 +67,9 @@ export default async function TeamsPage() {
         <div>
           <h1>Teams</h1>
         </div>
+        {canManageTeams && (
+          <Link href="/admin/teams/new" className="btn btn-primary">New team</Link>
+        )}
       </div>
       {!viewer.person && (
         <p className="text-sm" style={{ color: "var(--muted)" }}>
