@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { fetchGoogleAccessToken } from "./google-auth";
 
 export type GmailCredentials = { clientEmail: string; privateKey: string; sender: string };
@@ -22,22 +23,49 @@ export function gmailCredentialsFromEnv(): GmailCredentials | null {
   return { clientEmail, privateKey, sender };
 }
 
-function buildMessage(sender: string, to: string, subject: string, text: string): string {
+// Wrap a base64 string into 76-char lines per RFC 2045.
+function wrapBase64(b64: string): string {
+  return (b64.match(/.{1,76}/g) ?? []).join("\r\n");
+}
+
+function buildMessage(sender: string, to: string, subject: string, text: string, html?: string): string {
+  if (html === undefined) {
+    return [
+      `From: ${sender}`,
+      `To: ${to}`,
+      `Subject: ${subject}`,
+      "MIME-Version: 1.0",
+      "Content-Type: text/plain; charset=utf-8",
+      "",
+      text,
+    ].join("\r\n");
+  }
+  const boundary = randomUUID();
   return [
     `From: ${sender}`,
     `To: ${to}`,
     `Subject: ${subject}`,
     "MIME-Version: 1.0",
-    "Content-Type: text/plain; charset=utf-8",
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
     "",
-    text,
+    `--${boundary}`,
+    "Content-Type: text/plain; charset=utf-8",
+    "Content-Transfer-Encoding: 8bit",
+    "",
+    text.replace(/\r?\n/g, "\r\n"),
+    `--${boundary}`,
+    "Content-Type: text/html; charset=utf-8",
+    "Content-Transfer-Encoding: base64",
+    "",
+    wrapBase64(Buffer.from(html).toString("base64")),
+    `--${boundary}--`,
   ].join("\r\n");
 }
 
-/** Send a plain-text email via the Gmail API, impersonating the configured sender. */
+/** Send a plain-text (or multipart text+HTML) email via the Gmail API, impersonating the configured sender. */
 export async function sendMail(
   deps: GmailDeps,
-  message: { to: string; subject: string; text: string },
+  message: { to: string; subject: string; text: string; html?: string },
 ): Promise<void> {
   const token = await fetchGoogleAccessToken(
     deps.fetch,
@@ -45,9 +73,9 @@ export async function sendMail(
     { scope: GMAIL_SEND_SCOPE, subject: deps.credentials.sender },
     deps.now,
   );
-  const raw = Buffer.from(buildMessage(deps.credentials.sender, message.to, message.subject, message.text)).toString(
-    "base64url",
-  );
+  const raw = Buffer.from(
+    buildMessage(deps.credentials.sender, message.to, message.subject, message.text, message.html),
+  ).toString("base64url");
   const res = await deps.fetch(SEND_URL, {
     method: "POST",
     headers: {
