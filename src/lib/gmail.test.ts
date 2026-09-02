@@ -171,4 +171,13 @@ describe("sendMail", () => {
 
     expect(message.trimEnd().endsWith(`--${boundary}--`)).toBe(true);
   });
+
+  test("rejects CR/LF in the To and Subject headers", async () => {
+    const { fetchFn } = fakeFetch([{ status: 200, body: {} }]);
+    const deps: GmailDeps = { fetch: fetchFn, credentials: CREDS };
+    await expect(sendMail(deps, { to: "x@example.com\r\nBcc: evil@example.com", subject: "s", text: "t" })).rejects.toThrow(
+      "invalid header value",
+    );
+    await expect(sendMail(deps, { to: "x@example.com", subject: "s\nX: y", text: "t" })).rejects.toThrow("invalid header value");
+  });
 });

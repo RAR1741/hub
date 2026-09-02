@@ -29,6 +29,8 @@ function wrapBase64(b64: string): string {
 }
 
 function buildMessage(sender: string, to: string, subject: string, text: string, html?: string): string {
+  // Header values must be single-line; a CR/LF in `to`/`subject` would inject headers.
+  if (/[\r\n]/.test(to) || /[\r\n]/.test(subject)) throw new Error("invalid header value");
   if (html === undefined) {
     return [
       `From: ${sender}`,

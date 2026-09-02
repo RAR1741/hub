@@ -30,12 +30,28 @@ describe("renderEmail", () => {
   });
 
   test("escapes html but leaves text raw", () => {
-    const input: EmailInput = { heading: '<b>&"x"</b>', paragraphs: [] };
+    const input: EmailInput = {
+      heading: '<b>&"x"</b>',
+      paragraphs: ['<i>p</i>'],
+      code: '<script>1</script>',
+      footerNote: "a&b"
+    };
     const { html, text } = renderEmail(input);
 
     expect(html).toContain("&lt;b&gt;&amp;&quot;x&quot;&lt;/b&gt;");
     expect(html).not.toContain('<b>&"x"</b>');
     expect(text).toContain('<b>&"x"</b>');
+
+    expect(html).toContain("&lt;i&gt;p&lt;/i&gt;");
+    expect(html).not.toContain("<i>");
+    expect(text).toContain("<i>p</i>");
+
+    expect(html).toContain("&lt;script&gt;1&lt;/script&gt;");
+    expect(html).not.toContain("<script>");
+    expect(text).toContain("<script>1</script>");
+
+    expect(html).toContain("a&amp;b");
+    expect(text).toContain("a&b");
   });
 
   test("omits the code block and footer note when absent", () => {
