@@ -88,9 +88,11 @@ function fakeDb(rows: Record<string, unknown>[]) {
   } as never;
 }
 
+// time_in/time_out default relative to now (not a fixed past date) so a still-open
+// fixture's elapsed time never crosses the 18h max-shift threshold and flips on "over_max".
 const row = (over: Partial<Record<string, unknown>>): Record<string, unknown> => ({
-  id: "s1", person_id: "p1", period_id: "pd", time_in: "2026-09-01T18:00:00Z",
-  time_out: "2026-09-01T20:00:00Z", source: "kiosk", note: null,
+  id: "s1", person_id: "p1", period_id: "pd", time_in: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+  time_out: new Date(Date.now() - 60 * 60 * 1000).toISOString(), source: "kiosk", note: null,
   excluded_from_totals: false, edited_by: null, edited_at: null,
   person: { id: "p1", first_name: "Ada", last_name: "Lovelace", display_name: null },
   ...over,
