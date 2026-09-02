@@ -128,4 +128,56 @@ describe("sendMail", () => {
 
     await expect(sendMail(deps, { to: "x@example.com", subject: "s", text: "t" })).rejects.toThrow("403");
   });
+
+  test("builds a multipart text+HTML message when html is given", async () => {
+    const { fetchFn, requests } = fakeFetch([{ status: 200, body: { id: "abc" } }]);
+    const deps: GmailDeps = { fetch: fetchFn, credentials: CREDS };
+    const text = "Your code is 123456—enjoy";
+    const html = "<p>Your code is 123456—enjoy</p>\n<p>bye</p>";
+
+    await sendMail(deps, { to: "student@example.com", subject: "Your code", text, html });
+
+    const sendReq = requests.find((r) => r.url.includes("gmail.googleapis.com"))!;
+    const { raw } = JSON.parse(sendReq.init!.body as string) as { raw: string };
+    const message = Buffer.from(raw, "base64url").toString();
+
+    const boundaryMatch = message.match(/Content-Type: multipart\/alternative; boundary="([^"]+)"/);
+    expect(boundaryMatch).not.toBeNull();
+    const boundary = boundaryMatch![1];
+
+    const textPartIndex = message.indexOf("Content-Type: text/plain; charset=utf-8");
+    const htmlPartIndex = message.indexOf("Content-Type: text/html; charset=utf-8");
+    expect(textPartIndex).toBeGreaterThan(-1);
+    expect(htmlPartIndex).toBeGreaterThan(-1);
+    expect(textPartIndex).toBeLessThan(htmlPartIndex);
+
+    const parts = message.split(`--${boundary}`);
+    const textPart = parts.find((p) => p.includes("text/plain"))!;
+    const htmlPart = parts.find((p) => p.includes("text/html"))!;
+
+    expect(textPart).toContain("Content-Transfer-Encoding: 8bit");
+    expect(textPart).toContain("Your code is 123456—enjoy");
+    expect(textPart).toContain("Your code is 123456—enjoy\r\n");
+
+    expect(htmlPart).toContain("Content-Transfer-Encoding: base64");
+    const htmlLines = htmlPart
+      .split("\r\n")
+      .filter((line) => line.length > 0 && !line.startsWith("Content-"));
+    for (const line of htmlLines) {
+      expect(line.length).toBeLessThanOrEqual(76);
+    }
+    const decodedHtml = Buffer.from(htmlLines.join(""), "base64").toString();
+    expect(decodedHtml).toBe(html);
+
+    expect(message.trimEnd().endsWith(`--${boundary}--`)).toBe(true);
+  });
+
+  test("rejects CR/LF in the To and Subject headers", async () => {
+    const { fetchFn } = fakeFetch([{ status: 200, body: {} }]);
+    const deps: GmailDeps = { fetch: fetchFn, credentials: CREDS };
+    await expect(sendMail(deps, { to: "x@example.com\r\nBcc: evil@example.com", subject: "s", text: "t" })).rejects.toThrow(
+      "invalid header value",
+    );
+    await expect(sendMail(deps, { to: "x@example.com", subject: "s\nX: y", text: "t" })).rejects.toThrow("invalid header value");
+  });
 });
