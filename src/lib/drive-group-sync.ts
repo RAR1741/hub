@@ -84,6 +84,19 @@ export async function reconcileDriveGroups(deps: {
           ).map((i) => i.email.toLowerCase()),
         );
 
+      const { data: externalRows, error: externalError } = await db
+        .from("team_external_account")
+        .select("provider, identifier")
+        .eq("team_id", team.id);
+      if (externalError) {
+        report.errors.push(externalError.message ?? String(externalError));
+        groups.push(report);
+        continue;
+      }
+      for (const row of (externalRows ?? []) as { provider: string; identifier: string }[]) {
+        if (row.provider === "google") expected.push(row.identifier);
+      }
+
       const actual = await listGroupMembers(dirDeps, groupEmail);
       report.expectedCount = expected.length;
       report.actualCount = actual.length;

@@ -113,6 +113,25 @@ export async function reconcileGithubTeams(deps: {
         .filter((p) => p.github_user_id == null)
         .map((p) => `${p.first_name} ${p.last_name}`);
 
+      const { data: externalRows, error: externalError } = await db
+        .from("team_external_account")
+        .select("provider, identifier, github_user_id")
+        .eq("team_id", team.id);
+      if (externalError) {
+        report.errors.push(externalError.message ?? String(externalError));
+        teams.push(report);
+        continue;
+      }
+      for (const row of (externalRows ?? []) as {
+        provider: string;
+        identifier: string;
+        github_user_id: number | null;
+      }[]) {
+        if (row.provider === "github" && row.github_user_id != null) {
+          expected.push({ id: row.github_user_id, login: row.identifier });
+        }
+      }
+
       const actual = await listTeamMembers(ghDeps, slug);
       const pendingLogins = await listPendingTeamInvitations(ghDeps, slug);
       report.expectedCount = expected.length;
