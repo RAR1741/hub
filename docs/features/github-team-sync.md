@@ -11,7 +11,8 @@ its **Sync now** button, which calls `POST /api/admin/github-team/sync`
 `src/lib/github-team-sync.ts`). For each team with a `github_team_slug`:
 
 1. Computes the expected member list — every person on that team with a verified GitHub login
-   (`person.github_login` and `person.github_user_id`) who is marked active.
+   (`person.github_login` and `person.github_user_id`) who is marked active. Team [external accounts](team-external-accounts.md)
+   with provider `github` are unioned into this list.
 2. Lists the GitHub Team's actual members via the GitHub App's installation token (`src/lib/github-teams.ts`).
 3. Diffs the two (`computeGithubTeamDiff()`, keyed on GitHub user id) and **adds** anyone expected but missing
    (`putTeamMembership()`) — adds as a direct member if already an org member, or invites as a new org
@@ -55,7 +56,9 @@ doesn't go through this real-time hook — the next nightly reconcile self-heals
 Membership sync requires verified GitHub identity — a person must link their hub account to their
 GitHub login via OAuth ("Connect GitHub" button on their profile). The OAuth callback stores the
 GitHub `login` (username) and stable numeric `id`; only the `id` is used thereafter, so renames don't
-break existing memberships. Admins never type a login by hand — identity is always verified.
+break existing memberships. Admins never type a login by hand — identity is always verified. Team-owned
+[external accounts](team-external-accounts.md) are a deliberate exception: admins type the login and
+it's resolved to the stable id via the GitHub App.
 
 Disconnecting ("Disconnect GitHub" button) clears the stored login and id but does **not** remove the
 person from any GitHub Team. They surface in `wouldRemove` on the next reconcile, and an admin removes
