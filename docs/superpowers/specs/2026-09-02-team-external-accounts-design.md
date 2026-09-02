@@ -111,8 +111,13 @@ place each already builds it:
   append `identifier` for rows with `provider = 'google'`. The diff is already
   case-insensitive.
 - `src/lib/github-team-sync.ts` `reconcileGithubTeams()`: after `expected` is built, append
-  `{ id: github_user_id, login: identifier }` for rows with `provider = 'github'`. Also add
-  them to `expectedById` so the diff keys correctly.
+  `{ id: github_user_id, login: identifier }` for rows with `provider = 'github'`. Do **not**
+  add them to `expectedById`: that map feeds only the login self-heal loop, which writes
+  `person.github_login`, and it already skips ids it does not know (`if (!person) continue`).
+  `computeGithubTeamDiff()` keys on `expected` by id, so no other change is needed. Pending
+  invitations are matched by login case-insensitively already, so the lowercased identifier
+  is safe. A renamed bot login leaves `identifier` stale for display only; the id still
+  matches, so sync stays correct. Self-healing that column is skipped for v1.
 
 External rows are not people, so they must not feed `notConnected`, "recommended members", or
 the PR #239 "assign to person" picker. Because they are in `expected`, they never reach
@@ -163,7 +168,10 @@ Unit (Vitest, fake db + fake fetch, existing patterns in `drive-group-sync.test.
   `notConnected` or in `computeGithubAddRecommendations()` output.
 
 E2E (Playwright, existing admin dev-login): on a team page, add a Google external account, see
-it in the External accounts table, remove it, see it gone. No live GitHub call in e2e.
+it in the External accounts table, remove it, see it gone. The e2e team is unlinked (the seed
+links no team to a Google Group or GitHub Team), so no live sync fires and no credentials are
+needed. `syncMembershipChange()` already wraps the whole call, token fetch included, in
+try/catch, so a linked team without creds would only log; the GitHub live sync must do the same.
 
 ## 8. Docs
 
