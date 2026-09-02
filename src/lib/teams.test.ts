@@ -4,7 +4,7 @@ import { teamFromRow } from "./types";
 import type { Team } from "./types";
 
 const team = (id: string, name: string, parentTeamId: string | null): Team => ({
-  id, name, parentTeamId, description: null, joinMode: "admin_only", googleGroupEmail: null,
+  id, name, parentTeamId, description: null, joinMode: "admin_only", googleGroupEmail: null, githubTeamSlug: null,
 });
 
 describe("buildTeamTree", () => {
@@ -74,7 +74,7 @@ describe("teamFromRow", () => {
   test("maps google_group_email column", () => {
     const t = teamFromRow({
       id: "t1", name: "Pit Crew", parent_team_id: null, description: null,
-      join_mode: "admin_only", google_group_email: "pit-crew@redalert1741.org",
+      join_mode: "admin_only", google_group_email: "pit-crew@redalert1741.org", github_team_slug: null,
     });
     expect(t.googleGroupEmail).toBe("pit-crew@redalert1741.org");
   });
@@ -82,7 +82,7 @@ describe("teamFromRow", () => {
   test("maps null google_group_email", () => {
     const t = teamFromRow({
       id: "t1", name: "Pit Crew", parent_team_id: null, description: null,
-      join_mode: "admin_only", google_group_email: null,
+      join_mode: "admin_only", google_group_email: null, github_team_slug: null,
     });
     expect(t.googleGroupEmail).toBeNull();
   });
@@ -90,7 +90,7 @@ describe("teamFromRow", () => {
 
 describe("joinAction", () => {
   const t = (joinMode: Team["joinMode"]): Team => ({
-    id: "t1", name: "T", parentTeamId: null, description: null, joinMode, googleGroupEmail: null,
+    id: "t1", name: "T", parentTeamId: null, description: null, joinMode, googleGroupEmail: null, githubTeamSlug: null,
   });
 
   test("existing member", () => {
