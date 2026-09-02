@@ -137,7 +137,11 @@ export default async function AdminGithubSyncPage() {
         {!lastReport ? (
           <p className="text-sm text-[var(--muted)]">No reconcile has run yet.</p>
         ) : (
-          <GithubReconcileReport report={lastReport} nameByLogin={nameByLogin} />
+          <GithubReconcileReport
+            report={lastReport}
+            nameByLogin={nameByLogin}
+            people={people.map((p) => ({ id: p.id, name: `${p.first_name} ${p.last_name}` }))}
+          />
         )}
       </section>
 
