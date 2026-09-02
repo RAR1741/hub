@@ -35,7 +35,10 @@ export type TeamInput = {
   description: string | null;
   joinMode: JoinMode;
   googleGroupEmail: string | null;
+  githubTeamSlug: string | null;
 };
+
+const GITHUB_SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
 
 /** Validate a team payload. PURE. Null = invalid. */
 export function parseTeamInput(body: unknown): TeamInput | null {
@@ -45,14 +48,18 @@ export function parseTeamInput(body: unknown): TeamInput | null {
   const parentTeamId = optString(b.parentTeamId, 64);
   const description = optString(b.description, 500);
   const googleGroupEmail = optString(b.googleGroupEmail, 254);
+  const githubTeamSlugRaw = optString(b.githubTeamSlug, 100);
   const joinMode = JOIN_MODES.find((m) => m === b.joinMode);
-  if (!name || !parentTeamId || !description || !googleGroupEmail || !joinMode) return null;
+  if (!name || !parentTeamId || !description || !googleGroupEmail || !githubTeamSlugRaw || !joinMode) return null;
+  const githubTeamSlug = githubTeamSlugRaw.value ? githubTeamSlugRaw.value.toLowerCase() : null;
+  if (githubTeamSlug && !GITHUB_SLUG_RE.test(githubTeamSlug)) return null;
   return {
     name,
     parentTeamId: parentTeamId.value,
     description: description.value,
     joinMode,
     googleGroupEmail: googleGroupEmail.value,
+    githubTeamSlug,
   };
 }
 
@@ -83,6 +90,7 @@ export async function createTeam(
       description: input.description,
       join_mode: input.joinMode,
       google_group_email: input.googleGroupEmail,
+      github_team_slug: input.githubTeamSlug,
     })
     .select("id")
     .single();
@@ -105,6 +113,7 @@ export async function updateTeam(
       description: input.description,
       join_mode: input.joinMode,
       google_group_email: input.googleGroupEmail,
+      github_team_slug: input.githubTeamSlug,
     })
     .eq("id", id)
     .select("id")

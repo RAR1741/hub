@@ -234,11 +234,10 @@ export async function syncPersonLinkedTeams(personId: string, db: SupabaseClient
   }
 }
 
-// TeamAddRecommendations in drive-group-sync.ts still uses `emails`; this
-// mirrors it with `labels` per the design's task-12 field rename. ponytail:
-// once task 12 renames the Drive field, these two near-identical types (and
-// computeAddRecommendations/computeGithubAddRecommendations) should merge
-// behind a shared key-extractor.
+// AddRecommendation in drive-group-sync.ts now also uses `labels` (task 12).
+// The wrapper types still differ (groupEmail vs teamSlug), so they're kept
+// separate here. ponytail: if a third caller needs this shape, extract a
+// shared key-extractor instead of a third near-duplicate.
 export type GithubAddRecommendation = { personId: string; name: string; labels: string[] };
 export type TeamAddRecommendations = {
   teamId: string;

@@ -330,7 +330,7 @@ describe("computeAddRecommendations", () => {
     const members = new Map<string, Set<string>>();
     expect(computeAddRecommendations(r, g2t, people, members)).toEqual([
       { teamId: "t1", teamName: "Team A", groupEmail: "team-a@x.org",
-        people: [{ personId: "p1", name: "Bob", emails: ["bob@x.com"] }] },
+        people: [{ personId: "p1", name: "Bob", labels: ["bob@x.com"] }] },
     ]);
   });
 
@@ -352,7 +352,7 @@ describe("computeAddRecommendations", () => {
       ["b@x.com", { personId: "p1", name: "Bob", isActive: true }],
     ]);
     const out = computeAddRecommendations(r, g2t, people, new Map());
-    expect(out[0].people).toEqual([{ personId: "p1", name: "Bob", emails: ["a@x.com", "b@x.com"] }]);
+    expect(out[0].people).toEqual([{ personId: "p1", name: "Bob", labels: ["a@x.com", "b@x.com"] }]);
   });
 
   test("omits groups with no linked team and teams with no recommendations", () => {

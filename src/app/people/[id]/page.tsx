@@ -12,16 +12,19 @@ import { BadgeAwardPanel } from "@/components/BadgeAwardPanel";
 import { RevokeBadgeButton } from "@/components/RevokeBadgeButton";
 import { getGuardiansForPerson } from "@/lib/guardians";
 import { StatusBadge } from "@/components/FirstStatusTable";
+import { GitHubConnectCard } from "@/components/GitHubConnectCard";
 import { getTeamTimezone } from "@/lib/settings";
 
 export const metadata: Metadata = { title: "Person" };
 
 export default async function PersonPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ github?: string }>;
 }) {
-  const [{ id }, viewer] = await Promise.all([params, getViewer()]);
+  const [{ id }, { github: githubStatus }, viewer] = await Promise.all([params, searchParams, getViewer()]);
   if (!canViewProfile(viewer, id)) notFound();
   const canViewGuardians = hasRole(viewer.role, "mentor");
   const canEdit = hasRole(viewer.role, "admin");
@@ -152,6 +155,16 @@ export default async function PersonPage({
             )}
           </section>
         )}
+
+      {(hasRole(viewer.role, "admin") || viewer.person?.id === person.id) && (
+        <GitHubConnectCard
+          githubLogin={person.githubLogin ?? null}
+          personId={person.id}
+          isSelf={viewer.person?.id === person.id}
+          isAdmin={hasRole(viewer.role, "admin")}
+          status={githubStatus}
+        />
+      )}
 
       {canViewGuardians && (
         <section className="card flex flex-col gap-3">

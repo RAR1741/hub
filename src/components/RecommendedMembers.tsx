@@ -10,10 +10,12 @@ export function RecommendedMembers({
   teams,
   ranAt,
   teamTz,
+  description,
 }: {
   teams: TeamAddRecommendations[];
   ranAt: string;
   teamTz: string;
+  description: string;
 }) {
   const router = useRouter();
   // key: `${teamId}:${personId}` -> row state
@@ -68,7 +70,7 @@ export function RecommendedMembers({
       <div>
         <h2 className="text-base font-semibold">Recommended members</h2>
         <p className="text-sm text-[var(--muted)]">
-          People with Drive access who are active but not on the team. Based on the sync from{" "}
+          {description} Based on the sync from{" "}
           <span className="mono">{new Date(ranAt).toLocaleString(undefined, { timeZone: teamTz })}</span>.
         </p>
       </div>
@@ -99,7 +101,7 @@ export function RecommendedMembers({
                   <li key={p.personId} className="flex items-center justify-between gap-3 text-sm">
                     <span>
                       {p.name}{" "}
-                      <span className="mono text-[var(--muted)]">({p.emails.join(", ")})</span>
+                      <span className="mono text-[var(--muted)]">({p.labels.join(", ")})</span>
                     </span>
                     <span className="flex items-center gap-2">
                       {st === "failed" && <span className="text-xs text-[var(--red)]">failed</span>}

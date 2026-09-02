@@ -35,7 +35,7 @@ describe("parseTeamInput", () => {
       parseTeamInput({ name: " Pit Crew ", joinMode: "open" }),
     ).toEqual({
       name: "Pit Crew", parentTeamId: null, description: null, joinMode: "open",
-      googleGroupEmail: null,
+      googleGroupEmail: null, githubTeamSlug: null,
     });
   });
   test.each([
@@ -67,6 +67,28 @@ describe("parseTeamInput", () => {
 
   test("googleGroupEmail rejects non-string values", () => {
     expect(parseTeamInput({ name: "X", joinMode: "open", googleGroupEmail: 42 })).toBeNull();
+  });
+
+  test("githubTeamSlug absent is fine", () => {
+    const result = parseTeamInput({ name: "X", joinMode: "open" });
+    expect(result?.githubTeamSlug).toBeNull();
+  });
+
+  test("githubTeamSlug blank string becomes null", () => {
+    const result = parseTeamInput({ name: "X", joinMode: "open", githubTeamSlug: "  " });
+    expect(result?.githubTeamSlug).toBeNull();
+  });
+
+  test("githubTeamSlug is lowercased", () => {
+    const result = parseTeamInput({ name: "X", joinMode: "open", githubTeamSlug: "Software" });
+    expect(result?.githubTeamSlug).toBe("software");
+  });
+
+  test.each([
+    ["Bad Slug!"],
+    ["-leading-hyphen"],
+  ])("rejects invalid githubTeamSlug %j", (slug) => {
+    expect(parseTeamInput({ name: "X", joinMode: "open", githubTeamSlug: slug })).toBeNull();
   });
 });
 

@@ -7,7 +7,7 @@ type SyncOutcome =
   | { kind: "ok"; groups: number }
   | { kind: "error"; message: string };
 
-export function DriveSyncPanel() {
+export function SyncNowPanel({ endpoint, noun }: { endpoint: string; noun: string }) {
   const [busy, setBusy] = useState(false);
   const [outcome, setOutcome] = useState<SyncOutcome | null>(null);
   const router = useRouter();
@@ -16,10 +16,10 @@ export function DriveSyncPanel() {
     setBusy(true);
     setOutcome(null);
     try {
-      const res = await fetch("/api/admin/drive-group/sync", { method: "POST" });
+      const res = await fetch(endpoint, { method: "POST" });
       const body = await res.json().catch(() => null);
       if (res.ok && body) {
-        const groups = Array.isArray(body.groups) ? body.groups.length : 0;
+        const groups = Object.values(body).find(Array.isArray)?.length ?? 0;
         setOutcome({ kind: "ok", groups });
         router.refresh();
       } else {
@@ -39,7 +39,7 @@ export function DriveSyncPanel() {
       </button>
       {outcome?.kind === "ok" && (
         <p className="text-sm text-[var(--muted)]">
-          Sync complete — reconciled {outcome.groups} group{outcome.groups === 1 ? "" : "s"}.
+          Sync complete — reconciled {outcome.groups} {noun} group{outcome.groups === 1 ? "" : "s"}.
         </p>
       )}
       {outcome?.kind === "error" && (
