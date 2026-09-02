@@ -20,7 +20,10 @@ export async function listTeamMembers(deps: GithubDeps, slug: string): Promise<G
     const res = await deps.fetch(url.toString(), { headers: githubHeaders(token) });
     if (!res.ok) throw new Error(`list team members failed: ${res.status}`);
     const json = (await res.json()) as { id: number; login: string }[];
-    for (const m of json) members.push({ id: m.id, login: m.login.toLowerCase() });
+    for (const m of json) {
+      // ponytail: logins are stored lowercased (case-insensitive on GitHub); a self-healed github_login may display lowercase. Preserve original casing only if display fidelity is ever needed.
+      members.push({ id: m.id, login: m.login.toLowerCase() });
+    }
     if (json.length < PER_PAGE) break;
     page += 1;
   }

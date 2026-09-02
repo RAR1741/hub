@@ -182,11 +182,13 @@ export async function syncGithubMembershipChange(
     const credentials = githubAppCredentialsFromEnv();
     if (!credentials) return;
 
-    const { data: team } = await db.from("team").select("github_team_slug").eq("id", teamId).maybeSingle();
+    const { data: team, error: teamError } = await db.from("team").select("github_team_slug").eq("id", teamId).maybeSingle();
+    if (teamError) throw new Error(teamError.message);
     const slug = (team as { github_team_slug: string | null } | null)?.github_team_slug;
     if (!slug) return;
 
-    const { data: person } = await db.from("person").select("github_login").eq("id", personId).maybeSingle();
+    const { data: person, error: personError } = await db.from("person").select("github_login").eq("id", personId).maybeSingle();
+    if (personError) throw new Error(personError.message);
     const login = (person as { github_login: string | null } | null)?.github_login;
     if (!login) return;
 
@@ -211,14 +213,16 @@ export async function syncPersonLinkedTeams(personId: string, db: SupabaseClient
     const credentials = githubAppCredentialsFromEnv();
     if (!credentials) return;
 
-    const { data: person } = await db.from("person").select("github_login").eq("id", personId).maybeSingle();
+    const { data: person, error: personError } = await db.from("person").select("github_login").eq("id", personId).maybeSingle();
+    if (personError) throw new Error(personError.message);
     const login = (person as { github_login: string | null } | null)?.github_login;
     if (!login) return;
 
-    const { data: memberships } = await db
+    const { data: memberships, error: membershipsError } = await db
       .from("team_membership")
       .select("team (id, github_team_slug)")
       .eq("person_id", personId);
+    if (membershipsError) throw new Error(membershipsError.message);
     type TeamJoin = { id: string; github_team_slug: string | null };
     const linkedSlugs = ((memberships ?? []) as unknown as { team: TeamJoin | TeamJoin[] | null }[])
       .map((m) => (Array.isArray(m.team) ? m.team[0] : m.team))

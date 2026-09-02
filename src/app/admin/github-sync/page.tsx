@@ -90,7 +90,7 @@ export default async function AdminGithubSyncPage() {
       </div>
 
       <section className="card flex flex-col gap-4">
-        <SyncNowPanel endpoint="/api/admin/github-team/sync" noun="GitHub" />
+        <SyncNowPanel endpoint="/api/admin/github-team/sync" noun="GitHub team" />
         <p className="text-sm text-[var(--muted)]">
           Reconcile adds missing members. Nobody is removed automatically — review the &ldquo;would be
           removed&rdquo; list below.

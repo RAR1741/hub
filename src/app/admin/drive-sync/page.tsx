@@ -112,7 +112,7 @@ export default async function AdminDriveSyncPage() {
       </div>
 
       <section className="card flex flex-col gap-4">
-        <SyncNowPanel endpoint="/api/admin/drive-group/sync" noun="Drive" />
+        <SyncNowPanel endpoint="/api/admin/drive-group/sync" noun="Drive group" />
         <p className="text-sm text-[var(--muted)]">
           Reconcile adds missing members. Nobody is removed automatically — review the &ldquo;would be
           removed&rdquo; list below.

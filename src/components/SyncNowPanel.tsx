@@ -39,7 +39,7 @@ export function SyncNowPanel({ endpoint, noun }: { endpoint: string; noun: strin
       </button>
       {outcome?.kind === "ok" && (
         <p className="text-sm text-[var(--muted)]">
-          Sync complete — reconciled {outcome.groups} {noun} group{outcome.groups === 1 ? "" : "s"}.
+          Sync complete — reconciled {outcome.groups} {noun}{outcome.groups === 1 ? "" : "s"}.
         </p>
       )}
       {outcome?.kind === "error" && (

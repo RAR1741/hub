@@ -64,7 +64,7 @@ export function RecommendedMembers({
     if (busyTeam) return;
     setBusyTeam(team.teamId);
     let anyOk = false;
-    // Sequential: each add triggers a Google Directory call; keeps failures attributable.
+    // Sequential: each add triggers the Drive/GitHub hooks; keeps failures attributable.
     for (const p of team.people) {
       const ok = await addOne(team.teamId, p.personId);
       anyOk = anyOk || ok;
