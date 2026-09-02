@@ -3,7 +3,7 @@ import type { JoinMode, Team, TeamRow } from "./types";
 import { teamFromRow } from "./types";
 import { displayName } from "./people";
 import { optString, reqString } from "./validate";
-import { syncMembershipChange } from "./drive-group-sync";
+import { syncMembershipChange } from "./membership-sync";
 
 export type TeamNode = Team & { children: TeamNode[] };
 

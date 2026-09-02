@@ -36,6 +36,7 @@ const ADMIN_ITEMS: { label: string; href: string; role: Role }[] = [
   // Config — admin
   { label: "Kiosk devices", href: "/admin/kiosk-devices", role: "admin" },
   { label: "Drive group sync", href: "/admin/drive-sync", role: "admin" },
+  { label: "GitHub team sync", href: "/admin/github-sync", role: "admin" },
   { label: "FIRST roster status", href: "/admin/first-status", role: "admin" },
   { label: "Slack", href: "/admin/slack", role: "admin" },
   { label: "Settings", href: "/admin/settings", role: "admin" },

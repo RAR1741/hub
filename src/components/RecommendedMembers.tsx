@@ -2,9 +2,17 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { TeamAddRecommendations } from "@/lib/drive-group-sync";
 
 type RowState = "idle" | "adding" | "failed";
+
+// Structural, not imported from drive-group-sync or github-team-sync: both
+// modules' TeamAddRecommendations satisfy this (each carries an extra
+// integration-specific field this component never reads).
+type TeamAddRecommendations = {
+  teamId: string;
+  teamName: string;
+  people: { personId: string; name: string; labels: string[] }[];
+};
 
 export function RecommendedMembers({
   teams,

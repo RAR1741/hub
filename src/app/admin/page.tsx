@@ -182,6 +182,7 @@ export default async function AdminHubPage() {
         <Section label="Config">
           <Card href="/admin/kiosk-devices" icon="chevron" title="Kiosk devices" count={kioskDevices.length} hint="Shop-tablet sign-in tokens." />
           <Card href="/admin/drive-sync" icon="users" title="Drive group sync" hint="Linked teams, reconcile report, and Sync now." />
+          <Card href="/admin/github-sync" icon="users" title="GitHub team sync" hint="Sync GitHub organization team membership." />
           <Card href="/admin/first-status" icon="check" title="FIRST roster status" hint="Consent, screening, and training sync from FIRST." />
           <Card href="/admin/slack" icon="users" title="Slack" hint="Link people to Slack users and sync from the workspace." />
           <Card href="/admin/settings" icon="x" title="Settings" hint="Timezone, calendar sync, shift limits." />
