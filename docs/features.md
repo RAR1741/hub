@@ -113,6 +113,9 @@ scannable catalog of what's built, grouped by area, with a route per entry. The
 - **Google Drive group sync** — syncs team membership to Google Groups. `/admin/drive-sync` — see
   [features/drive-group-sync.md](features/drive-group-sync.md),
   [setup/google-drive-groups.md](setup/google-drive-groups.md)
+- **GitHub team sync** — syncs team membership to GitHub Teams. `/admin/github-sync` — see
+  [features/github-team-sync.md](features/github-team-sync.md),
+  [setup/github-app.md](setup/github-app.md)
 - **Onshape** — see [features/parts-and-shop.md](features/parts-and-shop.md),
   [setup/onshape.md](setup/onshape.md)
 - **Google Calendar sync** — see [setup/google-calendar.md](setup/google-calendar.md)
