@@ -157,15 +157,21 @@ export async function removeTeamExternalAccount(
 ): Promise<RemoveExternalAccountResult> {
   const d = await resolveDeps(deps);
   const normalized = identifier.trim().toLowerCase();
-  const { error } = await d.db
+  const { data, error } = await d.db
     .from("team_external_account")
     .delete()
     .eq("team_id", teamId)
     .eq("provider", provider)
-    .eq("identifier", normalized);
+    .eq("identifier", normalized)
+    .select("identifier");
   if (error) return { ok: false, status: 500 };
 
-  await liveSync(d, "remove", teamId, provider, normalized);
+  // Nothing matched (already removed / never existed) — idempotent no-op, and
+  // critically: skip liveSync so we don't strip a real person sharing this
+  // email/login from the linked Google Group / GitHub Team.
+  if (data && data.length > 0) {
+    await liveSync(d, "remove", teamId, provider, normalized);
+  }
 
   return { ok: true };
 }

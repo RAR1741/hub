@@ -32,6 +32,7 @@ function fakeDb(opts: {
   insertResult?: { error?: { code: string } | null };
   onInsert?: (payload: unknown) => void;
   onDelete?: (match: Record<string, unknown>) => void;
+  deleteResult?: { data: { identifier: string }[]; error: null } | { data: null; error: { message: string } };
 }) {
   return {
     from(table: string) {
@@ -49,10 +50,12 @@ function fakeDb(opts: {
           delete: () => ({
             eq: (col1: string, val1: unknown) => ({
               eq: (col2: string, val2: unknown) => ({
-                eq: async (col3: string, val3: unknown) => {
-                  opts.onDelete?.({ [col1]: val1, [col2]: val2, [col3]: val3 });
-                  return { error: null };
-                },
+                eq: (col3: string, val3: unknown) => ({
+                  select: async () => {
+                    opts.onDelete?.({ [col1]: val1, [col2]: val2, [col3]: val3 });
+                    return opts.deleteResult ?? { data: [{ identifier: val3 }], error: null };
+                  },
+                }),
               }),
             }),
           }),
@@ -289,6 +292,22 @@ describe("removeTeamExternalAccount", () => {
     const fetchFn = vi.fn(async () => new Response("{}", { status: 200 })) as unknown as typeof fetch;
     const result = await removeTeamExternalAccount("t1", "github", "bot", baseDeps({ db, fetch: fetchFn }));
     expect(result.ok).toBe(true);
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  test("zero rows matched: returns ok:true and does not sync (would strip a real member otherwise)", async () => {
+    const db = fakeDb({
+      team: { data: { github_team_slug: null, google_group_email: "team@groups.example.org" } },
+      deleteResult: { data: [], error: null },
+    });
+    const fetchFn = vi.fn(async () => new Response("{}", { status: 200 })) as unknown as typeof fetch;
+    const result = await removeTeamExternalAccount(
+      "t1",
+      "google",
+      "nobody@example.org",
+      baseDeps({ db, fetch: fetchFn }),
+    );
+    expect(result).toEqual({ ok: true });
     expect(fetchFn).not.toHaveBeenCalled();
   });
 });

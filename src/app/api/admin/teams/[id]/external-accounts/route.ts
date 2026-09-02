@@ -21,6 +21,9 @@ export const POST = withRole<Ctx>("admin", async (_viewer, request, context) => 
     if (result.status === 404) {
       return Response.json({ error: "github_user_not_found" }, { status: 404 });
     }
+    if (result.status === 400) {
+      return Response.json({ error: "invalid" }, { status: 400 });
+    }
     return Response.json({ error: "failed" }, { status: result.status });
   }
   return Response.json({ ok: true, row: result.row });
