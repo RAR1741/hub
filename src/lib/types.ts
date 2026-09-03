@@ -778,3 +778,122 @@ export function onshapeConnectionFromRow(row: OnshapeConnectionRow): OnshapeConn
     updatedAt: row.updated_at,
   };
 }
+
+export type BatteryStatus = "active" | "retired";
+
+export type BatteryRow = {
+  id: string;
+  number: string;
+  kind: string;
+  year_acquired: number | null;
+  model: string | null;
+  serial_date_code: string | null;
+  manufacturer: string | null;
+  trade_name: string | null;
+  amp_hour_rating: number | string | null;
+  notes: string | null;
+  status: BatteryStatus;
+  retired_at: string | null;
+  retired_reason: string | null;
+  created_at: string;
+};
+
+export type Battery = {
+  id: string;
+  number: string;
+  kind: string;
+  yearAcquired: number | null;
+  model: string | null;
+  serialDateCode: string | null;
+  manufacturer: string | null;
+  tradeName: string | null;
+  ampHourRating: number | null;
+  notes: string | null;
+  status: BatteryStatus;
+  retiredAt: string | null;
+  retiredReason: string | null;
+  createdAt: string;
+};
+
+export function batteryFromRow(row: BatteryRow): Battery {
+  return {
+    id: row.id,
+    number: row.number,
+    kind: row.kind,
+    yearAcquired: row.year_acquired,
+    model: row.model,
+    serialDateCode: row.serial_date_code,
+    manufacturer: row.manufacturer,
+    tradeName: row.trade_name,
+    ampHourRating: row.amp_hour_rating == null ? null : Number(row.amp_hour_rating),
+    notes: row.notes,
+    status: row.status,
+    retiredAt: row.retired_at,
+    retiredReason: row.retired_reason,
+    createdAt: row.created_at,
+  };
+}
+
+export type BatteryUsageRow = {
+  id: string;
+  battery_id: string;
+  tech_id: string;
+  used_at: string;
+  event_key: string | null;
+  match_key: string | null;
+  had_problem: boolean;
+  problem_description: string | null;
+  wiggle_test_ok: boolean | null;
+  charger_test_ok: boolean | null;
+  rint_ohms: number | string | null;
+  charge_pre_pct: number | null;
+  charge_post_pct: number | null;
+  notes: string | null;
+  created_at: string;
+  // Embedded via `person (first_name, last_name, display_name)` — one FK, no hint needed.
+  person: { first_name: string; last_name: string; display_name: string | null };
+};
+
+export type BatteryUsage = {
+  id: string;
+  batteryId: string;
+  techId: string;
+  usedAt: string;
+  eventKey: string | null;
+  matchKey: string | null;
+  hadProblem: boolean;
+  problemDescription: string | null;
+  wiggleTestOk: boolean | null;
+  chargerTestOk: boolean | null;
+  rintOhms: number | null;
+  chargePrePct: number | null;
+  chargePostPct: number | null;
+  notes: string | null;
+  createdAt: string;
+  tech: { firstName: string; lastName: string; displayName: string | null };
+};
+
+export function batteryUsageFromRow(row: BatteryUsageRow): BatteryUsage {
+  return {
+    id: row.id,
+    batteryId: row.battery_id,
+    techId: row.tech_id,
+    usedAt: row.used_at,
+    eventKey: row.event_key,
+    matchKey: row.match_key,
+    hadProblem: row.had_problem,
+    problemDescription: row.problem_description,
+    wiggleTestOk: row.wiggle_test_ok,
+    chargerTestOk: row.charger_test_ok,
+    rintOhms: row.rint_ohms == null ? null : Number(row.rint_ohms),
+    chargePrePct: row.charge_pre_pct,
+    chargePostPct: row.charge_post_pct,
+    notes: row.notes,
+    createdAt: row.created_at,
+    tech: {
+      firstName: row.person.first_name,
+      lastName: row.person.last_name,
+      displayName: row.person.display_name,
+    },
+  };
+}
