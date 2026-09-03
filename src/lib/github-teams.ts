@@ -49,6 +49,20 @@ export async function listPendingTeamInvitations(deps: GithubDeps, slug: string)
   return logins;
 }
 
+/** Look up a GitHub user by login. 404 → not found. */
+export async function getUserByLogin(
+  deps: GithubDeps,
+  login: string,
+): Promise<{ ok: true; user: GithubUser } | { ok: false; status: number }> {
+  const token = await fetchInstallationToken(deps);
+  const res = await deps.fetch(`https://api.github.com/users/${encodeURIComponent(login)}`, {
+    headers: githubHeaders(token),
+  });
+  if (!res.ok) return { ok: false, status: res.status };
+  const json = (await res.json()) as { id: number; login: string };
+  return { ok: true, user: { id: json.id, login: json.login } };
+}
+
 /** Add (or invite) a user to a team. Adds directly if already an org member, else invites. */
 export async function putTeamMembership(
   deps: GithubDeps,

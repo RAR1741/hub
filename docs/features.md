@@ -116,6 +116,8 @@ scannable catalog of what's built, grouped by area, with a route per entry. The
 - **GitHub team sync** — syncs team membership to GitHub Teams. `/admin/github-sync` — see
   [features/github-team-sync.md](features/github-team-sync.md),
   [setup/github-app.md](setup/github-app.md)
+- **Team external accounts** — role-owned service accounts linked to a team's Google Group or GitHub Team.
+  `/admin/teams/[id]` — see [features/team-external-accounts.md](features/team-external-accounts.md)
 - **Onshape** — see [features/parts-and-shop.md](features/parts-and-shop.md),
   [setup/onshape.md](setup/onshape.md)
 - **Google Calendar sync** — see [setup/google-calendar.md](setup/google-calendar.md)

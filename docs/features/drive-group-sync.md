@@ -13,7 +13,8 @@ its **Sync now** button, which calls `POST /api/admin/drive-group/sync`
 
 1. Computes the expected member list — every linked `person_identity.email` of that team's active
    members (a person can have more than one, e.g. personal + school account; each is its own group
-   membership).
+   membership). Team [external accounts](team-external-accounts.md) with provider `google` are unioned
+   into this list.
 2. Lists the group's actual members via the Directory API (`src/lib/google-directory.ts`).
 3. Diffs the two (`computeGroupDiff()`, case-insensitive) and **adds** anyone expected but missing
    (`insertGroupMember()`) — idempotent, an "already a member" response counts as success.

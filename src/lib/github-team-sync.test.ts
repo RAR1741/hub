@@ -238,6 +238,97 @@ describe("reconcileGithubTeams", () => {
 
     expect(result.teams[0].notConnected).toEqual(["Jo Doe"]);
   });
+
+  test("unions github external accounts into expected, ignores google rows, and doesn't add them to notConnected", async () => {
+    const db = fakeDb({
+      team: { data: [{ id: "t1", name: "Team A", github_team_slug: "software" }], error: null },
+      team_membership: { data: [], error: null },
+      team_external_account: {
+        data: [
+          { provider: "github", identifier: "bot-login", github_user_id: 42 },
+          { provider: "google", identifier: "ignored@x.com", github_user_id: null },
+        ],
+        error: null,
+      },
+    });
+
+    const calls: { method: string | undefined; url: string }[] = [];
+    const fetchFn = vi.fn(async (url: string, init?: RequestInit) => {
+      const u = String(url);
+      if (u.includes("access_tokens")) return tokenResponse();
+      calls.push({ method: init?.method, url: u });
+      if (u.includes("/members?")) return new Response(JSON.stringify([]), { status: 200 });
+      if (u.includes("/invitations")) return new Response(JSON.stringify([]), { status: 200 });
+      if (u.includes("/memberships/") && init?.method === "PUT") {
+        return new Response(JSON.stringify({ role: "member", state: "active" }), { status: 200 });
+      }
+      throw new Error(`unexpected fetch: ${u} ${init?.method}`);
+    });
+
+    const result = await reconcileGithubTeams({
+      db: db as never,
+      fetch: fetchFn as unknown as typeof globalThis.fetch,
+      credentials,
+    });
+
+    const report = result.teams[0];
+    expect(report.expectedCount).toBe(1); // google row excluded
+    expect(report.added).toEqual(["bot-login"]);
+    expect(report.notConnected).toEqual([]);
+  });
+
+  test("a github external account already on the team is not in wouldRemove and does not surface via computeGithubAddRecommendations", async () => {
+    const db = fakeDb({
+      team: { data: [{ id: "t1", name: "Team A", github_team_slug: "software" }], error: null },
+      team_membership: { data: [], error: null },
+      team_external_account: {
+        data: [{ provider: "github", identifier: "bot-login", github_user_id: 42 }],
+        error: null,
+      },
+    });
+
+    const fetchFn = vi.fn(async (url: string) => {
+      const u = String(url);
+      if (u.includes("access_tokens")) return tokenResponse();
+      if (u.includes("/members?")) return new Response(JSON.stringify([{ id: 42, login: "bot-login" }]), { status: 200 });
+      if (u.includes("/invitations")) return new Response(JSON.stringify([]), { status: 200 });
+      throw new Error(`unexpected fetch: ${u}`);
+    });
+
+    const result = await reconcileGithubTeams({
+      db: db as never,
+      fetch: fetchFn as unknown as typeof globalThis.fetch,
+      credentials,
+    });
+
+    const report = result.teams[0];
+    expect(report.wouldRemove).toEqual([]);
+
+    const s2t = new Map([["software", { teamId: "t1", teamName: "Team A" }]]);
+    const people = new Map([[42, { personId: "px", name: "Bot", isActive: true }]]);
+    expect(computeGithubAddRecommendations(result, s2t, people, new Map())).toEqual([]);
+  });
+
+  test("an external-account read error is pushed to report.errors and the team is skipped", async () => {
+    const db = fakeDb({
+      team: { data: [{ id: "t1", name: "Team A", github_team_slug: "software" }], error: null },
+      team_membership: { data: [], error: null },
+      team_external_account: { data: null, error: { message: "boom" } },
+    });
+
+    const fetchFn = vi.fn(async () => {
+      throw new Error("should not be called");
+    });
+
+    const result = await reconcileGithubTeams({
+      db: db as never,
+      fetch: fetchFn as unknown as typeof globalThis.fetch,
+      credentials,
+    });
+
+    expect(result.teams[0].errors).toEqual(["boom"]);
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
 });
 
 describe("syncGithubMembershipChange", () => {

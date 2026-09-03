@@ -184,6 +184,73 @@ describe("reconcileDriveGroups", () => {
     expect(result.groups[1].errors).toEqual([]);
     expect(result.groups[1].added).toEqual(["keep@x.com"]);
   });
+
+  test("unions google external accounts into expected, ignores github rows, and doesn't re-add an already-present one", async () => {
+    const db = fakeDb({
+      team: {
+        data: [{ id: "t1", name: "Team A", google_group_email: "team-a@example.org" }],
+        error: null,
+      },
+      team_membership: { data: [], error: null },
+      team_external_account: {
+        data: [
+          { provider: "google", identifier: "existing@x.com" },
+          { provider: "google", identifier: "missing@x.com" },
+          { provider: "github", identifier: "some-bot" },
+        ],
+        error: null,
+      },
+    });
+
+    const fetchFn = vi.fn(async (url: string, init?: RequestInit) => {
+      const u = String(url);
+      if (u.includes("oauth2")) {
+        return new Response(JSON.stringify({ access_token: "tok", expires_in: 3600 }), { status: 200 });
+      }
+      if (u.includes("/members") && !init?.method) {
+        return new Response(JSON.stringify({ members: [{ email: "existing@x.com" }] }), { status: 200 });
+      }
+      if (init?.method === "POST") {
+        return new Response(JSON.stringify({}), { status: 200 });
+      }
+      throw new Error(`unexpected fetch: ${u} ${init?.method}`);
+    });
+
+    const result = await reconcileDriveGroups({
+      db: db as never,
+      fetch: fetchFn as unknown as typeof globalThis.fetch,
+      credentials,
+    });
+
+    const g = result.groups[0];
+    expect(g.expectedCount).toBe(2); // github row excluded
+    expect(g.wouldRemove).toEqual([]);
+    expect(g.added).toEqual(["missing@x.com"]);
+  });
+
+  test("an external-account read error is pushed to report.errors and the team is skipped", async () => {
+    const db = fakeDb({
+      team: {
+        data: [{ id: "t1", name: "Team A", google_group_email: "team-a@example.org" }],
+        error: null,
+      },
+      team_membership: { data: [], error: null },
+      team_external_account: { data: null, error: { message: "boom" } },
+    });
+
+    const fetchFn = vi.fn(async () => {
+      throw new Error("should not be called");
+    });
+
+    const result = await reconcileDriveGroups({
+      db: db as never,
+      fetch: fetchFn as unknown as typeof globalThis.fetch,
+      credentials,
+    });
+
+    expect(result.groups[0].errors).toEqual(["boom"]);
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
 });
 
 describe("syncMembershipChange", () => {
