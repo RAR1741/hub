@@ -1,11 +1,45 @@
 import { describe, expect, test } from "vitest";
-import { buildTeamTree, joinAction, parseTeamInput } from "./teams";
+import { buildTeamTree, createTeam, joinAction, parseTeamInput, updateTeam } from "./teams";
 import { teamFromRow } from "./types";
 import type { Team } from "./types";
 
 const team = (id: string, name: string, parentTeamId: string | null): Team => ({
   id, name, parentTeamId, description: null, joinMode: "admin_only", googleGroupEmail: null, githubTeamSlug: null,
 });
+
+// Generic chained-query stub in the style of github-team-sync.test.ts.
+function fakeDb(opts: {
+  insertResult?: { data: unknown; error: unknown };
+  updateResult?: { data: unknown; error: unknown };
+  deletes: unknown[];
+  inserts: unknown[];
+}) {
+  return {
+    from(table: string) {
+      const chain: Record<string, unknown> = {};
+      chain.eq = (col: string, val: unknown) => {
+        if (table === "team_slack_channel") {
+          opts.deletes.push({ table, col, val });
+          return Promise.resolve({ data: null, error: null });
+        }
+        return chain;
+      };
+      chain.delete = () => chain;
+      chain.select = () => chain;
+      chain.single = async () => opts.insertResult ?? { data: null, error: null };
+      chain.maybeSingle = async () => opts.updateResult ?? { data: null, error: null };
+      chain.insert = (payload: unknown) => {
+        if (table === "team_slack_channel") {
+          opts.inserts.push({ table, payload });
+          return Promise.resolve({ data: null, error: null });
+        }
+        return chain;
+      };
+      chain.update = () => chain;
+      return chain;
+    },
+  } as never;
+}
 
 describe("buildTeamTree", () => {
   test("nests children under parents, sorted by name", () => {
@@ -35,7 +69,7 @@ describe("parseTeamInput", () => {
       parseTeamInput({ name: " Pit Crew ", joinMode: "open" }),
     ).toEqual({
       name: "Pit Crew", parentTeamId: null, description: null, joinMode: "open",
-      googleGroupEmail: null, githubTeamSlug: null,
+      googleGroupEmail: null, githubTeamSlug: null, slackChannels: [],
     });
   });
   test.each([
@@ -89,6 +123,94 @@ describe("parseTeamInput", () => {
     ["-leading-hyphen"],
   ])("rejects invalid githubTeamSlug %j", (slug) => {
     expect(parseTeamInput({ name: "X", joinMode: "open", githubTeamSlug: slug })).toBeNull();
+  });
+
+  test("slackChannels absent defaults to []", () => {
+    const result = parseTeamInput({ name: "X", joinMode: "open" });
+    expect(result?.slackChannels).toEqual([]);
+  });
+
+  test("slackChannels accepts a valid array", () => {
+    const result = parseTeamInput({
+      name: "X", joinMode: "open",
+      slackChannels: [{ channelId: "C12345", label: " General " }, { channelId: "G6789A", label: null }],
+    });
+    expect(result?.slackChannels).toEqual([
+      { channelId: "C12345", label: "General" },
+      { channelId: "G6789A", label: null },
+    ]);
+  });
+
+  test("slackChannels rejects a non-array", () => {
+    expect(parseTeamInput({ name: "X", joinMode: "open", slackChannels: "nope" })).toBeNull();
+  });
+
+  test.each([
+    ["nope"],
+    ["#frc"],
+  ])("slackChannels rejects a bad channelId %j", (channelId) => {
+    expect(parseTeamInput({ name: "X", joinMode: "open", slackChannels: [{ channelId, label: null }] })).toBeNull();
+  });
+
+  test("slackChannels dedupes by channelId, keeping the first occurrence", () => {
+    const result = parseTeamInput({
+      name: "X", joinMode: "open",
+      slackChannels: [
+        { channelId: "C12345", label: "First" },
+        { channelId: "C12345", label: "Second" },
+      ],
+    });
+    expect(result?.slackChannels).toEqual([{ channelId: "C12345", label: "First" }]);
+  });
+});
+
+describe("createTeam / updateTeam — slack channel sync", () => {
+  const input = {
+    name: "X", parentTeamId: null, description: null, joinMode: "admin_only" as const,
+    googleGroupEmail: null, githubTeamSlug: null,
+    slackChannels: [{ channelId: "C12345", label: "General" }],
+  };
+
+  test("createTeam replaces team_slack_channel rows on the happy path", async () => {
+    const deletes: unknown[] = [];
+    const inserts: unknown[] = [];
+    const db = fakeDb({ insertResult: { data: { id: "t1" }, error: null }, deletes, inserts });
+
+    const result = await createTeam(input, db);
+
+    expect(result).toEqual({ ok: true, id: "t1" });
+    expect(deletes).toEqual([{ table: "team_slack_channel", col: "team_id", val: "t1" }]);
+    expect(inserts).toEqual([{
+      table: "team_slack_channel",
+      payload: [{ team_id: "t1", slack_channel_id: "C12345", label: "General" }],
+    }]);
+  });
+
+  test("updateTeam replaces team_slack_channel rows on the happy path", async () => {
+    const deletes: unknown[] = [];
+    const inserts: unknown[] = [];
+    const db = fakeDb({ updateResult: { data: { id: "t1" }, error: null }, deletes, inserts });
+
+    const result = await updateTeam("t1", input, db);
+
+    expect(result).toEqual({ ok: true, status: 200 });
+    expect(deletes).toEqual([{ table: "team_slack_channel", col: "team_id", val: "t1" }]);
+    expect(inserts).toEqual([{
+      table: "team_slack_channel",
+      payload: [{ team_id: "t1", slack_channel_id: "C12345", label: "General" }],
+    }]);
+  });
+
+  test("updateTeam does not touch team_slack_channel on 404", async () => {
+    const deletes: unknown[] = [];
+    const inserts: unknown[] = [];
+    const db = fakeDb({ updateResult: { data: null, error: null }, deletes, inserts });
+
+    const result = await updateTeam("missing", input, db);
+
+    expect(result).toEqual({ ok: false, status: 404 });
+    expect(deletes).toEqual([]);
+    expect(inserts).toEqual([]);
   });
 });
 
