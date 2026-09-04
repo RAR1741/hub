@@ -44,3 +44,24 @@ test("an admin imports an application CSV and sees a result summary", async ({ b
   await expect(page.getByText("New people (review): Ada Testlake")).toBeVisible();
   await context.close();
 });
+
+test("preview of a current-season file lists students whose active flag would flip", async ({ browser }) => {
+  // Same fixture re-labelled as the current season (2026-2027). Ada is new, so
+  // every currently-active seeded student is "not in this application" and the
+  // preview must name them before anything is written. Preview only — no import.
+  const currentSeasonCsv = CSV.replace("2025-2026", "2026-2027");
+  const context = await browser.newContext();
+  await context.addCookies([await adminSessionCookie()]);
+  const page = await context.newPage();
+  await page.goto("/admin/application-import");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "current.csv", mimeType: "text/csv", buffer: Buffer.from(currentSeasonCsv, "utf8"),
+  });
+  await page.getByRole("button", { name: "Preview" }).click();
+  await expect(page.getByRole("heading", { name: "2. Preview" })).toBeVisible();
+  const flips = page.getByTestId("roster-flips");
+  await expect(flips).toBeVisible();
+  await expect(flips).toContainText("Would become inactive");
+  await expect(page.getByText(/\d+ would deactivate/)).toBeVisible();
+  await context.close();
+});
