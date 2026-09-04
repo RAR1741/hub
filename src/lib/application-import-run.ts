@@ -17,9 +17,17 @@ export type ApplicationImportSummary = {
   roleCallouts: { name: string; role: string }[]; // matched person is mentor/admin (never role-changed)
   anomalies: { name: string; field: string; detail: string }[];
   errors: { name: string; message: string }[];
-  wouldDeactivate: number; // dry-run projection
-  deactivated: number; // 0 on dry-run
+  // Active-flag flips from the roster sweep (current-season imports only).
+  // would* are the dry-run projection; activated/deactivated are what the real
+  // run wrote (empty on dry-run). Newly created applicants aren't listed under
+  // wouldActivate — they're already under `created`.
+  wouldActivate: RosterFlip[];
+  wouldDeactivate: RosterFlip[];
+  activated: RosterFlip[];
+  deactivated: RosterFlip[];
 };
+
+export type RosterFlip = { name: string; personId: string };
 
 const normalizeFull = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
 const normalizeEmail = (e: string | null) => (e ? e.trim().toLowerCase() : null);
@@ -227,8 +235,10 @@ export async function runApplicationImport(args: {
     roleCallouts: [],
     anomalies: [],
     errors: [],
-    wouldDeactivate: 0,
-    deactivated: 0,
+    wouldActivate: [],
+    wouldDeactivate: [],
+    activated: [],
+    deactivated: [],
   };
   for (const a of parsed.anomalies) {
     summary.anomalies.push({ name: a.name, field: a.field, detail: a.detail });
@@ -283,14 +293,37 @@ export async function runApplicationImport(args: {
     return { error: "undecided_decisions" };
   }
 
+  // A student is only "on the team" if they're in the current season's
+  // application. When importing the current-season file, applicants are created
+  // active and a roster sweep (below) re-derives who's active; an
+  // older/historical file creates its applicants inactive and never sweeps.
+  const isCurrentSeasonImport =
+    parsed.seasonYear !== null && parsed.seasonYear >= currentSeasonYear(now());
+
+  // Everyone this file resolves to an existing person — INCLUDING stale matches.
+  // A stale applicant already has this response on file, so there's nothing to
+  // write for them, but they still submitted this season's application and are
+  // on the team. The sweep must never treat "nothing to write" as "not in the
+  // application": that's what deactivated the whole roster on the 2026-09-03
+  // re-import (one new applicant made the written set non-empty, and everyone
+  // stale got swept). Created applicants join this set once they have an id.
+  const inImportIds = new Set<string>();
+  for (const r of resolved) if (r.action === "matched" && r.personId) inImportIds.add(r.personId);
+
+  const nameOf = (id: string) => {
+    const p = personById.get(id);
+    return p ? `${p.first_name} ${p.last_name}`.trim() : id;
+  };
+  /** Students whose is_active would flip if `ids` is the current-season applicant set. */
+  const projectFlips = (ids: Set<string>) => ({
+    activate: roster.filter((p) => p.role === "student" && !p.is_active && ids.has(p.id)),
+    deactivate: roster.filter((p) => p.role === "student" && p.is_active && !ids.has(p.id)),
+  });
+
   if (dryRun) {
-    // Project matched/created/stale without writing. wouldDeactivate mirrors the
-    // real roster sweep below: only a current-season import re-derives
-    // membership, and it deactivates every currently-active student who isn't in
-    // this import (i.e. didn't submit the most recent application).
-    const isCurrentSeasonImport =
-      parsed.seasonYear !== null && parsed.seasonYear >= currentSeasonYear(now());
-    const wouldWriteIds = new Set<string>();
+    // Project matched/created/stale without writing. would{Activate,Deactivate}
+    // mirror the real roster sweep below.
+    let wouldCreate = 0;
     for (const r of resolved) {
       if (r.action === "matched" && r.personId) {
         const person = personById.get(r.personId);
@@ -304,15 +337,16 @@ export async function runApplicationImport(args: {
         }
         const changes = person ? computeChanges(person, r.app) : [];
         summary.matched.push({ name: r.name, personId: r.personId, changes });
-        wouldWriteIds.add(r.personId);
       } else if (r.action === "create") {
         summary.created.push(r.name);
+        wouldCreate += 1;
       }
     }
-    summary.wouldDeactivate = isCurrentSeasonImport
-      ? roster.filter((p) => p.role === "student" && p.is_active && !wouldWriteIds.has(p.id)).length
-      : 0;
-    summary.deactivated = 0;
+    if (isCurrentSeasonImport && inImportIds.size + wouldCreate > 0) {
+      const flips = projectFlips(inImportIds);
+      summary.wouldActivate = flips.activate.map((p) => ({ name: nameOf(p.id), personId: p.id }));
+      summary.wouldDeactivate = flips.deactivate.map((p) => ({ name: nameOf(p.id), personId: p.id }));
+    }
     // Guardian projection (best-effort counts only; no writes).
     for (const r of resolved) {
       if (r.action === "matched" || r.action === "create") {
@@ -328,14 +362,6 @@ export async function runApplicationImport(args: {
   }
 
   // Phase 2: real writes.
-  const writtenPersonIds = new Set<string>();
-  // A student is only "on the team" if they're in the current season's
-  // application. When importing the current-season file, applicants are created
-  // active and a roster sweep (below) deactivates everyone else; an
-  // older/historical file creates its applicants inactive and never sweeps.
-  const isCurrentSeasonImport =
-    parsed.seasonYear !== null && parsed.seasonYear >= currentSeasonYear(now());
-
   for (const r of resolved) {
     if (r.action === "skip" || r.action === "error") continue;
 
@@ -373,7 +399,7 @@ export async function runApplicationImport(args: {
       }
       const personId = data.id as string;
       summary.created.push(r.name);
-      writtenPersonIds.add(personId);
+      inImportIds.add(personId);
       await writeExperiences(db, personId, r.app, summary);
       await writeGuardians(db, personId, r.app, guardianByNameKey, guardianRoster, summary);
       continue;
@@ -403,7 +429,6 @@ export async function runApplicationImport(args: {
         continue;
       }
       summary.matched.push({ name: r.name, personId: r.personId, changes });
-      writtenPersonIds.add(r.personId);
       await writeExperiences(db, r.personId, r.app, summary);
       await writeGuardians(db, r.personId, r.app, guardianByNameKey, guardianRoster, summary);
     }
@@ -413,25 +438,25 @@ export async function runApplicationImport(args: {
   //
   // Only a current-season import re-derives who's active; importing an older,
   // historical file must never deactivate this year's students. When it IS the
-  // current-season file: activate every student in the import, then deactivate
-  // every other (still-active) student — anyone who didn't submit the most
-  // recent application. They can re-apply, or a mentor can re-activate them by
-  // hand. This is order-independent: whichever import is the current season is
-  // the sole authority on the active roster.
-  // Guard on writtenPersonIds being non-empty: a current-season import that
-  // wrote nobody (every applicant already up-to-date/stale, or all skipped)
-  // carries no roster signal, so it must NOT sweep — otherwise a harmless
-  // re-import of the current file would deactivate the ENTIRE active roster
-  // (deactivate-all-except-nobody). This also makes re-imports idempotent.
-  if (isCurrentSeasonImport && writtenPersonIds.size > 0) {
-    const writtenIds = [...writtenPersonIds];
+  // current-season file: activate every student in the import (stale or not),
+  // then deactivate every other (still-active) student — anyone who didn't
+  // submit the most recent application. They can re-apply, or a mentor can
+  // re-activate them by hand. This is order-independent and idempotent:
+  // whichever import is the current season is the sole authority on the active
+  // roster, and re-importing the same file is a no-op for the flag.
+  // Guard on inImportIds being non-empty: a file where every applicant was
+  // skipped/undecided carries no roster signal and must not sweep.
+  if (isCurrentSeasonImport && inImportIds.size > 0) {
+    const ids = [...inImportIds];
     const activateRes = await db
       .from("person")
       .update({ is_active: true })
       .eq("role", "student")
-      .in("id", writtenIds)
+      .eq("is_active", false)
+      .in("id", ids)
       .select("id");
     if (activateRes.error) summary.errors.push({ name: "activation", message: activateRes.error.message });
+    summary.activated = ((activateRes.data as { id: string }[] | null) ?? []).map((r) => ({ name: nameOf(r.id), personId: r.id }));
 
     // Deactivate every active student who wasn't in this application.
     const deactivateRes = await db
@@ -439,12 +464,10 @@ export async function runApplicationImport(args: {
       .update({ is_active: false })
       .eq("role", "student")
       .eq("is_active", true)
-      .not("id", "in", `(${writtenIds.join(",")})`)
+      .not("id", "in", `(${ids.join(",")})`)
       .select("id");
     if (deactivateRes.error) summary.errors.push({ name: "deactivation", message: deactivateRes.error.message });
-    summary.deactivated = (deactivateRes.data as { id: string }[] | null)?.length ?? 0;
-  } else {
-    summary.deactivated = 0;
+    summary.deactivated = ((deactivateRes.data as { id: string }[] | null) ?? []).map((r) => ({ name: nameOf(r.id), personId: r.id }));
   }
 
   return summary;
