@@ -63,7 +63,7 @@ export function ApplicationImportForm() {
         const data = (await res.json()) as ApplicationImportSummary;
         setSummary(data);
         setStatus(
-          `Imported ${data.created.length} created, ${data.matched.length} matched · ${data.guardiansCreated} guardians created, ${data.guardiansMatched} matched · ${data.experienceRows} experience rows · ${data.skipped.length} skipped, ${data.stale.length} stale, ${data.errors.length} errors · ${data.deactivated} deactivated.`,
+          `Imported ${data.created.length} created, ${data.matched.length} matched · ${data.guardiansCreated} guardians created, ${data.guardiansMatched} matched · ${data.experienceRows} experience rows · ${data.skipped.length} skipped, ${data.stale.length} stale, ${data.errors.length} errors · ${data.activated.length} activated, ${data.deactivated.length} deactivated.`,
         );
         router.refresh();
       } else if (res.status === 403) {
@@ -121,8 +121,21 @@ export function ApplicationImportForm() {
             <span className="pill">{dry.stale.length} stale</span>
             <span className="pill error">{dry.anomalies.length} anomalies</span>
             <span className="pill error">{dry.errors.length} errors</span>
-            <span className="pill update">{dry.wouldDeactivate} would deactivate</span>
+            <span className="pill new">{dry.wouldActivate.length} would activate</span>
+            <span className="pill update">{dry.wouldDeactivate.length} would deactivate</span>
           </div>
+
+          {(dry.wouldActivate.length > 0 || dry.wouldDeactivate.length > 0) && (
+            <div className="flex flex-col gap-1 rounded-md border border-[var(--absent)] p-3 text-sm" data-testid="roster-flips">
+              <strong>Active-flag changes — check these before importing</strong>
+              {dry.wouldActivate.length > 0 && (
+                <p><span className="text-[var(--muted)]">Would become active:</span> {dry.wouldActivate.map((p) => p.name).join(", ")}</p>
+              )}
+              {dry.wouldDeactivate.length > 0 && (
+                <p><span className="text-[var(--muted)]">Would become inactive (not in this application):</span> {dry.wouldDeactivate.map((p) => p.name).join(", ")}</p>
+              )}
+            </div>
+          )}
           <p className="text-sm text-[var(--muted)]">
             Guardians: {dry.guardiansCreated} created, {dry.guardiansMatched} matched · {dry.experienceRows} experience rows.
           </p>
@@ -234,8 +247,15 @@ export function ApplicationImportForm() {
             <span className="pill update">{summary.skipped.length} skipped</span>
             <span className="pill">{summary.stale.length} stale</span>
             <span className="pill error">{summary.errors.length} errors</span>
-            <span className="pill update">{summary.deactivated} deactivated</span>
+            <span className="pill new">{summary.activated.length} activated</span>
+            <span className="pill update">{summary.deactivated.length} deactivated</span>
           </div>
+          {summary.activated.length > 0 && (
+            <p className="text-sm text-[var(--muted)]">Activated: {summary.activated.map((p) => p.name).join(", ")}</p>
+          )}
+          {summary.deactivated.length > 0 && (
+            <p className="text-sm text-[var(--muted)]">Deactivated: {summary.deactivated.map((p) => p.name).join(", ")}</p>
+          )}
           {summary.created.length > 0 && (
             <p className="text-sm text-[var(--muted)]">New people (review): {summary.created.join(", ")}</p>
           )}
