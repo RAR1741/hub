@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
-import { getTeam, listTeamMembers, listTeams } from "@/lib/teams";
+import { getTeam, listTeamMembers, listTeams, listTeamSlackChannels } from "@/lib/teams";
 import { listPeople, displayName } from "@/lib/people";
 import { listTeamExternalAccounts } from "@/lib/team-external-accounts";
 import { TeamForm } from "@/components/TeamForm";
@@ -20,12 +20,13 @@ export default async function AdminTeamPage({
   const [{ id }, viewer] = await Promise.all([params, getViewer()]);
   if (!hasRole(viewer.role, "admin")) redirect("/");
 
-  const [team, teams, members, everyone, externalAccounts] = await Promise.all([
+  const [team, teams, members, everyone, externalAccounts, slackChannels] = await Promise.all([
     getTeam(id),
     listTeams(),
     listTeamMembers(id),
     listPeople(),
     listTeamExternalAccounts(id),
+    listTeamSlackChannels(id),
   ]);
   if (!team) notFound();
 
@@ -54,6 +55,7 @@ export default async function AdminTeamPage({
             joinMode: team.joinMode,
             googleGroupEmail: team.googleGroupEmail ?? "",
             githubTeamSlug: team.githubTeamSlug ?? "",
+            slackChannels: slackChannels.map((c) => ({ channelId: c.channelId, label: c.label ?? "" })),
           }}
         />
       </section>
