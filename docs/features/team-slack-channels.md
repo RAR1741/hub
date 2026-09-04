@@ -10,8 +10,8 @@ When a membership change occurs — a person is added to a team via the admin UI
 2. If the person has no linked Slack account, the invite is skipped and logged as "no slack_user_id" — not surfaced as an error.
 3. Calls Slack's `conversations.invite` API to add the person to the channel, passing the channel ID (e.g. `C0123ABC`) and the Slack user ID.
 4. If Slack returns `already_in_channel`, counts it as success (idempotent).
-5. If Slack returns `not_in_channel`, the invite fails — this means the bot is not a member of the channel and cannot invite anyone; this is logged as a warning and does **not** block the membership change.
-6. Any other Slack error is logged as a warning; the membership change still succeeds.
+5. If Slack returns `not_in_channel`, the invite fails — this means the bot is not a member of the channel and cannot invite anyone; this is logged and does **not** block the membership change.
+6. Any other Slack error is logged; the membership change still succeeds.
 
 ## Linking channels to teams
 

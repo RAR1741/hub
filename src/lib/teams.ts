@@ -40,7 +40,7 @@ export type TeamInput = {
 };
 
 const GITHUB_SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
-const SLACK_CHANNEL_ID_RE = /^[CG][A-Z0-9]{2,}$/;
+const SLACK_CHANNEL_ID_RE = /^[CG][A-Z0-9]{2,20}$/;
 
 /** Validate the slackChannels array. PURE. Null = invalid, dedupes by channelId. */
 function parseSlackChannels(v: unknown): { channelId: string; label: string | null }[] | null {
@@ -93,35 +93,41 @@ export async function listTeamSlackChannels(
   db?: SupabaseClient,
 ): Promise<{ channelId: string; label: string | null }[]> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client
+  const { data, error } = await client
     .from("team_slack_channel")
     .select("slack_channel_id, label")
     .eq("team_id", teamId)
     .order("slack_channel_id");
+  if (error) throw new Error(error.message);
   return (data ?? []).map((r) => ({
     channelId: r.slack_channel_id as string,
     label: r.label as string | null,
   }));
 }
 
-/** Delete-then-insert, non-transactional — fine for an admin form save. On
- *  failure we log and swallow rather than fail the whole team save over a
- *  best-effort side table. */
+/** Delete-then-insert, non-transactional. `team_slack_channel` is
+ *  source-of-truth team config (like `team_external_account`), not a
+ *  best-effort Slack side effect — on failure we log and return false so the
+ *  caller reports a failed save rather than silently losing channel links. */
 async function replaceTeamSlackChannels(
   client: SupabaseClient,
   teamId: string,
   channels: { channelId: string; label: string | null }[],
-): Promise<void> {
+): Promise<boolean> {
   const { error: deleteError } = await client.from("team_slack_channel").delete().eq("team_id", teamId);
   if (deleteError) {
     console.error("replaceTeamSlackChannels: delete failed", deleteError);
-    return;
+    return false;
   }
-  if (channels.length === 0) return;
+  if (channels.length === 0) return true;
   const { error: insertError } = await client.from("team_slack_channel").insert(
     channels.map((c) => ({ team_id: teamId, slack_channel_id: c.channelId, label: c.label })),
   );
-  if (insertError) console.error("replaceTeamSlackChannels: insert failed", insertError);
+  if (insertError) {
+    console.error("replaceTeamSlackChannels: insert failed", insertError);
+    return false;
+  }
+  return true;
 }
 
 export async function listTeams(db?: SupabaseClient): Promise<Team[]> {
@@ -154,7 +160,8 @@ export async function createTeam(
     .select("id")
     .single();
   if (error) return { ok: false, status: error.code === UNIQUE_VIOLATION ? 409 : 500 };
-  await replaceTeamSlackChannels(client, data.id as string, input.slackChannels);
+  const channelsOk = await replaceTeamSlackChannels(client, data.id as string, input.slackChannels);
+  if (!channelsOk) return { ok: false, status: 500 };
   return { ok: true, id: data.id as string };
 }
 
@@ -180,7 +187,8 @@ export async function updateTeam(
     .maybeSingle();
   if (error) return { ok: false, status: error.code === UNIQUE_VIOLATION ? 409 : 500 };
   if (!data) return { ok: false, status: 404 };
-  await replaceTeamSlackChannels(client, id, input.slackChannels);
+  const channelsOk = await replaceTeamSlackChannels(client, id, input.slackChannels);
+  if (!channelsOk) return { ok: false, status: 500 };
   return { ok: true, status: 200 };
 }
 

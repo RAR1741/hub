@@ -94,6 +94,27 @@ describe("syncSlackMembershipChange", () => {
     expect(bodyOf(requests[0])).toMatchObject({ channel: "C1", users: "U1" });
   });
 
+  test("team_slack_channel query error -> logged and swallowed, never throws", async () => {
+    const { fetchFn, requests } = fakeFetch();
+    const db = makeDb([{ data: null, error: { message: "boom" } }]); // team_slack_channel
+    await expect(
+      syncSlackMembershipChange("add", "team-1", "person-1", db as never, fakeSlackDeps(fetchFn)),
+    ).resolves.toBeUndefined();
+    expect(requests).toHaveLength(0);
+  });
+
+  test("person query error -> logged and swallowed, never throws", async () => {
+    const { fetchFn, requests } = fakeFetch();
+    const db = makeDb([
+      { data: [{ slack_channel_id: "C1" }] }, // team_slack_channel
+      { data: null, error: { message: "boom" } }, // person
+    ]);
+    await expect(
+      syncSlackMembershipChange("add", "team-1", "person-1", db as never, fakeSlackDeps(fetchFn)),
+    ).resolves.toBeUndefined();
+    expect(requests).toHaveLength(0);
+  });
+
   test("action remove -> immediate no-op, no db access", async () => {
     const { fetchFn, requests } = fakeFetch();
     const db = makeDb([]);

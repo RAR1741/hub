@@ -11,6 +11,8 @@ const team = (id: string, name: string, parentTeamId: string | null): Team => ({
 function fakeDb(opts: {
   insertResult?: { data: unknown; error: unknown };
   updateResult?: { data: unknown; error: unknown };
+  channelDeleteError?: unknown;
+  channelInsertError?: unknown;
   deletes: unknown[];
   inserts: unknown[];
 }) {
@@ -20,7 +22,7 @@ function fakeDb(opts: {
       chain.eq = (col: string, val: unknown) => {
         if (table === "team_slack_channel") {
           opts.deletes.push({ table, col, val });
-          return Promise.resolve({ data: null, error: null });
+          return Promise.resolve({ data: null, error: opts.channelDeleteError ?? null });
         }
         return chain;
       };
@@ -31,7 +33,7 @@ function fakeDb(opts: {
       chain.insert = (payload: unknown) => {
         if (table === "team_slack_channel") {
           opts.inserts.push({ table, payload });
-          return Promise.resolve({ data: null, error: null });
+          return Promise.resolve({ data: null, error: opts.channelInsertError ?? null });
         }
         return chain;
       };
@@ -148,8 +150,16 @@ describe("parseTeamInput", () => {
   test.each([
     ["nope"],
     ["#frc"],
+    ["C" + "A".repeat(25)], // over the 20-char cap
   ])("slackChannels rejects a bad channelId %j", (channelId) => {
     expect(parseTeamInput({ name: "X", joinMode: "open", slackChannels: [{ channelId, label: null }] })).toBeNull();
+  });
+
+  test("slackChannels accepts a normal-length channelId", () => {
+    const result = parseTeamInput({
+      name: "X", joinMode: "open", slackChannels: [{ channelId: "C0123ABC", label: null }],
+    });
+    expect(result?.slackChannels).toEqual([{ channelId: "C0123ABC", label: null }]);
   });
 
   test("slackChannels dedupes by channelId, keeping the first occurrence", () => {
@@ -211,6 +221,52 @@ describe("createTeam / updateTeam — slack channel sync", () => {
     expect(result).toEqual({ ok: false, status: 404 });
     expect(deletes).toEqual([]);
     expect(inserts).toEqual([]);
+  });
+
+  test("createTeam returns 500 when the team_slack_channel insert fails (team row already committed)", async () => {
+    const deletes: unknown[] = [];
+    const inserts: unknown[] = [];
+    const db = fakeDb({
+      insertResult: { data: { id: "t1" }, error: null },
+      channelInsertError: { message: "boom" },
+      deletes,
+      inserts,
+    });
+
+    const result = await createTeam(input, db);
+
+    expect(result).toEqual({ ok: false, status: 500 });
+  });
+
+  test("createTeam returns 500 when the team_slack_channel delete fails", async () => {
+    const deletes: unknown[] = [];
+    const inserts: unknown[] = [];
+    const db = fakeDb({
+      insertResult: { data: { id: "t1" }, error: null },
+      channelDeleteError: { message: "boom" },
+      deletes,
+      inserts,
+    });
+
+    const result = await createTeam(input, db);
+
+    expect(result).toEqual({ ok: false, status: 500 });
+    expect(inserts).toEqual([]); // insert never attempted after delete failure
+  });
+
+  test("updateTeam returns 500 when the team_slack_channel insert fails", async () => {
+    const deletes: unknown[] = [];
+    const inserts: unknown[] = [];
+    const db = fakeDb({
+      updateResult: { data: { id: "t1" }, error: null },
+      channelInsertError: { message: "boom" },
+      deletes,
+      inserts,
+    });
+
+    const result = await updateTeam("t1", input, db);
+
+    expect(result).toEqual({ ok: false, status: 500 });
   });
 });
 
