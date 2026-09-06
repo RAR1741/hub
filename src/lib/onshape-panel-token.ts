@@ -7,9 +7,11 @@ export const PANEL_TOKEN_KIND = "onshape-panel";
 // expiry, and every request also re-checks the person's is_active/role, so a
 // stolen token dies the moment the user is deactivated regardless of this. See
 // security audit #251.
-const PANEL_TOKEN_DURATION = "30d";
-/** The above, in seconds — exported for tests to assert the minted lifetime. */
-export const PANEL_TOKEN_DURATION_SECONDS = 30 * 24 * 60 * 60;
+// Single source of truth for the lifetime; the string form (for jose) and the
+// seconds form (exported for tests) are both derived from it so they can't drift.
+const PANEL_TOKEN_DAYS = 30;
+const PANEL_TOKEN_DURATION = `${PANEL_TOKEN_DAYS}d`;
+export const PANEL_TOKEN_DURATION_SECONDS = PANEL_TOKEN_DAYS * 24 * 60 * 60;
 
 export async function createPanelToken(
   personId: string,

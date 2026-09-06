@@ -1,5 +1,5 @@
 import { SignJWT } from "jose";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { createStudentSessionToken } from "./student-session";
 import {
   PANEL_TOKEN_DURATION_SECONDS,
@@ -17,12 +17,21 @@ describe("onshape panel token", () => {
   });
 
   test("mints a 30-day token (audit #251)", async () => {
-    const token = await createPanelToken("p1", SECRET);
-    const claims = JSON.parse(
-      Buffer.from(token.split(".")[1], "base64url").toString(),
-    ) as { iat: number; exp: number };
-    expect(PANEL_TOKEN_DURATION_SECONDS).toBe(30 * 24 * 60 * 60);
-    expect(claims.exp - claims.iat).toBe(PANEL_TOKEN_DURATION_SECONDS);
+    // Freeze time so iat and exp are computed at the same instant — otherwise a
+    // second boundary between setIssuedAt() and setExpirationTime() could make
+    // exp - iat off by one.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
+    try {
+      const token = await createPanelToken("p1", SECRET);
+      const claims = JSON.parse(
+        Buffer.from(token.split(".")[1], "base64url").toString(),
+      ) as { iat: number; exp: number };
+      expect(PANEL_TOKEN_DURATION_SECONDS).toBe(30 * 24 * 60 * 60);
+      expect(claims.exp - claims.iat).toBe(PANEL_TOKEN_DURATION_SECONDS);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test("rejects a student-session token (wrong kind)", async () => {
