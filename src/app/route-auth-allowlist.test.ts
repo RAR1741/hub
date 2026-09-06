@@ -105,10 +105,14 @@ const ROUTE_AUTH_ALLOWLIST: Record<string, string> = {
 };
 
 const APP_DIR = fileURLToPath(new URL("./", import.meta.url));
-// A route handler is considered "gated by the standard wrapper" if it uses
-// withRole(...) / withRole<...>(...). This is the one auto-recognized signal;
-// every other gating mechanism must be documented in the allowlist above.
-const WITH_ROLE = /\bwithRole\s*[<(]/;
+// A route handler is considered "gated by the standard wrapper" only when it
+// actually exports a handler wrapped in withRole, i.e. the established
+// `export const <METHOD> = withRole(...)` / `withRole<...>(...)` form (verified
+// to be the only shape used across the codebase). Anchoring to the export
+// statement — rather than matching `withRole` anywhere — keeps a mere mention
+// in a comment or string from silently marking a route as gated. Every other
+// gating mechanism must be documented in the allowlist above.
+const WITH_ROLE = /^\s*export\s+const\s+[A-Z]+\s*=\s*withRole\s*[<(]/m;
 
 function findRouteFiles(dir: string): string[] {
   const out: string[] = [];
