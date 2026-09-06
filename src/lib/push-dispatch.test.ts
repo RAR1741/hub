@@ -1,4 +1,5 @@
 // src/lib/push-dispatch.test.ts
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { describe, expect, test, vi } from "vitest";
 import { sanitizePushText, sendPushToOptedIn, type PushDeps } from "./push-dispatch";
 
@@ -10,9 +11,9 @@ const PUSH: PushDeps = {
 };
 
 // Minimal fake query builder: db.from("push_subscription")...returns rows.
-function fakeDb(rows: any[]) {
+function fakeDb(rows: Array<Record<string, unknown>>) {
   const deleted: string[] = [];
-  const db: any = {
+  const db = {
     _deleted: deleted,
     from() {
       return {
@@ -30,7 +31,7 @@ function fakeDb(rows: any[]) {
       };
     },
   };
-  return db;
+  return db as unknown as SupabaseClient & { _deleted: string[] };
 }
 
 describe("sanitizePushText", () => {

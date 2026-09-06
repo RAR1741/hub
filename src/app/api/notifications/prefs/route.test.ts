@@ -1,4 +1,5 @@
-import { describe, expect, test, vi } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { expect, test, vi } from "vitest";
 
 // route.ts imports @/lib/db, which imports the "server-only" package — that
 // throws unconditionally outside a Next.js RSC/webpack build. Mock it so the
@@ -7,6 +8,7 @@ import { describe, expect, test, vi } from "vitest";
 vi.mock("@/lib/db", () => ({ getDb: vi.fn() }));
 
 import { prefsHandler } from "./route";
+import type { Viewer } from "@/lib/viewer";
 
 function req(body: unknown) {
   return new Request("http://localhost/api/notifications/prefs", {
@@ -16,17 +18,17 @@ function req(body: unknown) {
   });
 }
 
-const student: any = { role: "student", person: { id: "p1", notification_types: [] } };
-const admin: any = { role: "admin", person: { id: "a1", notification_types: [] } };
+const student = { role: "student", person: { id: "p1", notification_types: [] } } as unknown as Viewer;
+const admin = { role: "admin", person: { id: "a1", notification_types: [] } } as unknown as Viewer;
 
 test("rejects an unknown type", async () => {
-  const db: any = { from: vi.fn() };
+  const db = { from: vi.fn() } as unknown as SupabaseClient;
   const res = await prefsHandler(student, req({ type: "bogus", enabled: true }), undefined, db);
   expect(res.status).toBe(400);
 });
 
 test("a student cannot enable admin_alerts", async () => {
-  const db: any = { from: vi.fn() };
+  const db = { from: vi.fn() } as unknown as SupabaseClient;
   const res = await prefsHandler(student, req({ type: "admin_alerts", enabled: true }), undefined, db);
   expect(res.status).toBe(403);
   expect(db.from).not.toHaveBeenCalled();
@@ -34,7 +36,7 @@ test("a student cannot enable admin_alerts", async () => {
 
 test("enabling adds the type via array_append RPC/update", async () => {
   const update = vi.fn().mockReturnValue({ eq: () => ({ error: null }) });
-  const db: any = { from: () => ({ update }) };
+  const db = { from: () => ({ update }) } as unknown as SupabaseClient;
   const res = await prefsHandler(admin, req({ type: "admin_alerts", enabled: true }), undefined, db);
   expect(res.status).toBe(200);
 });
