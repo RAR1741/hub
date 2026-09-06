@@ -69,10 +69,10 @@ export default async function AdminGithubSyncPage() {
   }
 
   // lowercased team slug -> team.
-  const slugToTeam = new Map<string, { teamId: string; teamName: string }>();
+  const slugToTeam = new Map<string, { teamId: string; teamName: string; allowInactive: boolean }>();
   for (const t of linkedTeams) {
     if (t.githubTeamSlug) {
-      slugToTeam.set(t.githubTeamSlug.toLowerCase(), { teamId: t.id, teamName: t.name });
+      slugToTeam.set(t.githubTeamSlug.toLowerCase(), { teamId: t.id, teamName: t.name, allowInactive: t.githubSyncAllowInactive });
     }
   }
 
