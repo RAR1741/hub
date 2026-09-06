@@ -111,3 +111,33 @@ export function ExcusalRequestActions({ requestId }: { requestId: string }) {
     </span>
   );
 }
+
+export function ToolDeleteRequestActions({ requestId }: { requestId: string }) {
+  const [status, setStatus] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const router = useRouter();
+
+  async function act(decision: "approve" | "deny") {
+    setStatus(null);
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/admin/requests/tool-delete/${requestId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ decision }),
+      });
+      if (res.ok) router.refresh();
+      else setStatus("Action failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <span className="inline-flex flex-wrap items-center gap-2">
+      <Button variant="primary" className="px-3 py-1" onClick={() => act("approve")} pending={busy} pendingLabel="Working…">Approve</Button>
+      <Button variant="secondary" className="px-3 py-1" disabled={busy} onClick={() => act("deny")}>Deny</Button>
+      {status && <span role="status" className="text-sm text-[var(--muted)]"> {status}</span>}
+    </span>
+  );
+}
