@@ -1,7 +1,7 @@
 // src/lib/push-dispatch.test.ts
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { describe, expect, test, vi } from "vitest";
-import { sanitizePushText, sendPushToOptedIn, type PushDeps } from "./push-dispatch";
+import { deliverToSubscriptions, sanitizePushText, sendPushToOptedIn, type PushDeps, type PushSubscriptionRow } from "./push-dispatch";
 
 const PUSH: PushDeps = {
   publicKey: "pub",
@@ -92,5 +92,22 @@ describe("sendPushToOptedIn", () => {
     const res = await sendPushToOptedIn(["p1"], "admin_alerts", { title: "t", body: "b", url: "/" }, { db, push: { ...PUSH, send } });
     expect(res.sent).toBe(1); // s2 only
     expect(res.pruned).toBe(0); // 500 is not a prune
+  });
+});
+
+describe("deliverToSubscriptions", () => {
+  test("sends to each row, prunes the one that 410s", async () => {
+    const send = vi
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce({ statusCode: 410 });
+    const db = fakeDb([]);
+    const rows: PushSubscriptionRow[] = [
+      { id: "s1", endpoint: "https://push/1", p256dh: "k1", auth: "a1" },
+      { id: "s2", endpoint: "https://push/2", p256dh: "k2", auth: "a2" },
+    ];
+    const res = await deliverToSubscriptions(rows, JSON.stringify({ title: "t" }), { db, push: { ...PUSH, send } });
+    expect(res).toEqual({ sent: 1, pruned: 1 });
+    expect(db._deleted).toContain("s2");
   });
 });

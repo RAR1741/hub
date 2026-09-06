@@ -40,6 +40,44 @@ function isGone(err: unknown): boolean {
   return code === 404 || code === 410;
 }
 
+export type PushSubscriptionRow = { id: string; endpoint: string; p256dh: string; auth: string };
+
+/** Encrypt+send one already-serialized body to each subscription; prune 404/410.
+ *  Never throws. `push` MUST be non-null (caller handles the unconfigured case). */
+export async function deliverToSubscriptions(
+  rows: PushSubscriptionRow[],
+  body: string,
+  deps: { db: SupabaseClient; push: NonNullable<PushDeps> },
+): Promise<{ sent: number; pruned: number }> {
+  const { db, push } = deps;
+  let sent = 0;
+  let pruned = 0;
+  await Promise.allSettled(
+    rows.map(async (r) => {
+      try {
+        await push.send(
+          { endpoint: r.endpoint, keys: { p256dh: r.p256dh, auth: r.auth } },
+          body,
+          {
+            TTL: 3600,
+            timeout: SEND_TIMEOUT_MS,
+            vapidDetails: { subject: push.subject, publicKey: push.publicKey, privateKey: push.privateKey },
+          },
+        );
+        sent += 1;
+      } catch (err) {
+        if (isGone(err)) {
+          pruned += 1;
+          await db.from("push_subscription").delete().eq("id", r.id);
+        } else {
+          console.error(`[push] send failed for ${r.id}:`, (err as Error)?.message ?? err);
+        }
+      }
+    }),
+  );
+  return { sent, pruned };
+}
+
 /** Send one payload to every subscription owned by an opted-in person.
  *  `personIds` may be "all" for team-wide types. Never throws. */
 export async function sendPushToOptedIn(
@@ -82,31 +120,5 @@ export async function sendPushToOptedIn(
   });
 
   const body = JSON.stringify(payload);
-
-  let sent = 0;
-  let pruned = 0;
-  await Promise.allSettled(
-    rows.map(async (r) => {
-      try {
-        await push.send(
-          { endpoint: r.endpoint, keys: { p256dh: r.p256dh, auth: r.auth } },
-          body,
-          {
-            TTL: 3600,
-            timeout: SEND_TIMEOUT_MS,
-            vapidDetails: { subject: push.subject, publicKey: push.publicKey, privateKey: push.privateKey },
-          },
-        );
-        sent += 1;
-      } catch (err) {
-        if (isGone(err)) {
-          pruned += 1;
-          await deps.db.from("push_subscription").delete().eq("id", r.id);
-        } else {
-          console.error(`[push] send failed for ${r.id}:`, (err as Error)?.message ?? err);
-        }
-      }
-    }),
-  );
-  return { sent, pruned };
+  return deliverToSubscriptions(rows, body, { db: deps.db, push });
 }
