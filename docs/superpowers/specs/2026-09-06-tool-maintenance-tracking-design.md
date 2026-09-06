@@ -14,7 +14,7 @@ Where this spec is silent, do what BT / `src/lib/batteries.ts` / `excusal-reques
 
 Decisions (do not re-open):
 
-1. **Three tables, one migration** `supabase/migrations/20260906120000_tool_maintenance.sql`:
+1. **Three tables, one migration** `supabase/migrations/20260906130000_tool_maintenance.sql`:
    `tool`, `tool_check`, `tool_delete_request`. Re-run `git ls-tree origin/master
    supabase/migrations/` before naming — origin/master tops out at `20260903120000` today.
 2. **Tool identity.** `name` is NOT unique (three identical drills). `asset_tag` is an optional
@@ -315,7 +315,7 @@ mentor (checks and request cascaded); guest `/tools` → `/login`. `finally`: me
 
 ## 10. Tasks (each sized for a fresh subagent; 1 → 2 → {3, 7} → 4 → {5, 6} → {8, 9})
 
-1. **coder** — Migration `supabase/migrations/20260906120000_tool_maintenance.sql` (§2: three
+1. **coder** — Migration `supabase/migrations/20260906130000_tool_maintenance.sql` (§2: three
    tables, indexes, trigger, `merge_person` re-declared from `20260903120000_battery_tracking.sql`
    + three lines) and types in `src/lib/types.ts` (§2, incl. `ToolDeleteRequest*`). Verify with
    `./dev npm run db:reset`, then `psql` in `./dev bash`: check with `status_after` flips the
