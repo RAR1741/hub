@@ -120,27 +120,39 @@ export async function archiveChannel(deps: SlackDeps, channelId: string): Promis
   }
 }
 
-/** Invite Slack users to a channel. `already_in_channel` counts as success. */
-export async function inviteToChannel(deps: SlackDeps, channelId: string, slackUserIds: string[]): Promise<boolean> {
+export type InviteResult = { ok: true } | { ok: false; error?: string };
+
+/**
+ * Invite Slack users to a channel. `already_in_channel` counts as success.
+ * Unlike `inviteToChannel`, a real Slack-side failure carries its `error` code
+ * so a caller can alert with the specifics (e.g. `not_in_channel`); a skip
+ * (no token / non-prod) carries no error — it's not a failure.
+ */
+export async function inviteToChannelDetailed(deps: SlackDeps, channelId: string, slackUserIds: string[]): Promise<InviteResult> {
   if (!deps.token) {
     console.log(`[slack:no-token] would invite ${slackUserIds.join(",")} to ${channelId}`);
-    return false;
+    return { ok: false };
   }
   if (!deps.isProd) {
     console.log(`[slack:dev] would invite ${slackUserIds.join(",")} to ${channelId}`);
-    return false;
+    return { ok: false };
   }
   try {
     const { ok, body } = await post(deps, "conversations.invite", { channel: channelId, users: slackUserIds.join(",") });
     if (!ok && body.error !== "already_in_channel") {
       console.error(`[slack] conversations.invite failed:`, body.error ?? body);
-      return false;
+      return { ok: false, error: String(body.error ?? "unknown") };
     }
-    return true;
+    return { ok: true };
   } catch (e) {
     console.error(`[slack] conversations.invite threw:`, e);
-    return false;
+    return { ok: false, error: e instanceof Error ? e.message : "threw" };
   }
+}
+
+/** Invite Slack users to a channel. `already_in_channel` counts as success. */
+export async function inviteToChannel(deps: SlackDeps, channelId: string, slackUserIds: string[]): Promise<boolean> {
+  return (await inviteToChannelDetailed(deps, channelId, slackUserIds)).ok;
 }
 
 /** Post the kickoff message to an event's channel. */

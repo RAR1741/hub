@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 export type TeamFormValues = {
@@ -10,7 +10,10 @@ export type TeamFormValues = {
   joinMode: string;
   googleGroupEmail: string;
   githubTeamSlug: string;
+  slackChannels: { channelId: string; label: string }[];
 };
+
+type ChannelRow = { key: string; channelId: string; label: string };
 
 export function TeamForm({
   teams,
@@ -22,9 +25,13 @@ export function TeamForm({
   teamId?: string; // present = edit
 }) {
   const EMPTY: TeamFormValues = {
-    name: "", parentTeamId: "", description: "", joinMode: "admin_only", googleGroupEmail: "", githubTeamSlug: "",
+    name: "", parentTeamId: "", description: "", joinMode: "admin_only", googleGroupEmail: "", githubTeamSlug: "", slackChannels: [],
   };
   const [values, setValues] = useState<TeamFormValues>(initial ?? EMPTY);
+  const [channels, setChannels] = useState<ChannelRow[]>(() =>
+    (initial?.slackChannels ?? []).map((c, i) => ({ key: `init-${i}`, ...c })),
+  );
+  const nextKey = useRef(0);
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const router = useRouter();
@@ -44,6 +51,9 @@ export function TeamForm({
           joinMode: values.joinMode,
           googleGroupEmail: values.googleGroupEmail || undefined,
           githubTeamSlug: values.githubTeamSlug || undefined,
+          slackChannels: channels
+            .filter((c) => c.channelId.trim())
+            .map((c) => ({ channelId: c.channelId.trim(), label: c.label.trim() || null })),
         }),
       });
       if (res.ok) {
@@ -96,6 +106,53 @@ export function TeamForm({
           onChange={(e) => setValues({ ...values, githubTeamSlug: e.target.value })}
         />
       </label>
+      <div className="label">
+        Slack channels
+        <div className="flex flex-col gap-2">
+          {channels.map((c) => (
+            <div key={c.key} className="flex gap-2">
+              <input
+                className="input"
+                type="text"
+                placeholder="C0123ABC"
+                aria-label="Slack channel ID"
+                value={c.channelId}
+                onChange={(e) => {
+                  setChannels(channels.map((row) => (row.key === c.key ? { ...row, channelId: e.target.value } : row)));
+                }}
+              />
+              <input
+                className="input"
+                type="text"
+                placeholder="#frc"
+                aria-label="Channel label (optional)"
+                value={c.label}
+                onChange={(e) => {
+                  setChannels(channels.map((row) => (row.key === c.key ? { ...row, label: e.target.value } : row)));
+                }}
+              />
+              <button
+                type="button"
+                className="btn"
+                aria-label={`Remove channel ${c.channelId || "row"}`}
+                onClick={() => setChannels(channels.filter((row) => row.key !== c.key))}
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+        <button
+          type="button"
+          className="btn"
+          onClick={() => setChannels([...channels, { key: `new-${nextKey.current++}`, channelId: "", label: "" }])}
+        >
+          Add channel
+        </button>
+        <span className="text-sm text-[var(--muted)]">
+          Members of this team are auto-invited to these Slack channels. The bot must already be in each channel.
+        </span>
+      </div>
       <label className="label">Join mode{" "}
         <select className="input" value={values.joinMode} onChange={(e) => setValues({ ...values, joinMode: e.target.value })}>
           <option value="admin_only">admin only</option>

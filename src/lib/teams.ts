@@ -36,9 +36,30 @@ export type TeamInput = {
   joinMode: JoinMode;
   googleGroupEmail: string | null;
   githubTeamSlug: string | null;
+  slackChannels: { channelId: string; label: string | null }[];
 };
 
 const GITHUB_SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
+const SLACK_CHANNEL_ID_RE = /^[CG][A-Z0-9]{2,20}$/;
+
+/** Validate the slackChannels array. PURE. Null = invalid, dedupes by channelId. */
+function parseSlackChannels(v: unknown): { channelId: string; label: string | null }[] | null {
+  if (v === undefined) return [];
+  if (!Array.isArray(v)) return null;
+  const seen = new Set<string>();
+  const result: { channelId: string; label: string | null }[] = [];
+  for (const entry of v) {
+    if (typeof entry !== "object" || entry === null) return null;
+    const e = entry as Record<string, unknown>;
+    if (typeof e.channelId !== "string" || !SLACK_CHANNEL_ID_RE.test(e.channelId)) return null;
+    const label = optString(e.label, 80);
+    if (!label) return null;
+    if (seen.has(e.channelId)) continue;
+    seen.add(e.channelId);
+    result.push({ channelId: e.channelId, label: label.value });
+  }
+  return result;
+}
 
 /** Validate a team payload. PURE. Null = invalid. */
 export function parseTeamInput(body: unknown): TeamInput | null {
@@ -50,7 +71,8 @@ export function parseTeamInput(body: unknown): TeamInput | null {
   const googleGroupEmail = optString(b.googleGroupEmail, 254);
   const githubTeamSlugRaw = optString(b.githubTeamSlug, 100);
   const joinMode = JOIN_MODES.find((m) => m === b.joinMode);
-  if (!name || !parentTeamId || !description || !googleGroupEmail || !githubTeamSlugRaw || !joinMode) return null;
+  const slackChannels = parseSlackChannels(b.slackChannels);
+  if (!name || !parentTeamId || !description || !googleGroupEmail || !githubTeamSlugRaw || !joinMode || !slackChannels) return null;
   const githubTeamSlug = githubTeamSlugRaw.value ? githubTeamSlugRaw.value.toLowerCase() : null;
   if (githubTeamSlug && !GITHUB_SLUG_RE.test(githubTeamSlug)) return null;
   return {
@@ -60,10 +82,60 @@ export function parseTeamInput(body: unknown): TeamInput | null {
     joinMode,
     googleGroupEmail: googleGroupEmail.value,
     githubTeamSlug,
+    slackChannels,
   };
 }
 
 const UNIQUE_VIOLATION = "23505";
+
+export async function listTeamSlackChannels(
+  teamId: string,
+  db?: SupabaseClient,
+): Promise<{ channelId: string; label: string | null }[]> {
+  const client = db ?? (await import("./db")).getDb();
+  const { data, error } = await client
+    .from("team_slack_channel")
+    .select("slack_channel_id, label")
+    .eq("team_id", teamId)
+    .order("slack_channel_id");
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) => ({
+    channelId: r.slack_channel_id as string,
+    label: r.label as string | null,
+  }));
+}
+
+/** Upsert-then-prune, non-transactional. `team_slack_channel` is
+ *  source-of-truth team config (like `team_external_account`), not a
+ *  best-effort Slack side effect — a failure can leave extra links but never
+ *  drops existing ones; caller reports a failed save. */
+async function replaceTeamSlackChannels(
+  client: SupabaseClient,
+  teamId: string,
+  channels: { channelId: string; label: string | null }[],
+): Promise<boolean> {
+  if (channels.length > 0) {
+    const { error: upsertError } = await client.from("team_slack_channel").upsert(
+      channels.map((c) => ({ team_id: teamId, slack_channel_id: c.channelId, label: c.label })),
+      { onConflict: "team_id,slack_channel_id" },
+    );
+    if (upsertError) {
+      console.error("replaceTeamSlackChannels: upsert failed", upsertError);
+      return false;
+    }
+  }
+  let prune = client.from("team_slack_channel").delete().eq("team_id", teamId);
+  if (channels.length > 0) {
+    const keep = channels.map((c) => c.channelId).join(",");
+    prune = prune.not("slack_channel_id", "in", `(${keep})`);
+  }
+  const { error: pruneError } = await prune;
+  if (pruneError) {
+    console.error("replaceTeamSlackChannels: prune failed", pruneError);
+    return false;
+  }
+  return true;
+}
 
 export async function listTeams(db?: SupabaseClient): Promise<Team[]> {
   const client = db ?? (await import("./db")).getDb();
@@ -95,6 +167,8 @@ export async function createTeam(
     .select("id")
     .single();
   if (error) return { ok: false, status: error.code === UNIQUE_VIOLATION ? 409 : 500 };
+  const channelsOk = await replaceTeamSlackChannels(client, data.id as string, input.slackChannels);
+  if (!channelsOk) return { ok: false, status: 500 };
   return { ok: true, id: data.id as string };
 }
 
@@ -120,6 +194,8 @@ export async function updateTeam(
     .maybeSingle();
   if (error) return { ok: false, status: error.code === UNIQUE_VIOLATION ? 409 : 500 };
   if (!data) return { ok: false, status: 404 };
+  const channelsOk = await replaceTeamSlackChannels(client, id, input.slackChannels);
+  if (!channelsOk) return { ok: false, status: 500 };
   return { ok: true, status: 200 };
 }
 
