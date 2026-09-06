@@ -13,8 +13,11 @@ async function tokenSubject(): Promise<string | null> {
   const kioskToken = (await cookies()).get(KIOSK_COOKIE)?.value;
   if (await verifyKioskToken(kioskToken)) return "kiosk";
   const viewer = await getViewer();
-  if (viewer.role === "guest") return null;
-  return viewer.person ? `person:${viewer.person.id}` : "authenticated";
+  // Fail closed: resolveViewer only returns a non-guest role together with a
+  // person row, so a non-guest viewer always has a person. If that invariant
+  // ever breaks, deny rather than mint an unattributable token.
+  if (viewer.role === "guest" || !viewer.person) return null;
+  return `person:${viewer.person.id}`;
 }
 
 export async function GET() {

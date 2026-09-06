@@ -38,13 +38,27 @@ describe("GET /api/realtime-token", () => {
     expect(res.status).toBe(401);
   });
 
+  test("401 (fails closed) for a non-guest viewer with no person, rather than an unattributable token", async () => {
+    const { cookies } = await import("next/headers");
+    const { verifyKioskToken } = await import("@/lib/kiosk");
+    const { getViewer } = await import("@/lib/viewer");
+    vi.mocked(cookies).mockResolvedValue({ get: () => undefined } as never);
+    vi.mocked(verifyKioskToken).mockResolvedValue(false);
+    vi.mocked(getViewer).mockResolvedValue({ person: null, role: "mentor" } as never);
+    vi.stubEnv("SUPABASE_JWT_SECRET", SECRET);
+
+    const { GET } = await import("./route");
+    const res = await GET();
+    expect(res.status).toBe(401);
+  });
+
   test("503 when SUPABASE_JWT_SECRET is missing, even for an authorized viewer", async () => {
     const { cookies } = await import("next/headers");
     const { verifyKioskToken } = await import("@/lib/kiosk");
     const { getViewer } = await import("@/lib/viewer");
     vi.mocked(cookies).mockResolvedValue({ get: () => undefined } as never);
     vi.mocked(verifyKioskToken).mockResolvedValue(false);
-    vi.mocked(getViewer).mockResolvedValue({ person: null, role: "mentor" });
+    vi.mocked(getViewer).mockResolvedValue({ person: { id: "p-1" }, role: "mentor" } as never);
     vi.stubEnv("SUPABASE_JWT_SECRET", "");
 
     const { GET } = await import("./route");
