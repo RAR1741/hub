@@ -1,15 +1,21 @@
 import { describe, expect, test } from "vitest";
 import type { SlackDeps } from "./slack";
+import { CHANNELS } from "./slack-registry";
 import { syncSlackMembershipChange } from "./slack-channel-sync";
 
 type CapturedRequest = { url: string; init?: RequestInit };
 
-function fakeFetch(responses: { status: number; body?: unknown }[] = []) {
+/** Fake Slack fetch: dispatches on the called method (last URL segment) so both conversations.invite and chat.postMessage can be scripted independently. */
+function fakeFetch(responses: Record<string, { status: number; body?: unknown }[]> = {}) {
   const requests: CapturedRequest[] = [];
-  const queue = [...responses];
+  const queues: Record<string, { status: number; body?: unknown }[]> = Object.fromEntries(
+    Object.entries(responses).map(([k, v]) => [k, [...v]]),
+  );
   const fetchFn = (async (url: string | URL | Request, init?: RequestInit) => {
-    requests.push({ url: String(url), init });
-    const next = queue.shift() ?? { status: 200, body: { ok: true } };
+    const urlStr = String(url);
+    requests.push({ url: urlStr, init });
+    const method = urlStr.split("/").pop() ?? "";
+    const next = queues[method]?.shift() ?? { status: 200, body: { ok: true } };
     return new Response(next.body !== undefined ? JSON.stringify(next.body) : undefined, {
       status: next.status,
       headers: { "Content-Type": "application/json" },
@@ -49,6 +55,8 @@ function makeDb(script: { data?: unknown; error?: unknown }[]) {
   };
 }
 
+const PERSON = { slack_user_id: "U1", first_name: "Jane", last_name: "Doe", display_name: null };
+
 describe("syncSlackMembershipChange", () => {
   test("no token -> no-op, no db access, no fetch", async () => {
     const { fetchFn, requests } = fakeFetch();
@@ -77,21 +85,43 @@ describe("syncSlackMembershipChange", () => {
     expect(requests).toHaveLength(0);
   });
 
-  test("already_in_channel is treated as success, does not throw", async () => {
-    const { fetchFn } = fakeFetch([{ status: 200, body: { ok: false, error: "already_in_channel" } }]);
-    const db = makeDb([{ data: [{ slack_channel_id: "C1" }] }, { data: { slack_user_id: "U1" } }]);
+  test("already_in_channel is treated as success, does not throw, no alert", async () => {
+    const { fetchFn, requests } = fakeFetch({ "conversations.invite": [{ status: 200, body: { ok: false, error: "already_in_channel" } }] });
+    const db = makeDb([{ data: [{ slack_channel_id: "C1", label: "frc" }] }, { data: PERSON }, { data: { name: "FRC Mentors" } }]);
     await expect(
       syncSlackMembershipChange("add", "team-1", "person-1", db as never, fakeSlackDeps(fetchFn)),
     ).resolves.toBeUndefined();
+    expect(requests.some((r) => r.url.includes("chat.postMessage"))).toBe(false);
   });
 
-  test("happy path: one channel + linked person -> one conversations.invite with channel and user", async () => {
-    const { fetchFn, requests } = fakeFetch([{ status: 200, body: { ok: true } }]);
-    const db = makeDb([{ data: [{ slack_channel_id: "C1" }] }, { data: { slack_user_id: "U1" } }]);
+  test("happy path: one channel + linked person -> one conversations.invite with channel and user, no alert", async () => {
+    const { fetchFn, requests } = fakeFetch({ "conversations.invite": [{ status: 200, body: { ok: true } }] });
+    const db = makeDb([{ data: [{ slack_channel_id: "C1", label: "frc" }] }, { data: PERSON }, { data: { name: "FRC Mentors" } }]);
     await syncSlackMembershipChange("add", "team-1", "person-1", db as never, fakeSlackDeps(fetchFn));
     expect(requests).toHaveLength(1);
     expect(requests[0].url).toContain("conversations.invite");
     expect(bodyOf(requests[0])).toMatchObject({ channel: "C1", users: "U1" });
+    expect(requests.some((r) => r.url.includes("chat.postMessage"))).toBe(false);
+  });
+
+  test("not_in_channel -> posts one alert to #hub-admin-alerts naming the person, channel and team", async () => {
+    const { fetchFn, requests } = fakeFetch({
+      "conversations.invite": [{ status: 200, body: { ok: false, error: "not_in_channel" } }],
+      "chat.postMessage": [{ status: 200, body: { ok: true } }],
+    });
+    const db = makeDb([{ data: [{ slack_channel_id: "C1", label: "#frc" }] }, { data: PERSON }, { data: { name: "FRC Mentors" } }]);
+    await syncSlackMembershipChange("add", "team-1", "person-1", db as never, fakeSlackDeps(fetchFn));
+
+    const alerts = requests.filter((r) => r.url.includes("chat.postMessage"));
+    expect(alerts).toHaveLength(1);
+    const alertBody = bodyOf(alerts[0]);
+    expect(alertBody.channel).toBe(CHANNELS["hub-admin-alerts"]);
+    expect(alertBody.text as string).toContain("Jane Doe");
+    expect(alertBody.text as string).toContain("#frc (");
+    expect(alertBody.text as string).not.toContain("##");
+    expect(alertBody.text as string).toContain("C1");
+    expect(alertBody.text as string).toContain("FRC Mentors");
+    expect(alertBody.text as string).toContain("not_in_channel");
   });
 
   test("team_slack_channel query error -> logged and swallowed, never throws", async () => {

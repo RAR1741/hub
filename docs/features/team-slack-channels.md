@@ -12,6 +12,7 @@ When a membership change occurs — a person is added to a team via the admin UI
 4. If Slack returns `already_in_channel`, counts it as success (idempotent).
 5. If Slack returns `not_in_channel`, the invite fails — this means the bot is not a member of the channel and cannot invite anyone; this is logged and does **not** block the membership change.
 6. Any other Slack error is logged; the membership change still succeeds.
+7. A failed invite (e.g. `not_in_channel`, `channel_not_found`) posts a one-line alert to `#hub-admin-alerts` naming the person, team, and channel so an admin can invite the bot to the channel or fix its ID; skipped invites (no bot token, non-prod, or a person with no linked Slack account) do not alert.
 
 ## Linking channels to teams
 
