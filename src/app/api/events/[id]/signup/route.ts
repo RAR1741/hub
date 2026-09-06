@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { masqueradeReadOnly } from "@/lib/api";
 import { cancelEventSignup, signUpForEvent } from "@/lib/event-signups";
 import { getEvent } from "@/lib/events";
 import { submitEventSignupResponse } from "@/lib/form-responses";
@@ -16,6 +17,8 @@ export async function POST(request: Request, context: Ctx) {
   }
   const viewer = await getViewer();
   if (!viewer.person) return NextResponse.json({ ok: false }, { status: 401 });
+  const blocked = masqueradeReadOnly(viewer);
+  if (blocked) return blocked;
   const { id: rawId } = await context.params;
   const id = reqUuid(rawId);
   if (!id) return NextResponse.json({ ok: false }, { status: 400 });
@@ -47,6 +50,8 @@ export async function DELETE(request: Request, context: Ctx) {
   }
   const viewer = await getViewer();
   if (!viewer.person) return NextResponse.json({ ok: false }, { status: 401 });
+  const blocked = masqueradeReadOnly(viewer);
+  if (blocked) return blocked;
   const { id: rawId } = await context.params;
   const id = reqUuid(rawId);
   if (!id) return NextResponse.json({ ok: false }, { status: 400 });

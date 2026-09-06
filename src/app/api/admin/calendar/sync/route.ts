@@ -1,3 +1,4 @@
+import { masqueradeReadOnly } from "@/lib/api";
 import { getDb } from "@/lib/db";
 import { getSetting, getTeamTimezone } from "@/lib/settings";
 import { getViewer } from "@/lib/viewer";
@@ -20,6 +21,8 @@ export async function POST(request: Request) {
     if (!hasRole(viewer.role, "mentor")) {
       return Response.json({ error: "forbidden" }, { status: 403 });
     }
+    const blocked = masqueradeReadOnly(viewer);
+    if (blocked) return blocked;
   }
 
   // GOOGLE_CALENDAR_ID env var wins; otherwise the gcal_calendar_id app setting.
