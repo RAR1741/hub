@@ -92,6 +92,24 @@ describe("clientUrl", () => {
     });
   });
 
+  test("uses the first token of a comma-separated x-forwarded-proto (no throw)", () => {
+    const r = req("http://internal/x", {
+      host: "hub.redalert1741.org",
+      "x-forwarded-host": "hub.redalert1741.org",
+      "x-forwarded-proto": "https, http",
+    });
+    expect(clientUrl(r, "/").toString()).toBe("https://hub.redalert1741.org/");
+  });
+
+  test("falls back to request.url's scheme for a non-http(s) x-forwarded-proto", () => {
+    const r = req("https://hub.redalert1741.org/x", {
+      host: "hub.redalert1741.org",
+      "x-forwarded-host": "hub.redalert1741.org",
+      "x-forwarded-proto": "javascript",
+    });
+    expect(clientUrl(r, "/").toString()).toBe("https://hub.redalert1741.org/");
+  });
+
   test("rejects a malformed (@) host even with no allow-list, falling back to request.url", () => {
     // No APP_ALLOWED_HOSTS: a bare `new URL()` on this would resolve to evil.com,
     // so the malformed host must be dropped rather than trusted.

@@ -24,8 +24,21 @@ export function clientUrl(request: Request, path: string): URL {
   const candidate = h.get("x-forwarded-host") ?? h.get("host");
   const host = safeHost(candidate);
   if (!host) return new URL(path, request.url); // last-resort fallback
-  const proto = h.get("x-forwarded-proto") ?? new URL(request.url).protocol.replace(/:$/, "");
+  const proto = safeProto(h.get("x-forwarded-proto"), request);
   return new URL(path, `${proto}://${host}`);
+}
+
+/**
+ * Scheme for the redirect. `x-forwarded-proto` is client-controlled on a
+ * deployment whose proxy doesn't overwrite it, and can be a comma-separated
+ * list. Take the first token and accept only http/https; anything else falls
+ * back to the scheme of `request.url` — so a malformed value can't crash the
+ * URL build or reflect a foreign scheme into a redirect / OAuth redirect_uri.
+ */
+function safeProto(candidate: string | null, request: Request): string {
+  const first = (candidate ?? "").split(",")[0].trim().toLowerCase();
+  if (first === "http" || first === "https") return first;
+  return new URL(request.url).protocol.replace(/:$/, "");
 }
 
 /** Comma-separated canonical host[:port]s from APP_ALLOWED_HOSTS, lowercased. */
@@ -60,11 +73,12 @@ function normalizeHost(candidate: string | null): string | null {
 }
 
 /**
- * Returns the host to build the URL from, after normalization:
- * - candidate isn't a valid bare host → null (caller falls back to request.url);
- * - no allow-list configured → the normalized candidate (preserves dev/preview behavior);
- * - candidate is allow-listed (or a local host) → the normalized candidate;
- * - candidate is a valid host but not allow-listed → the canonical (first allow-listed) host.
+ * Returns the host to build the URL from, after normalization.
+ * With NO allow-list configured: the normalized candidate, or null when it is
+ * missing/malformed (the caller then falls back to request.url).
+ * With an allow-list configured: the normalized candidate when it is allow-listed
+ * or a local host; otherwise the canonical (first allow-listed) host — including
+ * when the candidate is missing or malformed (never null in this case).
  */
 function safeHost(candidate: string | null): string | null {
   const host = normalizeHost(candidate);
