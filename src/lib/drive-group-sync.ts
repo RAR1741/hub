@@ -6,6 +6,7 @@ import {
   listGroupMembers,
   type DirectoryCredentials,
 } from "./google-directory";
+import { subtreeIds, type TeamLink } from "./team-tree";
 
 /** Diff expected vs actual group membership. PURE, case-insensitive, deduped. */
 export function computeGroupDiff(
@@ -49,10 +50,18 @@ export async function reconcileDriveGroups(deps: {
     .not("google_group_email", "is", null);
   const linkedTeams = (data ?? []) as LinkedTeamRow[];
 
+  const { data: teamRows, error: treeError } = await db.from("team").select("id, parent_team_id");
+  if (treeError) throw new Error(`list team tree failed: ${treeError.message}`);
+  const tree: TeamLink[] = ((teamRows ?? []) as { id: string; parent_team_id: string | null }[]).map((t) => ({
+    id: t.id,
+    parentTeamId: t.parent_team_id,
+  }));
+
   const groups: GroupReconcileReport[] = [];
 
   for (const team of linkedTeams) {
     const groupEmail = team.google_group_email;
+    const subtree = subtreeIds(tree, team.id);
     const report: GroupReconcileReport = {
       teamName: team.name,
       groupEmail,
@@ -66,7 +75,7 @@ export async function reconcileDriveGroups(deps: {
       const { data: memberships } = await db
         .from("team_membership")
         .select("person (is_active, person_identity (email))")
-        .eq("team_id", team.id);
+        .in("team_id", subtree);
       type IdentityJoin = { email: string };
       type PersonJoin = {
         is_active: boolean;
@@ -87,7 +96,7 @@ export async function reconcileDriveGroups(deps: {
       const { data: externalRows, error: externalError } = await db
         .from("team_external_account")
         .select("provider, identifier")
-        .eq("team_id", team.id);
+        .in("team_id", subtree);
       if (externalError) {
         report.errors.push(externalError.message ?? String(externalError));
         groups.push(report);
@@ -97,11 +106,15 @@ export async function reconcileDriveGroups(deps: {
         if (row.provider === "google") expected.push(row.identifier);
       }
 
+      // Dedupe (a person or bot account reachable via more than one team in the
+      // subtree, e.g. direct FRC membership + FRC Students) before counts/inserts.
+      const dedupedExpected = [...new Set(expected.map((e) => e.toLowerCase()))];
+
       const actual = await listGroupMembers(dirDeps, groupEmail);
-      report.expectedCount = expected.length;
+      report.expectedCount = dedupedExpected.length;
       report.actualCount = actual.length;
 
-      const { missing, extra } = computeGroupDiff(expected, actual);
+      const { missing, extra } = computeGroupDiff(dedupedExpected, actual);
       report.wouldRemove = extra;
 
       for (const email of missing) {
