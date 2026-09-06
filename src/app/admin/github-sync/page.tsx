@@ -109,6 +109,7 @@ export default async function AdminGithubSyncPage() {
                   <tr>
                     <th>Team</th>
                     <th>Slug</th>
+                    <th>Inactive members</th>
                     <th style={{ textAlign: "right" }}>Connected / active</th>
                   </tr>
                 </thead>
@@ -119,6 +120,7 @@ export default async function AdminGithubSyncPage() {
                       <tr key={t.id}>
                         <td>{t.name}</td>
                         <td className="mono">{t.githubTeamSlug}</td>
+                        <td>{t.githubSyncAllowInactive ? "Allowed" : "Excluded"}</td>
                         <td style={{ textAlign: "right" }}>
                           {counts.connected} / {counts.active}
                         </td>

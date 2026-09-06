@@ -6,6 +6,7 @@ import {
   renameChannel,
   archiveChannel,
   inviteToChannel,
+  inviteToChannelDetailed,
   postToEventChannel,
   afterEventCreated,
   afterEventUpdated,
@@ -208,6 +209,48 @@ describe("inviteToChannel", () => {
     const { fetchFn } = fakeFetch([{ status: 200, body: { ok: false, error: "not_in_channel" } }]);
     const ok = await inviteToChannel(prodDeps(fetchFn), "C1", ["U1"]);
     expect(ok).toBe(false);
+  });
+});
+
+describe("inviteToChannelDetailed", () => {
+  test("no token -> skip ({ ok: false }, no error), no fetch", async () => {
+    const { fetchFn, requests } = fakeFetch();
+    const result = await inviteToChannelDetailed({ fetch: fetchFn, token: null, isProd: true }, "C1", ["U1"]);
+    expect(result).toEqual({ ok: false });
+    expect(requests).toHaveLength(0);
+  });
+
+  test("non-prod -> skip ({ ok: false }, no error), no fetch", async () => {
+    const { fetchFn, requests } = fakeFetch();
+    const result = await inviteToChannelDetailed(devDeps(fetchFn), "C1", ["U1"]);
+    expect(result).toEqual({ ok: false });
+    expect(requests).toHaveLength(0);
+  });
+
+  test("already_in_channel -> { ok: true }", async () => {
+    const { fetchFn } = fakeFetch([{ status: 200, body: { ok: false, error: "already_in_channel" } }]);
+    const result = await inviteToChannelDetailed(prodDeps(fetchFn), "C1", ["U1"]);
+    expect(result).toEqual({ ok: true });
+  });
+
+  test("real success -> { ok: true }", async () => {
+    const { fetchFn } = fakeFetch([{ status: 200, body: { ok: true } }]);
+    const result = await inviteToChannelDetailed(prodDeps(fetchFn), "C1", ["U1"]);
+    expect(result).toEqual({ ok: true });
+  });
+
+  test("other Slack error -> { ok: false, error } carries the code", async () => {
+    const { fetchFn } = fakeFetch([{ status: 200, body: { ok: false, error: "not_in_channel" } }]);
+    const result = await inviteToChannelDetailed(prodDeps(fetchFn), "C1", ["U1"]);
+    expect(result).toEqual({ ok: false, error: "not_in_channel" });
+  });
+
+  test("network throw -> { ok: false, error } carries the message", async () => {
+    const fetchFn = (async () => {
+      throw new Error("down");
+    }) as unknown as typeof globalThis.fetch;
+    const result = await inviteToChannelDetailed(prodDeps(fetchFn), "C1", ["U1"]);
+    expect(result).toEqual({ ok: false, error: "down" });
   });
 });
 
