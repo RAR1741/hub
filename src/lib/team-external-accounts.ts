@@ -7,6 +7,7 @@ import {
 } from "./google-directory";
 import { githubAppCredentialsFromEnv, type GithubAppCredentials, type GithubDeps } from "./github-app";
 import { getUserByLogin, putTeamMembership, deleteTeamMembership } from "./github-teams";
+import { ancestorIds, type TeamLink } from "./team-tree";
 
 export type Provider = "google" | "github";
 
@@ -70,7 +71,52 @@ export async function listTeamExternalAccounts(
   return (data ?? []) as TeamExternalAccountRow[];
 }
 
-/** Best-effort live sync, matching syncMembershipChange()/syncGithubMembershipChange(): logged, never thrown. */
+async function loadTeamTree(db: SupabaseClient): Promise<TeamLink[] | null> {
+  const { data, error } = await db.from("team").select("id, parent_team_id");
+  if (error || !data) return null;
+  return data.map((t: { id: string; parent_team_id: string | null }) => ({
+    id: t.id,
+    parentTeamId: t.parent_team_id,
+  }));
+}
+
+/** Add/remove for a single team's resource. */
+async function syncOneTeam(
+  deps: TeamExternalAccountDeps,
+  action: "add" | "remove",
+  teamId: string,
+  provider: Provider,
+  identifier: string,
+): Promise<void> {
+  const { data: team, error } = await deps.db
+    .from("team")
+    .select("google_group_email, github_team_slug")
+    .eq("id", teamId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  const t = team as { google_group_email: string | null; github_team_slug: string | null } | null;
+
+  if (provider === "google") {
+    const groupEmail = t?.google_group_email;
+    if (!groupEmail || !deps.directoryCredentials) return;
+    const dirDeps = { fetch: deps.fetch, credentials: deps.directoryCredentials };
+    if (action === "add") await insertGroupMember(dirDeps, groupEmail, identifier);
+    else await deleteGroupMember(dirDeps, groupEmail, identifier);
+  } else {
+    const slug = t?.github_team_slug;
+    if (!slug || !deps.githubCredentials) return;
+    const ghDeps: GithubDeps = { fetch: deps.fetch, credentials: deps.githubCredentials };
+    if (action === "add") await putTeamMembership(ghDeps, slug, identifier);
+    else await deleteTeamMembership(ghDeps, slug, identifier);
+  }
+}
+
+/**
+ * Best-effort live sync, matching syncMembershipChange()/syncGithubMembershipChange(): logged, never thrown.
+ * On `add`, walks up to ancestors too (see membership-sync.ts §3.1) so linking a bot to a sub-team's
+ * resource also lands it on the umbrella team's. `remove` stays scoped to `teamId` (§3.3 posture: an
+ * ancestor may still expect the account via another descendant; the nightly reconcile catches true orphans).
+ */
 async function liveSync(
   deps: TeamExternalAccountDeps,
   action: "add" | "remove",
@@ -79,26 +125,14 @@ async function liveSync(
   identifier: string,
 ): Promise<void> {
   try {
-    const { data: team, error } = await deps.db
-      .from("team")
-      .select("google_group_email, github_team_slug")
-      .eq("id", teamId)
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    const t = team as { google_group_email: string | null; github_team_slug: string | null } | null;
-
-    if (provider === "google") {
-      const groupEmail = t?.google_group_email;
-      if (!groupEmail || !deps.directoryCredentials) return;
-      const dirDeps = { fetch: deps.fetch, credentials: deps.directoryCredentials };
-      if (action === "add") await insertGroupMember(dirDeps, groupEmail, identifier);
-      else await deleteGroupMember(dirDeps, groupEmail, identifier);
-    } else {
-      const slug = t?.github_team_slug;
-      if (!slug || !deps.githubCredentials) return;
-      const ghDeps: GithubDeps = { fetch: deps.fetch, credentials: deps.githubCredentials };
-      if (action === "add") await putTeamMembership(ghDeps, slug, identifier);
-      else await deleteTeamMembership(ghDeps, slug, identifier);
+    let targets = [teamId];
+    if (action === "add") {
+      const tree = await loadTeamTree(deps.db);
+      // Never let the umbrella feature reduce what happened before: a failed tree read still syncs teamId.
+      targets = tree ? [teamId, ...ancestorIds(tree, teamId)] : [teamId];
+    }
+    for (const target of targets) {
+      await syncOneTeam(deps, action, target, provider, identifier);
     }
   } catch (error) {
     console.error("team external account live sync failed", { action, teamId, provider, identifier, error });

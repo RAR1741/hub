@@ -12,27 +12,6 @@ import { SyncNowPanel } from "@/components/SyncNowPanel";
 import { ReconcileReport } from "@/components/ReconcileReport";
 import { RecommendedMembers } from "@/components/RecommendedMembers";
 
-type IdentityJoin = { email: string };
-type MembershipPersonRow = {
-  is_active: boolean;
-  person_identity: IdentityJoin | IdentityJoin[] | null;
-};
-
-/** How many linked identity emails of active members a linked team's group should contain. */
-async function expectedCount(teamId: string, db: ReturnType<typeof getDb>): Promise<number> {
-  const { data } = await db
-    .from("team_membership")
-    .select("person (is_active, person_identity (email))")
-    .eq("team_id", teamId);
-  const rows = (data ?? []) as unknown as { person: MembershipPersonRow | MembershipPersonRow[] | null }[];
-  return rows
-    .map((r) => (Array.isArray(r.person) ? r.person[0] : r.person))
-    .filter((p): p is MembershipPersonRow => !!p && p.is_active)
-    .flatMap((p) =>
-      Array.isArray(p.person_identity) ? p.person_identity : p.person_identity ? [p.person_identity] : [],
-    ).length;
-}
-
 export const metadata: Metadata = { title: "Drive Sync" };
 
 export default async function AdminDriveSyncPage() {
@@ -48,7 +27,13 @@ export default async function AdminDriveSyncPage() {
   ]);
 
   const linkedTeams = allTeams.filter((t) => t.googleGroupEmail);
-  const counts = await Promise.all(linkedTeams.map((t) => expectedCount(t.id, db)));
+
+  // Expected member counts come from the last reconcile report (computed over the whole
+  // subtree), not a page-local direct-membership recount — one source of truth.
+  const expectedCountByGroupEmail = new Map<string, number>();
+  for (const g of lastReport?.groups ?? []) {
+    expectedCountByGroupEmail.set(g.groupEmail.toLowerCase(), g.expectedCount);
+  }
 
   // email (lowercase) -> display name, for resolving added/wouldRemove lists.
   const { data: identityRows } = await db
@@ -135,13 +120,18 @@ export default async function AdminDriveSyncPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {linkedTeams.map((t, i) => (
-                    <tr key={t.id}>
-                      <td>{t.name}</td>
-                      <td className="mono">{t.googleGroupEmail}</td>
-                      <td style={{ textAlign: "right" }}>{counts[i]}</td>
-                    </tr>
-                  ))}
+                  {linkedTeams.map((t) => {
+                    const expected = t.googleGroupEmail
+                      ? expectedCountByGroupEmail.get(t.googleGroupEmail.toLowerCase())
+                      : undefined;
+                    return (
+                      <tr key={t.id}>
+                        <td>{t.name}</td>
+                        <td className="mono">{t.googleGroupEmail}</td>
+                        <td style={{ textAlign: "right" }}>{expected ?? "—"}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

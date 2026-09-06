@@ -28,6 +28,15 @@ result is saved to `app_setting.drive_last_reconcile` and rendered on the page, 
 active hub person not currently on that team — i.e. "this person is already in the Google Group,
 consider adding them to the team instead."
 
+## Umbrella teams (subtree inheritance)
+
+Teams form a tree (`team.parent_team_id`). A linked team's expected member set is computed over
+the team **and all its descendants**, not just its direct members — so a Google Group linked to a
+parent team automatically contains everyone in its sub-teams too, with no one added to the parent
+directly. Realtime **add** walks up and syncs the joined team plus every ancestor; realtime
+**remove** stays scoped to the directly-changed team only — the nightly reconcile reports a true
+orphan under `wouldRemove` rather than an automatic cross-team removal.
+
 ## Real-time sync (the one path that does remove)
 
 Adding or removing someone from a linked team in the hub UI fires `syncMembershipChange()`

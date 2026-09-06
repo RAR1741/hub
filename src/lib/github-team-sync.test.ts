@@ -27,11 +27,21 @@ function fakeDb(tables: Record<string, { data: unknown; error: unknown }>, upser
   return {
     from(table: string) {
       const result = tables[table] ?? { data: null, error: null };
+      // `current` starts as the canned result; `.in()` narrows `current.data` when the rows
+      // carry the filtered column, so later `.then`/`.maybeSingle` see the filtered rows.
+      let current = result;
       const chain: Record<string, unknown> = {};
       for (const m of ["select", "eq", "not"]) {
         chain[m] = () => chain;
       }
-      chain.maybeSingle = async () => result;
+      chain.in = (column: string, ids: readonly unknown[]) => {
+        const rows = current.data;
+        if (Array.isArray(rows) && rows.length > 0 && Object.prototype.hasOwnProperty.call(rows[0], column)) {
+          current = { ...current, data: rows.filter((row) => ids.includes((row as Record<string, unknown>)[column])) };
+        }
+        return chain;
+      };
+      chain.maybeSingle = async () => current;
       chain.upsert = async (payload: unknown) => {
         upserts.push({ table, payload });
         return { data: null, error: null };
@@ -44,7 +54,7 @@ function fakeDb(tables: Record<string, { data: unknown; error: unknown }>, upser
         };
         return updateChain;
       };
-      chain.then = (onF: (v: unknown) => unknown) => onF(result);
+      chain.then = (onF: (v: unknown) => unknown) => onF(current);
       return chain;
     },
   } as never;
@@ -393,6 +403,183 @@ describe("reconcileGithubTeams", () => {
     expect(result.teams[0].errors).toEqual(["boom"]);
     expect(fetchFn).not.toHaveBeenCalled();
   });
+
+  describe("umbrella (subtree) expected sets", () => {
+    // Tree: FRC (t1, slug "frc") is parent of FRC Students (t2, slug "frc-students").
+    const tree = [
+      { id: "t1", name: "FRC", parent_team_id: null, github_team_slug: "frc", github_sync_allow_inactive: false },
+      { id: "t2", name: "FRC Students", parent_team_id: "t1", github_team_slug: "frc-students", github_sync_allow_inactive: false },
+    ];
+
+    test("umbrella team's expected/added include a descendant's members and external account; descendant's report has only its own", async () => {
+      const db = fakeDb({
+        team: { data: tree, error: null },
+        team_membership: {
+          data: [
+            { team_id: "t2", person: { id: "p1", first_name: "Stu", last_name: "Dent", is_active: true, github_login: "stu", github_user_id: 1 } },
+          ],
+          error: null,
+        },
+        team_external_account: {
+          data: [{ team_id: "t2", provider: "github", identifier: "bot-login", github_user_id: 42 }],
+          error: null,
+        },
+      });
+
+      const fetchFn = vi.fn(async (url: string, init?: RequestInit) => {
+        const u = String(url);
+        if (u.includes("access_tokens")) return tokenResponse();
+        if (u.includes("/members?")) return new Response(JSON.stringify([]), { status: 200 });
+        if (u.includes("/invitations")) return new Response(JSON.stringify([]), { status: 200 });
+        if (u.includes("/memberships/") && init?.method === "PUT") {
+          return new Response(JSON.stringify({ role: "member", state: "active" }), { status: 200 });
+        }
+        throw new Error(`unexpected fetch: ${u} ${init?.method}`);
+      });
+
+      const result = await reconcileGithubTeams({
+        db: db as never,
+        fetch: fetchFn as unknown as typeof globalThis.fetch,
+        credentials,
+      });
+
+      expect(result.teams).toHaveLength(2);
+      const frc = result.teams.find((t) => t.teamSlug === "frc")!;
+      const frcStudents = result.teams.find((t) => t.teamSlug === "frc-students")!;
+
+      expect(frc.expectedCount).toBe(2); // student + bot, from the descendant
+      expect(frc.added.sort()).toEqual(["bot-login", "stu"]);
+
+      expect(frcStudents.expectedCount).toBe(2); // its own member + its own external account
+      expect(frcStudents.added.sort()).toEqual(["bot-login", "stu"]);
+    });
+
+    test("a person who is a direct member of both parent and child is counted once and PUT once", async () => {
+      const db = fakeDb({
+        team: { data: tree, error: null },
+        team_membership: {
+          data: [
+            { team_id: "t1", person: { id: "p1", first_name: "Both", last_name: "Places", is_active: true, github_login: "both", github_user_id: 7 } },
+            { team_id: "t2", person: { id: "p1", first_name: "Both", last_name: "Places", is_active: true, github_login: "both", github_user_id: 7 } },
+          ],
+          error: null,
+        },
+      });
+
+      const puts: string[] = [];
+      const fetchFn = vi.fn(async (url: string, init?: RequestInit) => {
+        const u = String(url);
+        if (u.includes("access_tokens")) return tokenResponse();
+        if (u.includes("/members?")) return new Response(JSON.stringify([]), { status: 200 });
+        if (u.includes("/invitations")) return new Response(JSON.stringify([]), { status: 200 });
+        if (u.includes("/memberships/") && init?.method === "PUT") {
+          puts.push(u);
+          return new Response(JSON.stringify({ role: "member", state: "active" }), { status: 200 });
+        }
+        throw new Error(`unexpected fetch: ${u} ${init?.method}`);
+      });
+
+      const result = await reconcileGithubTeams({
+        db: db as never,
+        fetch: fetchFn as unknown as typeof globalThis.fetch,
+        credentials,
+      });
+
+      const frc = result.teams.find((t) => t.teamSlug === "frc")!;
+      expect(frc.expectedCount).toBe(1);
+      expect(frc.added).toEqual(["both"]);
+      expect(puts.filter((u) => u.includes("/teams/frc/"))).toHaveLength(1);
+    });
+
+    test("an inactive member of a child is in the parent's expected set iff the parent's github_sync_allow_inactive is true", async () => {
+      const membershipRow = {
+        team_id: "t2",
+        person: { id: "p1", first_name: "In", last_name: "Active", is_active: false, github_login: "inactive", github_user_id: 3 },
+      };
+
+      const fetchFnFor = () =>
+        vi.fn(async (url: string, init?: RequestInit) => {
+          const u = String(url);
+          if (u.includes("access_tokens")) return tokenResponse();
+          if (u.includes("/members?")) return new Response(JSON.stringify([]), { status: 200 });
+          if (u.includes("/invitations")) return new Response(JSON.stringify([]), { status: 200 });
+          if (u.includes("/memberships/") && init?.method === "PUT") {
+            return new Response(JSON.stringify({ role: "member", state: "active" }), { status: 200 });
+          }
+          throw new Error(`unexpected fetch: ${u} ${init?.method}`);
+        });
+
+      // Parent's flag true: inactive descendant member is expected.
+      const allowInactiveTree = tree.map((t) => (t.id === "t1" ? { ...t, github_sync_allow_inactive: true } : t));
+      const dbAllow = fakeDb({
+        team: { data: allowInactiveTree, error: null },
+        team_membership: { data: [membershipRow], error: null },
+      });
+      const resultAllow = await reconcileGithubTeams({
+        db: dbAllow as never,
+        fetch: fetchFnFor() as unknown as typeof globalThis.fetch,
+        credentials,
+      });
+      const frcAllow = resultAllow.teams.find((t) => t.teamSlug === "frc")!;
+      expect(frcAllow.expectedCount).toBe(1);
+      expect(frcAllow.added).toEqual(["inactive"]);
+
+      // Parent's flag false (default): inactive descendant member is excluded.
+      const dbDeny = fakeDb({
+        team: { data: tree, error: null },
+        team_membership: { data: [membershipRow], error: null },
+      });
+      const resultDeny = await reconcileGithubTeams({
+        db: dbDeny as never,
+        fetch: fetchFnFor() as unknown as typeof globalThis.fetch,
+        credentials,
+      });
+      const frcDeny = resultDeny.teams.find((t) => t.teamSlug === "frc")!;
+      expect(frcDeny.expectedCount).toBe(0);
+      expect(frcDeny.added).toEqual([]);
+    });
+
+    test("a cyclic tree (A<->B) still produces one report per linked team and terminates", async () => {
+      const cyclicTree = [
+        { id: "a", name: "A", parent_team_id: "b", github_team_slug: "team-a", github_sync_allow_inactive: false },
+        { id: "b", name: "B", parent_team_id: "a", github_team_slug: "team-b", github_sync_allow_inactive: false },
+      ];
+      const db = fakeDb({
+        team: { data: cyclicTree, error: null },
+        team_membership: { data: [], error: null },
+      });
+      const fetchFn = vi.fn(async (url: string) => {
+        const u = String(url);
+        if (u.includes("access_tokens")) return tokenResponse();
+        if (u.includes("/members?")) return new Response(JSON.stringify([]), { status: 200 });
+        if (u.includes("/invitations")) return new Response(JSON.stringify([]), { status: 200 });
+        throw new Error(`unexpected fetch: ${u}`);
+      });
+
+      const result = await reconcileGithubTeams({
+        db: db as never,
+        fetch: fetchFn as unknown as typeof globalThis.fetch,
+        credentials,
+      });
+
+      expect(result.teams).toHaveLength(2);
+      expect(result.teams.map((t) => t.teamSlug).sort()).toEqual(["team-a", "team-b"]);
+    });
+
+    test("a team-tree read error makes reconcile throw and makes no external calls", async () => {
+      const db = fakeDb({
+        team: { data: null, error: { message: "tree boom" } },
+      });
+      const fetchFn = vi.fn(async () => {
+        throw new Error("should not be called");
+      });
+
+      await expect(
+        reconcileGithubTeams({ db: db as never, fetch: fetchFn as unknown as typeof globalThis.fetch, credentials }),
+      ).rejects.toThrow();
+      expect(fetchFn).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe("syncGithubMembershipChange", () => {
@@ -532,6 +719,89 @@ describe("syncPersonLinkedTeams", () => {
 
     await expect(syncPersonLinkedTeams("p1", db as never)).resolves.toBeUndefined();
     expect(errSpy).toHaveBeenCalled();
+  });
+
+  test("member of a child whose parent is linked PUTs onto the parent's slug", async () => {
+    const db = fakeDb({
+      person: { data: { github_login: "alice" }, error: null },
+      team_membership: { data: [{ team: { id: "c1", github_team_slug: null } }], error: null },
+      team: {
+        data: [
+          { id: "p1", parent_team_id: null, github_team_slug: "frc" },
+          { id: "c1", parent_team_id: "p1", github_team_slug: null },
+        ],
+        error: null,
+      },
+    });
+    const puts: string[] = [];
+    globalThis.fetch = vi.fn(async (url: string, init?: RequestInit) => {
+      const u = String(url);
+      if (u.includes("access_tokens")) return tokenResponse();
+      if (u.includes("/memberships/") && init?.method === "PUT") puts.push(u);
+      return new Response(JSON.stringify({ state: "active" }), { status: 200 });
+    }) as unknown as typeof globalThis.fetch;
+
+    await syncPersonLinkedTeams("p1", db as never);
+    expect(puts).toHaveLength(1);
+    expect(puts[0]).toContain("/teams/frc/");
+  });
+
+  test("member of a child whose parent is also linked PUTs onto both slugs", async () => {
+    const db = fakeDb({
+      person: { data: { github_login: "alice" }, error: null },
+      team_membership: { data: [{ team: { id: "c1", github_team_slug: "frc-students" } }], error: null },
+      team: {
+        data: [
+          { id: "p1", parent_team_id: null, github_team_slug: "frc" },
+          { id: "c1", parent_team_id: "p1", github_team_slug: "frc-students" },
+        ],
+        error: null,
+      },
+    });
+    const puts: string[] = [];
+    globalThis.fetch = vi.fn(async (url: string, init?: RequestInit) => {
+      const u = String(url);
+      if (u.includes("access_tokens")) return tokenResponse();
+      if (u.includes("/memberships/") && init?.method === "PUT") puts.push(u);
+      return new Response(JSON.stringify({ state: "active" }), { status: 200 });
+    }) as unknown as typeof globalThis.fetch;
+
+    await syncPersonLinkedTeams("p1", db as never);
+    expect(puts).toHaveLength(2);
+    expect(puts.some((u) => u.includes("/teams/frc/"))).toBe(true);
+    expect(puts.some((u) => u.includes("/teams/frc-students/"))).toBe(true);
+  });
+
+  test("the same ancestor slug reachable via two member teams is PUT only once", async () => {
+    const db = fakeDb({
+      person: { data: { github_login: "alice" }, error: null },
+      team_membership: {
+        data: [
+          { team: { id: "c1", github_team_slug: null } },
+          { team: { id: "c2", github_team_slug: null } },
+        ],
+        error: null,
+      },
+      team: {
+        data: [
+          { id: "p1", parent_team_id: null, github_team_slug: "frc" },
+          { id: "c1", parent_team_id: "p1", github_team_slug: null },
+          { id: "c2", parent_team_id: "p1", github_team_slug: null },
+        ],
+        error: null,
+      },
+    });
+    const puts: string[] = [];
+    globalThis.fetch = vi.fn(async (url: string, init?: RequestInit) => {
+      const u = String(url);
+      if (u.includes("access_tokens")) return tokenResponse();
+      if (u.includes("/memberships/") && init?.method === "PUT") puts.push(u);
+      return new Response(JSON.stringify({ state: "active" }), { status: 200 });
+    }) as unknown as typeof globalThis.fetch;
+
+    await syncPersonLinkedTeams("p1", db as never);
+    expect(puts).toHaveLength(1);
+    expect(puts[0]).toContain("/teams/frc/");
   });
 });
 

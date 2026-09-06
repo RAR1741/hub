@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { subtreeIds } from "@/lib/team-tree";
 
 export type TeamFormValues = {
   name: string;
@@ -21,10 +22,13 @@ export function TeamForm({
   initial,
   teamId,
 }: {
-  teams: { id: string; name: string }[]; // parent options
+  teams: { id: string; name: string; parentTeamId: string | null }[]; // parent options
   initial?: TeamFormValues;
   teamId?: string; // present = edit
 }) {
+  // Exclude the team itself and its whole subtree — re-parenting under a
+  // descendant would create a cycle (also rejected server-side in updateTeam).
+  const excludedParentIds = teamId ? new Set(subtreeIds(teams, teamId)) : new Set<string>();
   const EMPTY: TeamFormValues = {
     name: "", parentTeamId: "", description: "", joinMode: "admin_only", googleGroupEmail: "", githubTeamSlug: "", githubSyncAllowInactive: false, slackChannels: [],
   };
@@ -82,7 +86,7 @@ export function TeamForm({
       <label className="label">Parent{" "}
         <select className="input" value={values.parentTeamId} onChange={(e) => setValues({ ...values, parentTeamId: e.target.value })}>
           <option value="">(none — top level)</option>
-          {teams.filter((t) => t.id !== teamId).map((t) => (
+          {teams.filter((t) => !excludedParentIds.has(t.id)).map((t) => (
             <option key={t.id} value={t.id}>{t.name}</option>
           ))}
         </select>
