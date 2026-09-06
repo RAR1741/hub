@@ -117,3 +117,26 @@ The browser and in-container server code reach Supabase at different URLs. Two r
   `src/lib/supabase-cookie.ts`, or OAuth/session cookies break across the seam.
 
 Why, in full: [dev-notes — "Why two Supabase URLs"](docs/dev-notes.md).
+
+## Auth & CSRF conventions
+
+Every session cookie (`hub_student_session`, the Supabase auth cookie, `hub_kiosk_token`,
+`hub_masquerade_session`) is set `httpOnly`, `sameSite: "lax"`, `secure` in production, `path: "/"`.
+
+**CSRF: `sameSite=lax` is the only protection, and it is load-bearing.** There are no CSRF
+tokens. `sameSite=lax` stops a cross-site page from POSTing with the user's cookies, which is
+enough *only because every state change is a non-simple method* — `POST` / `PATCH` / `PUT` /
+`DELETE`. So the rule when adding routes:
+
+- **Never make a `GET`/`HEAD` handler mutate state.** A state-changing GET is reachable
+  cross-site (`<img>`, a link) and `sameSite=lax` does **not** block top-level GET navigations —
+  it would be a CSRF hole with no backstop. Keep every mutation on POST/PATCH/PUT/DELETE.
+- If you ever need a mutation that a browser can issue cross-site as a "simple" request, or a
+  deliberate state-changing GET, add an explicit CSRF token (double-submit cookie or an
+  origin/referer check) — do not rely on `sameSite` alone for it.
+- OAuth callbacks are the one place a `GET` has side effects; each guards itself with a
+  single-use `state` cookie (CSRF) plus the provider's PKCE/code exchange — see
+  `src/app/api/{github,onshape}/oauth/callback/route.ts` and `src/app/auth/callback/route.ts`.
+
+Reviewed as part of the security audit (issue #251); revisit this note if the cookie/CSRF
+posture changes.
