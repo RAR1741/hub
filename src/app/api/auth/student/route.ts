@@ -11,10 +11,7 @@ export async function POST(request: Request) {
   // Student-ID login is a single-factor, low-entropy credential. Disabled in
   // production (email OTP / Google are the prod paths) but kept for dev/e2e
   // convenience; we may reintroduce a hardened version later. See issue #251.
-  // Captured as a boolean so the early return below doesn't narrow NODE_ENV
-  // away from "production" for the cookie's `secure` flag further down.
-  const isProduction = process.env.NODE_ENV === "production";
-  if (isProduction) {
+  if (process.env.NODE_ENV === "production") {
     return NextResponse.json({ ok: false }, { status: 404 });
   }
 
@@ -50,7 +47,7 @@ export async function POST(request: Request) {
   response.cookies.set(STUDENT_SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: isProduction,
+    secure: false, // guaranteed non-production by the guard above
     maxAge: 60 * 60 * 24 * 7,
     path: "/",
   });
