@@ -248,6 +248,12 @@ export async function SiteNav() {
                 Batteries
               </NavLink>
             )}
+            {(isStudent || isMentor || isAdmin) && (
+              <NavLink href="/tools" className="sbi">
+                <Icon name="tools" className="ic" />
+                Tools
+              </NavLink>
+            )}
           </div>
         )}
 
@@ -323,6 +329,9 @@ export async function SiteNav() {
         {isStudent && <RailItem href="/shop" icon="wrench" label="Shop" hue="--hue-shopfloor" />}
         {(isStudent || isMentor || isAdmin) && (
           <RailItem href="/batteries" icon="battery" label="Batteries" hue="--hue-shopfloor" />
+        )}
+        {(isStudent || isMentor || isAdmin) && (
+          <RailItem href="/tools" icon="tools" label="Tools" hue="--hue-shopfloor" />
         )}
 
         {showTeam && <div className="rail-sep" />}
@@ -404,6 +413,12 @@ export async function SiteNav() {
               <Link href="/batteries" className="sheet-i">
                 <Icon name="battery" className="ic" style={{ color: "var(--hue-shopfloor)" }} />
                 Batteries
+              </Link>
+            )}
+            {(isStudent || isMentor || isAdmin) && (
+              <Link href="/tools" className="sheet-i">
+                <Icon name="tools" className="ic" style={{ color: "var(--hue-shopfloor)" }} />
+                Tools
               </Link>
             )}
             {isMentor && (
