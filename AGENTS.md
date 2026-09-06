@@ -138,7 +138,7 @@ enough *only because every state change is a non-simple method* — `POST` / `PA
   the **start** routes set a single-use `*_oauth_state` cookie, and the **callback** routes
   verify that `state` (CSRF) before the provider's PKCE/code exchange. See
   `src/app/api/{github,onshape}/oauth/{start,callback}/route.ts` and
-  `src/app/auth/callback/route.ts`. This is deliberate and self-guarded — not licence to add
+  `src/app/auth/callback/route.ts`. This is deliberate and self-guarded — not license to add
   other state-changing GETs.
 
 Reviewed as part of the security audit (issue #251); revisit this note if the cookie/CSRF
