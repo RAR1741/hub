@@ -439,13 +439,29 @@ describe("syncCalendar", () => {
       );
     });
 
-    test("does NOT fire when starts_at is unchanged", async () => {
+    test("does NOT fire when starts_at is unchanged (same instant, different format)", async () => {
       vi.mocked(notifyMeetingChanged).mockClear();
+      // Same instant as FUTURE, but expressed with a non-UTC offset the way
+      // Google Calendar's dateTime often comes back — the DB's prior value
+      // (read back UTC-normalized) must be compared by epoch, not by string.
+      const futureOffset = new Date(new Date(FUTURE).getTime() - 4 * 60 * 60 * 1000)
+        .toISOString()
+        .replace("Z", "-04:00");
       const events = [
-        { id: "evt-1", summary: "Build Session", start: { dateTime: FUTURE }, end: { dateTime: FUTURE } },
+        { id: "evt-1", summary: "Build Session", start: { dateTime: futureOffset }, end: { dateTime: futureOffset } },
       ];
       await run(events, [{ id: "m1", gcal_event_id: "evt-1", starts_at: FUTURE }]);
       expect(notifyMeetingChanged).not.toHaveBeenCalled();
+    });
+
+    test("fires when starts_at genuinely moves to a different instant", async () => {
+      vi.mocked(notifyMeetingChanged).mockClear();
+      const laterStill = new Date(new Date(FUTURE).getTime() + 60 * 60 * 1000).toISOString();
+      const events = [
+        { id: "evt-1", summary: "Build Session", start: { dateTime: laterStill }, end: { dateTime: laterStill } },
+      ];
+      await run(events, [{ id: "m1", gcal_event_id: "evt-1", starts_at: FUTURE }]);
+      expect(notifyMeetingChanged).toHaveBeenCalledTimes(1);
     });
 
     test("does NOT fire for a brand-new event with no prior row", async () => {

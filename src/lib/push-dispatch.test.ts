@@ -59,6 +59,19 @@ describe("sendPushToOptedIn", () => {
     expect(res.sent).toBe(2);
   });
 
+  test("sends when the person embed comes back as a single-element array", async () => {
+    // PostgREST can serialize a to-one `person!inner(...)` embed as an array;
+    // this locks in the same defensive normalization used elsewhere (e.g.
+    // github-team-sync.ts) so recipients aren't silently dropped.
+    const send = vi.fn().mockResolvedValue(undefined);
+    const db = fakeDb([
+      { id: "s1", endpoint: "https://push/1", p256dh: "k1", auth: "a1", person: [{ is_active: true, notification_types: ["admin_alerts"] }] },
+    ]);
+    const res = await sendPushToOptedIn(["p1"], "admin_alerts", { title: "t", body: "b", url: "/x" }, { db, push: { ...PUSH, send } });
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(res.sent).toBe(1);
+  });
+
   test("prunes a subscription on 404/410", async () => {
     const send = vi.fn().mockRejectedValue({ statusCode: 410 });
     const db = fakeDb([{ id: "s1", endpoint: "https://push/1", p256dh: "k1", auth: "a1", person: { is_active: true, notification_types: ["admin_alerts"] } }]);

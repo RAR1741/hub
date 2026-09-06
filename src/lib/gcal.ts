@@ -309,7 +309,7 @@ export async function syncCalendar(deps: GcalDeps): Promise<SyncResult> {
   for (const row of meetingRows) {
     const prior = priorByGcalId.get(row.gcal_event_id);
     if (!prior) continue; // new event, not a change
-    if (prior.starts_at === row.starts_at) continue; // unchanged
+    if (Date.parse(prior.starts_at) === Date.parse(row.starts_at)) continue; // unchanged (same instant, maybe different format)
     if (new Date(row.starts_at).getTime() <= nowMs) continue; // past
     try {
       await notifyMeetingChanged(deps.db, { id: prior.id, title: row.title, starts_at: row.starts_at });

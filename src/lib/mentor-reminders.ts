@@ -69,10 +69,8 @@ export async function sendMentorReminders(deps: {
   for (const m of mentors) {
     const items = outstandingItems(m);
     if (items.length === 0) { complete++; continue; }
-    if (!m.slackUserId) { unlinked.push(m.name); continue; }
-    const ok = await sendDM(deps.slack, m.slackUserId, buildReminderText(m.name, items));
-    if (ok) reminded++;
-    else failed.push(m.name);
+    // Push is additive and independent of the Slack DM below — fire it for
+    // every mentor with outstanding items, whether or not they're Slack-linked.
     await sendPushToOptedIn(
       [m.personId],
       "consent_missing",
@@ -83,6 +81,10 @@ export async function sendMentorReminders(deps: {
       },
       { db: deps.db, push: pushDepsFromEnv() },
     );
+    if (!m.slackUserId) { unlinked.push(m.name); continue; }
+    const ok = await sendDM(deps.slack, m.slackUserId, buildReminderText(m.name, items));
+    if (ok) reminded++;
+    else failed.push(m.name);
     await sleep(1100); // ~1 msg/sec
   }
 

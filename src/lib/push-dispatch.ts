@@ -68,16 +68,18 @@ export async function sendPushToOptedIn(
     return { sent: 0, pruned: 0 };
   }
 
+  type PersonEmbed = { is_active: boolean; notification_types: string[] };
   type Row = {
     id: string;
     endpoint: string;
     p256dh: string;
     auth: string;
-    person: { is_active: boolean; notification_types: string[] } | null;
+    person: PersonEmbed | PersonEmbed[] | null;
   };
-  const rows = ((data ?? []) as unknown as Row[]).filter(
-    (r) => r.person?.is_active && r.person.notification_types.includes(type),
-  );
+  const rows = ((data ?? []) as unknown as Row[]).filter((r) => {
+    const person = Array.isArray(r.person) ? r.person[0] : r.person;
+    return person?.is_active && person.notification_types.includes(type);
+  });
 
   const body = JSON.stringify(payload);
 

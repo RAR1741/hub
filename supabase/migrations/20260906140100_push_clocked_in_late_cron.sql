@@ -1,4 +1,4 @@
--- 20260906120100_push_clocked_in_late_cron.sql
+-- 20260906140100_push_clocked_in_late_cron.sql
 -- Nightly "still clocked in" nudge. Fixed UTC hour (pg_cron runs in UTC and
 -- can't read the team timezone). 03:00 UTC ≈ 10pm EST / 11pm EDT — an evening
 -- hour, and BEFORE the 08:00 UTC close-stale-sessions sweep so there are still

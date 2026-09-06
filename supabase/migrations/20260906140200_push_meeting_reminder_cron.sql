@@ -1,4 +1,4 @@
--- 20260906120200_push_meeting_reminder_cron.sql
+-- 20260906140200_push_meeting_reminder_cron.sql
 -- Hourly meeting-reminder sweep: the route reminds meetings starting within 3h
 -- that haven't been reminded, and stamps reminder_pushed_at so each fires once.
 insert into app_setting (key, value) values

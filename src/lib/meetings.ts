@@ -112,7 +112,9 @@ export async function updateMeeting(
     .maybeSingle();
   if (error) return { ok: false, status: 500 };
   if (!data) return { ok: false, status: 404 };
-  const moved = prior != null && (prior as { starts_at: string }).starts_at !== input.startsAt;
+  const moved =
+    prior != null &&
+    new Date((prior as { starts_at: string }).starts_at).getTime() !== new Date(input.startsAt).getTime();
   const future = new Date(input.startsAt).getTime() > Date.now();
   if (moved && future) {
     try {

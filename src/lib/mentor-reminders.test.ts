@@ -117,6 +117,14 @@ describe("sendMentorReminders", () => {
       expect.anything(),
       expect.anything(),
     );
+    // pB has outstanding items but NO Slack link → still gets the push;
+    // it's additive and independent of the Slack DM.
+    expect(sendPushToOptedIn).toHaveBeenCalledWith(
+      ["pB"],
+      "consent_missing",
+      expect.objectContaining({ url: "/admin/first-status" }),
+      expect.objectContaining({ db }),
+    );
   });
 
   test("a linked incomplete mentor whose DM fails is reported as failed, not reminded", async () => {

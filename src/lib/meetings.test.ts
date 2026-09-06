@@ -202,14 +202,31 @@ describe("updateMeeting", () => {
     expect(sendPushToOptedIn).toHaveBeenCalledTimes(1);
   });
 
-  test("does NOT fire when starts_at is unchanged", async () => {
+  test("does NOT fire when starts_at is unchanged (same instant, different format)", async () => {
     vi.mocked(sendPushToOptedIn).mockClear();
+    // Same instant as FUTURE, but the DB row's prior value carries a
+    // non-UTC offset instead of "Z" — a string compare would wrongly see
+    // this as a change.
+    const futureOffset = new Date(new Date(FUTURE).getTime() - 4 * 60 * 60 * 1000)
+      .toISOString()
+      .replace("Z", "-04:00");
     await updateMeeting(
       "m1",
       { title: "X", startsAt: FUTURE, endsAt: FUTURE },
-      fakeDb(true, FUTURE),
+      fakeDb(true, futureOffset),
     );
     expect(sendPushToOptedIn).not.toHaveBeenCalled();
+  });
+
+  test("fires when starts_at genuinely moves to a different instant", async () => {
+    vi.mocked(sendPushToOptedIn).mockClear();
+    const laterStill = new Date(new Date(FUTURE).getTime() + 60 * 60 * 1000).toISOString();
+    await updateMeeting(
+      "m1",
+      { title: "X", startsAt: laterStill, endsAt: laterStill },
+      fakeDb(true, FUTURE),
+    );
+    expect(sendPushToOptedIn).toHaveBeenCalledTimes(1);
   });
 
   test("does NOT fire when the new starts_at is in the past", async () => {
