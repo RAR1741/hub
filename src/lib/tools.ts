@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Tool, ToolCheck, ToolCheckKind, ToolCheckRow, ToolCondition, ToolRow, ToolStatus } from "./types";
+import type { Tool, ToolCheck, ToolCheckKind, ToolCheckRow, ToolCondition, ToolRow, ToolStatus, ToolStatusAfter } from "./types";
 import { toolCheckFromRow, toolFromRow } from "./types";
 import { optInt, optString, reqString, reqUuid } from "./validate";
 
@@ -58,7 +58,7 @@ export type CheckInput = {
   checkedAt: string;
   kind: ToolCheckKind;
   condition: ToolCondition;
-  statusAfter: ToolStatus | null;
+  statusAfter: ToolStatusAfter | null;
   notes: string | null;
 };
 
@@ -85,10 +85,10 @@ export function parseCheckInput(body: unknown): CheckInput | null {
   if (typeof b.condition !== "string" || !CHECK_CONDITIONS.includes(b.condition as ToolCondition)) return null;
   const condition = b.condition as ToolCondition;
 
-  let statusAfter: ToolStatus | null = null;
+  let statusAfter: ToolStatusAfter | null = null;
   if (b.statusAfter !== undefined && b.statusAfter !== null) {
     if (typeof b.statusAfter !== "string" || !CHECK_STATUS_AFTER.includes(b.statusAfter as ToolStatus)) return null;
-    statusAfter = b.statusAfter as ToolStatus;
+    statusAfter = b.statusAfter as ToolStatusAfter;
   }
 
   const notes = optString(b.notes, 2000);

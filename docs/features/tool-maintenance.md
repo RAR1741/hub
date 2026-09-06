@@ -4,7 +4,7 @@ The shop maintains an inventory of tools and logs every inspection, maintenance,
 
 ## Inventory and lifecycle
 
-The **tool** table holds each tool with name, optional category and location tags, optional asset tag (unique, for shop-assigned serial numbers), and lifecycle status (`in_service`, `needs_attention`, `out_of_service`, or `retired`). Unlike batteries, tool names are not unique (three identical drills may coexist). Retire is a PATCH operation (no DELETE); retired tools stay in history for record-keeping and remain visible on the detail page.
+The **tool** table holds each tool with name, optional category and location tags, optional asset tag (unique, for shop-assigned serial numbers), and lifecycle status (`in_service`, `needs_attention`, `out_of_service`, or `retired`). Unlike batteries, tool names are not unique (three identical drills may coexist). Retiring is a PATCH status change; retired tools stay in history for record-keeping and remain visible on the detail page. Tools can be hard-deleted by a mentor directly or via an approved student deletion request (see the Deletion requests section below).
 
 ## Check log
 

@@ -937,6 +937,7 @@ export function batteryUsageFromRow(row: BatteryUsageRow): BatteryUsage {
 }
 
 export type ToolStatus = "in_service" | "needs_attention" | "out_of_service" | "retired";
+export type ToolStatusAfter = Exclude<ToolStatus, "retired">;
 export type ToolCheckKind = "inspection" | "maintenance" | "repair";
 export type ToolCondition = "good" | "fair" | "poor";
 
@@ -985,7 +986,7 @@ export type ToolCheckRow = {
   checked_at: string;
   kind: ToolCheckKind;
   condition: ToolCondition;
-  status_after: ToolStatus | null;
+  status_after: ToolStatusAfter | null;
   notes: string | null;
   created_at: string;
   // Embedded via `person (first_name, last_name, display_name)` — one FK, no hint needed.
@@ -999,7 +1000,7 @@ export type ToolCheck = {
   checkedAt: string;
   kind: ToolCheckKind;
   condition: ToolCondition;
-  statusAfter: ToolStatus | null;
+  statusAfter: ToolStatusAfter | null;
   notes: string | null;
   createdAt: string;
   checkedBy: { firstName: string; lastName: string; displayName: string | null };
