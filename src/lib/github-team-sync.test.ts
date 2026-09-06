@@ -368,7 +368,7 @@ describe("reconcileGithubTeams", () => {
     const report = result.teams[0];
     expect(report.wouldRemove).toEqual([]);
 
-    const s2t = new Map([["software", { teamId: "t1", teamName: "Team A" }]]);
+    const s2t = new Map([["software", { teamId: "t1", teamName: "Team A", allowInactive: false }]]);
     const people = new Map([[42, { personId: "px", name: "Bot", isActive: true }]]);
     expect(computeGithubAddRecommendations(result, s2t, people, new Map())).toEqual([]);
   });
@@ -543,7 +543,7 @@ describe("computeGithubAddRecommendations", () => {
       added: [], pending: [], wouldRemove: [], notConnected: [], errors: [], ...t,
     })),
   });
-  const s2t = new Map([["software", { teamId: "t1", teamName: "Team A" }]]);
+  const s2t = new Map([["software", { teamId: "t1", teamName: "Team A", allowInactive: false }]]);
 
   test("recommends an active, resolved, non-member person with an @login label", () => {
     const r = report([{ teamSlug: "software", wouldRemove: [{ id: 1, login: "bob" }] }]);
@@ -569,6 +569,22 @@ describe("computeGithubAddRecommendations", () => {
   test("omits teams with no linked team and no recommendations", () => {
     const r = report([{ teamSlug: "unlinked", wouldRemove: [{ id: 1, login: "bob" }] }]);
     const people = new Map([[1, { personId: "p1", name: "Bob", isActive: true }]]);
+    expect(computeGithubAddRecommendations(r, s2t, people, new Map())).toEqual([]);
+  });
+
+  test("recommends an inactive person when the team allows inactive members", () => {
+    const s2tAllow = new Map([["software", { teamId: "t1", teamName: "Team A", allowInactive: true }]]);
+    const r = report([{ teamSlug: "software", wouldRemove: [{ id: 2, login: "old" }] }]);
+    const people = new Map([[2, { personId: "p2", name: "Old", isActive: false }]]);
+    expect(computeGithubAddRecommendations(r, s2tAllow, people, new Map())).toEqual([
+      { teamId: "t1", teamName: "Team A", teamSlug: "software",
+        people: [{ personId: "p2", name: "Old", labels: ["@old"] }] },
+    ]);
+  });
+
+  test("does not recommend an inactive person when the team disallows inactive members", () => {
+    const r = report([{ teamSlug: "software", wouldRemove: [{ id: 2, login: "old" }] }]);
+    const people = new Map([[2, { personId: "p2", name: "Old", isActive: false }]]);
     expect(computeGithubAddRecommendations(r, s2t, people, new Map())).toEqual([]);
   });
 });

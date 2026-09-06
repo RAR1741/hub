@@ -272,8 +272,9 @@ export type TeamAddRecommendations = {
 /**
  * Derive "add these people to the team" recommendations from the last
  * reconcile report. A recommendation is a wouldRemove GitHub user that
- * resolves to an ACTIVE hub person who is NOT currently a member of that
- * team. PURE.
+ * resolves to an active hub person — or an inactive one when the team's
+ * allow-inactive flag is on — who is NOT currently a member of that team.
+ * PURE.
  *
  * The current-membership filter is load-bearing: after an add, the stored
  * report still lists the user in wouldRemove, so this filter is what drops
@@ -281,7 +282,7 @@ export type TeamAddRecommendations = {
  */
 export function computeGithubAddRecommendations(
   report: GithubReconcileResult,
-  slugToTeam: Map<string, { teamId: string; teamName: string }>,
+  slugToTeam: Map<string, { teamId: string; teamName: string; allowInactive: boolean }>,
   personByGithubId: Map<number, { personId: string; name: string; isActive: boolean }>,
   membersByTeam: Map<string, Set<string>>,
 ): TeamAddRecommendations[] {
@@ -293,7 +294,8 @@ export function computeGithubAddRecommendations(
     const byPerson = new Map<string, GithubAddRecommendation>();
     for (const user of teamReport.wouldRemove) {
       const person = personByGithubId.get(user.id);
-      if (!person || !person.isActive) continue;
+      if (!person) continue;
+      if (!person.isActive && !team.allowInactive) continue;
       if (members.has(person.personId)) continue;
       const existing = byPerson.get(person.personId);
       if (existing) {
