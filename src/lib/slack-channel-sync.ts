@@ -31,7 +31,10 @@ export async function syncSlackMembershipChange(
     const { data: person, error: personError } = await db.from("person").select("slack_user_id").eq("id", personId).maybeSingle();
     if (personError) throw new Error(personError.message);
     const slackUserId = (person as { slack_user_id: string | null } | null)?.slack_user_id;
-    if (!slackUserId) return;
+    if (!slackUserId) {
+      console.log("[slack-channel-sync] person has no slack_user_id; skipping invites", { teamId, personId });
+      return;
+    }
 
     for (const channel of channelRows) {
       await inviteToChannel(deps, channel.slack_channel_id, [slackUserId]);

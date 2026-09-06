@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 export type TeamFormValues = {
@@ -12,6 +12,8 @@ export type TeamFormValues = {
   githubTeamSlug: string;
   slackChannels: { channelId: string; label: string }[];
 };
+
+type ChannelRow = { key: string; channelId: string; label: string };
 
 export function TeamForm({
   teams,
@@ -26,6 +28,10 @@ export function TeamForm({
     name: "", parentTeamId: "", description: "", joinMode: "admin_only", googleGroupEmail: "", githubTeamSlug: "", slackChannels: [],
   };
   const [values, setValues] = useState<TeamFormValues>(initial ?? EMPTY);
+  const [channels, setChannels] = useState<ChannelRow[]>(() =>
+    (initial?.slackChannels ?? []).map((c, i) => ({ key: `init-${i}`, ...c })),
+  );
+  const nextKey = useRef(0);
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const router = useRouter();
@@ -45,7 +51,7 @@ export function TeamForm({
           joinMode: values.joinMode,
           googleGroupEmail: values.googleGroupEmail || undefined,
           githubTeamSlug: values.githubTeamSlug || undefined,
-          slackChannels: values.slackChannels
+          slackChannels: channels
             .filter((c) => c.channelId.trim())
             .map((c) => ({ channelId: c.channelId.trim(), label: c.label.trim() || null })),
         }),
@@ -103,34 +109,33 @@ export function TeamForm({
       <div className="label">
         Slack channels
         <div className="flex flex-col gap-2">
-          {values.slackChannels.map((c, i) => (
-            <div key={i} className="flex gap-2">
+          {channels.map((c) => (
+            <div key={c.key} className="flex gap-2">
               <input
                 className="input"
                 type="text"
                 placeholder="C0123ABC"
+                aria-label="Slack channel ID"
                 value={c.channelId}
                 onChange={(e) => {
-                  const slackChannels = [...values.slackChannels];
-                  slackChannels[i] = { ...slackChannels[i], channelId: e.target.value };
-                  setValues({ ...values, slackChannels });
+                  setChannels(channels.map((row) => (row.key === c.key ? { ...row, channelId: e.target.value } : row)));
                 }}
               />
               <input
                 className="input"
                 type="text"
                 placeholder="#frc"
+                aria-label="Channel label (optional)"
                 value={c.label}
                 onChange={(e) => {
-                  const slackChannels = [...values.slackChannels];
-                  slackChannels[i] = { ...slackChannels[i], label: e.target.value };
-                  setValues({ ...values, slackChannels });
+                  setChannels(channels.map((row) => (row.key === c.key ? { ...row, label: e.target.value } : row)));
                 }}
               />
               <button
                 type="button"
                 className="btn"
-                onClick={() => setValues({ ...values, slackChannels: values.slackChannels.filter((_, j) => j !== i) })}
+                aria-label={`Remove channel ${c.channelId || "row"}`}
+                onClick={() => setChannels(channels.filter((row) => row.key !== c.key))}
               >
                 Remove
               </button>
@@ -140,7 +145,7 @@ export function TeamForm({
         <button
           type="button"
           className="btn"
-          onClick={() => setValues({ ...values, slackChannels: [...values.slackChannels, { channelId: "", label: "" }] })}
+          onClick={() => setChannels([...channels, { key: `new-${nextKey.current++}`, channelId: "", label: "" }])}
         >
           Add channel
         </button>

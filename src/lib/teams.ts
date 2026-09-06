@@ -105,26 +105,33 @@ export async function listTeamSlackChannels(
   }));
 }
 
-/** Delete-then-insert, non-transactional. `team_slack_channel` is
+/** Upsert-then-prune, non-transactional. `team_slack_channel` is
  *  source-of-truth team config (like `team_external_account`), not a
- *  best-effort Slack side effect — on failure we log and return false so the
- *  caller reports a failed save rather than silently losing channel links. */
+ *  best-effort Slack side effect — a failure can leave extra links but never
+ *  drops existing ones; caller reports a failed save. */
 async function replaceTeamSlackChannels(
   client: SupabaseClient,
   teamId: string,
   channels: { channelId: string; label: string | null }[],
 ): Promise<boolean> {
-  const { error: deleteError } = await client.from("team_slack_channel").delete().eq("team_id", teamId);
-  if (deleteError) {
-    console.error("replaceTeamSlackChannels: delete failed", deleteError);
-    return false;
+  if (channels.length > 0) {
+    const { error: upsertError } = await client.from("team_slack_channel").upsert(
+      channels.map((c) => ({ team_id: teamId, slack_channel_id: c.channelId, label: c.label })),
+      { onConflict: "team_id,slack_channel_id" },
+    );
+    if (upsertError) {
+      console.error("replaceTeamSlackChannels: upsert failed", upsertError);
+      return false;
+    }
   }
-  if (channels.length === 0) return true;
-  const { error: insertError } = await client.from("team_slack_channel").insert(
-    channels.map((c) => ({ team_id: teamId, slack_channel_id: c.channelId, label: c.label })),
-  );
-  if (insertError) {
-    console.error("replaceTeamSlackChannels: insert failed", insertError);
+  let prune = client.from("team_slack_channel").delete().eq("team_id", teamId);
+  if (channels.length > 0) {
+    const keep = channels.map((c) => c.channelId).join(",");
+    prune = prune.not("slack_channel_id", "in", `(${keep})`);
+  }
+  const { error: pruneError } = await prune;
+  if (pruneError) {
+    console.error("replaceTeamSlackChannels: prune failed", pruneError);
     return false;
   }
   return true;

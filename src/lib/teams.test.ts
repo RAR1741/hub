@@ -11,18 +11,30 @@ const team = (id: string, name: string, parentTeamId: string | null): Team => ({
 function fakeDb(opts: {
   insertResult?: { data: unknown; error: unknown };
   updateResult?: { data: unknown; error: unknown };
-  channelDeleteError?: unknown;
-  channelInsertError?: unknown;
-  deletes: unknown[];
-  inserts: unknown[];
+  channelPruneError?: unknown;
+  channelUpsertError?: unknown;
+  prunes: unknown[];
+  upserts: unknown[];
 }) {
   return {
     from(table: string) {
       const chain: Record<string, unknown> = {};
       chain.eq = (col: string, val: unknown) => {
         if (table === "team_slack_channel") {
-          opts.deletes.push({ table, col, val });
-          return Promise.resolve({ data: null, error: opts.channelDeleteError ?? null });
+          const prune: Record<string, unknown> = { table, col, val };
+          const result = { data: null, error: opts.channelPruneError ?? null };
+          const thenable = {
+            not: (notCol: string, op: string, notVal: unknown) => {
+              prune.not = { col: notCol, op, val: notVal };
+              opts.prunes.push(prune);
+              return Promise.resolve(result);
+            },
+            then: (resolve: (r: unknown) => unknown) => {
+              opts.prunes.push(prune);
+              return resolve(result);
+            },
+          };
+          return thenable;
         }
         return chain;
       };
@@ -30,13 +42,14 @@ function fakeDb(opts: {
       chain.select = () => chain;
       chain.single = async () => opts.insertResult ?? { data: null, error: null };
       chain.maybeSingle = async () => opts.updateResult ?? { data: null, error: null };
-      chain.insert = (payload: unknown) => {
+      chain.upsert = (payload: unknown, options: unknown) => {
         if (table === "team_slack_channel") {
-          opts.inserts.push({ table, payload });
-          return Promise.resolve({ data: null, error: opts.channelInsertError ?? null });
+          opts.upserts.push({ table, payload, options });
+          return Promise.resolve({ data: null, error: opts.channelUpsertError ?? null });
         }
         return chain;
       };
+      chain.insert = () => chain;
       chain.update = () => chain;
       return chain;
     },
@@ -180,57 +193,94 @@ describe("createTeam / updateTeam — slack channel sync", () => {
     googleGroupEmail: null, githubTeamSlug: null,
     slackChannels: [{ channelId: "C12345", label: "General" }],
   };
+  const noChannelsInput = { ...input, slackChannels: [] };
 
-  test("createTeam replaces team_slack_channel rows on the happy path", async () => {
-    const deletes: unknown[] = [];
-    const inserts: unknown[] = [];
-    const db = fakeDb({ insertResult: { data: { id: "t1" }, error: null }, deletes, inserts });
+  test("createTeam upserts then prunes team_slack_channel rows on the happy path", async () => {
+    const prunes: unknown[] = [];
+    const upserts: unknown[] = [];
+    const db = fakeDb({ insertResult: { data: { id: "t1" }, error: null }, prunes, upserts });
 
     const result = await createTeam(input, db);
 
     expect(result).toEqual({ ok: true, id: "t1" });
-    expect(deletes).toEqual([{ table: "team_slack_channel", col: "team_id", val: "t1" }]);
-    expect(inserts).toEqual([{
+    expect(upserts).toEqual([{
       table: "team_slack_channel",
       payload: [{ team_id: "t1", slack_channel_id: "C12345", label: "General" }],
+      options: { onConflict: "team_id,slack_channel_id" },
+    }]);
+    expect(prunes).toEqual([{
+      table: "team_slack_channel", col: "team_id", val: "t1",
+      not: { col: "slack_channel_id", op: "in", val: "(C12345)" },
     }]);
   });
 
-  test("updateTeam replaces team_slack_channel rows on the happy path", async () => {
-    const deletes: unknown[] = [];
-    const inserts: unknown[] = [];
-    const db = fakeDb({ updateResult: { data: { id: "t1" }, error: null }, deletes, inserts });
+  test("updateTeam upserts then prunes team_slack_channel rows on the happy path", async () => {
+    const prunes: unknown[] = [];
+    const upserts: unknown[] = [];
+    const db = fakeDb({ updateResult: { data: { id: "t1" }, error: null }, prunes, upserts });
 
     const result = await updateTeam("t1", input, db);
 
     expect(result).toEqual({ ok: true, status: 200 });
-    expect(deletes).toEqual([{ table: "team_slack_channel", col: "team_id", val: "t1" }]);
-    expect(inserts).toEqual([{
+    expect(upserts).toEqual([{
       table: "team_slack_channel",
       payload: [{ team_id: "t1", slack_channel_id: "C12345", label: "General" }],
+      options: { onConflict: "team_id,slack_channel_id" },
+    }]);
+    expect(prunes).toEqual([{
+      table: "team_slack_channel", col: "team_id", val: "t1",
+      not: { col: "slack_channel_id", op: "in", val: "(C12345)" },
     }]);
   });
 
   test("updateTeam does not touch team_slack_channel on 404", async () => {
-    const deletes: unknown[] = [];
-    const inserts: unknown[] = [];
-    const db = fakeDb({ updateResult: { data: null, error: null }, deletes, inserts });
+    const prunes: unknown[] = [];
+    const upserts: unknown[] = [];
+    const db = fakeDb({ updateResult: { data: null, error: null }, prunes, upserts });
 
     const result = await updateTeam("missing", input, db);
 
     expect(result).toEqual({ ok: false, status: 404 });
-    expect(deletes).toEqual([]);
-    expect(inserts).toEqual([]);
+    expect(prunes).toEqual([]);
+    expect(upserts).toEqual([]);
   });
 
-  test("createTeam returns 500 when the team_slack_channel insert fails (team row already committed)", async () => {
-    const deletes: unknown[] = [];
-    const inserts: unknown[] = [];
+  test("createTeam with no channels skips the upsert and prunes all rows for the team", async () => {
+    const prunes: unknown[] = [];
+    const upserts: unknown[] = [];
+    const db = fakeDb({ insertResult: { data: { id: "t1" }, error: null }, prunes, upserts });
+
+    const result = await createTeam(noChannelsInput, db);
+
+    expect(result).toEqual({ ok: true, id: "t1" });
+    expect(upserts).toEqual([]);
+    expect(prunes).toEqual([{ table: "team_slack_channel", col: "team_id", val: "t1" }]);
+  });
+
+  test("createTeam returns 500 when the team_slack_channel upsert fails, and never prunes existing links", async () => {
+    const prunes: unknown[] = [];
+    const upserts: unknown[] = [];
     const db = fakeDb({
       insertResult: { data: { id: "t1" }, error: null },
-      channelInsertError: { message: "boom" },
-      deletes,
-      inserts,
+      channelUpsertError: { message: "boom" },
+      prunes,
+      upserts,
+    });
+
+    const result = await createTeam(input, db);
+
+    expect(result).toEqual({ ok: false, status: 500 });
+    expect(prunes).toEqual([]); // prune never attempted after upsert failure — old links survive
+  });
+
+  test("createTeam returns 500 when the team_slack_channel prune fails", async () => {
+    const prunes: unknown[] = [];
+    const upserts: unknown[] = [];
+    const db = fakeDb({
+      insertResult: { data: { id: "t1" }, error: null },
+      channelPruneError: { message: "boom" },
+      prunes,
+      upserts,
     });
 
     const result = await createTeam(input, db);
@@ -238,30 +288,14 @@ describe("createTeam / updateTeam — slack channel sync", () => {
     expect(result).toEqual({ ok: false, status: 500 });
   });
 
-  test("createTeam returns 500 when the team_slack_channel delete fails", async () => {
-    const deletes: unknown[] = [];
-    const inserts: unknown[] = [];
-    const db = fakeDb({
-      insertResult: { data: { id: "t1" }, error: null },
-      channelDeleteError: { message: "boom" },
-      deletes,
-      inserts,
-    });
-
-    const result = await createTeam(input, db);
-
-    expect(result).toEqual({ ok: false, status: 500 });
-    expect(inserts).toEqual([]); // insert never attempted after delete failure
-  });
-
-  test("updateTeam returns 500 when the team_slack_channel insert fails", async () => {
-    const deletes: unknown[] = [];
-    const inserts: unknown[] = [];
+  test("updateTeam returns 500 when the team_slack_channel upsert fails", async () => {
+    const prunes: unknown[] = [];
+    const upserts: unknown[] = [];
     const db = fakeDb({
       updateResult: { data: { id: "t1" }, error: null },
-      channelInsertError: { message: "boom" },
-      deletes,
-      inserts,
+      channelUpsertError: { message: "boom" },
+      prunes,
+      upserts,
     });
 
     const result = await updateTeam("t1", input, db);
