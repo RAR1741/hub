@@ -118,6 +118,7 @@ export type TeamRow = {
   join_mode: JoinMode;
   google_group_email: string | null;
   github_team_slug: string | null;
+  github_sync_allow_inactive: boolean;
 };
 
 export type Team = {
@@ -128,6 +129,7 @@ export type Team = {
   joinMode: JoinMode;
   googleGroupEmail: string | null;
   githubTeamSlug: string | null;
+  githubSyncAllowInactive: boolean;
 };
 
 export function teamFromRow(row: TeamRow): Team {
@@ -139,6 +141,7 @@ export function teamFromRow(row: TeamRow): Team {
     joinMode: row.join_mode,
     googleGroupEmail: row.google_group_email,
     githubTeamSlug: row.github_team_slug,
+    githubSyncAllowInactive: row.github_sync_allow_inactive,
   };
 }
 

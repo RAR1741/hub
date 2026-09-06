@@ -10,6 +10,7 @@ export type TeamFormValues = {
   joinMode: string;
   googleGroupEmail: string;
   githubTeamSlug: string;
+  githubSyncAllowInactive: boolean;
   slackChannels: { channelId: string; label: string }[];
 };
 
@@ -25,7 +26,7 @@ export function TeamForm({
   teamId?: string; // present = edit
 }) {
   const EMPTY: TeamFormValues = {
-    name: "", parentTeamId: "", description: "", joinMode: "admin_only", googleGroupEmail: "", githubTeamSlug: "", slackChannels: [],
+    name: "", parentTeamId: "", description: "", joinMode: "admin_only", googleGroupEmail: "", githubTeamSlug: "", githubSyncAllowInactive: false, slackChannels: [],
   };
   const [values, setValues] = useState<TeamFormValues>(initial ?? EMPTY);
   const [channels, setChannels] = useState<ChannelRow[]>(() =>
@@ -51,6 +52,7 @@ export function TeamForm({
           joinMode: values.joinMode,
           googleGroupEmail: values.googleGroupEmail || undefined,
           githubTeamSlug: values.githubTeamSlug || undefined,
+          githubSyncAllowInactive: values.githubSyncAllowInactive,
           slackChannels: channels
             .filter((c) => c.channelId.trim())
             .map((c) => ({ channelId: c.channelId.trim(), label: c.label.trim() || null })),
@@ -106,6 +108,17 @@ export function TeamForm({
           onChange={(e) => setValues({ ...values, githubTeamSlug: e.target.value })}
         />
       </label>
+      <label className="label flex-row items-center gap-2" style={{ flexDirection: "row" }}>
+        <input
+          type="checkbox"
+          checked={values.githubSyncAllowInactive}
+          onChange={(e) => setValues({ ...values, githubSyncAllowInactive: e.target.checked })}
+        />
+        Allow inactive members
+      </label>
+      <span className="text-sm text-[var(--muted)]">
+        When on, alumni and other inactive members stay on the linked GitHub team instead of being flagged for removal during sync.
+      </span>
       <div className="label">
         Slack channels
         <div className="flex flex-col gap-2">

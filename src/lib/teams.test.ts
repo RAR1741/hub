@@ -5,6 +5,7 @@ import type { Team } from "./types";
 
 const team = (id: string, name: string, parentTeamId: string | null): Team => ({
   id, name, parentTeamId, description: null, joinMode: "admin_only", googleGroupEmail: null, githubTeamSlug: null,
+  githubSyncAllowInactive: false,
 });
 
 // Generic chained-query stub in the style of github-team-sync.test.ts.
@@ -84,7 +85,7 @@ describe("parseTeamInput", () => {
       parseTeamInput({ name: " Pit Crew ", joinMode: "open" }),
     ).toEqual({
       name: "Pit Crew", parentTeamId: null, description: null, joinMode: "open",
-      googleGroupEmail: null, githubTeamSlug: null, slackChannels: [],
+      googleGroupEmail: null, githubTeamSlug: null, githubSyncAllowInactive: false, slackChannels: [],
     });
   });
   test.each([
@@ -140,6 +141,21 @@ describe("parseTeamInput", () => {
     expect(parseTeamInput({ name: "X", joinMode: "open", githubTeamSlug: slug })).toBeNull();
   });
 
+  test("githubSyncAllowInactive true is parsed", () => {
+    const result = parseTeamInput({ name: "X", joinMode: "open", githubSyncAllowInactive: true });
+    expect(result?.githubSyncAllowInactive).toBe(true);
+  });
+
+  test("githubSyncAllowInactive absent defaults to false", () => {
+    const result = parseTeamInput({ name: "X", joinMode: "open" });
+    expect(result?.githubSyncAllowInactive).toBe(false);
+  });
+
+  test("githubSyncAllowInactive non-boolean coerces to false", () => {
+    const result = parseTeamInput({ name: "X", joinMode: "open", githubSyncAllowInactive: "yes" });
+    expect(result?.githubSyncAllowInactive).toBe(false);
+  });
+
   test("slackChannels absent defaults to []", () => {
     const result = parseTeamInput({ name: "X", joinMode: "open" });
     expect(result?.slackChannels).toEqual([]);
@@ -190,7 +206,7 @@ describe("parseTeamInput", () => {
 describe("createTeam / updateTeam — slack channel sync", () => {
   const input = {
     name: "X", parentTeamId: null, description: null, joinMode: "admin_only" as const,
-    googleGroupEmail: null, githubTeamSlug: null,
+    googleGroupEmail: null, githubTeamSlug: null, githubSyncAllowInactive: false,
     slackChannels: [{ channelId: "C12345", label: "General" }],
   };
   const noChannelsInput = { ...input, slackChannels: [] };
@@ -309,6 +325,7 @@ describe("teamFromRow", () => {
     const t = teamFromRow({
       id: "t1", name: "Pit Crew", parent_team_id: null, description: null,
       join_mode: "admin_only", google_group_email: "pit-crew@redalert1741.org", github_team_slug: null,
+      github_sync_allow_inactive: false,
     });
     expect(t.googleGroupEmail).toBe("pit-crew@redalert1741.org");
   });
@@ -317,6 +334,7 @@ describe("teamFromRow", () => {
     const t = teamFromRow({
       id: "t1", name: "Pit Crew", parent_team_id: null, description: null,
       join_mode: "admin_only", google_group_email: null, github_team_slug: null,
+      github_sync_allow_inactive: false,
     });
     expect(t.googleGroupEmail).toBeNull();
   });
@@ -325,6 +343,7 @@ describe("teamFromRow", () => {
 describe("joinAction", () => {
   const t = (joinMode: Team["joinMode"]): Team => ({
     id: "t1", name: "T", parentTeamId: null, description: null, joinMode, googleGroupEmail: null, githubTeamSlug: null,
+    githubSyncAllowInactive: false,
   });
 
   test("existing member", () => {
