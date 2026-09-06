@@ -1,7 +1,15 @@
 import { SignJWT, jwtVerify } from "jose";
 
 export const PANEL_TOKEN_KIND = "onshape-panel";
-const PANEL_TOKEN_DURATION = "90d";
+// Long-lived bearer stored in the browser's localStorage (the Onshape panel is
+// a cross-origin iframe, so it can't use httpOnly cookies). Kept short-ish to
+// bound the XSS-exfiltration window; the panel prompts a cheap "Reconnect" on
+// expiry, and every request also re-checks the person's is_active/role, so a
+// stolen token dies the moment the user is deactivated regardless of this. See
+// security audit #251.
+const PANEL_TOKEN_DURATION = "30d";
+/** The above, in seconds — exported for tests to assert the minted lifetime. */
+export const PANEL_TOKEN_DURATION_SECONDS = 30 * 24 * 60 * 60;
 
 export async function createPanelToken(
   personId: string,
