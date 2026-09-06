@@ -7,6 +7,7 @@ import {
   type GithubUser,
 } from "./github-teams";
 import { githubAppCredentialsFromEnv, type GithubDeps, type GithubAppCredentials } from "./github-app";
+import { ancestorIds, subtreeIds, type TeamLink } from "./team-tree";
 
 /**
  * Diff expected vs actual GitHub team membership. PURE. Keyed on numeric `id`
@@ -73,7 +74,16 @@ export async function reconcileGithubTeams(deps: {
     .select("id, name, github_team_slug, github_sync_allow_inactive")
     .not("github_team_slug", "is", null);
   if (teamsError) throw new Error(`list linked GitHub teams failed: ${teamsError.message}`);
-  const linkedTeams = (data ?? []) as LinkedTeamRow[];
+  // Extra safety filter (the query's `.not(...)` already does this against real Postgres):
+  // guards against a fixture/tree read returning unlinked rows too.
+  const linkedTeams = ((data ?? []) as LinkedTeamRow[]).filter((t) => t.github_team_slug != null);
+
+  const { data: treeData, error: treeError } = await db.from("team").select("id, parent_team_id");
+  if (treeError) throw new Error(`list team tree failed: ${treeError.message}`);
+  const tree: TeamLink[] = ((treeData ?? []) as { id: string; parent_team_id: string | null }[]).map((t) => ({
+    id: t.id,
+    parentTeamId: t.parent_team_id,
+  }));
 
   const teams: GithubTeamReconcileReport[] = [];
 
@@ -91,15 +101,25 @@ export async function reconcileGithubTeams(deps: {
       errors: [],
     };
     try {
+      const subtree = subtreeIds(tree, team.id);
+
       const { data: memberships, error: membershipError } = await db
         .from("team_membership")
         .select("person (id, first_name, last_name, is_active, github_login, github_user_id)")
-        .eq("team_id", team.id);
+        .in("team_id", subtree);
       if (membershipError) throw new Error(membershipError.message);
 
-      const people = ((memberships ?? []) as unknown as { person: MembershipPersonRow | MembershipPersonRow[] | null }[])
-        .map((m) => (Array.isArray(m.person) ? m.person[0] : m.person))
-        .filter((p): p is MembershipPersonRow => !!p && (team.github_sync_allow_inactive || p.is_active));
+      // Dedupe by person.id: the same person can surface once per team in the
+      // subtree they belong to (e.g. direct member of both the umbrella team
+      // and a descendant), and would otherwise be double-counted / double-PUT.
+      const peopleById = new Map<string, MembershipPersonRow>();
+      for (const m of (memberships ?? []) as unknown as { person: MembershipPersonRow | MembershipPersonRow[] | null }[]) {
+        const p = Array.isArray(m.person) ? m.person[0] : m.person;
+        if (!p) continue;
+        if (!(team.github_sync_allow_inactive || p.is_active)) continue;
+        peopleById.set(p.id, p);
+      }
+      const people = [...peopleById.values()];
 
       const expected: GithubUser[] = people
         .filter((p) => p.github_user_id != null && p.github_login)
@@ -116,20 +136,26 @@ export async function reconcileGithubTeams(deps: {
       const { data: externalRows, error: externalError } = await db
         .from("team_external_account")
         .select("provider, identifier, github_user_id")
-        .eq("team_id", team.id);
+        .in("team_id", subtree);
       if (externalError) {
         report.errors.push(externalError.message ?? String(externalError));
         teams.push(report);
         continue;
       }
+      // Dedupe by github_user_id: the same external account can be attached to
+      // more than one team in the subtree (same identifier, two rows).
+      const externalByGithubId = new Map<number, { identifier: string; github_user_id: number }>();
       for (const row of (externalRows ?? []) as {
         provider: string;
         identifier: string;
         github_user_id: number | null;
       }[]) {
         if (row.provider === "github" && row.github_user_id != null) {
-          expected.push({ id: row.github_user_id, login: row.identifier });
+          externalByGithubId.set(row.github_user_id, { identifier: row.identifier, github_user_id: row.github_user_id });
         }
+      }
+      for (const row of externalByGithubId.values()) {
+        expected.push({ id: row.github_user_id, login: row.identifier });
       }
 
       const actual = await listTeamMembers(ghDeps, slug);
@@ -243,10 +269,26 @@ export async function syncPersonLinkedTeams(personId: string, db: SupabaseClient
       .eq("person_id", personId);
     if (membershipsError) throw new Error(membershipsError.message);
     type TeamJoin = { id: string; github_team_slug: string | null };
-    const linkedSlugs = ((memberships ?? []) as unknown as { team: TeamJoin | TeamJoin[] | null }[])
+    const memberTeams = ((memberships ?? []) as unknown as { team: TeamJoin | TeamJoin[] | null }[])
       .map((m) => (Array.isArray(m.team) ? m.team[0] : m.team))
-      .filter((t): t is TeamJoin => !!t && !!t.github_team_slug)
-      .map((t) => t.github_team_slug as string);
+      .filter((t): t is TeamJoin => !!t);
+
+    // Load the whole tree once so we can PUT onto each member team's ancestors'
+    // GitHub Teams too, not just the ones they're a direct member of.
+    const { data: treeData, error: treeError } = await db.from("team").select("id, parent_team_id, github_team_slug");
+    if (treeError) throw new Error(treeError.message);
+    const teamRows = (treeData ?? []) as { id: string; parent_team_id: string | null; github_team_slug: string | null }[];
+    const tree: TeamLink[] = teamRows.map((t) => ({ id: t.id, parentTeamId: t.parent_team_id }));
+    const slugById = new Map(teamRows.map((t) => [t.id, t.github_team_slug]));
+
+    const linkedSlugs = new Set<string>();
+    for (const t of memberTeams) {
+      if (t.github_team_slug) linkedSlugs.add(t.github_team_slug);
+      for (const id of ancestorIds(tree, t.id)) {
+        const slug = slugById.get(id);
+        if (slug) linkedSlugs.add(slug);
+      }
+    }
 
     const ghDeps: GithubDeps = { fetch: globalThis.fetch, credentials };
     for (const slug of linkedSlugs) {
