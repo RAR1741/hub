@@ -36,6 +36,7 @@ export type TeamInput = {
   joinMode: JoinMode;
   googleGroupEmail: string | null;
   githubTeamSlug: string | null;
+  githubSyncAllowInactive: boolean;
   slackChannels: { channelId: string; label: string | null }[];
 };
 
@@ -72,6 +73,7 @@ export function parseTeamInput(body: unknown): TeamInput | null {
   const githubTeamSlugRaw = optString(b.githubTeamSlug, 100);
   const joinMode = JOIN_MODES.find((m) => m === b.joinMode);
   const slackChannels = parseSlackChannels(b.slackChannels);
+  const githubSyncAllowInactive = b.githubSyncAllowInactive === true;
   if (!name || !parentTeamId || !description || !googleGroupEmail || !githubTeamSlugRaw || !joinMode || !slackChannels) return null;
   const githubTeamSlug = githubTeamSlugRaw.value ? githubTeamSlugRaw.value.toLowerCase() : null;
   if (githubTeamSlug && !GITHUB_SLUG_RE.test(githubTeamSlug)) return null;
@@ -82,6 +84,7 @@ export function parseTeamInput(body: unknown): TeamInput | null {
     joinMode,
     googleGroupEmail: googleGroupEmail.value,
     githubTeamSlug,
+    githubSyncAllowInactive,
     slackChannels,
   };
 }
@@ -163,6 +166,7 @@ export async function createTeam(
       join_mode: input.joinMode,
       google_group_email: input.googleGroupEmail,
       github_team_slug: input.githubTeamSlug,
+      github_sync_allow_inactive: input.githubSyncAllowInactive,
     })
     .select("id")
     .single();
@@ -188,6 +192,7 @@ export async function updateTeam(
       join_mode: input.joinMode,
       google_group_email: input.googleGroupEmail,
       github_team_slug: input.githubTeamSlug,
+      github_sync_allow_inactive: input.githubSyncAllowInactive,
     })
     .eq("id", id)
     .select("id")

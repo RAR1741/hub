@@ -84,7 +84,7 @@ describe("reconcileGithubTeams", () => {
   test("does not PUT a missing member whose login is in pendingLogins", async () => {
     const upserts: unknown[] = [];
     const db = fakeDb({
-      team: { data: [{ id: "t1", name: "Team A", github_team_slug: "software" }], error: null },
+      team: { data: [{ id: "t1", name: "Team A", github_team_slug: "software", github_sync_allow_inactive: false }], error: null },
       team_membership: {
         data: [
           { person: { id: "p1", first_name: "A", last_name: "One", is_active: true, github_login: "alice", github_user_id: 1 } },
@@ -121,7 +121,7 @@ describe("reconcileGithubTeams", () => {
 
   test("a PUT returning state pending lands in pending, not added", async () => {
     const db = fakeDb({
-      team: { data: [{ id: "t1", name: "Team A", github_team_slug: "software" }], error: null },
+      team: { data: [{ id: "t1", name: "Team A", github_team_slug: "software", github_sync_allow_inactive: false }], error: null },
       team_membership: {
         data: [
           { person: { id: "p1", first_name: "A", last_name: "One", is_active: true, github_login: "alice", github_user_id: 1 } },
@@ -155,7 +155,7 @@ describe("reconcileGithubTeams", () => {
   test("a renamed login (actual id matches expected, login differs) triggers exactly one person.update", async () => {
     const updates: unknown[] = [];
     const db = fakeDb({
-      team: { data: [{ id: "t1", name: "Team A", github_team_slug: "software" }], error: null },
+      team: { data: [{ id: "t1", name: "Team A", github_team_slug: "software", github_sync_allow_inactive: false }], error: null },
       team_membership: {
         data: [
           { person: { id: "p1", first_name: "A", last_name: "One", is_active: true, github_login: "old-login", github_user_id: 1 } },
@@ -186,7 +186,7 @@ describe("reconcileGithubTeams", () => {
 
   test("extra members are never deleted (no DELETE call) and land in wouldRemove", async () => {
     const db = fakeDb({
-      team: { data: [{ id: "t1", name: "Team A", github_team_slug: "software" }], error: null },
+      team: { data: [{ id: "t1", name: "Team A", github_team_slug: "software", github_sync_allow_inactive: false }], error: null },
       team_membership: { data: [], error: null },
     });
 
@@ -212,7 +212,7 @@ describe("reconcileGithubTeams", () => {
 
   test("collects notConnected display names for active members with no github_user_id", async () => {
     const db = fakeDb({
-      team: { data: [{ id: "t1", name: "Team A", github_team_slug: "software" }], error: null },
+      team: { data: [{ id: "t1", name: "Team A", github_team_slug: "software", github_sync_allow_inactive: false }], error: null },
       team_membership: {
         data: [
           { person: { id: "p1", first_name: "Jo", last_name: "Doe", is_active: true, github_login: null, github_user_id: null } },
@@ -239,9 +239,73 @@ describe("reconcileGithubTeams", () => {
     expect(result.teams[0].notConnected).toEqual(["Jo Doe"]);
   });
 
+  test("github_sync_allow_inactive: true keeps an inactive member expected and PUTs them", async () => {
+    const db = fakeDb({
+      team: { data: [{ id: "t1", name: "Team A", github_team_slug: "software", github_sync_allow_inactive: true }], error: null },
+      team_membership: {
+        data: [
+          { person: { id: "p1", first_name: "Al", last_name: "Um", is_active: false, github_login: "alum", github_user_id: 1 } },
+        ],
+        error: null,
+      },
+    });
+
+    const fetchFn = vi.fn(async (url: string, init?: RequestInit) => {
+      const u = String(url);
+      if (u.includes("access_tokens")) return tokenResponse();
+      if (u.includes("/members?")) return new Response(JSON.stringify([]), { status: 200 });
+      if (u.includes("/invitations")) return new Response(JSON.stringify([]), { status: 200 });
+      if (u.includes("/memberships/") && init?.method === "PUT") {
+        return new Response(JSON.stringify({ role: "member", state: "active" }), { status: 200 });
+      }
+      throw new Error(`unexpected fetch: ${u} ${init?.method}`);
+    });
+
+    const result = await reconcileGithubTeams({
+      db: db as never,
+      fetch: fetchFn as unknown as typeof globalThis.fetch,
+      credentials,
+    });
+
+    const report = result.teams[0];
+    expect(report.added).toEqual(["alum"]);
+    expect(report.wouldRemove).toEqual([]);
+  });
+
+  test("github_sync_allow_inactive: false (default) excludes an inactive member from expected", async () => {
+    const db = fakeDb({
+      team: { data: [{ id: "t1", name: "Team A", github_team_slug: "software", github_sync_allow_inactive: false }], error: null },
+      team_membership: {
+        data: [
+          { person: { id: "p1", first_name: "Al", last_name: "Um", is_active: false, github_login: "alum", github_user_id: 1 } },
+        ],
+        error: null,
+      },
+    });
+
+    const fetchFn = vi.fn(async (url: string) => {
+      const u = String(url);
+      if (u.includes("access_tokens")) return tokenResponse();
+      // Inactive member is already on the GitHub team; since they're not expected, they land in wouldRemove.
+      if (u.includes("/members?")) return new Response(JSON.stringify([{ id: 1, login: "alum" }]), { status: 200 });
+      if (u.includes("/invitations")) return new Response(JSON.stringify([]), { status: 200 });
+      throw new Error(`unexpected fetch: ${u}`);
+    });
+
+    const result = await reconcileGithubTeams({
+      db: db as never,
+      fetch: fetchFn as unknown as typeof globalThis.fetch,
+      credentials,
+    });
+
+    const report = result.teams[0];
+    expect(report.expectedCount).toBe(0);
+    expect(report.wouldRemove).toEqual([{ id: 1, login: "alum" }]);
+  });
+
   test("unions github external accounts into expected, ignores google rows, and doesn't add them to notConnected", async () => {
     const db = fakeDb({
-      team: { data: [{ id: "t1", name: "Team A", github_team_slug: "software" }], error: null },
+      team: { data: [{ id: "t1", name: "Team A", github_team_slug: "software", github_sync_allow_inactive: false }], error: null },
       team_membership: { data: [], error: null },
       team_external_account: {
         data: [
@@ -279,7 +343,7 @@ describe("reconcileGithubTeams", () => {
 
   test("a github external account already on the team is not in wouldRemove and does not surface via computeGithubAddRecommendations", async () => {
     const db = fakeDb({
-      team: { data: [{ id: "t1", name: "Team A", github_team_slug: "software" }], error: null },
+      team: { data: [{ id: "t1", name: "Team A", github_team_slug: "software", github_sync_allow_inactive: false }], error: null },
       team_membership: { data: [], error: null },
       team_external_account: {
         data: [{ provider: "github", identifier: "bot-login", github_user_id: 42 }],
@@ -311,7 +375,7 @@ describe("reconcileGithubTeams", () => {
 
   test("an external-account read error is pushed to report.errors and the team is skipped", async () => {
     const db = fakeDb({
-      team: { data: [{ id: "t1", name: "Team A", github_team_slug: "software" }], error: null },
+      team: { data: [{ id: "t1", name: "Team A", github_team_slug: "software", github_sync_allow_inactive: false }], error: null },
       team_membership: { data: [], error: null },
       team_external_account: { data: null, error: { message: "boom" } },
     });

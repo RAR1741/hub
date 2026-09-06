@@ -49,7 +49,7 @@ export type GithubTeamReconcileReport = {
 
 export type GithubReconcileResult = { ranAt: string; teams: GithubTeamReconcileReport[] };
 
-type LinkedTeamRow = { id: string; name: string; github_team_slug: string };
+type LinkedTeamRow = { id: string; name: string; github_team_slug: string; github_sync_allow_inactive: boolean };
 type MembershipPersonRow = {
   id: string;
   first_name: string;
@@ -70,7 +70,7 @@ export async function reconcileGithubTeams(deps: {
 
   const { data, error: teamsError } = await db
     .from("team")
-    .select("id, name, github_team_slug")
+    .select("id, name, github_team_slug, github_sync_allow_inactive")
     .not("github_team_slug", "is", null);
   if (teamsError) throw new Error(`list linked GitHub teams failed: ${teamsError.message}`);
   const linkedTeams = (data ?? []) as LinkedTeamRow[];
@@ -99,7 +99,7 @@ export async function reconcileGithubTeams(deps: {
 
       const people = ((memberships ?? []) as unknown as { person: MembershipPersonRow | MembershipPersonRow[] | null }[])
         .map((m) => (Array.isArray(m.person) ? m.person[0] : m.person))
-        .filter((p): p is MembershipPersonRow => !!p && p.is_active);
+        .filter((p): p is MembershipPersonRow => !!p && (team.github_sync_allow_inactive || p.is_active));
 
       const expected: GithubUser[] = people
         .filter((p) => p.github_user_id != null && p.github_login)

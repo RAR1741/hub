@@ -55,6 +55,7 @@ export default async function AdminTeamPage({
             joinMode: team.joinMode,
             googleGroupEmail: team.googleGroupEmail ?? "",
             githubTeamSlug: team.githubTeamSlug ?? "",
+            githubSyncAllowInactive: team.githubSyncAllowInactive,
             slackChannels: slackChannels.map((c) => ({ channelId: c.channelId, label: c.label ?? "" })),
           }}
         />
