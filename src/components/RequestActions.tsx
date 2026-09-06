@@ -117,14 +117,14 @@ export function ToolDeleteRequestActions({ requestId }: { requestId: string }) {
   const [busy, setBusy] = useState(false);
   const router = useRouter();
 
-  async function act(decision: "approve" | "deny") {
+  async function act(action: "approve" | "deny") {
     setStatus(null);
     setBusy(true);
     try {
       const res = await fetch(`/api/admin/requests/tool-delete/${requestId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ decision }),
+        body: JSON.stringify({ action }),
       });
       if (res.ok) router.refresh();
       else setStatus("Action failed.");

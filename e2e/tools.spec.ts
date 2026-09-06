@@ -99,7 +99,7 @@ test("tool inventory + checks + delete requests: student logging, mentor review,
     await expect(page.getByText(tool.name)).toBeVisible();
 
     const denyRes = await page.request.post(`/api/admin/requests/tool-delete/${requestId}`, {
-      data: { decision: "deny" },
+      data: { action: "deny" },
     });
     expect(denyRes.status()).toBe(200);
 
@@ -118,7 +118,7 @@ test("tool inventory + checks + delete requests: student logging, mentor review,
 
     // --- Mentor: approves -> tool cascaded away ---
     const approveRes = await page.request.post(`/api/admin/requests/tool-delete/${requestId}`, {
-      data: { decision: "approve" },
+      data: { action: "approve" },
     });
     expect(approveRes.status()).toBe(200);
     requestId = ""; // request row is gone along with the tool

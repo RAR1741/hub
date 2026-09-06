@@ -24,7 +24,7 @@ The **"due" date** is computed, never stored. A tool is due for its next check w
 
 ## Pages and access
 
-- `/tools` — check log form (active tools in sorted order), active tool summary table (name, category, location, status badge, last checked, due or blank), and recent check history (last 50). Students see all of this; mentors also see a "New tool" panel (collapse/expand) and a collapsed list of retired tools at the bottom. Student-gated (guests redirect to `/login`).
+- `/tools` — check log form (active tools in sorted order), active tool summary table (name, category, location, status badge, last checked, due or blank), and recent check history (last 50). Student+ see all of this, including the "New tool" panel (collapse/expand) and a collapsed list of retired tools at the bottom. Student-gated (guests redirect to `/login`).
 - `/tools/[id]` — tool spec card (name, category, location, asset tag, status, maintenance interval, last checked, next due), `<details>` "Edit tool" panel (`status` `<select>` shown only here), per-tool check history, and a **Danger zone** row: if a deletion request is pending, everyone sees a pill "Deletion requested"; mentors+ see a Delete button; students without a pending request see a "Request deletion" form.
 
 ## Future work

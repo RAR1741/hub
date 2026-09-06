@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
@@ -142,7 +143,7 @@ export default async function AdminRequestsPage() {
                 <tbody>
                   {toolDeleteRequests.map((r) => (
                     <tr key={r.id}>
-                      <td>{r.toolName}</td>
+                      <td><Link href={`/tools/${r.toolId}`}>{r.toolName}</Link></td>
                       <td>{r.name}</td>
                       <td>{r.reason}</td>
                       <td className="mono">{new Date(r.createdAt).toLocaleDateString(undefined, { timeZone: teamTz })}</td>

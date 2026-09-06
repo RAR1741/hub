@@ -216,7 +216,7 @@ export function nextDueAt(
 ): string | null {
   if (tool.maintenanceIntervalDays === null) return null;
   if (tool.status === "retired") return null;
-  if (lastCheckedAt === null) return tool.createdAt;
+  if (lastCheckedAt === null) return new Date(tool.createdAt).toISOString();
   const due = new Date(lastCheckedAt);
   due.setUTCDate(due.getUTCDate() + tool.maintenanceIntervalDays);
   return due.toISOString();
