@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { pushDepsFromEnv, sendPushToOptedIn, type PushDeps } from "./push-dispatch";
 import type { Meeting, MeetingRow } from "./types";
 import { meetingFromRow } from "./types";
 import { reqString } from "./validate";
@@ -73,20 +74,53 @@ export async function createManualMeeting(
   return { ok: true, id: data.id as string };
 }
 
+/** Push `meeting_changed` to all opted-in members and reset the meeting's
+ * reminder stamp so it re-reminds at its new time. Never throws. */
+export async function notifyMeetingChanged(
+  db: SupabaseClient,
+  meeting: { id: string; title: string; starts_at: string },
+  push?: PushDeps,
+): Promise<void> {
+  const when = new Date(meeting.starts_at).toLocaleString("en-US", {
+    timeZone: "America/Indiana/Indianapolis",
+    weekday: "short",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  await sendPushToOptedIn(
+    "all",
+    "meeting_changed",
+    { title: "Meeting time changed", body: `${meeting.title || "A meeting"} is now ${when}`, url: "/calendar" },
+    { db, push: push ?? pushDepsFromEnv() },
+  );
+  // Reset so the moved meeting re-reminds at its new time.
+  await db.from("meeting").update({ reminder_pushed_at: null }).eq("id", meeting.id);
+}
+
 export async function updateMeeting(
   id: string,
   input: ManualMeetingInput,
   db?: SupabaseClient,
 ): Promise<{ ok: boolean; status: number }> {
   const client = db ?? (await import("./db")).getDb();
+  const { data: prior } = await client.from("meeting").select("starts_at").eq("id", id).maybeSingle();
   const { data, error } = await client
     .from("meeting")
     .update({ title: input.title, starts_at: input.startsAt, ends_at: input.endsAt })
     .eq("id", id)
-    .select("id")
+    .select("id, title, starts_at")
     .maybeSingle();
   if (error) return { ok: false, status: 500 };
   if (!data) return { ok: false, status: 404 };
+  const moved = prior != null && (prior as { starts_at: string }).starts_at !== input.startsAt;
+  const future = new Date(input.startsAt).getTime() > Date.now();
+  if (moved && future) {
+    try {
+      await notifyMeetingChanged(client, data as { id: string; title: string; starts_at: string });
+    } catch (e) {
+      console.error("[meetings] meeting_changed push failed:", e);
+    }
+  }
   return { ok: true, status: 200 };
 }
 

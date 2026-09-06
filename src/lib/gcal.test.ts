@@ -1,4 +1,6 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
+vi.mock("./meetings", () => ({ notifyMeetingChanged: vi.fn().mockResolvedValue(undefined) }));
+import { notifyMeetingChanged } from "./meetings";
 import {
   buildServiceAccountJwt,
   diffLinkedEvents,
@@ -63,6 +65,7 @@ function fakeDb(seed?: {
   meetingDates?: string[];
   linkedEvents?: { id: string; gcal_event_id: string; name: string; starts_at: string; ends_at: string; gcal_missing: boolean }[];
   meetingsByGcalId?: { gcal_event_id: string; title: string; starts_at: string; ends_at: string }[];
+  priorMeetings?: { id: string; gcal_event_id: string; starts_at: string }[];
 }) {
   const calls: { table: string; rows: unknown; opts: unknown }[] = [];
   const deletes: { table: string; filters: { op: string; col: string; val: unknown }[] }[] = [];
@@ -71,6 +74,7 @@ function fakeDb(seed?: {
   const meetingDates = seed?.meetingDates ?? [];
   const linkedEvents = seed?.linkedEvents ?? [];
   const meetingsByGcalId = seed?.meetingsByGcalId ?? [];
+  const priorMeetings = seed?.priorMeetings ?? [];
   return {
     calls,
     deletes,
@@ -90,7 +94,7 @@ function fakeDb(seed?: {
               },
             };
           },
-          select(_cols: string) {
+          select(cols: string) {
             let gteVal: string | undefined;
             let lteVal: string | undefined;
             let notNullCol: string | undefined;
@@ -126,6 +130,15 @@ function fakeDb(seed?: {
                 if (table === "event" && notNullCol === "gcal_event_id") {
                   // Linked events with ends_at >= gteVal.
                   const hit = linkedEvents.filter((e) => !gteVal || e.ends_at >= gteVal);
+                  resolve({ data: hit, error: null });
+                  return;
+                }
+                // The pre-upsert "prior starts_at" read (syncCalendar) selects
+                // "id, gcal_event_id, starts_at"; syncLinkedEvents' meeting
+                // lookup selects "gcal_event_id, title, starts_at, ends_at" —
+                // distinguish by the leading column so each hits its own seed.
+                if (table === "meeting" && inVal && cols.startsWith("id,")) {
+                  const hit = priorMeetings.filter((m) => inVal!.includes(m.gcal_event_id));
                   resolve({ data: hit, error: null });
                   return;
                 }
@@ -395,6 +408,63 @@ describe("syncCalendar", () => {
       // verbatim date, no tz shift; all-day + no "mandatory" → optional
       { date: "2026-03-15", kind: "optional", source: "gcal" },
     ]);
+  });
+
+  describe("meeting_changed fan-out", () => {
+    const NOW_MS = 1_700_000_000_000; // fixed "now" used by these tests
+    const FUTURE = new Date(NOW_MS + 24 * 60 * 60 * 1000).toISOString();
+    const PAST = new Date(NOW_MS - 24 * 60 * 60 * 1000).toISOString();
+
+    function run(events: unknown[], priorMeetings: { id: string; gcal_event_id: string; starts_at: string }[]) {
+      const db = fakeDb({ priorMeetings });
+      return syncCalendar({
+        fetch: fakeFetch(events),
+        db: db.client,
+        credentials: CREDS,
+        tz: TZ,
+        now: () => NOW_MS,
+      });
+    }
+
+    test("fires when a previously-synced meeting's start time moved to the future", async () => {
+      vi.mocked(notifyMeetingChanged).mockClear();
+      const events = [
+        { id: "evt-1", summary: "Build Session", start: { dateTime: FUTURE }, end: { dateTime: FUTURE } },
+      ];
+      await run(events, [{ id: "m1", gcal_event_id: "evt-1", starts_at: PAST }]);
+      expect(notifyMeetingChanged).toHaveBeenCalledTimes(1);
+      expect(notifyMeetingChanged).toHaveBeenCalledWith(
+        expect.anything(),
+        { id: "m1", title: "Build Session", starts_at: FUTURE },
+      );
+    });
+
+    test("does NOT fire when starts_at is unchanged", async () => {
+      vi.mocked(notifyMeetingChanged).mockClear();
+      const events = [
+        { id: "evt-1", summary: "Build Session", start: { dateTime: FUTURE }, end: { dateTime: FUTURE } },
+      ];
+      await run(events, [{ id: "m1", gcal_event_id: "evt-1", starts_at: FUTURE }]);
+      expect(notifyMeetingChanged).not.toHaveBeenCalled();
+    });
+
+    test("does NOT fire for a brand-new event with no prior row", async () => {
+      vi.mocked(notifyMeetingChanged).mockClear();
+      const events = [
+        { id: "evt-new", summary: "New Event", start: { dateTime: FUTURE }, end: { dateTime: FUTURE } },
+      ];
+      await run(events, []);
+      expect(notifyMeetingChanged).not.toHaveBeenCalled();
+    });
+
+    test("does NOT fire when the moved meeting's new start time is in the past", async () => {
+      vi.mocked(notifyMeetingChanged).mockClear();
+      const events = [
+        { id: "evt-1", summary: "Build Session", start: { dateTime: PAST }, end: { dateTime: PAST } },
+      ];
+      await run(events, [{ id: "m1", gcal_event_id: "evt-1", starts_at: "2020-01-01T00:00:00Z" }]);
+      expect(notifyMeetingChanged).not.toHaveBeenCalled();
+    });
   });
 
   test("a day is required if ANY of its events qualifies; else optional; and out-of-window meetings are pruned", async () => {
