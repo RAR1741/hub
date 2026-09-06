@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { notifyAdmins } from "./admin-notify";
+import type { PushDeps } from "./push-dispatch";
 import { getSetting } from "./settings";
-import { postChannelMessage, slackDepsFromEnv, type SlackDeps } from "./slack";
+import { slackDepsFromEnv, type SlackDeps } from "./slack";
 
 export type AlertSource = "first_sync" | "calendar_sync" | "drive_sync" | "github_sync";
 
@@ -21,7 +23,7 @@ const LABELS: Record<AlertSource, string> = {
 export async function reportSyncOutcome(
   source: AlertSource,
   ok: boolean,
-  opts: { db: SupabaseClient; slack?: SlackDeps; error?: string },
+  opts: { db: SupabaseClient; slack?: SlackDeps; push?: PushDeps; error?: string },
 ): Promise<void> {
   try {
     const key = `slack_alert_state_${source}`;
@@ -37,7 +39,7 @@ export async function reportSyncOutcome(
         : `:rotating_light: ${LABELS[source]} is failing.${opts.error ? `\n\`\`\`${opts.error}\`\`\`` : ""}`;
       // Only advance state once the alert actually went out — a failed/no-op post
       // (e.g. token not yet configured) must re-alert next run, not swallow the transition.
-      delivered = await postChannelMessage(slack, "hub-admin-alerts", text);
+      delivered = await notifyAdmins(text, { db: opts.db, slack, push: opts.push });
     }
 
     if (delivered) {

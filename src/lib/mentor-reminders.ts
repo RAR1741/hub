@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { postChannelMessage, sendDM, type SlackDeps } from "./slack";
+import { notifyAdmins } from "./admin-notify";
+import { sendDM, type SlackDeps } from "./slack";
 
 export type MentorReq = {
   personId: string;
@@ -78,7 +79,7 @@ export async function sendMentorReminders(deps: {
     `:memo: Weekly FIRST reminder run — DMed ${reminded} mentor(s); ${complete} fully complete.` +
     (unlinked.length ? `\n:warning: No Slack link (not reminded): ${unlinked.join(", ")}` : "") +
     (failed.length ? `\n:x: DM failed (not reminded): ${failed.join(", ")}` : "");
-  await postChannelMessage(deps.slack, "hub-admin-alerts", summary);
+  await notifyAdmins(summary, { db: deps.db, slack: deps.slack });
 
   return { reminded, unlinked, complete, failed };
 }
