@@ -86,9 +86,11 @@ function safeHost(candidate: string | null): string | null {
   if (allow.length === 0) return host;
   if (host) {
     const hostname = host.split(":")[0];
-    if (isLocalHost(hostname) || allow.includes(host) || allow.includes(hostname)) {
-      return host;
-    }
+    if (isLocalHost(hostname)) return host; // dev: port matters and is fine
+    if (allow.includes(host)) return host; // exact allow-listed host[:port]
+    // Allow-list holds the bare hostname: accept it but drop the caller-supplied
+    // port, so header input can't steer the redirect authority to another port.
+    if (allow.includes(hostname)) return hostname;
   }
   return allow[0];
 }

@@ -67,6 +67,17 @@ describe("clientUrl", () => {
       expect(clientUrl(r, "/").toString()).toBe("http://localhost:3000/");
     });
 
+    test("drops a caller-chosen port when only the hostname is allow-listed", () => {
+      vi.stubEnv("APP_ALLOWED_HOSTS", "hub.redalert1741.org");
+      const r = req("https://hub.redalert1741.org/x", {
+        host: "hub.redalert1741.org",
+        "x-forwarded-host": "hub.redalert1741.org:444",
+        "x-forwarded-proto": "https",
+      });
+      // The allow-list owns the authority: the injected :444 must not survive.
+      expect(clientUrl(r, "/").toString()).toBe("https://hub.redalert1741.org/");
+    });
+
     test("does not fall for userinfo (@) injection that resolves to another host", () => {
       vi.stubEnv("APP_ALLOWED_HOSTS", "hub.redalert1741.org");
       // Authority would resolve to evil.example.com via new URL(); the allow-list
