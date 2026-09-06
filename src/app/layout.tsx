@@ -32,6 +32,11 @@ export const metadata: Metadata = {
     template: "%s - 1741 Hub",
   },
   description: "Attendance and roster for FRC Team 1741.",
+  appleWebApp: {
+    capable: true,
+    title: "1741 Hub",
+    statusBarStyle: "default",
+  },
 };
 
 // Applies a persisted theme choice (light/dark) before first paint so there's
