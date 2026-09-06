@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
+import { hasRole } from "@/lib/authz";
 import { typesForRole } from "@/lib/notification-types";
+import { pushTestBlocked } from "@/app/admin/push-test/gate";
 import { NotificationSettings } from "./NotificationSettings";
 
 export const metadata: Metadata = { title: "Notifications" };
@@ -27,6 +29,11 @@ export default async function NotificationsPage() {
         publicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ""}
         types={types}
       />
+      {!pushTestBlocked() && hasRole(viewer.role, "admin") && (
+        <a href="/admin/push-test" className="text-sm" style={{ color: "var(--muted)" }}>
+          🔧 Dev: push notification tester
+        </a>
+      )}
     </main>
   );
 }
