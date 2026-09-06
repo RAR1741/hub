@@ -2,6 +2,11 @@
 
 When a person joins a team (admin add, self-service join, or approved application), they are automatically invited to every Slack channel linked to that team. A team can be linked to many Slack channels, and a single Slack channel can be linked to many teams — many-to-many. Setup/config: [Slack setup](../setup/slack.md).
 
+Joining a team also invites the person to every Slack channel linked to that team's **ancestor**
+teams (umbrella channels) — teams form a tree (`team.parent_team_id`), and joining `FRC Students`
+invites them to `#frc-all` if that channel is linked to the parent `FRC` team. Slack has no
+reconcile, so this join-time invite is the only mechanism that fills an umbrella channel.
+
 ## How it works
 
 When a membership change occurs — a person is added to a team via the admin UI, self-joins a team, or an application is approved — the system invokes `syncSlackMembershipChange()` from `src/lib/slack-channel-sync.ts` via the shared fan-out helper `syncMembershipChange` in `src/lib/membership-sync.ts` (which also runs the Google Group and GitHub Team syncs). For each linked Slack channel:
@@ -30,7 +35,7 @@ Admins manage links directly in the team edit form — no separate sync page. Ad
 
 - **Add-only**: invites never remove anyone. Unlinking a channel from a team does not kick existing members.
 - **Best-effort**: a Slack API failure is logged and never blocks the membership change in the hub.
-- **No backfill**: linking a channel to a team with existing members does not retroactively invite them; only new membership changes trigger invites going forward.
+- **No backfill**: linking a channel to a team with existing members does not retroactively invite them; only new membership changes trigger invites going forward. This also applies to umbrella channels — linking a new channel to a parent team, or re-parenting a team under it, does not retroactively invite existing sub-team members. A one-shot "Invite all effective members" follow-up that would cover both cases is tracked in issue #264, not yet built.
 - **No workspace auto-add**: the feature assumes people have already linked their Slack account to the hub. If a person has no `slack_user_id`, no invite happens; they must link their Slack account first via the Slack link sync.
 - **Idempotent**: calling `conversations.invite` with a user already in the channel succeeds; a second membership change to the same person does not error.
 

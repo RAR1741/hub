@@ -123,6 +123,8 @@ scannable catalog of what's built, grouped by area, with a route per entry. The
   [setup/github-app.md](setup/github-app.md)
 - **Team external accounts** — role-owned service accounts linked to a team's Google Group or GitHub Team.
   `/admin/teams/[id]` — see [features/team-external-accounts.md](features/team-external-accounts.md)
+- **Umbrella team resource inheritance** — being a member of a team also counts as membership in
+  its ancestor teams' Slack channels, Google Group, and GitHub Team.
 - **Onshape** — see [features/parts-and-shop.md](features/parts-and-shop.md),
   [setup/onshape.md](setup/onshape.md)
 - **Google Calendar sync** — see [setup/google-calendar.md](setup/google-calendar.md)
