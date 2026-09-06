@@ -46,19 +46,34 @@ function isLocalHost(hostname: string): boolean {
 }
 
 /**
- * Returns the host to build the URL from:
- * - no allow-list configured → the candidate unchanged (preserves dev/preview behavior);
- * - candidate is allow-listed (or a local host) → the candidate;
- * - candidate is missing or not allow-listed → the canonical (first allow-listed) host.
+ * Normalize a raw `Host` / `x-forwarded-host` value to a bare `hostname[:port]`,
+ * or null if it isn't one. `x-forwarded-host` can be a comma-separated list
+ * (the client-facing host is the first entry). Crucially, we reject anything
+ * that isn't strictly `hostname[:port]` — userinfo (`@`), path, query, fragment,
+ * or whitespace — so an authority like `good.example:443@evil.example` (which
+ * `new URL()` would resolve to `evil.example`) can never pass the allow-list.
+ */
+function normalizeHost(candidate: string | null): string | null {
+  if (!candidate) return null;
+  const first = candidate.split(",")[0].trim().toLowerCase();
+  return /^[a-z0-9.-]+(:\d+)?$/.test(first) ? first : null;
+}
+
+/**
+ * Returns the host to build the URL from, after normalization:
+ * - candidate isn't a valid bare host → null (caller falls back to request.url);
+ * - no allow-list configured → the normalized candidate (preserves dev/preview behavior);
+ * - candidate is allow-listed (or a local host) → the normalized candidate;
+ * - candidate is a valid host but not allow-listed → the canonical (first allow-listed) host.
  */
 function safeHost(candidate: string | null): string | null {
+  const host = normalizeHost(candidate);
   const allow = allowedHosts();
-  if (allow.length === 0) return candidate;
-  if (candidate) {
-    const h = candidate.toLowerCase();
-    const hostname = h.split(":")[0];
-    if (isLocalHost(hostname) || allow.includes(h) || allow.includes(hostname)) {
-      return candidate;
+  if (allow.length === 0) return host;
+  if (host) {
+    const hostname = host.split(":")[0];
+    if (isLocalHost(hostname) || allow.includes(host) || allow.includes(hostname)) {
+      return host;
     }
   }
   return allow[0];
