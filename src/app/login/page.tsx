@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
-// import { StudentLoginForm } from "@/components/StudentLoginForm"; // Student ID login hidden during internal-tool rollout
+import { StudentLoginForm } from "@/components/StudentLoginForm";
 import { AccountRequestForm } from "@/components/AccountRequestForm";
 import { EmailOtpForm } from "@/components/EmailOtpForm";
 
@@ -21,7 +21,9 @@ export default function LoginPage() {
         <hr style={{ border: 0, borderTop: "1px solid var(--hair)" }} />
         <section className="flex flex-col gap-3">
           <h2 className="eyebrow">Students</h2>
-          {/* <StudentLoginForm /> Student ID login hidden during internal-tool rollout */}
+          {/* Student-ID login is dev-only for now; the API returns 404 in
+              production. Email OTP above is the production path for students. */}
+          {process.env.NODE_ENV !== "production" && <StudentLoginForm />}
           <details className="text-sm">
             <summary className="cursor-pointer font-medium" style={{ color: "var(--red)" }}>
               New student? Request an account
