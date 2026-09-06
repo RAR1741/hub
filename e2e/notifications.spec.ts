@@ -1,14 +1,15 @@
 import { test, expect } from "@playwright/test";
+import { studentSessionCookie } from "./helpers/session";
 
 test("guest is redirected from /me/notifications", async ({ page }) => {
   await page.goto("/me/notifications");
   await expect(page).toHaveURL(/\/login/);
 });
 
-test("a signed-in student sees meeting toggles and one persists", async ({ page }) => {
-  // Non-prod dev-login: one-click "Log in as Student" form on /login.
-  await page.goto("/login");
-  await page.getByRole("button", { name: /log in as student/i }).click();
+test("a signed-in student sees meeting toggles and one persists", async ({ browser }) => {
+  const context = await browser.newContext();
+  await context.addCookies([await studentSessionCookie()]);
+  const page = await context.newPage();
   await page.goto("/me/notifications");
 
   const toggle = page.getByTestId("toggle-meeting_reminder");
