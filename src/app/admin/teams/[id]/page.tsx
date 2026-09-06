@@ -47,7 +47,7 @@ export default async function AdminTeamPage({
       <section className="card flex flex-col gap-4">
         <TeamForm
           teamId={team.id}
-          teams={teams.map((t) => ({ id: t.id, name: t.name }))}
+          teams={teams.map((t) => ({ id: t.id, name: t.name, parentTeamId: t.parentTeamId }))}
           initial={{
             name: team.name,
             parentTeamId: team.parentTeamId ?? "",

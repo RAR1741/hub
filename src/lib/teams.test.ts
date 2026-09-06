@@ -16,6 +16,8 @@ function fakeDb(opts: {
   channelUpsertError?: unknown;
   prunes: unknown[];
   upserts: unknown[];
+  teamTree?: { id: string; parent_team_id: string | null }[];
+  teamTreeError?: unknown;
 }) {
   return {
     from(table: string) {
@@ -52,6 +54,15 @@ function fakeDb(opts: {
       };
       chain.insert = () => chain;
       chain.update = () => chain;
+      // Direct-await path for `.from("team").select("id, parent_team_id")` — no
+      // further chaining, so `select` above just returns `chain` and this
+      // resolves it when it's awaited on its own.
+      chain.then = (resolve: (r: unknown) => unknown) => {
+        if (table === "team") {
+          return resolve({ data: opts.teamTree ?? [], error: opts.teamTreeError ?? null });
+        }
+        return resolve({ data: null, error: null });
+      };
       return chain;
     },
   } as never;
@@ -317,6 +328,64 @@ describe("createTeam / updateTeam — slack channel sync", () => {
     const result = await updateTeam("t1", input, db);
 
     expect(result).toEqual({ ok: false, status: 500 });
+  });
+});
+
+describe("updateTeam — cycle guard", () => {
+  const baseInput = {
+    name: "X", description: null, joinMode: "admin_only" as const,
+    googleGroupEmail: null, githubTeamSlug: null, githubSyncAllowInactive: false,
+    slackChannels: [],
+  };
+
+  test("rejects re-parenting a team under itself", async () => {
+    const prunes: unknown[] = [];
+    const upserts: unknown[] = [];
+    const db = fakeDb({
+      teamTree: [{ id: "t1", parent_team_id: null }],
+      prunes,
+      upserts,
+    });
+
+    const result = await updateTeam("t1", { ...baseInput, parentTeamId: "t1" }, db);
+
+    expect(result).toEqual({ ok: false, status: 400 });
+  });
+
+  test("rejects re-parenting a team under its own descendant", async () => {
+    const prunes: unknown[] = [];
+    const upserts: unknown[] = [];
+    const db = fakeDb({
+      teamTree: [
+        { id: "t1", parent_team_id: null },
+        { id: "t2", parent_team_id: "t1" }, // t2 is a child of t1
+      ],
+      prunes,
+      upserts,
+    });
+
+    const result = await updateTeam("t1", { ...baseInput, parentTeamId: "t2" }, db);
+
+    expect(result).toEqual({ ok: false, status: 400 });
+  });
+
+  test("accepts a valid non-descendant parent", async () => {
+    const prunes: unknown[] = [];
+    const upserts: unknown[] = [];
+    const db = fakeDb({
+      teamTree: [
+        { id: "root", parent_team_id: null },
+        { id: "t1", parent_team_id: "root" },
+        { id: "sibling", parent_team_id: "root" },
+      ],
+      updateResult: { data: { id: "t1" }, error: null },
+      prunes,
+      upserts,
+    });
+
+    const result = await updateTeam("t1", { ...baseInput, parentTeamId: "sibling" }, db);
+
+    expect(result).toEqual({ ok: true, status: 200 });
   });
 });
 

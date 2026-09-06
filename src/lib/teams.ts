@@ -4,6 +4,7 @@ import { teamFromRow } from "./types";
 import { displayName } from "./people";
 import { optString, reqString } from "./validate";
 import { syncMembershipChange } from "./membership-sync";
+import { subtreeIds, type TeamLink } from "./team-tree";
 
 export type TeamNode = Team & { children: TeamNode[] };
 
@@ -181,8 +182,19 @@ export async function updateTeam(
   input: TeamInput,
   db?: SupabaseClient,
 ): Promise<{ ok: boolean; status: number }> {
-  if (input.parentTeamId === id) return { ok: false, status: 400 }; // no self-parenting
   const client = db ?? (await import("./db")).getDb();
+  if (input.parentTeamId !== null) {
+    // Reject re-parenting under self or a descendant — that would create a cycle.
+    const { data: treeRows, error: treeError } = await client
+      .from("team")
+      .select("id, parent_team_id");
+    if (treeError) return { ok: false, status: 500 };
+    const tree: TeamLink[] = (treeRows ?? []).map((r) => ({
+      id: r.id as string,
+      parentTeamId: r.parent_team_id as string | null,
+    }));
+    if (subtreeIds(tree, id).includes(input.parentTeamId)) return { ok: false, status: 400 };
+  }
   const { data, error } = await client
     .from("team")
     .update({
