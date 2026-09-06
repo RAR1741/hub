@@ -99,6 +99,8 @@ scannable catalog of what's built, grouped by area, with a route per entry. The
   [features/parts-and-shop.md](features/parts-and-shop.md), [setup/onshape.md](setup/onshape.md)
 - **Battery tracking** — inventory and per-match usage log replacing paper log sheets. `/batteries`,
   `/batteries/[id]` — see [features/battery-tracking.md](features/battery-tracking.md)
+- **Tool maintenance** — tool inventory and check-log with student deletion requests. `/tools`,
+  `/tools/[id]` — see [features/tool-maintenance.md](features/tool-maintenance.md)
 
 ## Admin review & settings
 

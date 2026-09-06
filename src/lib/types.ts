@@ -525,6 +525,41 @@ export function excusalRequestFromRow(row: ExcusalRequestRow): ExcusalRequest {
   };
 }
 
+export type ToolDeleteRequestRow = {
+  id: string;
+  tool_id: string;
+  requested_by: string;
+  reason: string;
+  status: ExcusalRequestStatus;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+};
+
+export type ToolDeleteRequest = {
+  id: string;
+  toolId: string;
+  requestedBy: string;
+  reason: string;
+  status: ExcusalRequestStatus;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+};
+
+export function toolDeleteRequestFromRow(row: ToolDeleteRequestRow): ToolDeleteRequest {
+  return {
+    id: row.id,
+    toolId: row.tool_id,
+    requestedBy: row.requested_by,
+    reason: row.reason,
+    status: row.status,
+    reviewedBy: row.reviewed_by,
+    reviewedAt: row.reviewed_at,
+    createdAt: row.created_at,
+  };
+}
+
 export type GuardianRow = {
   id: string;
   first_name: string;
@@ -894,6 +929,95 @@ export function batteryUsageFromRow(row: BatteryUsageRow): BatteryUsage {
     notes: row.notes,
     createdAt: row.created_at,
     tech: {
+      firstName: row.person.first_name,
+      lastName: row.person.last_name,
+      displayName: row.person.display_name,
+    },
+  };
+}
+
+export type ToolStatus = "in_service" | "needs_attention" | "out_of_service" | "retired";
+export type ToolStatusAfter = Exclude<ToolStatus, "retired">;
+export type ToolCheckKind = "inspection" | "maintenance" | "repair";
+export type ToolCondition = "good" | "fair" | "poor";
+
+export type ToolRow = {
+  id: string;
+  name: string;
+  category: string | null;
+  location: string | null;
+  asset_tag: string | null;
+  status: ToolStatus;
+  maintenance_interval_days: number | null;
+  notes: string | null;
+  created_at: string;
+};
+
+export type Tool = {
+  id: string;
+  name: string;
+  category: string | null;
+  location: string | null;
+  assetTag: string | null;
+  status: ToolStatus;
+  maintenanceIntervalDays: number | null;
+  notes: string | null;
+  createdAt: string;
+};
+
+export function toolFromRow(row: ToolRow): Tool {
+  return {
+    id: row.id,
+    name: row.name,
+    category: row.category,
+    location: row.location,
+    assetTag: row.asset_tag,
+    status: row.status,
+    maintenanceIntervalDays: row.maintenance_interval_days,
+    notes: row.notes,
+    createdAt: row.created_at,
+  };
+}
+
+export type ToolCheckRow = {
+  id: string;
+  tool_id: string;
+  checked_by: string;
+  checked_at: string;
+  kind: ToolCheckKind;
+  condition: ToolCondition;
+  status_after: ToolStatusAfter | null;
+  notes: string | null;
+  created_at: string;
+  // Embedded via `person (first_name, last_name, display_name)` — one FK, no hint needed.
+  person: { first_name: string; last_name: string; display_name: string | null };
+};
+
+export type ToolCheck = {
+  id: string;
+  toolId: string;
+  checkedById: string;
+  checkedAt: string;
+  kind: ToolCheckKind;
+  condition: ToolCondition;
+  statusAfter: ToolStatusAfter | null;
+  notes: string | null;
+  createdAt: string;
+  checkedBy: { firstName: string; lastName: string; displayName: string | null };
+};
+
+export function toolCheckFromRow(row: ToolCheckRow): ToolCheck {
+  return {
+    id: row.id,
+    toolId: row.tool_id,
+    checkedById: row.checked_by,
+    checkedAt: row.checked_at,
+    kind: row.kind,
+    condition: row.condition,
+    statusAfter: row.status_after,
+    notes: row.notes,
+    createdAt: row.created_at,
+    checkedBy: {
       firstName: row.person.first_name,
       lastName: row.person.last_name,
       displayName: row.person.display_name,
