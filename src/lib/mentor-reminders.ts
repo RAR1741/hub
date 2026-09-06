@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { notifyAdmins } from "./admin-notify";
+import { pushDepsFromEnv, sendPushToOptedIn } from "./push-dispatch";
 import { sendDM, type SlackDeps } from "./slack";
 
 export type MentorReq = {
@@ -72,6 +73,16 @@ export async function sendMentorReminders(deps: {
     const ok = await sendDM(deps.slack, m.slackUserId, buildReminderText(m.name, items));
     if (ok) reminded++;
     else failed.push(m.name);
+    await sendPushToOptedIn(
+      [m.personId],
+      "consent_missing",
+      {
+        title: "Outstanding FIRST requirements",
+        body: "You still have unfinished consent/YPP items.",
+        url: "/admin/first-status",
+      },
+      { db: deps.db, push: pushDepsFromEnv() },
+    );
     await sleep(1100); // ~1 msg/sec
   }
 
