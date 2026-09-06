@@ -134,9 +134,12 @@ enough *only because every state change is a non-simple method* — `POST` / `PA
 - If you ever need a mutation that a browser can issue cross-site as a "simple" request, or a
   deliberate state-changing GET, add an explicit CSRF token (double-submit cookie or an
   origin/referer check) — do not rely on `sameSite` alone for it.
-- OAuth callbacks are the one place a `GET` has side effects; each guards itself with a
-  single-use `state` cookie (CSRF) plus the provider's PKCE/code exchange — see
-  `src/app/api/{github,onshape}/oauth/callback/route.ts` and `src/app/auth/callback/route.ts`.
+- The OAuth flow is the intended exception where a `GET` has side effects, on both ends:
+  the **start** routes set a single-use `*_oauth_state` cookie, and the **callback** routes
+  verify that `state` (CSRF) before the provider's PKCE/code exchange. See
+  `src/app/api/{github,onshape}/oauth/{start,callback}/route.ts` and
+  `src/app/auth/callback/route.ts`. This is deliberate and self-guarded — not licence to add
+  other state-changing GETs.
 
 Reviewed as part of the security audit (issue #251); revisit this note if the cookie/CSRF
 posture changes.
