@@ -29,9 +29,12 @@ const nextConfig: NextConfig = {
       { key: "X-Content-Type-Options", value: "nosniff" },
       // Don't leak full URLs (which can carry ids) to third parties.
       { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-      // Anti-clickjacking for every non-onshape page. The /onshape routes send
-      // their own frame-ancestors CSP, which takes precedence in modern browsers
-      // so they remain embeddable by cad.onshape.com.
+      // Anti-clickjacking. Applied to EVERY path, /onshape included (the global
+      // rule below matches it too). /onshape stays embeddable by cad.onshape.com
+      // because it also sends a frame-ancestors CSP, and per the CSP spec a
+      // present frame-ancestors directive supersedes X-Frame-Options — honored by
+      // all current browsers (a legacy UA that ignores frame-ancestors would fall
+      // back to SAMEORIGIN and simply not embed the panel, which fails safe).
       { key: "X-Frame-Options", value: "SAMEORIGIN" },
     ];
 

@@ -13,7 +13,7 @@ describe("next.config security headers", () => {
     expect(byKey["X-Content-Type-Options"]).toBe("nosniff");
     expect(byKey["Referrer-Policy"]).toBe("strict-origin-when-cross-origin");
     expect(byKey["X-Frame-Options"]).toBe("SAMEORIGIN");
-    expect(byKey["Strict-Transport-Security"]).toMatch(/^max-age=\d+/);
+    expect(byKey["Strict-Transport-Security"]).toBe("max-age=63072000; includeSubDomains");
   });
 
   test("the /onshape frame-ancestors exception is preserved", async () => {
