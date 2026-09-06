@@ -23,6 +23,7 @@ describe("withRole", () => {
         interests: null, lastApplicationAt: null,
         firstPeopleId: null, firstConsentRelease: null, firstScreeningStatus: null,
         firstScreeningText: null, firstTrainingStatus: null, firstSyncedAt: null,
+        notification_types: [],
       },
       role: "admin",
     })(new Request("http://test/api/admin/ping"));
@@ -54,6 +55,7 @@ describe("withRole", () => {
           interests: null, lastApplicationAt: null,
           firstPeopleId: null, firstConsentRelease: null, firstScreeningStatus: null,
           firstScreeningText: null, firstTrainingStatus: null, firstSyncedAt: null,
+          notification_types: [],
         },
         role: "admin",
       }),
@@ -76,6 +78,7 @@ describe("withRole", () => {
         interests: null, lastApplicationAt: null,
         firstPeopleId: null, firstConsentRelease: null, firstScreeningStatus: null,
         firstScreeningText: null, firstTrainingStatus: null, firstSyncedAt: null,
+        notification_types: [] as string[],
       },
       role: "student",
       masquerade: {

@@ -34,6 +34,7 @@ export type PersonRow = {
   slack_user_id?: string | null;
   github_login?: string | null;
   github_user_id?: number | null;
+  notification_types?: string[] | null;
 };
 
 export type Person = {
@@ -69,6 +70,7 @@ export type Person = {
   slackUserId?: string | null;
   githubLogin?: string | null;
   githubUserId?: number | null;
+  notification_types: string[];
 };
 
 export function personFromRow(row: PersonRow): Person {
@@ -105,6 +107,7 @@ export function personFromRow(row: PersonRow): Person {
     slackUserId: row.slack_user_id ?? null,
     githubLogin: row.github_login ?? null,
     githubUserId: row.github_user_id ?? null,
+    notification_types: row.notification_types ?? [],
   };
 }
 
