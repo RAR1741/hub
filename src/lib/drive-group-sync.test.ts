@@ -23,16 +23,26 @@ function fakeDb(tables: Record<string, { data: unknown; error: unknown }>, upser
   return {
     from(table: string) {
       const result = tables[table] ?? { data: null, error: null };
+      // `current` starts as the canned result; `.in()` narrows `current.data` when the rows
+      // carry the filtered column, so later `.then`/`.maybeSingle` see the filtered rows.
+      let current = result;
       const chain: Record<string, unknown> = {};
       for (const m of ["select", "eq", "not"]) {
         chain[m] = () => chain;
       }
-      chain.maybeSingle = async () => result;
+      chain.in = (column: string, ids: readonly unknown[]) => {
+        const rows = current.data;
+        if (Array.isArray(rows) && rows.length > 0 && Object.prototype.hasOwnProperty.call(rows[0], column)) {
+          current = { ...current, data: rows.filter((row) => ids.includes((row as Record<string, unknown>)[column])) };
+        }
+        return chain;
+      };
+      chain.maybeSingle = async () => current;
       chain.upsert = async (payload: unknown) => {
         upserts.push({ table, payload });
         return { data: null, error: null };
       };
-      chain.then = (onF: (v: unknown) => unknown) => onF(result);
+      chain.then = (onF: (v: unknown) => unknown) => onF(current);
       return chain;
     },
   } as never;
