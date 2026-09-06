@@ -10,14 +10,40 @@ const nextConfig: NextConfig = {
   watchOptions: {
     pollIntervalMs: 500,
   },
-  // The /onshape panel routes are meant to be iframed by cad.onshape.com, but
-  // a previously-connected user's 90-day panel bearer token lives in
-  // localStorage regardless of who's embedding the page — so without this,
-  // any site could iframe the panel and clickjack that user into parts CRUD.
-  // Scoped to /onshape and /onshape/* only; there's no site-wide frame policy
-  // to conflict with.
   async headers() {
+    // Baseline security headers applied site-wide. Different header KEYS from the
+    // /onshape blocks below, so both sets emit cleanly where they overlap.
+    //
+    // Deliberately NOT set here: a global Content-Security-Policy. A real CSP for
+    // this app needs per-request script nonces and allow-lists for the inline
+    // theme script (layout.tsx), the Vercel preview toolbar, Supabase realtime
+    // websockets, and Google fonts/OAuth — shipping a blanket policy would break
+    // the app. That belongs in its own tested change. Frame protection is covered
+    // by X-Frame-Options below (and, for /onshape, the frame-ancestors CSP, which
+    // browsers honor over X-Frame-Options).
+    const securityHeaders = [
+      // Force HTTPS for two years. Ignored by browsers over http (dev/localhost),
+      // enforced on Vercel's https deployments.
+      { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
+      // Stop MIME sniffing (e.g. a text response executed as script).
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      // Don't leak full URLs (which can carry ids) to third parties.
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+      // Anti-clickjacking for every non-onshape page. The /onshape routes send
+      // their own frame-ancestors CSP, which takes precedence in modern browsers
+      // so they remain embeddable by cad.onshape.com.
+      { key: "X-Frame-Options", value: "SAMEORIGIN" },
+    ];
+
     return [
+      {
+        source: "/:path*",
+        headers: securityHeaders,
+      },
+      // The /onshape panel routes are meant to be iframed by cad.onshape.com, but
+      // a previously-connected user's 90-day panel bearer token lives in
+      // localStorage regardless of who's embedding the page — so without this,
+      // any site could iframe the panel and clickjack that user into parts CRUD.
       {
         source: "/onshape",
         headers: [
