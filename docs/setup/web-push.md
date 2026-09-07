@@ -4,7 +4,8 @@ The hub can push five notification types straight to a member's browser/device:
 `admin_alerts`, `clocked_in_late`, `meeting_reminder`, `consent_missing`, and `meeting_changed`.
 Everything is off by default and shares one VAPID key pair and one dispatch pipeline
 (`sendPushToOptedIn()`). See [features/push-notifications.md](../features/push-notifications.md)
-for the member-facing behavior; this doc is config only.
+for the member-facing behavior; this doc is config only. To test, verify, or troubleshoot it
+(local or prod), see the [notifications runbook](notifications-runbook.md).
 
 ## 1. Generate the VAPID key pair
 

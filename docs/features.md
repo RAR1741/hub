@@ -74,7 +74,7 @@ scannable catalog of what's built, grouped by area, with a route per entry. The
 - **Push notifications** — opt-in Web Push for admin alerts, late clock-outs, meeting reminders,
   outstanding FIRST items, and moved meetings; off by default. `/me/notifications` — see
   [features/push-notifications.md](features/push-notifications.md),
-  [setup/web-push.md](setup/web-push.md)
+  [setup/web-push.md](setup/web-push.md), [runbook](setup/notifications-runbook.md)
 
 ## Calendar & meetings
 

@@ -1,7 +1,8 @@
 # Push notifications
 
 Web Push notifications to a member's browser/device, on one shared VAPID pipeline
-(`sendPushToOptedIn()`). Setup/config: [Web Push setup](../setup/web-push.md).
+(`sendPushToOptedIn()`). Setup/config: [Web Push setup](../setup/web-push.md). Testing, verifying,
+and troubleshooting (local + prod): [notifications runbook](../setup/notifications-runbook.md).
 
 ## Off by default, two-step opt-in
 
