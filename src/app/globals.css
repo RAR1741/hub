@@ -709,6 +709,53 @@
     outline-offset: 2px;
   }
 
+  /* Segmented control — native radios in a fieldset (arrow-key nav + one tab
+     stop come free from the browser). Used for the People role/active filters. */
+  .seg {
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    margin: 0;
+    min-width: 0;
+    border: 1px solid var(--hair);
+    border-radius: 9px;
+    background: var(--surface-2);
+  }
+  .seg label {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 11px;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 650;
+    color: var(--muted);
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+  .seg label:hover { color: var(--ink); }
+  /* Keep the radio inside the box (not visually-hidden off-screen) so a click
+     on the label lands on it; opacity:0 removes the UA ring — restored below. */
+  .seg input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    margin: 0;
+    cursor: pointer;
+  }
+  .seg label:has(input:checked) {
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: var(--shadow);
+  }
+  /* Visible focus depends on THIS rule since the input is opacity:0. Required. */
+  .seg label:has(input:focus-visible) {
+    outline: 2px solid var(--red);
+    outline-offset: 2px;
+  }
+
   .table {
     width: 100%;
     border-collapse: collapse;

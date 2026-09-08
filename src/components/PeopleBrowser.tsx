@@ -3,8 +3,9 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
+import { Avatar } from "@/components/ui/Avatar";
 import { sortByName } from "@/lib/name-sort";
-import { filterPeople, type PeopleRow } from "@/lib/people-filter";
+import { filterPeople, ROLE_OPTIONS, type PeopleRow, type RoleFilter } from "@/lib/people-filter";
 
 export type { PeopleRow } from "@/lib/people-filter";
 
@@ -19,83 +20,6 @@ function initials(name: string): string {
     .toUpperCase();
 }
 
-function PeopleColumn({
-  title,
-  rows,
-  canEdit,
-  emptyHint,
-}: {
-  title: string;
-  rows: PeopleRow[];
-  canEdit: boolean;
-  emptyHint: string;
-}) {
-  return (
-    <section className="card flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
-          {title}
-        </h2>
-        <span className="count">{rows.length}</span>
-      </div>
-      {rows.length === 0 ? (
-        <p className="py-6 text-center text-sm text-[var(--muted)]">{emptyHint}</p>
-      ) : (
-        <div className="tablewrap">
-          <div style={{ overflowX: "auto" }}>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Member</th>
-                  <th>Status</th>
-                  {canEdit && <th aria-label="Edit" />}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((p) => {
-                  const name = `${p.firstName} ${p.lastName}`;
-                  return (
-                    <tr key={p.id}>
-                      <td>
-                        <Link href={`/people/${p.id}`} className="name-cell hover:no-underline">
-                          <span className="avatar" aria-hidden="true">
-                            {initials(name)}
-                          </span>
-                          <span>
-                            <div className="nm" style={{ color: "var(--ink)" }}>
-                              {name}
-                            </div>
-                          </span>
-                        </Link>
-                      </td>
-                      <td>
-                        <span className={`pill ${p.isActive ? "on" : "off"}`}>
-                          {p.isActive ? "Active" : "Inactive"}
-                        </span>
-                      </td>
-                      {canEdit && (
-                        <td>
-                          <Link
-                            href={`/admin/people/${p.id}`}
-                            className="btn icon"
-                            aria-label={`Edit ${name}`}
-                          >
-                            <Icon name="edit" />
-                          </Link>
-                        </td>
-                      )}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-    </section>
-  );
-}
-
 export function PeopleBrowser({
   people,
   canEdit,
@@ -104,21 +28,24 @@ export function PeopleBrowser({
   canEdit: boolean;
 }) {
   const [search, setSearch] = useState("");
-  const [includeInactive, setIncludeInactive] = useState(false);
+  const [role, setRole] = useState<RoleFilter>("all");
+  const [includeInactive, setIncludeInactive] = useState(false); // default: Active only
 
-  const { students, mentors } = useMemo(() => {
-    const students = filterPeople(people, { search, role: "student", includeInactive });
-    // Mentors column holds mentors and admins, mirroring the leaderboard split.
-    const mentors = filterPeople(people, { search, role: "mentor", includeInactive });
-    return { students: sortByName(students), mentors: sortByName(mentors) };
-  }, [people, search, includeInactive]);
+  const visible = useMemo(
+    () => sortByName(filterPeople(people, { search, role, includeInactive })),
+    [people, search, role, includeInactive],
+  );
 
   const searching = search.trim() !== "";
+  const noun = { all: "members", student: "students", mentor: "mentors", admin: "admins" }[role];
+  const emptyMessage = searching
+    ? `No ${noun} match your search.`
+    : `No ${includeInactive ? "" : "active "}${noun}.`;
 
   return (
     <div className="flex flex-col gap-6">
       <div className="card flex flex-wrap items-center gap-x-5 gap-y-3">
-        <label className="search" style={{ maxWidth: "24rem" }}>
+        <label className="search basis-full">
           <Icon name="search" />
           <input
             aria-label="Search people"
@@ -127,29 +54,109 @@ export function PeopleBrowser({
             placeholder="Search name, email, or ID…"
           />
         </label>
-        <label className="flex cursor-pointer select-none items-center gap-2 text-sm font-medium text-[var(--muted)]">
-          <input
-            type="checkbox"
-            checked={includeInactive}
-            onChange={(e) => setIncludeInactive(e.target.checked)}
-          />
-          Include inactive
-        </label>
+        <fieldset className="seg">
+          <legend className="sr-only">Role</legend>
+          {ROLE_OPTIONS.map(([value, label]) => (
+            <label key={value}>
+              <input
+                type="radio"
+                name="people-role"
+                value={value}
+                checked={role === value}
+                onChange={() => setRole(value)}
+              />
+              <span>{label}</span>
+            </label>
+          ))}
+        </fieldset>
+        <fieldset className="seg ml-auto">
+          <legend className="sr-only">Status</legend>
+          <label>
+            <input
+              type="radio"
+              name="people-status"
+              checked={!includeInactive}
+              onChange={() => setIncludeInactive(false)}
+            />
+            <span>Active only</span>
+          </label>
+          <label>
+            <input
+              type="radio"
+              name="people-status"
+              checked={includeInactive}
+              onChange={() => setIncludeInactive(true)}
+            />
+            <span>Include inactive</span>
+          </label>
+        </fieldset>
       </div>
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <PeopleColumn
-          title="Students"
-          rows={students}
-          canEdit={canEdit}
-          emptyHint={searching ? "No students match your search." : "No active students."}
-        />
-        <PeopleColumn
-          title="Mentors"
-          rows={mentors}
-          canEdit={canEdit}
-          emptyHint={searching ? "No mentors match your search." : "No active mentors."}
-        />
-      </div>
+      <section className="card flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
+            Roster
+          </h2>
+          <span className="count">{visible.length}</span>
+        </div>
+        {visible.length === 0 ? (
+          <p className="py-6 text-center text-sm text-[var(--muted)]">{emptyMessage}</p>
+        ) : (
+          <div className="tablewrap">
+            <div style={{ overflowX: "auto" }}>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Member</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    {canEdit && <th aria-label="Edit" />}
+                  </tr>
+                </thead>
+                <tbody>
+                  {visible.map((p) => {
+                    const name = `${p.firstName} ${p.lastName}`;
+                    return (
+                      <tr key={p.id}>
+                        <td>
+                          <Link href={`/people/${p.id}`} className="name-cell hover:no-underline">
+                            <Avatar initials={initials(name)} role={p.role} />
+                            <span>
+                              <div className="nm" style={{ color: "var(--ink)" }}>
+                                {name}
+                              </div>
+                            </span>
+                          </Link>
+                        </td>
+                        <td>
+                          <span className={`pill ${p.role === "admin" ? "admin" : "role"}`}>
+                            {p.role}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`pill ${p.isActive ? "on" : "off"}`}>
+                            {p.isActive ? "Active" : "Inactive"}
+                          </span>
+                        </td>
+                        {canEdit && (
+                          <td>
+                            <Link
+                              href={`/admin/people/${p.id}`}
+                              className="btn icon"
+                              aria-label={`Edit ${name}`}
+                            >
+                              <Icon name="edit" />
+                            </Link>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </section>
     </div>
   );
 }
