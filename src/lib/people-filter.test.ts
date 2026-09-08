@@ -63,6 +63,10 @@ describe("matchesRole", () => {
     expect(matchesRole("admin", "admin")).toBe(true);
     expect(matchesRole("mentor", "admin")).toBe(false);
   });
+
+  test("student does not match admin filter", () => {
+    expect(matchesRole("student", "admin")).toBe(false);
+  });
 });
 
 describe("filterPeople", () => {
@@ -90,5 +94,25 @@ describe("filterPeople", () => {
     });
     // "Turing" matches p3 (admin, included in mentor filter), but not p2 (Hopper).
     expect(result.map((p) => p.id)).toEqual(["p3"]);
+  });
+
+  test("role student filter returns only student rows", () => {
+    const result = filterPeople(people, {
+      search: "",
+      role: "student",
+      includeInactive: true,
+    });
+    expect(result.map((p) => p.id)).toEqual(["p1"]);
+    expect(result.every((p) => p.role === "student")).toBe(true);
+  });
+
+  test("role admin filter returns only admin rows", () => {
+    const result = filterPeople(people, {
+      search: "",
+      role: "admin",
+      includeInactive: true,
+    });
+    expect(result.map((p) => p.id)).toEqual(["p3"]);
+    expect(result.every((p) => p.role === "admin")).toBe(true);
   });
 });
