@@ -2,46 +2,13 @@ import Link from "next/link";
 import Image from "next/image";
 import { cookies } from "next/headers";
 import { getViewer } from "@/lib/viewer";
-import { hasRole } from "@/lib/authz";
-import type { Role } from "@/lib/types";
 import { KIOSK_COOKIE, verifyKioskToken } from "@/lib/kiosk";
+import { navDestinations } from "@/lib/nav-destinations";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { NavLink } from "@/components/NavLink";
 import { SidebarToggle } from "@/components/SidebarToggle";
 import { Icon } from "@/components/ui/Icon";
 import { MoreSheet } from "@/components/ui/MoreSheet";
-
-// Admin subpages surfaced in the Admin flyout. Each row is gated to the same
-// role its card requires on /admin (src/app/admin/page.tsx); a mentor must not
-// even see a link to an admin-only page (authz e2e asserts count 0 page-wide).
-const ADMIN_ITEMS: { label: string; href: string; role: Role }[] = [
-  // Review — mentor+
-  { label: "Requests", href: "/admin/requests", role: "mentor" },
-  { label: "Flagged sessions", href: "/admin/sessions/flagged", role: "mentor" },
-  { label: "Reports", href: "/admin/reports", role: "mentor" },
-  // Roster — admin
-  { label: "People", href: "/admin/people", role: "admin" },
-  { label: "Teams", href: "/admin/teams", role: "admin" },
-  { label: "Badges", href: "/admin/badges", role: "admin" },
-  { label: "Time import", href: "/admin/time-import", role: "admin" },
-  { label: "Application import", href: "/admin/application-import", role: "admin" },
-  // Time — mentor+ except where noted
-  { label: "Meetings", href: "/admin/meetings", role: "admin" },
-  { label: "Build days", href: "/admin/build-days", role: "mentor" },
-  { label: "Sessions", href: "/admin/sessions", role: "mentor" },
-  { label: "Events", href: "/admin/events", role: "mentor" },
-  { label: "Forms", href: "/admin/forms", role: "mentor" },
-  { label: "Parts", href: "/admin/projects", role: "mentor" },
-  { label: "Periods", href: "/admin/periods", role: "admin" },
-  // Config — admin
-  { label: "Kiosk devices", href: "/admin/kiosk-devices", role: "admin" },
-  { label: "Drive group sync", href: "/admin/drive-sync", role: "admin" },
-  { label: "GitHub team sync", href: "/admin/github-sync", role: "admin" },
-  { label: "FIRST roster status", href: "/admin/first-status", role: "admin" },
-  { label: "Slack", href: "/admin/slack", role: "admin" },
-  { label: "Settings", href: "/admin/settings", role: "admin" },
-  { label: "Cron jobs", href: "/admin/cron", role: "admin" },
-];
 
 // Per-group signature hue (Task 1 tokens). Typed loosely so the CSS var passes.
 const grp = (hue: string) => ({ ["--grp" as string]: `var(${hue})` }) as React.CSSProperties;
@@ -147,40 +114,35 @@ export async function SiteNav() {
   // → verifyKioskToken short-circuits to false with no DB hit.
   const [viewer, kioskRegistered] = await Promise.all([getViewer(), verifyKioskToken(token)]);
   const role = viewer.role;
-  const isStudent = hasRole(role, "student");
-  const isMentor = hasRole(role, "mentor");
-  const isAdmin = hasRole(role, "admin");
 
-  const adminItems = ADMIN_ITEMS.filter((item) => hasRole(role, item.role));
+  const dest = navDestinations({ role, kioskRegistered });
+  const can = (href: string) => dest.some((d) => d.href === href);
+
+  const adminItems = dest.filter((d) => d.group === "Admin" && d.href !== "/admin");
 
   // Flyout sub-links, gated by role. NavItemWithFlyout drops the flyout when a
   // viewer is left with only the redundant same-as-parent link.
   const peopleItems = [
     { label: "All people", href: "/people" },
-    ...(isAdmin
-      ? [
-          { label: "Duplicates", href: "/admin/people/duplicates" },
-          { label: "Import CSV", href: "/admin/people/import" },
-        ]
-      : []),
+    ...dest.filter((d) => d.group === "Team" && d.href.startsWith("/admin/people/")),
   ];
   const eventsItems = [
     { label: "Upcoming", href: "/events" },
-    ...(isMentor ? [{ label: "Calendar", href: "/calendar" }] : []),
+    ...dest.filter((d) => d.href === "/calendar"),
   ];
-  const showShopFloor = isMentor || kioskRegistered || isStudent;
-  const showTeam = isMentor || isStudent;
+  const showShopFloor = can("/kiosk") || can("/shop");
+  const showTeam = can("/people") || can("/teams");
 
   // ---- mobile bottom tab bar: same role gates as the sidebar above, just
   // collapsed to one primary link per group (the rest live in the More sheet). ----
-  const shopPrimary = isMentor || kioskRegistered
+  const shopPrimary = can("/kiosk")
     ? { label: "Kiosk", href: "/kiosk", icon: "tablet" as const }
-    : isStudent
+    : can("/shop")
       ? { label: "Shop", href: "/shop", icon: "wrench" as const }
       : null;
-  const teamPrimary = isMentor
+  const teamPrimary = can("/people")
     ? { label: "People", href: "/people", icon: "users" as const }
-    : isStudent
+    : can("/teams")
       ? { label: "Teams", href: "/teams", icon: "layers" as const }
       : null;
   const primaryTabs: { label: string; href: string; icon: Parameters<typeof Icon>[0]["name"]; exact?: boolean }[] = [
@@ -192,9 +154,9 @@ export async function SiteNav() {
   const tabCount = primaryTabs.length + 1; // + the More tab
 
   // Whatever a primary slot didn't claim still needs a home in the sheet.
-  const showShopInSheet = isStudent && shopPrimary?.href !== "/shop";
-  const showTeamsInSheet = isStudent && teamPrimary?.href !== "/teams";
-  const showEventsInSheet = isStudent;
+  const showShopInSheet = can("/shop") && shopPrimary?.href !== "/shop";
+  const showTeamsInSheet = can("/teams") && teamPrimary?.href !== "/teams";
+  const showEventsInSheet = can("/events");
 
   return (
     <>
@@ -230,25 +192,25 @@ export async function SiteNav() {
         {showShopFloor && (
           <div className="sb-group" style={grp("--hue-shopfloor")}>
             <h5>Shop floor</h5>
-            {(isMentor || kioskRegistered) && (
+            {can("/kiosk") && (
               <NavLink href="/kiosk" className="sbi">
                 <Icon name="tablet" className="ic" />
                 Kiosk
               </NavLink>
             )}
-            {isStudent && (
+            {can("/shop") && (
               <NavLink href="/shop" className="sbi">
                 <Icon name="wrench" className="ic" />
                 Shop
               </NavLink>
             )}
-            {(isStudent || isMentor || isAdmin) && (
+            {can("/batteries") && (
               <NavLink href="/batteries" className="sbi">
                 <Icon name="battery" className="ic" />
                 Batteries
               </NavLink>
             )}
-            {(isStudent || isMentor || isAdmin) && (
+            {can("/tools") && (
               <NavLink href="/tools" className="sbi">
                 <Icon name="tools" className="ic" />
                 Tools
@@ -260,22 +222,22 @@ export async function SiteNav() {
         {showTeam && (
           <div className="sb-group" style={grp("--hue-team")}>
             <h5>Team</h5>
-            {isMentor && (
+            {can("/people") && (
               <NavItemWithFlyout href="/people" icon="users" label="People" items={peopleItems} />
             )}
-            {isStudent && (
+            {can("/teams") && (
               <NavLink href="/teams" className="sbi">
                 <Icon name="layers" className="ic" />
                 Teams
               </NavLink>
             )}
-            {isStudent && (
+            {can("/events") && (
               <NavItemWithFlyout href="/events" icon="calendar" label="Events" items={eventsItems} />
             )}
           </div>
         )}
 
-        {isMentor && (
+        {can("/admin") && (
           <div className="sb-group" style={grp("--hue-admin")}>
             <h5>Admin</h5>
             <div className="sbi-wrap">
@@ -323,28 +285,28 @@ export async function SiteNav() {
         <RailItem href="/leaderboard" icon="chart" label="Leaderboard" hue="--hue-overview" />
 
         {showShopFloor && <div className="rail-sep" />}
-        {(isMentor || kioskRegistered) && (
+        {can("/kiosk") && (
           <RailItem href="/kiosk" icon="tablet" label="Kiosk" hue="--hue-shopfloor" />
         )}
-        {isStudent && <RailItem href="/shop" icon="wrench" label="Shop" hue="--hue-shopfloor" />}
-        {(isStudent || isMentor || isAdmin) && (
+        {can("/shop") && <RailItem href="/shop" icon="wrench" label="Shop" hue="--hue-shopfloor" />}
+        {can("/batteries") && (
           <RailItem href="/batteries" icon="battery" label="Batteries" hue="--hue-shopfloor" />
         )}
-        {(isStudent || isMentor || isAdmin) && (
+        {can("/tools") && (
           <RailItem href="/tools" icon="tools" label="Tools" hue="--hue-shopfloor" />
         )}
 
         {showTeam && <div className="rail-sep" />}
-        {isMentor && (
+        {can("/people") && (
           <RailItem href="/people" icon="users" label="People" hue="--hue-team" items={peopleItems} />
         )}
-        {isStudent && <RailItem href="/teams" icon="layers" label="Teams" hue="--hue-team" />}
-        {isStudent && (
+        {can("/teams") && <RailItem href="/teams" icon="layers" label="Teams" hue="--hue-team" />}
+        {can("/events") && (
           <RailItem href="/events" icon="calendar" label="Events" hue="--hue-team" items={eventsItems} />
         )}
 
-        {isMentor && <div className="rail-sep" />}
-        {isMentor && (
+        {can("/admin") && <div className="rail-sep" />}
+        {can("/admin") && (
           <RailItem
             href="/admin"
             icon="sliders"
@@ -395,7 +357,7 @@ export async function SiteNav() {
                 Events
               </Link>
             )}
-            {isMentor && (
+            {can("/calendar") && (
               // /calendar has no other entry point (desktop-only Events flyout sub-link) —
               // dropping it here would narrow a mentor's reachable surface vs. desktop.
               <Link href="/calendar" className="sheet-i">
@@ -409,19 +371,19 @@ export async function SiteNav() {
                 Shop
               </Link>
             )}
-            {(isStudent || isMentor || isAdmin) && (
+            {can("/batteries") && (
               <Link href="/batteries" className="sheet-i">
                 <Icon name="battery" className="ic" style={{ color: "var(--hue-shopfloor)" }} />
                 Batteries
               </Link>
             )}
-            {(isStudent || isMentor || isAdmin) && (
+            {can("/tools") && (
               <Link href="/tools" className="sheet-i">
                 <Icon name="tools" className="ic" style={{ color: "var(--hue-shopfloor)" }} />
                 Tools
               </Link>
             )}
-            {isMentor && (
+            {can("/admin") && (
               <Link href="/admin" className="sheet-i">
                 <Icon name="sliders" className="ic" style={{ color: "var(--hue-admin)" }} />
                 Admin
