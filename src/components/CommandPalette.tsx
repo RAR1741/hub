@@ -24,7 +24,7 @@ export function CommandPalette({
   const [query, setQuery] = useState("");
   const [people, setPeople] = useState<PersonHit[]>([]);
   const [searching, setSearching] = useState(false);
-  const [isMac, setIsMac] = useState(false);
+  const [isMac, setIsMac] = useState(true);
 
   useEffect(() => {
     // Server always renders "⌘K"; this corrects it post-mount from

@@ -138,6 +138,7 @@ scannable catalog of what's built, grouped by area, with a route per entry. The
 
 ## Cross-cutting
 
+- **Command palette** — ⌘K / Ctrl+K to jump to any accessible page; mentors and admins can search people by name.
 - **Global activity indicator** — a loading/saving/saved pill reflecting in-flight requests.
 - **Light/dark theme toggle**
 
