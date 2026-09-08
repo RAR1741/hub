@@ -4,13 +4,9 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
 import { sortByName } from "@/lib/name-sort";
-import type { Person } from "@/lib/types";
+import { filterPeople, type PeopleRow } from "@/lib/people-filter";
 
-/** Only the fields the roster renders — keeps the server→client payload small. */
-export type PeopleRow = Pick<
-  Person,
-  "id" | "firstName" | "lastName" | "email" | "role" | "isActive" | "studentIdNumber"
->;
+export type { PeopleRow } from "@/lib/people-filter";
 
 function initials(name: string): string {
   return name
@@ -21,16 +17,6 @@ function initials(name: string): string {
     .slice(0, 2)
     .join("")
     .toUpperCase();
-}
-
-function matches(p: PeopleRow, term: string): boolean {
-  if (term === "") return true;
-  const t = term.toLowerCase();
-  return (
-    `${p.firstName} ${p.lastName}`.toLowerCase().includes(t) ||
-    (p.email?.toLowerCase().includes(t) ?? false) ||
-    (p.studentIdNumber?.toLowerCase().includes(t) ?? false)
-  );
 }
 
 function PeopleColumn({
@@ -121,14 +107,10 @@ export function PeopleBrowser({
   const [includeInactive, setIncludeInactive] = useState(false);
 
   const { students, mentors } = useMemo(() => {
-    const visible = people.filter(
-      (p) => (includeInactive || p.isActive) && matches(p, search),
-    );
-    return {
-      students: sortByName(visible.filter((p) => p.role === "student")),
-      // Mentors column holds mentors and admins, mirroring the leaderboard split.
-      mentors: sortByName(visible.filter((p) => p.role !== "student")),
-    };
+    const students = filterPeople(people, { search, role: "student", includeInactive });
+    // Mentors column holds mentors and admins, mirroring the leaderboard split.
+    const mentors = filterPeople(people, { search, role: "mentor", includeInactive });
+    return { students: sortByName(students), mentors: sortByName(mentors) };
   }, [people, search, includeInactive]);
 
   const searching = search.trim() !== "";
