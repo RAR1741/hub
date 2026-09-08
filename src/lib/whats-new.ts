@@ -52,6 +52,8 @@ export async function fetchMergedPrs(deps: WhatsNewDeps, window: Window): Promis
     }
   }
 
+  // ponytail: one page of 100; a week where >100 closed PRs get touched would drop
+  // the oldest merges — add page=2 when that happens.
   const res = await deps.fetch(url, { headers });
   if (!res.ok) throw new Error(`whats-new: list pulls failed: ${res.status}`);
   const pulls = (await res.json()) as GithubPull[];
@@ -68,8 +70,6 @@ export async function fetchMergedPrs(deps: WhatsNewDeps, window: Window): Promis
       author: p.user?.login ?? "unknown",
       labels: p.labels.map((l) => l.name),
     }));
-  // ponytail: one page of 100; a week where >100 closed PRs get touched would drop
-  // the oldest merges — add page=2 when that happens.
 }
 
 function esc(s: string): string {
