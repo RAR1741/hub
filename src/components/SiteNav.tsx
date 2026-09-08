@@ -14,33 +14,52 @@ import { MoreSheet } from "@/components/ui/MoreSheet";
 // Admin subpages surfaced in the Admin flyout. Each row is gated to the same
 // role its card requires on /admin (src/app/admin/page.tsx); a mentor must not
 // even see a link to an admin-only page (authz e2e asserts count 0 page-wide).
-const ADMIN_ITEMS: { label: string; href: string; role: Role }[] = [
-  // Review — mentor+
-  { label: "Requests", href: "/admin/requests", role: "mentor" },
-  { label: "Flagged sessions", href: "/admin/sessions/flagged", role: "mentor" },
-  { label: "Reports", href: "/admin/reports", role: "mentor" },
-  // Roster — admin
-  { label: "People", href: "/admin/people", role: "admin" },
-  { label: "Teams", href: "/admin/teams", role: "admin" },
-  { label: "Badges", href: "/admin/badges", role: "admin" },
-  { label: "Time import", href: "/admin/time-import", role: "admin" },
-  { label: "Application import", href: "/admin/application-import", role: "admin" },
-  // Time — mentor+ except where noted
-  { label: "Meetings", href: "/admin/meetings", role: "admin" },
-  { label: "Build days", href: "/admin/build-days", role: "mentor" },
-  { label: "Sessions", href: "/admin/sessions", role: "mentor" },
-  { label: "Events", href: "/admin/events", role: "mentor" },
-  { label: "Forms", href: "/admin/forms", role: "mentor" },
-  { label: "Parts", href: "/admin/projects", role: "mentor" },
-  { label: "Periods", href: "/admin/periods", role: "admin" },
-  // Config — admin
-  { label: "Kiosk devices", href: "/admin/kiosk-devices", role: "admin" },
-  { label: "Drive group sync", href: "/admin/drive-sync", role: "admin" },
-  { label: "GitHub team sync", href: "/admin/github-sync", role: "admin" },
-  { label: "FIRST roster status", href: "/admin/first-status", role: "admin" },
-  { label: "Slack", href: "/admin/slack", role: "admin" },
-  { label: "Settings", href: "/admin/settings", role: "admin" },
-  { label: "Cron jobs", href: "/admin/cron", role: "admin" },
+type AdminItem = { label: string; href: string; role: Role };
+type AdminSection = { label: string; items: AdminItem[] };
+
+const ADMIN_SECTIONS: AdminSection[] = [
+  {
+    label: "Review",
+    items: [
+      { label: "Requests", href: "/admin/requests", role: "mentor" },
+      { label: "Flagged sessions", href: "/admin/sessions/flagged", role: "mentor" },
+      { label: "Reports", href: "/admin/reports", role: "mentor" },
+    ],
+  },
+  {
+    label: "Roster",
+    items: [
+      { label: "People", href: "/admin/people", role: "admin" },
+      { label: "Teams", href: "/admin/teams", role: "admin" },
+      { label: "Badges", href: "/admin/badges", role: "admin" },
+      { label: "Time import", href: "/admin/time-import", role: "admin" },
+      { label: "Application import", href: "/admin/application-import", role: "admin" },
+    ],
+  },
+  {
+    label: "Time",
+    items: [
+      { label: "Meetings", href: "/admin/meetings", role: "admin" },
+      { label: "Build days", href: "/admin/build-days", role: "mentor" },
+      { label: "Sessions", href: "/admin/sessions", role: "mentor" },
+      { label: "Events", href: "/admin/events", role: "mentor" },
+      { label: "Forms", href: "/admin/forms", role: "mentor" },
+      { label: "Parts", href: "/admin/projects", role: "mentor" },
+      { label: "Periods", href: "/admin/periods", role: "admin" },
+    ],
+  },
+  {
+    label: "Config",
+    items: [
+      { label: "Kiosk devices", href: "/admin/kiosk-devices", role: "admin" },
+      { label: "Drive group sync", href: "/admin/drive-sync", role: "admin" },
+      { label: "GitHub team sync", href: "/admin/github-sync", role: "admin" },
+      { label: "FIRST roster status", href: "/admin/first-status", role: "admin" },
+      { label: "Slack", href: "/admin/slack", role: "admin" },
+      { label: "Settings", href: "/admin/settings", role: "admin" },
+      { label: "Cron jobs", href: "/admin/cron", role: "admin" },
+    ],
+  },
 ];
 
 // Per-group signature hue (Task 1 tokens). Typed loosely so the CSS var passes.
@@ -89,10 +108,32 @@ function NavItemWithFlyout({
   );
 }
 
+// Section triggers + their second-level flyouts for the Admin menu. Receives
+// only non-empty sections (SiteNav filters by role first), so no empty branch.
+function FlySections({ sections }: { sections: { label: string; items: { label: string; href: string }[] }[] }) {
+  return sections.map((s) => (
+    <div key={s.label} className="fly-sec">
+      <div className="fly-link fly-sec-trigger" role="menuitem" aria-haspopup="menu" tabIndex={0}>
+        {s.label}
+        <Icon name="chevron" className="ic" />
+      </div>
+      <div className="flyout fly-sub" role="menu" aria-label={s.label}>
+        {s.items.map((item) => (
+          <NavLink key={item.href} href={item.href} className="fly-link" role="menuitem">
+            {item.label}
+          </NavLink>
+        ))}
+      </div>
+    </div>
+  ));
+}
+
 // A single icon in the collapsed rail. Icon-only items get a native `title`
 // tooltip; items with sub-links get the same hover flyout as the expanded nav
-// (with a label header, since the icon alone carries no text). Honors the same
-// redundant-single-item collapse rule as NavItemWithFlyout.
+// (with a label header, since the icon alone carries no text). Passing
+// `sections` nests a second-level flyout per section (the Admin menu);
+// otherwise `items` renders a flat link list. Honors the same redundant-
+// single-item collapse rule as NavItemWithFlyout.
 function RailItem({
   href,
   icon,
@@ -100,7 +141,7 @@ function RailItem({
   hue,
   exact,
   items,
-  scroll,
+  sections,
 }: {
   href: string;
   icon: IconName;
@@ -108,10 +149,11 @@ function RailItem({
   hue: string;
   exact?: boolean;
   items?: { label: string; href: string }[];
-  scroll?: boolean;
+  sections?: { label: string; items: { label: string; href: string }[] }[];
 }) {
   const showFlyout =
-    !!items && (items.length > 1 || (items.length === 1 && items[0].href !== href));
+    (!!sections && sections.length > 0) ||
+    (!!items && (items.length > 1 || (items.length === 1 && items[0].href !== href)));
   if (!showFlyout) {
     return (
       <NavLink href={href} exact={exact} className="rail-i" aria-label={label} title={label} style={grp(hue)}>
@@ -119,7 +161,7 @@ function RailItem({
       </NavLink>
     );
   }
-  const links = items!.map((item) => (
+  const links = items?.map((item) => (
     <NavLink key={item.href} href={item.href} className="fly-link" role="menuitem">
       {item.label}
     </NavLink>
@@ -134,7 +176,7 @@ function RailItem({
           <Icon name={icon} className="ic" />
           {label}
         </div>
-        {scroll ? <div className="fly-scroll">{links}</div> : links}
+        {sections ? <FlySections sections={sections} /> : links}
       </div>
     </div>
   );
@@ -151,7 +193,9 @@ export async function SiteNav() {
   const isMentor = hasRole(role, "mentor");
   const isAdmin = hasRole(role, "admin");
 
-  const adminItems = ADMIN_ITEMS.filter((item) => hasRole(role, item.role));
+  const adminSections = ADMIN_SECTIONS
+    .map((s) => ({ ...s, items: s.items.filter((i) => hasRole(role, i.role)) }))
+    .filter((s) => s.items.length > 0);
 
   // Flyout sub-links, gated by role. NavItemWithFlyout drops the flyout when a
   // viewer is left with only the redundant same-as-parent link.
@@ -286,18 +330,7 @@ export async function SiteNav() {
               </NavLink>
               <div className="flyout" role="menu">
                 <div className="fly-title">Admin</div>
-                <div className="fly-scroll">
-                  {adminItems.map((item) => (
-                    <NavLink
-                      key={item.href}
-                      href={item.href}
-                      className="fly-link"
-                      role="menuitem"
-                    >
-                      {item.label}
-                    </NavLink>
-                  ))}
-                </div>
+                <FlySections sections={adminSections} />
               </div>
             </div>
           </div>
@@ -350,8 +383,7 @@ export async function SiteNav() {
             icon="sliders"
             label="Admin"
             hue="--hue-admin"
-            items={adminItems}
-            scroll
+            sections={adminSections}
           />
         )}
 
