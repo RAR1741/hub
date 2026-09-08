@@ -88,12 +88,16 @@ export function fetchInstallationToken(deps: GithubDeps): Promise<string> {
   return promise;
 }
 
-/** Standard headers for every GitHub REST call. */
-export function githubHeaders(token: string): Record<string, string> {
+/** Headers every GitHub REST call sends, with or without auth. */
+export function githubBaseHeaders(): Record<string, string> {
   return {
     Accept: "application/vnd.github+json",
     "X-GitHub-Api-Version": "2022-11-28",
     "User-Agent": "rar1741-hub",
-    Authorization: `Bearer ${token}`,
   };
+}
+
+/** Standard headers for every GitHub REST call. */
+export function githubHeaders(token: string): Record<string, string> {
+  return { ...githubBaseHeaders(), Authorization: `Bearer ${token}` };
 }
