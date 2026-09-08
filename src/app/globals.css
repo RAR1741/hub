@@ -1731,16 +1731,43 @@
     background: var(--surface-2);
     text-decoration: none;
   }
-  .fly-scroll {
-    max-height: 264px;
-    overflow-y: auto;
+  /* ---- second-level (section) flyouts inside the Admin flyout / rail-fly ---- */
+  .fly-sec {
+    position: relative;
   }
-  .fly-scroll::-webkit-scrollbar {
-    width: 8px;
+  .fly-sec-trigger {
+    display: flex;
+    align-items: center;
+    cursor: default;
   }
-  .fly-scroll::-webkit-scrollbar-thumb {
-    background: var(--hair);
-    border-radius: 4px;
+  .fly-sec-trigger .ic {
+    margin-left: auto;
+    width: 11px;
+    height: 11px;
+    flex: none;
+    color: var(--muted);
+    opacity: 0.7;
+  }
+  .fly-sec:hover > .fly-sec-trigger {
+    background: var(--surface-2);
+  }
+  /* Reuses .flyout for surface/shadow/arrow/hidden-state; only position + the
+     open selectors differ. Opens to the right of the parent flyout (parent has
+     5px padding + 1px border, so +14px yields the same ~8px visible gap as the
+     first level). The parent flyout must NOT be a scroll container or this is
+     clipped — that's why .fly-scroll was removed. */
+  .fly-sub {
+    left: calc(100% + 14px);
+  }
+  .fly-sub::after {
+    left: -14px;
+    width: 14px;
+  }
+  .fly-sec:hover > .fly-sub,
+  .fly-sec:has(:focus-visible) > .fly-sub {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(0);
   }
 
   /* ---- icon rail (collapsed sidebar) — the .sb/.rail pair are both always in

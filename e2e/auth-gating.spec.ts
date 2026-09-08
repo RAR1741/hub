@@ -139,6 +139,24 @@ test.describe("admin hub is mentor-scoped", () => {
     await context.close();
   });
 
+  test("a mentor's nav flyout omits Roster/Config sections but keeps Review/Time", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext();
+    await context.addCookies([await mentorSessionCookie()]);
+    const page = await context.newPage();
+    await page.goto("/admin");
+    // 100%-admin-only sections don't render at all for a mentor: no trigger,
+    // no submenu, anywhere on the page (expanded sidebar or collapsed rail).
+    await expect(page.locator(".fly-sec-trigger", { hasText: "Roster" })).toHaveCount(0);
+    await expect(page.locator(".fly-sec-trigger", { hasText: "Config" })).toHaveCount(0);
+    // Positive control: sections a mentor does get render in both the
+    // expanded sidebar (.sb) and the collapsed rail (.rail), so count 2.
+    await expect(page.locator(".fly-sec-trigger", { hasText: "Review" })).toHaveCount(2);
+    await expect(page.locator(".fly-sec-trigger", { hasText: "Time" })).toHaveCount(2);
+    await context.close();
+  });
+
   test("an admin sees all admin-hub cards, including Roster and Config", async ({ browser }) => {
     const context = await browser.newContext();
     await context.addCookies([await adminSessionCookie()]);
@@ -151,6 +169,19 @@ test.describe("admin hub is mentor-scoped", () => {
     // authz property, and it verifies the flyout is role-gated too).
     for (const href of ADMIN_ONLY_HREFS) {
       await expect(page.locator(`#main a[href="${href}"]`)).toHaveCount(1);
+    }
+    await context.close();
+  });
+
+  test("an admin's nav flyout shows all four sections in both sidebar and rail", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext();
+    await context.addCookies([await adminSessionCookie()]);
+    const page = await context.newPage();
+    await page.goto("/admin");
+    for (const s of ["Review", "Roster", "Time", "Config"]) {
+      await expect(page.locator(".fly-sec-trigger", { hasText: s })).toHaveCount(2);
     }
     await context.close();
   });
