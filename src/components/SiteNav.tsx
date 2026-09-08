@@ -3,7 +3,7 @@ import Image from "next/image";
 import { cookies } from "next/headers";
 import { getViewer } from "@/lib/viewer";
 import { KIOSK_COOKIE, verifyKioskToken } from "@/lib/kiosk";
-import { navDestinations } from "@/lib/nav-destinations";
+import { navDestinations, adminSections as adminSectionsFor } from "@/lib/nav-destinations";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { NavLink } from "@/components/NavLink";
 import { SidebarToggle } from "@/components/SidebarToggle";
@@ -56,10 +56,32 @@ function NavItemWithFlyout({
   );
 }
 
+// Section triggers + their second-level flyouts for the Admin menu. Receives
+// only non-empty sections (SiteNav filters by role first), so no empty branch.
+function FlySections({ sections }: { sections: { label: string; items: { label: string; href: string }[] }[] }) {
+  return sections.map((s) => (
+    <div key={s.label} className="fly-sec">
+      <div className="fly-link fly-sec-trigger" role="menuitem" aria-haspopup="menu" tabIndex={0}>
+        {s.label}
+        <Icon name="chevron" className="ic" />
+      </div>
+      <div className="flyout fly-sub" role="menu" aria-label={s.label}>
+        {s.items.map((item) => (
+          <NavLink key={item.href} href={item.href} className="fly-link" role="menuitem">
+            {item.label}
+          </NavLink>
+        ))}
+      </div>
+    </div>
+  ));
+}
+
 // A single icon in the collapsed rail. Icon-only items get a native `title`
 // tooltip; items with sub-links get the same hover flyout as the expanded nav
-// (with a label header, since the icon alone carries no text). Honors the same
-// redundant-single-item collapse rule as NavItemWithFlyout.
+// (with a label header, since the icon alone carries no text). Passing
+// `sections` nests a second-level flyout per section (the Admin menu);
+// otherwise `items` renders a flat link list. Honors the same redundant-
+// single-item collapse rule as NavItemWithFlyout.
 function RailItem({
   href,
   icon,
@@ -67,7 +89,7 @@ function RailItem({
   hue,
   exact,
   items,
-  scroll,
+  sections,
 }: {
   href: string;
   icon: IconName;
@@ -75,10 +97,11 @@ function RailItem({
   hue: string;
   exact?: boolean;
   items?: { label: string; href: string }[];
-  scroll?: boolean;
+  sections?: { label: string; items: { label: string; href: string }[] }[];
 }) {
   const showFlyout =
-    !!items && (items.length > 1 || (items.length === 1 && items[0].href !== href));
+    (!!sections && sections.length > 0) ||
+    (!!items && (items.length > 1 || (items.length === 1 && items[0].href !== href)));
   if (!showFlyout) {
     return (
       <NavLink href={href} exact={exact} className="rail-i" aria-label={label} title={label} style={grp(hue)}>
@@ -86,7 +109,7 @@ function RailItem({
       </NavLink>
     );
   }
-  const links = items!.map((item) => (
+  const links = items?.map((item) => (
     <NavLink key={item.href} href={item.href} className="fly-link" role="menuitem">
       {item.label}
     </NavLink>
@@ -101,7 +124,7 @@ function RailItem({
           <Icon name={icon} className="ic" />
           {label}
         </div>
-        {scroll ? <div className="fly-scroll">{links}</div> : links}
+        {sections ? <FlySections sections={sections} /> : links}
       </div>
     </div>
   );
@@ -118,7 +141,7 @@ export async function SiteNav() {
   const dest = navDestinations({ role, kioskRegistered });
   const can = (href: string) => dest.some((d) => d.href === href);
 
-  const adminItems = dest.filter((d) => d.group === "Admin" && d.href !== "/admin");
+  const adminSections = adminSectionsFor({ role, kioskRegistered });
 
   // Flyout sub-links, gated by role. NavItemWithFlyout drops the flyout when a
   // viewer is left with only the redundant same-as-parent link.
@@ -248,18 +271,7 @@ export async function SiteNav() {
               </NavLink>
               <div className="flyout" role="menu">
                 <div className="fly-title">Admin</div>
-                <div className="fly-scroll">
-                  {adminItems.map((item) => (
-                    <NavLink
-                      key={item.href}
-                      href={item.href}
-                      className="fly-link"
-                      role="menuitem"
-                    >
-                      {item.label}
-                    </NavLink>
-                  ))}
-                </div>
+                <FlySections sections={adminSections} />
               </div>
             </div>
           </div>
@@ -312,8 +324,7 @@ export async function SiteNav() {
             icon="sliders"
             label="Admin"
             hue="--hue-admin"
-            items={adminItems}
-            scroll
+            sections={adminSections}
           />
         )}
 

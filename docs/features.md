@@ -112,6 +112,7 @@ scannable catalog of what's built, grouped by area, with a route per entry. The
 ## Integrations
 
 - **Slack** — account linking, weekly mentor FIRST reminders, and sync-failure alerts. `/admin/slack` — see [features/slack-integration.md](features/slack-integration.md), [setup/slack.md](setup/slack.md)
+- **Weekly "What's new" Slack digest** — Monday post to #hub-admin-alerts listing last week's merged PRs, with a "Watch out for" section for PRs labelled `heads-up`. — see [features/whats-new-digest.md](features/whats-new-digest.md)
 - **Team Slack channel auto-invites** — teams linked to Slack channels auto-invite members when they join. `/admin/teams/[id]` — see [features/team-slack-channels.md](features/team-slack-channels.md)
 - **FIRST roster sync** — syncs roster data from FIRST, with a status dashboard.
   `/admin/first-status` — see [features/first-roster-sync.md](features/first-roster-sync.md)

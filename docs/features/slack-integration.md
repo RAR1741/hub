@@ -42,6 +42,10 @@ gated on `app_setting.slack_reminder_secret`):
 A pg_cron job (`slack-mentor-reminders-weekly`) runs this on `0 23 * * 4` — Thursdays 23:00 UTC
 (6pm EST / 7pm EDT; pg_cron runs in UTC and doesn't follow daylight saving).
 
+## Weekly what's-new digest
+
+Weekly what's-new digest — see [whats-new-digest.md](whats-new-digest.md)
+
 ## Sync-failure alerts
 
 `reportSyncOutcome()` (`src/lib/slack-alerts.ts`) posts to `#hub-admin-alerts` when the FIRST,
