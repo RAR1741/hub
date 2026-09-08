@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { isAllowed, NAV_ITEMS, navDestinations, type NavContext } from "./nav-destinations";
+import {
+  adminSections,
+  isAllowed,
+  NAV_ITEMS,
+  navDestinations,
+  type NavContext,
+} from "./nav-destinations";
 
 // Same set as e2e/auth-gating.spec.ts's ADMIN_ONLY_HREFS ("admin hub is
 // mentor-scoped" describe block) — hrefs a mentor must never see anywhere in
@@ -68,6 +74,52 @@ describe("navDestinations", () => {
   it("has no duplicate hrefs", () => {
     const hrefs = NAV_ITEMS.map((d) => d.href);
     expect(new Set(hrefs).size).toBe(hrefs.length);
+  });
+});
+
+describe("adminSections", () => {
+  it("mentor sees only Review + Time sections, with the mentor-gated items", () => {
+    const sections = adminSections(ctx("mentor"));
+    expect(sections.map((s) => s.label)).toEqual(["Review", "Time"]);
+    expect(sections.find((s) => s.label === "Review")!.items.map((i) => i.href)).toEqual([
+      "/admin/requests",
+      "/admin/sessions/flagged",
+      "/admin/reports",
+    ]);
+    expect(sections.find((s) => s.label === "Time")!.items.map((i) => i.href)).toEqual([
+      "/admin/build-days",
+      "/admin/sessions",
+      "/admin/events",
+      "/admin/forms",
+      "/admin/projects",
+    ]);
+  });
+
+  it("admin sees all four sections with every item", () => {
+    const sections = adminSections(ctx("admin"));
+    expect(sections.map((s) => s.label)).toEqual(["Review", "Roster", "Time", "Config"]);
+    expect(sections.find((s) => s.label === "Roster")!.items.map((i) => i.href)).toEqual([
+      "/admin/people",
+      "/admin/teams",
+      "/admin/badges",
+      "/admin/time-import",
+      "/admin/application-import",
+    ]);
+    expect(sections.find((s) => s.label === "Config")!.items.map((i) => i.href)).toEqual([
+      "/admin/kiosk-devices",
+      "/admin/drive-sync",
+      "/admin/github-sync",
+      "/admin/first-status",
+      "/admin/slack",
+      "/admin/settings",
+      "/admin/cron",
+    ]);
+  });
+
+  it("never includes the /admin hub item itself (no section)", () => {
+    for (const s of adminSections(ctx("admin"))) {
+      expect(s.items.every((i) => i.href !== "/admin")).toBe(true);
+    }
   });
 });
 
