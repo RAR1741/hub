@@ -155,6 +155,52 @@ export async function inviteToChannel(deps: SlackDeps, channelId: string, slackU
   return (await inviteToChannelDetailed(deps, channelId, slackUserIds)).ok;
 }
 
+/**
+ * List the Slack user ids currently in a channel, following pagination. Read
+ * only. Returns `[]` on no-token / non-prod (there is no real channel to read)
+ * and on any Slack-side failure: a caller that can't learn current membership
+ * should fall back to "invite everyone", and `already_in_channel` is folded
+ * into success, so at worst it re-invites people who are already in.
+ *
+ * Uses GET with query params — Slack's read methods (`conversations.members`)
+ * take form/query params, not the JSON body the write helpers `post()` with.
+ */
+export async function listChannelMembers(deps: SlackDeps, channelId: string): Promise<string[]> {
+  if (!deps.token || !deps.isProd) return [];
+  const members: string[] = [];
+  let cursor = "";
+  try {
+    // Hard page cap: a channel that never stops paginating (bug or hostile
+    // cursor) must not spin forever. 50 × 200 = 10k members is far past any
+    // real team channel.
+    for (let page = 0; page < 50; page++) {
+      const params = new URLSearchParams({ channel: channelId, limit: "200" });
+      if (cursor) params.set("cursor", cursor);
+      const res = await deps.fetch(`${API}conversations.members?${params.toString()}`, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${deps.token}` },
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        members?: string[];
+        response_metadata?: { next_cursor?: string };
+      };
+      if (!(res.ok && body.ok === true)) {
+        console.error(`[slack] conversations.members failed:`, body.error ?? body);
+        return [];
+      }
+      for (const m of body.members ?? []) members.push(m);
+      cursor = body.response_metadata?.next_cursor ?? "";
+      if (!cursor) break;
+    }
+  } catch (e) {
+    console.error(`[slack] conversations.members threw:`, e);
+    return [];
+  }
+  return members;
+}
+
 /** Post the kickoff message to an event's channel. */
 export async function postToEventChannel(deps: SlackDeps, channelId: string, text: string): Promise<boolean> {
   if (!deps.token) {
