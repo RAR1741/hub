@@ -322,6 +322,7 @@ export async function createUsage(
     .maybeSingle();
   if (batteryError) return { ok: false, status: mapWriteError(batteryError.code) };
   const frc = batteryRow?.kind === "frc_robot";
+  const { data, error } = await client
     .from("battery_usage")
     .insert({
       battery_id: input.batteryId,
