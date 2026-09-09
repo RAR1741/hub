@@ -7,6 +7,7 @@ import {
   archiveChannel,
   inviteToChannel,
   inviteToChannelDetailed,
+  listChannelMembers,
   postToEventChannel,
   afterEventCreated,
   afterEventUpdated,
@@ -251,6 +252,59 @@ describe("inviteToChannelDetailed", () => {
     }) as unknown as typeof globalThis.fetch;
     const result = await inviteToChannelDetailed(prodDeps(fetchFn), "C1", ["U1"]);
     expect(result).toEqual({ ok: false, error: "down" });
+  });
+});
+
+describe("listChannelMembers", () => {
+  test("no token -> [], no fetch", async () => {
+    const { fetchFn, requests } = fakeFetch();
+    const members = await listChannelMembers({ fetch: fetchFn, token: null, isProd: true }, "C1");
+    expect(members).toEqual([]);
+    expect(requests).toHaveLength(0);
+  });
+
+  test("non-prod -> [], no fetch", async () => {
+    const { fetchFn, requests } = fakeFetch();
+    const members = await listChannelMembers(devDeps(fetchFn), "C1");
+    expect(members).toEqual([]);
+    expect(requests).toHaveLength(0);
+  });
+
+  test("single page returns the members and GETs the channel", async () => {
+    const { fetchFn, requests } = fakeFetch([
+      { status: 200, body: { ok: true, members: ["U1", "U2"], response_metadata: { next_cursor: "" } } },
+    ]);
+    const members = await listChannelMembers(prodDeps(fetchFn), "C1");
+    expect(members).toEqual(["U1", "U2"]);
+    expect(requests).toHaveLength(1);
+    expect(requests[0].url).toContain("conversations.members");
+    expect(requests[0].url).toContain("channel=C1");
+    expect((requests[0].init as RequestInit).method).toBe("GET");
+  });
+
+  test("follows next_cursor and concatenates pages", async () => {
+    const { fetchFn, requests } = fakeFetch([
+      { status: 200, body: { ok: true, members: ["U1"], response_metadata: { next_cursor: "CUR2" } } },
+      { status: 200, body: { ok: true, members: ["U2", "U3"], response_metadata: { next_cursor: "" } } },
+    ]);
+    const members = await listChannelMembers(prodDeps(fetchFn), "C1");
+    expect(members).toEqual(["U1", "U2", "U3"]);
+    expect(requests).toHaveLength(2);
+    expect(requests[1].url).toContain("cursor=CUR2");
+  });
+
+  test("Slack error -> [] (caller falls back to invite-everyone)", async () => {
+    const { fetchFn } = fakeFetch([{ status: 200, body: { ok: false, error: "channel_not_found" } }]);
+    const members = await listChannelMembers(prodDeps(fetchFn), "C1");
+    expect(members).toEqual([]);
+  });
+
+  test("network throw -> []", async () => {
+    const fetchFn = (async () => {
+      throw new Error("down");
+    }) as unknown as typeof globalThis.fetch;
+    const members = await listChannelMembers(prodDeps(fetchFn), "C1");
+    expect(members).toEqual([]);
   });
 });
 

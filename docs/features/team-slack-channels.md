@@ -35,10 +35,38 @@ Admins manage links directly in the team edit form — no separate sync page. Ad
 
 - **Add-only**: invites never remove anyone. Unlinking a channel from a team does not kick existing members.
 - **Best-effort**: a Slack API failure is logged and never blocks the membership change in the hub.
-- **No backfill**: linking a channel to a team with existing members does not retroactively invite them; only new membership changes trigger invites going forward. This also applies to umbrella channels — linking a new channel to a parent team, or re-parenting a team under it, does not retroactively invite existing sub-team members. A one-shot "Invite all effective members" follow-up that would cover both cases is tracked in issue #264, not yet built.
+- **No automatic backfill**: linking a channel to a team with existing members does not retroactively invite them; only new membership changes trigger invites going forward. This also applies to umbrella channels — linking a new channel to a parent team, or re-parenting a team under it, does not retroactively invite existing sub-team members. The **[Invite all effective members](#invite-all-effective-members-backfill)** admin action (below) covers both cases on demand (#264).
 - **No workspace auto-add**: the feature assumes people have already linked their Slack account to the hub. If a person has no `slack_user_id`, no invite happens; they must link their Slack account first via the Slack link sync.
 - **Idempotent**: calling `conversations.invite` with a user already in the channel succeeds; a second membership change to the same person does not error.
+
+## Invite all effective members (backfill)
+
+Because Slack has no nightly reconcile, the join-time invite above is the *only* thing that fills a
+channel — so after any structural change (linking a channel, or re-parenting a team) existing
+members are never pulled in until they happen to join something else. The **Invite all effective
+members** button on **Admin → Teams → [Team]** closes that gap on demand.
+
+The action does two things for the team, in one click (guarded by a confirm dialog that shows the
+invite count first):
+
+1. **Slack backfill.** Computes the team's *effective* membership — every active person who is a
+   member of the team or any descendant (its subtree), deduped by person — and invites those with a
+   linked Slack account to every channel linked directly to the team. It reads each channel's
+   current membership first, so people already in are reported as "already in" and only the
+   genuinely-missing are invited. People with no `slack_user_id` are counted as skipped. This is
+   still **add-only** and never removes anyone.
+2. **On-demand Drive + GitHub reconcile.** Runs the same whole-graph, idempotent reconcile the
+   nightly cron runs, so a re-parenting propagates to Google Groups and GitHub Teams immediately
+   instead of waiting overnight. It is whole-graph on purpose: a re-parent changes an *ancestor's*
+   effective membership, so reconciling only the one team would miss exactly the group/team that
+   needs updating.
+
+After firing, the page reports a per-channel summary (invited / already-in / skipped / failed) plus
+the Drive and GitHub reconcile results. The action is a `POST` (`/api/admin/teams/[id]/backfill`,
+admin-only) — never a state-changing `GET`, per the `sameSite=lax` CSRF rule.
 
 ## Source
 
 `src/lib/slack-channel-sync.ts` (`syncSlackMembershipChange` — the add-only per-membership invite, fully unit-tested with fake fetch/db), `src/lib/membership-sync.ts` (fan-out that also runs the Google/GitHub syncs), `src/lib/slack-channels.ts` (`inviteToChannel`, the Slack `conversations.invite` call), `src/lib/teams.ts` (`parseTeamInput`/`createTeam`/`updateTeam` write the `team_slack_channel` join rows).
+
+Backfill action: `src/lib/team-slack-backfill.ts` (`computeEffectiveSlackMembers` + `backfillTeamSlack`), `src/lib/slack-channels.ts` (`listChannelMembers`, the paginated `conversations.members` read used to skip already-in members), `src/app/api/admin/teams/[id]/backfill/route.ts` (the admin `POST` handler that also triggers the Drive/GitHub reconcile), `src/components/InviteAllMembersButton.tsx` (the button + results UI).
