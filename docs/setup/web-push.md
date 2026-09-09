@@ -1,7 +1,7 @@
 # Setting up Web Push notifications
 
-The hub can push five notification types straight to a member's browser/device:
-`admin_alerts`, `clocked_in_late`, `meeting_reminder`, `consent_missing`, and `meeting_changed`.
+The hub can push six notification types straight to a member's browser/device:
+`admin_alerts`, `clocked_in_late`, `meeting_reminder`, `consent_missing`, `meeting_changed`, and `system_health`.
 Everything is off by default and shares one VAPID key pair and one dispatch pipeline
 (`sendPushToOptedIn()`). See [features/push-notifications.md](../features/push-notifications.md)
 for the member-facing behavior; this doc is config only. To test, verify, or troubleshoot it

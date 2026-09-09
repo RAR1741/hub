@@ -66,3 +66,5 @@ All sends go through `src/lib/slack.ts` (`postChannelMessage()`, `sendDM()`):
   — so a prod token pasted into a preview/dev environment still can't reach a real channel or DM.
 - Channel names are a fixed registry (`src/lib/slack-registry.ts`), not config — currently
   `bot_test` and `hub-admin-alerts`.
+
+A `postChannelMessage` failure inside `notifyAdmins()` (`src/lib/admin-notify.ts`) is reported to `reportSubsystemHealth("slack_delivery", …)` (`src/lib/system-health.ts`), which pushes a `system_health` notification to opted-in admins on the ok→failing / failing→ok transition only, and re-observes health only when an admin alert is next attempted (no canary).

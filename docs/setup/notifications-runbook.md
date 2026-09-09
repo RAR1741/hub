@@ -7,8 +7,8 @@ the two reference docs:
 - **Behavior** (what fires, who opts in): [features/push-notifications.md](../features/push-notifications.md)
 - **Config reference** (env vars, `app_setting` rows, iOS, rotation): [setup/web-push.md](web-push.md)
 
-The five types — `admin_alerts`, `clocked_in_late`, `meeting_reminder`, `consent_missing`,
-`meeting_changed` — share one VAPID pipeline (`sendPushToOptedIn()`) and are **all off by
+The six types — `admin_alerts`, `clocked_in_late`, `meeting_reminder`, `consent_missing`,
+`meeting_changed`, and `system_health` — share one VAPID pipeline (`sendPushToOptedIn()`) and are **all off by
 default**. Enabling push on a device and toggling a type on are two separate steps.
 
 `localhost` is a secure context, so Web Push works in Chrome/Edge/Firefox against a local site
