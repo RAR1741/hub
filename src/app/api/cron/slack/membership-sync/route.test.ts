@@ -100,4 +100,28 @@ describe("POST /api/cron/slack/membership-sync", () => {
     expect(body).toEqual({ error: "sync_failed" });
     expect(reportSyncOutcome).toHaveBeenCalledWith("slack_sync", false, expect.objectContaining({ error: "boom" }));
   });
+
+  test("502 and reports failure when the channel reconcile throws after link sync succeeds", async () => {
+    const { getSetting } = await import("@/lib/settings");
+    const { syncSlackLinks } = await import("@/lib/slack-link");
+    const { reconcileAllTeamSlackChannels } = await import("@/lib/team-slack-backfill");
+    const { reportSyncOutcome } = await import("@/lib/slack-alerts");
+    vi.mocked(getSetting).mockResolvedValue(SECRET);
+    vi.mocked(syncSlackLinks).mockResolvedValue({
+      ranAt: "now",
+      linked: 1,
+      alreadyLinked: 0,
+      ambiguous: [],
+      unmatchedSlack: [],
+      unmatchedPeople: [],
+    });
+    vi.mocked(reconcileAllTeamSlackChannels).mockRejectedValue(new Error("db error"));
+
+    const { POST } = await import("./route");
+    const res = await POST(req({ "x-sync-secret": SECRET }));
+    expect(res.status).toBe(502);
+    const body = await res.json();
+    expect(body).toEqual({ error: "sync_failed" });
+    expect(reportSyncOutcome).toHaveBeenCalledWith("slack_sync", false, expect.objectContaining({ error: "db error" }));
+  });
 });

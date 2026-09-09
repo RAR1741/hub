@@ -216,12 +216,21 @@ export async function reconcileAllTeamSlackChannels(
   const db = deps.db;
   const slack = deps.slack ?? slackDepsFromEnv();
 
+  // ponytail: built from currently-present person rows, so a hard-deleted
+  // (not just deactivated) linked person drops out of managedSlackIds and
+  // stops being tracked in wouldRemove.
   const { data: personData, error: personError } = await db.from("person").select("slack_user_id");
   if (personError) throw new Error(personError.message);
   const managedSlackIds = new Set<string>(
     ((personData ?? []) as { slack_user_id: string | null }[]).map((p) => p.slack_user_id).filter((id): id is string => Boolean(id)),
   );
 
+  // ponytail: dedupes teams by team_id only, not by slack_channel_id. Schema
+  // allows the same channel linked to two unrelated teams (PK is
+  // (team_id, slack_channel_id)), so that channel gets reconciled once per
+  // team: totals.channels double-counts it, and wouldRemove can false-positive
+  // a member who's effective under the other team. Report-only (nobody is
+  // removed) — group by channel instead if that reporting ever needs to be exact.
   const { data: channelTeamData, error: channelTeamError } = await db.from("team_slack_channel").select("team_id");
   if (channelTeamError) throw new Error(channelTeamError.message);
   const teamIds = [...new Set(((channelTeamData ?? []) as { team_id: string }[]).map((r) => r.team_id))].sort();
