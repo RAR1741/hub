@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { postChannelMessage, sendDM, type SlackDeps } from "./slack";
+import { notifyAdmins } from "./admin-notify";
+import { pushDepsFromEnv, sendPushToOptedIn } from "./push-dispatch";
+import { sendDM, type SlackDeps } from "./slack";
 
 export type MentorReq = {
   personId: string;
@@ -67,6 +69,18 @@ export async function sendMentorReminders(deps: {
   for (const m of mentors) {
     const items = outstandingItems(m);
     if (items.length === 0) { complete++; continue; }
+    // Push is additive and independent of the Slack DM below — fire it for
+    // every mentor with outstanding items, whether or not they're Slack-linked.
+    await sendPushToOptedIn(
+      [m.personId],
+      "consent_missing",
+      {
+        title: "Outstanding FIRST requirements",
+        body: "You still have unfinished consent/YPP items.",
+        url: "/admin/first-status",
+      },
+      { db: deps.db, push: pushDepsFromEnv() },
+    );
     if (!m.slackUserId) { unlinked.push(m.name); continue; }
     const ok = await sendDM(deps.slack, m.slackUserId, buildReminderText(m.name, items));
     if (ok) reminded++;
@@ -78,7 +92,7 @@ export async function sendMentorReminders(deps: {
     `:memo: Weekly FIRST reminder run — DMed ${reminded} mentor(s); ${complete} fully complete.` +
     (unlinked.length ? `\n:warning: No Slack link (not reminded): ${unlinked.join(", ")}` : "") +
     (failed.length ? `\n:x: DM failed (not reminded): ${failed.join(", ")}` : "");
-  await postChannelMessage(deps.slack, "hub-admin-alerts", summary);
+  await notifyAdmins(summary, { db: deps.db, slack: deps.slack });
 
   return { reminded, unlinked, complete, failed };
 }

@@ -71,6 +71,10 @@ scannable catalog of what's built, grouped by area, with a route per entry. The
   [features/excusal-requests.md](features/excusal-requests.md)
 - **Home dashboard** — who's-here board, personal hours + goal progress, and upcoming meetings with
   Required tags. `/`
+- **Push notifications** — opt-in Web Push for admin alerts, late clock-outs, meeting reminders,
+  outstanding FIRST items, and moved meetings; off by default. `/me/notifications` — see
+  [features/push-notifications.md](features/push-notifications.md),
+  [setup/web-push.md](setup/web-push.md), [runbook](setup/notifications-runbook.md)
 
 ## Calendar & meetings
 
