@@ -315,9 +315,13 @@ export async function createUsage(
   db?: SupabaseClient,
 ): Promise<{ ok: true; id: string } | { ok: false; status: number }> {
   const client = db ?? (await import("./db")).getDb();
-  const battery = await getBattery(input.batteryId, client);
-  const frc = battery?.kind === "frc_robot";
-  const { data, error } = await client
+  const { data: batteryRow, error: batteryError } = await client
+    .from("battery")
+    .select("kind")
+    .eq("id", input.batteryId)
+    .maybeSingle();
+  if (batteryError) return { ok: false, status: mapWriteError(batteryError.code) };
+  const frc = batteryRow?.kind === "frc_robot";
     .from("battery_usage")
     .insert({
       battery_id: input.batteryId,
