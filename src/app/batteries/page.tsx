@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { listBatteries, listUsage } from "@/lib/batteries";
 import { hasRole } from "@/lib/authz";
-import type { Battery } from "@/lib/types";
+import { BATTERY_KINDS, BATTERY_KIND_LABELS, type Battery } from "@/lib/types";
 import { getViewer } from "@/lib/viewer";
 import { BatteryForm } from "@/components/BatteryForm";
 import { UsageLogForm } from "@/components/UsageLogForm";
@@ -37,7 +37,20 @@ export default async function BatteriesPage() {
         </div>
       </div>
 
-      <BatteryTable batteries={active} emptyLabel="No active batteries." />
+      {active.length === 0 ? (
+        <BatteryTable batteries={active} emptyLabel="No active batteries." />
+      ) : (
+        BATTERY_KINDS.map((k) => {
+          const inKind = active.filter((b) => b.kind === k);
+          if (inKind.length === 0) return null;
+          return (
+            <div key={k}>
+              <h2 className="font-semibold mb-2">{BATTERY_KIND_LABELS[k]}</h2>
+              <BatteryTable batteries={inKind} emptyLabel="No active batteries." />
+            </div>
+          );
+        })
+      )}
 
       {isMentor && (
         <details className="card">
@@ -78,12 +91,13 @@ function BatteryTable({
       <div style={{ overflowX: "auto" }}>
         <table className="table">
           <thead>
-            <tr><th>Number</th><th>Model</th><th>Ah</th><th>Last used</th></tr>
+            <tr><th>Number</th><th>Kind</th><th>Model</th><th>Ah</th><th>Last used</th></tr>
           </thead>
           <tbody>
             {batteries.map((b) => (
               <tr key={b.id}>
                 <td className="mono"><Link href={`/batteries/${b.id}`}>{b.number}</Link></td>
+                <td>{BATTERY_KIND_LABELS[b.kind]}</td>
                 <td>{b.model ?? ""}</td>
                 <td>{b.ampHourRating ?? ""}</td>
                 <td className="mono">{b.lastUsedAt ? new Date(b.lastUsedAt).toLocaleString() : "Never"}</td>

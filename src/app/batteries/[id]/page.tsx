@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { getBattery, listUsage } from "@/lib/batteries";
 import { hasRole } from "@/lib/authz";
+import { BATTERY_KIND_LABELS } from "@/lib/types";
 import { getViewer } from "@/lib/viewer";
 import { BatteryForm } from "@/components/BatteryForm";
 import { UsageLogTable } from "@/components/UsageLogTable";
@@ -34,6 +35,7 @@ export default async function BatteryDetailPage({ params }: { params: Promise<{ 
             <tbody>
               <tr><th>Number</th><td className="mono">{battery.number}</td></tr>
               <tr><th>Status</th><td>{battery.status}</td></tr>
+              <tr><th>Kind</th><td>{BATTERY_KIND_LABELS[battery.kind]}</td></tr>
               <tr><th>Model</th><td>{battery.model ?? ""}</td></tr>
               <tr><th>Amp-hour rating</th><td>{battery.ampHourRating ?? ""}</td></tr>
               <tr><th>Year acquired</th><td>{battery.yearAcquired ?? ""}</td></tr>
