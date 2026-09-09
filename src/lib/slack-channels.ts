@@ -155,18 +155,22 @@ export async function inviteToChannel(deps: SlackDeps, channelId: string, slackU
   return (await inviteToChannelDetailed(deps, channelId, slackUserIds)).ok;
 }
 
+export type ChannelMembersResult = { ok: true; members: string[] } | { ok: false; error: string };
+
 /**
  * List the Slack user ids currently in a channel, following pagination. Read
- * only. Returns `[]` on no-token / non-prod (there is no real channel to read)
- * and on any Slack-side failure: a caller that can't learn current membership
- * should fall back to "invite everyone", and `already_in_channel` is folded
- * into success, so at worst it re-invites people who are already in.
+ * only. Returns a discriminated result so a caller can tell a genuinely-empty
+ * channel (`{ ok: true, members: [] }`) from a failed read (`{ ok: false }`):
+ * `not_configured` on no-token / non-prod, or the Slack error code / thrown
+ * message otherwise. A caller that can't learn current membership can still
+ * fall back to "invite everyone" (`already_in_channel` is folded into invite
+ * success), but should avoid reporting exact already-in / invited counts.
  *
  * Uses GET with query params — Slack's read methods (`conversations.members`)
  * take form/query params, not the JSON body the write helpers `post()` with.
  */
-export async function listChannelMembers(deps: SlackDeps, channelId: string): Promise<string[]> {
-  if (!deps.token || !deps.isProd) return [];
+export async function listChannelMembers(deps: SlackDeps, channelId: string): Promise<ChannelMembersResult> {
+  if (!deps.token || !deps.isProd) return { ok: false, error: "not_configured" };
   const members: string[] = [];
   let cursor = "";
   try {
@@ -188,7 +192,7 @@ export async function listChannelMembers(deps: SlackDeps, channelId: string): Pr
       };
       if (!(res.ok && body.ok === true)) {
         console.error(`[slack] conversations.members failed:`, body.error ?? body);
-        return [];
+        return { ok: false, error: String(body.error ?? "unknown") };
       }
       for (const m of body.members ?? []) members.push(m);
       cursor = body.response_metadata?.next_cursor ?? "";
@@ -196,9 +200,9 @@ export async function listChannelMembers(deps: SlackDeps, channelId: string): Pr
     }
   } catch (e) {
     console.error(`[slack] conversations.members threw:`, e);
-    return [];
+    return { ok: false, error: e instanceof Error ? e.message : "threw" };
   }
-  return members;
+  return { ok: true, members };
 }
 
 /** Post the kickoff message to an event's channel. */

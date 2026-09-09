@@ -10,6 +10,7 @@ type ChannelResult = {
   alreadyIn: number;
   skippedNoSlack: number;
   failed: number;
+  membersReadFailed?: boolean;
   error?: string;
 };
 
@@ -69,7 +70,7 @@ export function InviteAllMembersButton({
     try {
       const res = await fetch(`/api/admin/teams/${teamId}/backfill`, { method: "POST" });
       const body = (await res.json().catch(() => null)) as BackfillResponse | { error?: string } | null;
-      if (res.ok && body && "ok" in body) {
+      if (res.ok && body && "ok" in body && body.ok === true) {
         setResult(body);
         router.refresh();
       } else {
@@ -95,7 +96,7 @@ export function InviteAllMembersButton({
         </p>
       </div>
 
-      {error && <p className="text-sm text-[var(--red)]" role="status">Failed: {error}</p>}
+      {error && <p className="text-sm text-[var(--red)]" role="alert">Failed: {error}</p>}
 
       {result && <BackfillReport result={result} />}
     </div>
@@ -117,7 +118,9 @@ function BackfillReport({ result }: { result: BackfillResponse }) {
             {slack.channels.map((c) => (
               <li key={c.channelId} className="text-sm">
                 <span className="mono">{c.label ? `#${c.label.replace(/^#/, "")}` : c.channelId}</span>{" "}
-                — invited {c.invited}, already in {c.alreadyIn}
+                {c.membersReadFailed
+                  ? `— invited up to ${c.invited} (couldn't read current membership, already-in unknown)`
+                  : `— invited ${c.invited}, already in ${c.alreadyIn}`}
                 {c.skippedNoSlack > 0 ? `, skipped ${c.skippedNoSlack} (no Slack)` : ""}
                 {c.failed > 0 ? (
                   <span className="text-[var(--red)]">, failed {c.failed}{c.error ? ` (${c.error})` : ""}</span>

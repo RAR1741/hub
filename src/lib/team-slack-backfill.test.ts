@@ -136,6 +136,45 @@ describe("backfillTeamSlack", () => {
     ]);
   });
 
+  test("channel membership read fails: invites everyone as fallback, flags unknown split", async () => {
+    const db = makeDb([
+      { data: TREE },
+      { data: [person("p1", "Al", "U1"), person("p2", "Be", "U2")] },
+      { data: [{ slack_channel_id: "C1", label: "frc" }] },
+    ]);
+    const { fetchFn, requests } = fakeFetch([
+      { status: 200, body: { ok: false, error: "channel_not_found" } }, // conversations.members read fails
+      { status: 200, body: { ok: true } }, // fallback invite of everyone succeeds
+    ]);
+
+    const summary = await backfillTeamSlack({ db: db as never, slack: prodDeps(fetchFn), ...noSleep }, "A");
+
+    expect(summary.channels).toEqual([
+      { channelId: "C1", label: "frc", invited: 2, alreadyIn: 0, skippedNoSlack: 0, failed: 0, membersReadFailed: true },
+    ]);
+    // both the members read and the fallback invite hit Slack
+    expect(requests).toHaveLength(2);
+    expect(JSON.parse((requests[1].init as RequestInit).body as string).users).toBe("U1,U2");
+  });
+
+  test("does not sleep after the final channel", async () => {
+    const db = makeDb([
+      { data: TREE },
+      { data: [person("p1", "Al", "U1")] },
+      { data: [{ slack_channel_id: "C1", label: "frc" }] },
+    ]);
+    const { fetchFn } = fakeFetch([
+      { status: 200, body: { ok: true, members: [], response_metadata: { next_cursor: "" } } },
+      { status: 200, body: { ok: true } },
+    ]);
+    let sleeps = 0;
+    await backfillTeamSlack(
+      { db: db as never, slack: prodDeps(fetchFn), sleep: async () => { sleeps++; } },
+      "A",
+    );
+    expect(sleeps).toBe(0); // single channel -> no inter-channel pacing
+  });
+
   test("slack not configured: no Slack calls, channels reported with zeros", async () => {
     const db = makeDb([
       { data: TREE },

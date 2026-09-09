@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { inviteToChannelDetailed, listChannelMembers } from "./slack-channels";
+import { inviteToChannelDetailed, listChannelMembers, type InviteResult } from "./slack-channels";
 import { slackDepsFromEnv, type SlackDeps } from "./slack";
 import { displayName } from "./people";
 import { subtreeIds, type TeamLink } from "./team-tree";
@@ -75,10 +75,11 @@ export async function computeEffectiveSlackMembers(
 export type ChannelBackfillResult = {
   channelId: string;
   label: string | null;
-  invited: number; // newly invited this run
-  alreadyIn: number; // effective members already in the channel
+  invited: number; // newly invited this run (an upper bound when membersReadFailed)
+  alreadyIn: number; // effective members already in the channel (0/unknown when membersReadFailed)
   skippedNoSlack: number; // effective members with no slack_user_id (same for every channel)
   failed: number; // effective members we tried but Slack rejected
+  membersReadFailed?: boolean; // couldn't read current membership, so the invited/already-in split is unknown
   error?: string; // Slack error code when the invite failed
 };
 
@@ -90,6 +91,16 @@ export type TeamSlackBackfillSummary = {
   slackConfigured: boolean;
   channels: ChannelBackfillResult[];
 };
+
+/** Fold an invite outcome for `count` attempted users into a channel result. */
+function applyInvite(result: ChannelBackfillResult, invite: InviteResult, count: number): void {
+  if (invite.ok) {
+    result.invited += count;
+  } else {
+    result.failed += count;
+    if (invite.error) result.error = invite.error;
+  }
+}
 
 /**
  * One-shot Slack backfill for a team: invite every effective (subtree) member
@@ -122,7 +133,8 @@ export async function backfillTeamSlack(
   const channels = (channelData ?? []) as { slack_channel_id: string; label: string | null }[];
 
   const results: ChannelBackfillResult[] = [];
-  for (const ch of channels) {
+  for (let i = 0; i < channels.length; i++) {
+    const ch = channels[i];
     const result: ChannelBackfillResult = {
       channelId: ch.slack_channel_id,
       label: ch.label,
@@ -139,27 +151,27 @@ export async function backfillTeamSlack(
       continue;
     }
 
-    const current = new Set(await listChannelMembers(slack, ch.slack_channel_id));
-    const missing = withSlack.filter((t) => !current.has(t.slackUserId));
-    result.alreadyIn = withSlack.length - missing.length;
-    if (missing.length === 0) {
-      results.push(result);
-      continue;
-    }
-
-    const invite = await inviteToChannelDetailed(
-      slack,
-      ch.slack_channel_id,
-      missing.map((t) => t.slackUserId),
-    );
-    if (invite.ok) {
-      result.invited = missing.length;
+    const read = await listChannelMembers(slack, ch.slack_channel_id);
+    if (read.ok) {
+      // We know the current membership, so invite only the genuinely-missing
+      // and report the exact already-in / invited split.
+      const missing = withSlack.filter((t) => !read.members.includes(t.slackUserId));
+      result.alreadyIn = withSlack.length - missing.length;
+      if (missing.length > 0) {
+        applyInvite(result, await inviteToChannelDetailed(slack, ch.slack_channel_id, missing.map((t) => t.slackUserId)), missing.length);
+      }
     } else {
-      result.failed = missing.length;
-      if (invite.error) result.error = invite.error;
+      // Couldn't read current membership: fall back to inviting everyone
+      // (already_in_channel is folded into invite success), but flag it so the
+      // report shows `invited` as an upper bound with already-in unknown rather
+      // than claiming a precise split the read couldn't support.
+      result.membersReadFailed = true;
+      applyInvite(result, await inviteToChannelDetailed(slack, ch.slack_channel_id, withSlack.map((t) => t.slackUserId)), withSlack.length);
     }
     results.push(result);
-    await sleep(1100); // ~1 req/sec between channels, mirrors the event sweep
+    // ~1 req/sec between channels (mirrors the event sweep); no trailing sleep
+    // after the final channel.
+    if (i < channels.length - 1) await sleep(1100);
   }
 
   return {
