@@ -33,7 +33,11 @@ export async function reportSubsystemHealth(
     }
 
     // Duplicated from admin-notify.ts deliberately — importing it would create a cycle.
-    const { data } = await deps.db.from("person").select("id").eq("role", "admin");
+    const { data, error } = await deps.db.from("person").select("id").eq("role", "admin");
+    if (error) {
+      console.error(`[system-health] load admins failed for ${subsystem}:`, error.message);
+      return;
+    }
     const adminIds = ((data ?? []) as { id: string }[]).map((r) => r.id);
 
     const payload = {

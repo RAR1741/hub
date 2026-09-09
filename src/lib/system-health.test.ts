@@ -13,7 +13,9 @@ beforeEach(() => {
 });
 
 // Minimal fake app_setting + person store, mirroring slack-alerts.test.ts's fakeDb.
-function fakeDb(opts: { state?: Record<string, unknown>; admins?: { id: string }[] } = {}) {
+function fakeDb(
+  opts: { state?: Record<string, unknown>; admins?: { id: string }[]; adminError?: { message: string } } = {},
+) {
   const store = new Map<string, unknown>(Object.entries(opts.state ?? {}));
   const admins = opts.admins ?? [{ id: "admin-1" }];
   return {
@@ -24,7 +26,9 @@ function fakeDb(opts: { state?: Record<string, unknown>; admins?: { id: string }
           select() {
             return {
               eq() {
-                return Promise.resolve({ data: admins, error: null });
+                return Promise.resolve(
+                  opts.adminError ? { data: null, error: opts.adminError } : { data: admins, error: null },
+                );
               },
             };
           },
@@ -104,6 +108,14 @@ describe("reportSubsystemHealth", () => {
 
   test("zero admins does not call sendPushToOptedIn and does not advance state", async () => {
     const db = fakeDb({ state: { system_health_state_slack_delivery: "ok" }, admins: [] });
+    await reportSubsystemHealth("slack_delivery", false, { db: db as never });
+
+    expect(sendPushToOptedIn).not.toHaveBeenCalled();
+    expect(db.store.get("system_health_state_slack_delivery")).toBe("ok");
+  });
+
+  test("person select error does not call sendPushToOptedIn and does not advance state", async () => {
+    const db = fakeDb({ state: { system_health_state_slack_delivery: "ok" }, adminError: { message: "boom" } });
     await reportSubsystemHealth("slack_delivery", false, { db: db as never });
 
     expect(sendPushToOptedIn).not.toHaveBeenCalled();
