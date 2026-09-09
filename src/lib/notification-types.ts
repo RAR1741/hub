@@ -7,6 +7,7 @@ export const NOTIFICATION_TYPES = [
   "meeting_reminder",
   "consent_missing",
   "meeting_changed",
+  "system_health",
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
@@ -30,6 +31,12 @@ export const NOTIFICATION_META: Record<NotificationType, NotificationMeta> = {
     type: "admin_alerts",
     label: "Admin alerts",
     description: "Sync failures and other #hub-admin-alerts posts.",
+    roles: ADMINS,
+  },
+  system_health: {
+    type: "system_health",
+    label: "System health",
+    description: "A hub subsystem (e.g. Slack delivery) starts failing or recovers — sent over push so it still arrives when Slack is down.",
     roles: ADMINS,
   },
   clocked_in_late: {

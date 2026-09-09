@@ -17,7 +17,7 @@ Nothing pushes to anyone until they opt in, in two steps:
 
 A member with a device enabled but every type off receives nothing. Both steps are required.
 
-## The five types
+## The six types
 
 | Type | Who can enable it | Fires when |
 | --- | --- | --- |
@@ -26,9 +26,10 @@ A member with a device enabled but every type off receives nothing. Both steps a
 | `meeting_reminder` | all members | a few hours before a meeting starts |
 | `consent_missing` | mentors, admins | the weekly mentor FIRST-reminder run, to mentors with outstanding items |
 | `meeting_changed` | all members | a meeting's start time moves (manual edit or Google Calendar sync), only for a still-future meeting |
+| `system_health` | admins | a hub subsystem's health changes (currently: `#hub-admin-alerts` delivery starts failing or recovers). Push-only by design so it still arrives when Slack is the broken piece. Deduped per subsystem via `app_setting.system_health_state_<subsystem>`, same transition rule as sync alerts. |
 
-Role-restricted types (`admin_alerts`, `consent_missing`) are enforced server-side when toggling
-— a student can't enable `admin_alerts` by calling the API directly.
+Role-restricted types (`admin_alerts`, `consent_missing`, `system_health`) are enforced server-side when toggling
+— a student can't enable these by calling the API directly.
 
 ## Managing notifications
 

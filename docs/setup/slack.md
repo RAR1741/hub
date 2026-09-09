@@ -161,7 +161,7 @@ worktree's `APP_PORT` (not 3000), inside the container it's always 3000.
 ## Troubleshooting
 
 - **`200` but nothing posts** — token not loaded (restart/redeploy after setting it) or the bot
-  isn't in the target channel.
+  isn't in the target channel. A swallowed `#hub-admin-alerts` post also surfaces as a `system_health` push to opted-in admins.
 - **`403` from the cron endpoint** — the `x-sync-secret` header doesn't match
   `app_setting.slack_reminder_secret`, or the secret is still empty.
 - **`/admin/slack` errors** — migrations not pushed to prod (`person.slack_user_id` missing).
