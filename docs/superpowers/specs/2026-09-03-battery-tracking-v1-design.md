@@ -211,6 +211,6 @@ Gates before PR: `./dev npm run lint`, `typecheck`, `test`, `e2e`.
 - **SVN import** — writes through `createBattery`/`createUsage`; historical retirements use
   the client-settable `retiredAt`.
 - **Rotation flagging/enforcement** — reads the same `lastUsedAt` embed; no schema change.
-- **Other battery kinds** — new migration widening the `kind` check.
+- **Other battery kinds** — new migration widening the `kind` check. Done in #245 (`20260909130000_battery_kinds.sql`).
 - **TBA integration** — `event_key`/`match_key` already TBA-shaped; a lookup or `event` FK is
   a later migration, no data rewrite.

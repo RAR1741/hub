@@ -11,6 +11,8 @@ lifecycle status (`active` or `retired`). Batteries are identified by a unique p
 (`2026-01`). Retire is a PATCH operation (no DELETE); retired batteries stay in history with
 `retired_at` and `retired_reason` for record-keeping.
 
+Batteries have a **kind** — one of FRC robot, FTC robot, tool, camera, computer, or other (default FRC robot), set by mentors on the battery form. The `/batteries` active list is grouped by kind. The FRC-robot-only usage fields (event/match keys, wiggle and charger tests, internal resistance, pre/post charge %) are hidden in the usage form and nulled server-side for non-FRC-robot batteries; those batteries log only time, problem, and notes.
+
 ## Usage log
 
 The **battery_usage** table records every draw: who logged it (`tech_id`), when (`used_at`), which
@@ -36,12 +38,11 @@ can create/edit batteries, retire them, and delete a mistyped usage row (the onl
 
 v1 is inventory + usage log only. Not included: bench test records ([#241](https://github.com/RAR1741/hub/issues/241)), rotation
 enforcement ([#242](https://github.com/RAR1741/hub/issues/242)), SVN historical import
-([#243](https://github.com/RAR1741/hub/issues/243)), .bt2 file uploads to Google Drive
-([#244](https://github.com/RAR1741/hub/issues/244)), and other battery types beyond FRC robot
-([#245](https://github.com/RAR1741/hub/issues/245)).
+([#243](https://github.com/RAR1741/hub/issues/243)), and .bt2 file uploads to Google Drive
+([#244](https://github.com/RAR1741/hub/issues/244)).
 
 ## Source
 
 `src/lib/batteries.ts` (core logic, parsing, LRU sort), `src/app/api/batteries/` (CRUD routes),
 `src/app/batteries/page.tsx` and `src/app/batteries/[id]/page.tsx` (pages), `src/components/BatteryForm.tsx`,
-`UsageLogForm.tsx`, `UsageLogTable.tsx` (UI), and the schema in `supabase/migrations/20260903120000_battery_tracking.sql`.
+`UsageLogForm.tsx`, `UsageLogTable.tsx` (UI), and the schema in `supabase/migrations/20260903120000_battery_tracking.sql` and `supabase/migrations/20260909130000_battery_kinds.sql`.

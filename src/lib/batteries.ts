@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Battery, BatteryRow, BatteryStatus, BatteryUsage, BatteryUsageRow } from "./types";
-import { batteryFromRow, batteryUsageFromRow } from "./types";
+import type { Battery, BatteryKind, BatteryRow, BatteryStatus, BatteryUsage, BatteryUsageRow } from "./types";
+import { BATTERY_KINDS, batteryFromRow, batteryUsageFromRow } from "./types";
 import { optInt, optString, reqString, reqUuid } from "./validate";
 
 const EVENT_KEY_RE = /^\d{4}[a-z0-9]+$/;
@@ -15,6 +15,7 @@ function optFinite(v: unknown, min: number, max: number): { value: number | null
 
 export type BatteryInput = {
   number: string;
+  kind: BatteryKind;
   yearAcquired: number | null;
   model: string | null;
   serialDateCode: string | null;
@@ -38,6 +39,11 @@ export function parseBatteryInput(body: unknown): BatteryInput | null {
 
   const number = reqString(b.number, 20);
   if (!number) return null;
+
+  const kind = b.kind === undefined || b.kind === null
+    ? "frc_robot"
+    : BATTERY_KINDS.find((k) => k === b.kind);
+  if (!kind) return null;
 
   const yearAcquired = optInt(b.yearAcquired, 1990, 2100);
   if (!yearAcquired) return null;
@@ -74,6 +80,7 @@ export function parseBatteryInput(body: unknown): BatteryInput | null {
 
   return {
     number,
+    kind,
     yearAcquired: yearAcquired.value,
     model: model.value,
     serialDateCode: serialDateCode.value,
@@ -196,6 +203,7 @@ export async function createBattery(
     .from("battery")
     .insert({
       number: input.number,
+      kind: input.kind,
       year_acquired: input.yearAcquired,
       model: input.model,
       serial_date_code: input.serialDateCode,
@@ -223,6 +231,7 @@ export async function updateBattery(
     .from("battery")
     .update({
       number: input.number,
+      kind: input.kind,
       year_acquired: input.yearAcquired,
       model: input.model,
       serial_date_code: input.serialDateCode,
@@ -306,21 +315,28 @@ export async function createUsage(
   db?: SupabaseClient,
 ): Promise<{ ok: true; id: string } | { ok: false; status: number }> {
   const client = db ?? (await import("./db")).getDb();
+  const { data: batteryRow, error: batteryError } = await client
+    .from("battery")
+    .select("kind")
+    .eq("id", input.batteryId)
+    .maybeSingle();
+  if (batteryError) return { ok: false, status: mapWriteError(batteryError.code) };
+  const frc = batteryRow?.kind === "frc_robot";
   const { data, error } = await client
     .from("battery_usage")
     .insert({
       battery_id: input.batteryId,
       tech_id: techId,
       used_at: input.usedAt,
-      event_key: input.eventKey,
-      match_key: input.matchKey,
+      event_key: frc ? input.eventKey : null,
+      match_key: frc ? input.matchKey : null,
       had_problem: input.hadProblem,
       problem_description: input.problemDescription,
-      wiggle_test_ok: input.wiggleTestOk,
-      charger_test_ok: input.chargerTestOk,
-      rint_ohms: input.rintOhms,
-      charge_pre_pct: input.chargePrePct,
-      charge_post_pct: input.chargePostPct,
+      wiggle_test_ok: frc ? input.wiggleTestOk : null,
+      charger_test_ok: frc ? input.chargerTestOk : null,
+      rint_ohms: frc ? input.rintOhms : null,
+      charge_pre_pct: frc ? input.chargePrePct : null,
+      charge_post_pct: frc ? input.chargePostPct : null,
       notes: input.notes,
     })
     .select("id")

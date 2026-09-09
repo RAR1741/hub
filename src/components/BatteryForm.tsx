@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { Battery } from "@/lib/types";
+import { BATTERY_KINDS, BATTERY_KIND_LABELS, type Battery } from "@/lib/types";
 
 /** Create + edit (`initial?: Battery`), full-replace like `updateEvent`. */
 export function BatteryForm({ initial }: { initial?: Battery }) {
   const router = useRouter();
   const [number, setNumber] = useState(initial?.number ?? "");
+  const [kind, setKind] = useState<(typeof BATTERY_KINDS)[number]>(initial?.kind ?? "frc_robot");
   const [yearAcquired, setYearAcquired] = useState(initial?.yearAcquired?.toString() ?? "");
   const [model, setModel] = useState(initial?.model ?? "");
   const [serialDateCode, setSerialDateCode] = useState(initial?.serialDateCode ?? "");
@@ -31,6 +32,7 @@ export function BatteryForm({ initial }: { initial?: Battery }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           number,
+          kind,
           yearAcquired: yearAcquired ? Number(yearAcquired) : null,
           model: model || null,
           serialDateCode: serialDateCode || null,
@@ -68,6 +70,11 @@ export function BatteryForm({ initial }: { initial?: Battery }) {
   return (
     <form onSubmit={submit} className="flex flex-col gap-3">
       <label className="label">Number<input className="input" value={number} onChange={(e) => setNumber(e.target.value)} required maxLength={20} /></label>
+      <label className="label">Kind
+        <select className="input" value={kind} onChange={(e) => setKind(e.target.value as (typeof BATTERY_KINDS)[number])}>
+          {BATTERY_KINDS.map((k) => <option key={k} value={k}>{BATTERY_KIND_LABELS[k]}</option>)}
+        </select>
+      </label>
       <label className="label">Year acquired (optional)<input className="input" type="number" value={yearAcquired} onChange={(e) => setYearAcquired(e.target.value)} min={1990} max={2100} /></label>
       <label className="label">Model (optional)<input className="input" value={model} onChange={(e) => setModel(e.target.value)} maxLength={80} /></label>
       <label className="label">Serial/date code (optional)<input className="input" value={serialDateCode} onChange={(e) => setSerialDateCode(e.target.value)} maxLength={80} /></label>
