@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { SlackDeps } from "./slack";
-import { computeEffectiveSlackMembers, backfillTeamSlack } from "./team-slack-backfill";
+import { computeEffectiveSlackMembers, backfillTeamSlack, reconcileAllTeamSlackChannels } from "./team-slack-backfill";
 
 type CapturedRequest = { url: string; init?: RequestInit };
 
@@ -207,5 +207,71 @@ describe("backfillTeamSlack", () => {
 
     expect(summary.channels).toEqual([]);
     expect(requests).toHaveLength(0);
+  });
+
+  test("managedSlackIds provided: reports wouldRemove for managed non-effective members only", async () => {
+    const db = makeDb([
+      { data: TREE },
+      { data: [person("p1", "Al", "U1"), person("p2", "Be", "U2")] },
+      { data: [{ slack_channel_id: "C1", label: "frc" }] },
+    ]);
+    // channel currently has: U1 (effective, stays), U9 (managed but not effective -> wouldRemove),
+    // UBOT (unmanaged, e.g. the bot -> ignored)
+    const { fetchFn } = fakeFetch([
+      { status: 200, body: { ok: true, members: ["U1", "U9", "UBOT"], response_metadata: { next_cursor: "" } } },
+      { status: 200, body: { ok: true } }, // invite U2
+    ]);
+
+    const summary = await backfillTeamSlack(
+      { db: db as never, slack: prodDeps(fetchFn), managedSlackIds: new Set(["U1", "U2", "U9"]), ...noSleep },
+      "A",
+    );
+
+    expect(summary.channels[0].wouldRemove).toBe(1); // only U9
+  });
+
+  test("no managedSlackIds: wouldRemove stays undefined (regression guard for #264 caller)", async () => {
+    const db = makeDb([
+      { data: TREE },
+      { data: [person("p1", "Al", "U1")] },
+      { data: [{ slack_channel_id: "C1", label: "frc" }] },
+    ]);
+    const { fetchFn } = fakeFetch([
+      { status: 200, body: { ok: true, members: ["U1", "U9"], response_metadata: { next_cursor: "" } } },
+    ]);
+
+    const summary = await backfillTeamSlack({ db: db as never, slack: prodDeps(fetchFn), ...noSleep }, "A");
+
+    expect(summary.channels[0].wouldRemove).toBeUndefined();
+  });
+});
+
+describe("reconcileAllTeamSlackChannels", () => {
+  test("backfills every team with a linked channel, dedupes team ids, aggregates totals", async () => {
+    const db = makeDb([
+      { data: [{ slack_user_id: "U1" }, { slack_user_id: "U2" }, { slack_user_id: null }] }, // person (managed ids)
+      { data: [{ team_id: "A" }, { team_id: "B" }, { team_id: "A" }] }, // team_slack_channel (A duped)
+      // team A backfill: team tree, membership, channels
+      { data: TREE },
+      { data: [person("p1", "Al", "U1")] },
+      { data: [{ slack_channel_id: "C1", label: "frc" }] },
+      // team B backfill: team tree, membership, channels
+      { data: TREE },
+      { data: [person("p2", "Be", "U2")] },
+      { data: [{ slack_channel_id: "C2", label: "b-team" }] },
+    ]);
+    const { fetchFn } = fakeFetch([
+      { status: 200, body: { ok: true, members: [], response_metadata: { next_cursor: "" } } }, // A/C1 read
+      { status: 200, body: { ok: true } }, // A/C1 invite U1
+      { status: 200, body: { ok: true, members: ["U1"], response_metadata: { next_cursor: "" } } }, // B/C2 read (U1 not effective for B)
+      { status: 200, body: { ok: true } }, // B/C2 invite U2
+    ]);
+
+    const result = await reconcileAllTeamSlackChannels({ db: db as never, slack: prodDeps(fetchFn), sleep: async () => {} });
+
+    expect(result.teamsWithChannels).toBe(2);
+    expect(result.teams.map((t) => t.teamId)).toEqual(["A", "B"]);
+    expect(result.slackConfigured).toBe(true);
+    expect(result.totals).toEqual({ invited: 2, alreadyIn: 0, wouldRemove: 1, failed: 0, skippedNoSlack: 0, channels: 2 });
   });
 });

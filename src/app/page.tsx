@@ -91,6 +91,9 @@ export default async function HomePage() {
                 <Link href="/me/attendance" className="text-sm font-medium text-[var(--red)]">
                   My attendance
                 </Link>
+                <Link href="/me/notifications" className="text-sm font-medium text-[var(--red)]">
+                  Notifications
+                </Link>
               </nav>
             </div>
           </div>

@@ -15,6 +15,11 @@ writes `person.slack_user_id`.
   then matches each by lowercased email against `person.email` and every `person_identity.email`.
   An email matching more than one hub person is reported as **ambiguous** and not written; an
   already-correct link is counted separately from a new one.
+- **Nightly link sync**: a pg_cron job (`slack-nightly-sync`, `40 7 * * *` UTC) runs the same
+  `syncSlackLinks()` unattended via `POST /api/cron/slack/membership-sync` (shared-secret
+  `slack_sync_secret`), then reconciles team→Slack-channel membership. See
+  [team-slack-channels.md](team-slack-channels.md#nightly-reconcile-slack-nightly-sync). The secret
+  is not seeded, so the cron is a no-op until prod sets it.
 - **Manual per-person link/unlink**: `PUT` / `DELETE /api/admin/people/[id]/slack`
   (`src/app/api/admin/people/[id]/slack/route.ts`) sets or clears one person's `slack_user_id`
   directly — for people whose Slack email doesn't match their hub email. A `slackUserId` already
