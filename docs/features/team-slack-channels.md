@@ -35,16 +35,16 @@ Admins manage links directly in the team edit form — no separate sync page. Ad
 
 - **Add-only**: invites never remove anyone. Unlinking a channel from a team does not kick existing members.
 - **Best-effort**: a Slack API failure is logged and never blocks the membership change in the hub.
-- **No automatic backfill**: linking a channel to a team with existing members does not retroactively invite them; only new membership changes trigger invites going forward. This also applies to umbrella channels — linking a new channel to a parent team, or re-parenting a team under it, does not retroactively invite existing sub-team members. The **[Invite all effective members](#invite-all-effective-members-backfill)** admin action (below) covers both cases on demand (#264).
+- **No *instant* backfill**: linking a channel to a team with existing members does not retroactively invite them; only new membership changes trigger invites going forward. This also applies to umbrella channels — linking a new channel to a parent team, or re-parenting a team under it, does not retroactively invite existing sub-team members. The **[Invite all effective members](#invite-all-effective-members-backfill)** admin action (below) covers both cases on demand (#264). A nightly `slack-nightly-sync` cron also backfills every linked channel automatically (see below), so an admin only needs the button when they don't want to wait for the next night.
 - **No workspace auto-add**: the feature assumes people have already linked their Slack account to the hub. If a person has no `slack_user_id`, no invite happens; they must link their Slack account first via the Slack link sync.
 - **Idempotent**: calling `conversations.invite` with a user already in the channel succeeds; a second membership change to the same person does not error.
 
 ## Invite all effective members (backfill)
 
-Because Slack has no nightly reconcile, the join-time invite above is the *only* thing that fills a
-channel — so after any structural change (linking a channel, or re-parenting a team) existing
-members are never pulled in until they happen to join something else. The **Invite all effective
-members** button on **Admin → Teams → [Team]** closes that gap on demand.
+The join-time invite fills a channel only when someone joins, and the nightly `slack-nightly-sync`
+cron (below) reconciles every linked channel once a day. The **Invite all effective members** button
+on **Admin → Teams → [Team]** closes the gap *on demand* — for when an admin doesn't want to wait
+for the next nightly run after a structural change (linking a channel, or re-parenting a team).
 
 The action does two things for the team, in one click (guarded by a confirm dialog that shows the
 invite count first):
@@ -64,6 +64,24 @@ invite count first):
 After firing, the page reports a per-channel summary (invited / already-in / skipped / failed) plus
 the Drive and GitHub reconcile results. The action is a `POST` (`/api/admin/teams/[id]/backfill`,
 admin-only) — never a state-changing `GET`, per the `sameSite=lax` CSRF rule.
+
+## Nightly reconcile (`slack-nightly-sync`)
+
+A pg_cron job runs one unattended Slack reconcile each night at `40 7 * * *` (UTC), 20 minutes
+after the GitHub team sync so no two heavy syncs overlap. It posts to
+`/api/cron/slack/membership-sync`, guarded by the `slack_sync_secret` shared secret (constant-time
+compare; unset ⇒ 403, so prod must set it — it is deliberately not seeded). The job does two things
+in sequence, so newly-linked people are invited the same night:
+
+1. **Identity link sync** — refreshes `person.slack_user_id` from Slack membership (the same
+   `syncSlackLinks` behind the manual **Sync now** button).
+2. **Channel-membership reconcile** — for every team with a linked Slack channel, invites its
+   effective (subtree) members. **Add-only**: it invites the missing and only *reports* a
+   `wouldRemove` count for hub-linked channel members who are no longer effective members — it
+   never kicks anyone.
+
+The schedule is visible and editable at **Admin → Cron**. Migration:
+`supabase/migrations/20260909120000_slack_nightly_sync_cron.sql`.
 
 ## Source
 

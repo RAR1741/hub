@@ -43,6 +43,8 @@ Bot-token scopes (both apps): `chat:write`, `chat:write.public`, `im:write`, `us
 | `app_setting` | `slack_reminder_url` | URL pg_cron POSTs to for the weekly run. **Seeded to a dev default — must be set per-env.** |
 | `app_setting` | `slack_reminder_secret` | Shared secret the cron sends and the endpoint checks. **Seeded empty (no-op) — must be set in prod.** |
 | `app_setting` | `whats_new_url` | URL pg_cron POSTs to for the Monday what's-new digest. **Seeded to a dev default — must be set per-env.** |
+| `app_setting` | `slack_sync_url` | URL pg_cron POSTs to for the nightly Slack membership sync. **Seeded to a dev default — must be set per-env.** |
+| `app_setting` | `slack_sync_secret` | Shared secret the nightly sync cron sends and the endpoint checks. **Seeded empty (no-op) — must be set in prod.** |
 | `app_setting` | `slack_alert_state_<source>` | Last-known ok/failing per sync source. Managed automatically; don't touch. |
 
 ---
@@ -91,7 +93,9 @@ the **prod** Supabase SQL editor (replace the secret with a long random value; n
 insert into app_setting (key, value) values
   ('slack_reminder_url', '"https://hub.redalert1741.org/api/cron/slack/mentor-reminders"'),
   ('slack_reminder_secret', '"REPLACE_WITH_A_LONG_RANDOM_SECRET"'),
-  ('whats_new_url', '"https://hub.redalert1741.org/api/cron/slack/whats-new"')
+  ('whats_new_url', '"https://hub.redalert1741.org/api/cron/slack/whats-new"'),
+  ('slack_sync_url', '"https://hub.redalert1741.org/api/cron/slack/membership-sync"'),
+  ('slack_sync_secret', '"REPLACE_WITH_A_LONG_RANDOM_SECRET"')
 on conflict (key) do update set value = excluded.value;
 ```
 
@@ -100,8 +104,8 @@ The `value` column is `jsonb`, so keep the inner double-quotes exactly as shown.
 ### 5. Verify the schedule and settings
 
 ```sql
-select jobname, schedule, active from cron.job where jobname in ('slack-mentor-reminders-weekly','slack-whats-new-weekly');
-select key, value from app_setting where key in ('slack_reminder_url','slack_reminder_secret','whats_new_url');
+select jobname, schedule, active from cron.job where jobname in ('slack-mentor-reminders-weekly','slack-whats-new-weekly','slack-nightly-sync');
+select key, value from app_setting where key in ('slack_reminder_url','slack_reminder_secret','whats_new_url','slack_sync_url','slack_sync_secret');
 ```
 
 Expect `0 23 * * 4`, `active = t`, the prod URL, and your secret.
