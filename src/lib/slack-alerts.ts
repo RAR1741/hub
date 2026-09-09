@@ -4,13 +4,14 @@ import type { PushDeps } from "./push-dispatch";
 import { getSetting } from "./settings";
 import { slackDepsFromEnv, type SlackDeps } from "./slack";
 
-export type AlertSource = "first_sync" | "calendar_sync" | "drive_sync" | "github_sync";
+export type AlertSource = "first_sync" | "calendar_sync" | "drive_sync" | "github_sync" | "slack_sync";
 
 const LABELS: Record<AlertSource, string> = {
   first_sync: "FIRST roster sync",
   calendar_sync: "Google Calendar sync",
   drive_sync: "Google Drive group sync",
   github_sync: "GitHub team sync",
+  slack_sync: "Slack membership sync",
 };
 
 /**
