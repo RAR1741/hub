@@ -1,14 +1,17 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
+import { getDb } from "@/lib/db";
 import { hasRole } from "@/lib/authz";
 import { getTeam, listTeamMembers, listTeams, listTeamSlackChannels } from "@/lib/teams";
 import { listPeople, displayName } from "@/lib/people";
 import { listTeamExternalAccounts } from "@/lib/team-external-accounts";
+import { computeEffectiveSlackMembers } from "@/lib/team-slack-backfill";
 import { TeamForm } from "@/components/TeamForm";
 import { MemberManager } from "@/components/MemberManager";
 import { ExternalAccountManager } from "@/components/ExternalAccountManager";
 import { DeleteTeamButton } from "@/components/DeleteTeamButton";
+import { InviteAllMembersButton } from "@/components/InviteAllMembersButton";
 
 export const metadata: Metadata = { title: "Manage Team" };
 
@@ -20,13 +23,14 @@ export default async function AdminTeamPage({
   const [{ id }, viewer] = await Promise.all([params, getViewer()]);
   if (!hasRole(viewer.role, "admin")) redirect("/");
 
-  const [team, teams, members, everyone, externalAccounts, slackChannels] = await Promise.all([
+  const [team, teams, members, everyone, externalAccounts, slackChannels, effective] = await Promise.all([
     getTeam(id),
     listTeams(),
     listTeamMembers(id),
     listPeople(),
     listTeamExternalAccounts(id),
     listTeamSlackChannels(id),
+    computeEffectiveSlackMembers(getDb(), id),
   ]);
   if (!team) notFound();
 
@@ -69,6 +73,23 @@ export default async function AdminTeamPage({
           rows={externalAccounts}
           isLinkedGoogle={!!team.googleGroupEmail}
           isLinkedGithub={!!team.githubTeamSlug}
+        />
+      </section>
+      <section className="card flex flex-col gap-4">
+        <div>
+          <h2 className="text-base font-semibold">Membership backfill</h2>
+          <p className="text-sm text-[var(--muted)]">
+            Reconcile this team&apos;s effective membership everywhere at once — invite subtree members to
+            its linked Slack channels (which never self-heal on their own) and run the Drive/GitHub
+            reconcile now instead of waiting for the nightly job.
+          </p>
+        </div>
+        <InviteAllMembersButton
+          teamId={team.id}
+          effectiveActive={effective.effectiveActive}
+          withSlackCount={effective.withSlack.length}
+          withoutSlackCount={effective.withoutSlackCount}
+          channelCount={slackChannels.length}
         />
       </section>
     </main>
