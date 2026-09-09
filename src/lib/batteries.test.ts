@@ -100,7 +100,20 @@ describe("parseBatteryInput", () => {
       status: "active",
       retiredAt: null,
       retiredReason: null,
+      kind: "frc_robot",
     });
+  });
+
+  test("defaults kind to frc_robot when absent", () => {
+    expect(parseBatteryInput(validBattery)?.kind).toBe("frc_robot");
+  });
+
+  test("accepts a valid non-default kind", () => {
+    expect(parseBatteryInput({ ...validBattery, kind: "tool" })?.kind).toBe("tool");
+  });
+
+  test("rejects an invalid kind", () => {
+    expect(parseBatteryInput({ ...validBattery, kind: "drone" })).toBeNull();
   });
 
   test("rejects an empty number", () => {
@@ -227,11 +240,21 @@ describe("createBattery", () => {
     const input = parseBatteryInput(validBattery)!;
     expect(await createBattery(input, db)).toEqual({ ok: true, id: "battery-1" });
   });
+
+  test("insert payload includes kind", async () => {
+    const { db, stubs } = fakeDb({
+      battery: [{ data: { id: "battery-1" }, error: null }],
+    });
+    const input = parseBatteryInput({ ...validBattery, kind: "tool" })!;
+    await createBattery(input, db);
+    expect(stubs.battery[0].calls[0]).toEqual({ method: "insert", args: [expect.objectContaining({ kind: "tool" })] });
+  });
 });
 
 describe("createUsage", () => {
   test("maps a foreign-key violation (unknown battery) to 400", async () => {
     const { db } = fakeDb({
+      battery: [{ data: null, error: null }],
       battery_usage: [{ data: null, error: { code: "23503" } }],
     });
     const input = parseUsageInput(validUsage)!;
@@ -240,10 +263,64 @@ describe("createUsage", () => {
 
   test("returns the new id on success", async () => {
     const { db } = fakeDb({
+      battery: [{ data: { id: BATTERY_ID, kind: "frc_robot" }, error: null }],
       battery_usage: [{ data: { id: "usage-1" }, error: null }],
     });
     const input = parseUsageInput(validUsage)!;
     expect(await createUsage(input, TECH_ID, db)).toEqual({ ok: true, id: "usage-1" });
+  });
+
+  test("nulls the seven FRC-only fields for a non-FRC battery", async () => {
+    const { db, stubs } = fakeDb({
+      battery: [{ data: { id: BATTERY_ID, kind: "tool" }, error: null }],
+      battery_usage: [{ data: { id: "usage-1" }, error: null }],
+    });
+    const input = parseUsageInput({
+      ...validUsage,
+      hadProblem: true,
+      problemDescription: "won't hold charge",
+      wiggleTestOk: true,
+      chargerTestOk: true,
+      rintOhms: 0.02,
+      notes: "fine",
+    })!;
+    await createUsage(input, TECH_ID, db);
+    const insertPayload = stubs.battery_usage[0].calls[0].args[0] as Record<string, unknown>;
+    expect(insertPayload).toMatchObject({
+      event_key: null,
+      match_key: null,
+      wiggle_test_ok: null,
+      charger_test_ok: null,
+      rint_ohms: null,
+      charge_pre_pct: null,
+      charge_post_pct: null,
+      had_problem: true,
+      notes: "fine",
+    });
+  });
+
+  test("passes the seven FRC-only fields through unchanged for an frc_robot battery", async () => {
+    const { db, stubs } = fakeDb({
+      battery: [{ data: { id: BATTERY_ID, kind: "frc_robot" }, error: null }],
+      battery_usage: [{ data: { id: "usage-1" }, error: null }],
+    });
+    const input = parseUsageInput({
+      ...validUsage,
+      wiggleTestOk: true,
+      chargerTestOk: false,
+      rintOhms: 0.02,
+    })!;
+    await createUsage(input, TECH_ID, db);
+    const insertPayload = stubs.battery_usage[0].calls[0].args[0] as Record<string, unknown>;
+    expect(insertPayload).toMatchObject({
+      event_key: "2026incol",
+      match_key: "qm1",
+      wiggle_test_ok: true,
+      charger_test_ok: false,
+      rint_ohms: 0.02,
+      charge_pre_pct: 100,
+      charge_post_pct: 80,
+    });
   });
 });
 

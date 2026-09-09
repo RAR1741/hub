@@ -822,10 +822,16 @@ export function onshapeConnectionFromRow(row: OnshapeConnectionRow): OnshapeConn
 
 export type BatteryStatus = "active" | "retired";
 
+export const BATTERY_KINDS = ["frc_robot", "ftc_robot", "tool", "camera", "computer", "other"] as const;
+export type BatteryKind = (typeof BATTERY_KINDS)[number];
+export const BATTERY_KIND_LABELS: Record<BatteryKind, string> = {
+  frc_robot: "FRC robot", ftc_robot: "FTC robot", tool: "Tool", camera: "Camera", computer: "Computer", other: "Other",
+};
+
 export type BatteryRow = {
   id: string;
   number: string;
-  kind: string;
+  kind: BatteryKind;
   year_acquired: number | null;
   model: string | null;
   serial_date_code: string | null;
@@ -842,7 +848,7 @@ export type BatteryRow = {
 export type Battery = {
   id: string;
   number: string;
-  kind: string;
+  kind: BatteryKind;
   yearAcquired: number | null;
   model: string | null;
   serialDateCode: string | null;
