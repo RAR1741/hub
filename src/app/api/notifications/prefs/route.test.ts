@@ -40,3 +40,18 @@ test("enabling adds the type via array_append RPC/update", async () => {
   const res = await prefsHandler(admin, req({ type: "admin_alerts", enabled: true }), undefined, db);
   expect(res.status).toBe(200);
 });
+
+test("valid meetingReminderMinutes updates person.meeting_reminder_minutes", async () => {
+  const update = vi.fn().mockReturnValue({ eq: () => ({ error: null }) });
+  const db = { from: () => ({ update }) } as unknown as SupabaseClient;
+  const res = await prefsHandler(student, req({ meetingReminderMinutes: [15, 60] }), undefined, db);
+  expect(res.status).toBe(200);
+  expect(update).toHaveBeenCalledWith({ meeting_reminder_minutes: [15, 60] });
+});
+
+test("invalid meetingReminderMinutes is rejected", async () => {
+  const db = { from: vi.fn() } as unknown as SupabaseClient;
+  const res = await prefsHandler(student, req({ meetingReminderMinutes: [45] }), undefined, db);
+  expect(res.status).toBe(400);
+  expect(db.from).not.toHaveBeenCalled();
+});
