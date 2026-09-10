@@ -69,6 +69,9 @@ export async function pushEventReminders(deps: {
     pruned += res.pruned;
     eventsSent += 1;
 
+    // ponytail: two overlapping 5-min cron ticks could both pass the pushed_at IS NULL
+    // check before either stamps, double-sending; fire-and-forget cron makes the race
+    // near-impossible in practice, so no lock/transaction here (accepted ceiling).
     await deps.db
       .from("event_signup_reminder")
       .update({ pushed_at: nowIso })

@@ -45,6 +45,7 @@ export async function pushMeetingReminders(deps: {
       .overlaps("meeting_reminder_minutes", dueM);
     if (personError) {
       console.error("[meeting-reminder] load persons failed:", personError.message);
+      continue;
     }
     const ids = ((personData ?? []) as { id: string }[]).map((p) => p.id);
 
