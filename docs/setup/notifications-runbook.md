@@ -73,25 +73,29 @@ send this payload (the SW expects JSON `{title, body, url}`):
 {"title":"1741 Hub","body":"It works!","url":"/me/notifications"}
 ```
 
-**C. Exercise a real cron end-to-end.** Uses the shipped cron route. First set the local cron
-secret (the column is `jsonb` — keep the inner quotes, or the update is rejected and the route
-keeps 403ing):
+**C. Exercise a real cron end-to-end.** Uses the shipped cron route, which sweeps both meeting and
+event reminders in one call. First set the local cron secret (the column is `jsonb` — keep the
+inner quotes, or the update is rejected and the route keeps 403ing):
 
 ```bash
 ./dev npm run -s db:psql -- -tAc "update app_setting set value='\"localdev\"'::jsonb where key='push_cron_secret';"
 ```
 
-Then, with *Meeting reminders* toggled on for your subscribed user, insert a meeting ~1h out and
-fire the hourly cron (in-container the app is always `localhost:3000`):
+Then, with *Meeting reminders* toggled on (and a lead time picked, default `{60}`) for your
+subscribed user, insert a meeting ~1h out and fire the cron (in-container the app is always
+`localhost:3000`):
 
 ```bash
 ./dev npm run -s db:psql -- -tAc "insert into meeting (title, starts_at, ends_at) values ('Local push test', now()+interval '1 hour', now()+interval '2 hours');"
-./dev bash -lc "curl -sS -X POST http://localhost:3000/api/cron/push/meeting-reminder -H 'x-sync-secret: localdev'"
+./dev bash -lc "curl -sS -X POST http://localhost:3000/api/cron/push/reminders -H 'x-sync-secret: localdev'"
 ```
 
-Expected: `{"sent":1,"pruned":0}` and a notification in Chrome. A fired meeting is stamped
-`reminder_pushed_at`; to re-fire, insert a fresh meeting or
-`update meeting set reminder_pushed_at = null;`.
+Expected: `{"ok":true,"events":{...},"meetings":{"sent":1,"pruned":0,"meetings":1}}` and a
+notification in Chrome. A fired meeting offset is stamped into `reminder_pushed_minutes`; to
+re-fire, insert a fresh meeting or `update meeting set reminder_pushed_minutes = '{}';`. For an
+event reminder, pick an offset on the sign-up picker instead of toggling a notification type —
+it's stamped per `(event, person, minutes)` in `event_signup_reminder.pushed_at`; to re-fire,
+`update event_signup_reminder set pushed_at = null where event_id = '<id>';`.
 
 ### 1.4 Reset
 
@@ -128,7 +132,7 @@ Full detail in [web-push.md](web-push.md); the checklist:
    insert into app_setting (key, value) values
      ('push_cron_secret', '"<LONG_RANDOM_SECRET>"'),
      ('push_clocked_in_late_url', '"https://hub.redalert1741.org/api/cron/push/clocked-in-late"'),
-     ('push_meeting_reminder_url', '"https://hub.redalert1741.org/api/cron/push/meeting-reminder"')
+     ('push_reminders_url', '"https://hub.redalert1741.org/api/cron/push/reminders"')
    on conflict (key) do update set value = excluded.value;
    ```
 
@@ -141,29 +145,30 @@ Full detail in [web-push.md](web-push.md); the checklist:
 select key,
        case when key = 'push_cron_secret' then length(value #>> '{}')::text || ' chars' else value #>> '{}' end
 from app_setting
-where key in ('push_cron_secret','push_clocked_in_late_url','push_meeting_reminder_url');
+where key in ('push_cron_secret','push_clocked_in_late_url','push_reminders_url');
 
 -- Both pg_cron jobs scheduled and active
 select jobname, schedule, active from cron.job
-where jobname in ('push-clocked-in-late','push-meeting-reminder');
+where jobname in ('push-clocked-in-late','push-reminders');
 ```
 
 Expected jobs: `push-clocked-in-late` @ `0 3 * * *` (03:00 UTC nightly, before the 08:00 UTC
-auto-close sweep) and `push-meeting-reminder` @ `0 * * * *` (hourly). VAPID env is confirmed
-indirectly by 2.3 actually delivering.
+auto-close sweep) and `push-reminders` @ `*/5 * * * *` (every 5 minutes, sweeping both meeting and
+event reminders). VAPID env is confirmed indirectly by 2.3 actually delivering.
 
 ### 2.3 Manually verify a cron in prod
 
 Fire the route yourself instead of waiting for the schedule (needs the real secret):
 
 ```bash
-curl -sS -X POST https://hub.redalert1741.org/api/cron/push/meeting-reminder \
+curl -sS -X POST https://hub.redalert1741.org/api/cron/push/reminders \
   -H "x-sync-secret: <push_cron_secret>"
 ```
 
-- `{"sent":N,...}` → working; `N` reflects meetings in the next window with opted-in recipients.
+- `{"ok":true,"events":{...},"meetings":{...}}` → working; each sweep's counts reflect targets in
+  the next window with opted-in recipients.
 - `403` → `push_cron_secret` unset/mismatched (2.1).
-- `502` → the handler threw; check Vercel function logs for `meeting-reminder push failed`.
+- `502` → the handler threw; check Vercel function logs for `reminders push failed`.
 
 ### 2.4 Confirm pg_cron is actually running the job
 
@@ -183,9 +188,9 @@ actual push count is in the Vercel function logs, not here.
   **invalidates every existing subscription** — every device must re-enable. Not a casual action.
 - **Rotate the cron secret**: update `push_cron_secret` in prod SQL; takes effect immediately (no
   deploy — the route reads it per-request).
-- **Pause a cron**: `select cron.unschedule('push-meeting-reminder');` (re-add via a migration, or
-  re-run the `cron.schedule(...)` from `supabase/migrations/20260906140200_*`). Prefer a migration
-  for anything permanent.
+- **Pause a cron**: `select cron.unschedule('push-reminders');` (re-add via a migration, or
+  re-run the `cron.schedule(...)` from `supabase/migrations/20260910120100_push_reminders_cron.sql`).
+  Prefer a migration for anything permanent.
 - **Kill switch for all push**: clear `VAPID_PRIVATE_KEY` in Vercel and redeploy — every dispatch
   becomes a logged no-op instantly, no data lost.
 
