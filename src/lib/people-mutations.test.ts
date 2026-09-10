@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { createPerson, updatePerson, type PersonInput } from "./people";
+import { createPerson, updatePerson, setPersonActive, type PersonInput } from "./people";
 
 const input: PersonInput = {
   firstName: "A", lastName: "B", displayName: "AB", role: "student",
@@ -20,6 +20,18 @@ function updateDb(result: { data?: unknown; error?: { code: string } }) {
       update: () => ({ eq: () => ({ select: () => ({ maybeSingle: async () => result }) }) }),
     }),
   } as never;
+}
+function capturingUpdateDb(result: { data?: unknown; error?: { code: string } }) {
+  const captured: { payload?: unknown } = {};
+  const db = {
+    from: () => ({
+      update: (payload: unknown) => {
+        captured.payload = payload;
+        return { eq: () => ({ select: () => ({ maybeSingle: async () => result }) }) };
+      },
+    }),
+  } as never;
+  return { db, captured };
 }
 
 describe("createPerson", () => {
@@ -45,5 +57,22 @@ describe("updatePerson", () => {
   test("409 email_has_secondaries when the mirror trigger blocks blanking", async () => {
     const r = await updatePerson("p1", input, updateDb({ error: { code: "P0001" } }));
     expect(r).toEqual({ ok: false, status: 409, reason: "email_has_secondaries" });
+  });
+});
+
+describe("setPersonActive", () => {
+  test("ok writes only is_active", async () => {
+    const { db, captured } = capturingUpdateDb({ data: { id: "p1" }, error: undefined });
+    const r = await setPersonActive("p1", false, db);
+    expect(r).toEqual({ ok: true, status: 200 });
+    expect(captured.payload).toEqual({ is_active: false });
+  });
+  test("404 when no row matched", async () => {
+    const r = await setPersonActive("missing", true, updateDb({ data: null, error: undefined }));
+    expect(r).toEqual({ ok: false, status: 404 });
+  });
+  test("500 on db error", async () => {
+    const r = await setPersonActive("p1", true, updateDb({ error: { code: "XX000" } }));
+    expect(r).toEqual({ ok: false, status: 500 });
   });
 });
