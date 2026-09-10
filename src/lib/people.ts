@@ -336,6 +336,27 @@ export async function updatePerson(
 }
 
 /**
+ * Flip ONLY `is_active`, leaving every other column alone. Deliberately not
+ * `updatePerson`, which rewrites the whole row from a full PersonInput.
+ */
+export async function setPersonActive(
+  id: string,
+  active: boolean,
+  db?: SupabaseClient,
+): Promise<{ ok: boolean; status: number }> {
+  const client = db ?? (await import("./db")).getDb();
+  const { data, error } = await client
+    .from("person")
+    .update({ is_active: active })
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
+  if (error) return { ok: false, status: 500 };
+  if (!data) return { ok: false, status: 404 };
+  return { ok: true, status: 200 };
+}
+
+/**
  * The subset of person columns a roster CSV row can supply. `firstName` /
  * `lastName` are always applied (the CSV parser requires them on every row).
  * `email` / `role` / `gradYear` / `studentIdNumber` are `null` when the CSV

@@ -60,6 +60,13 @@ export const NAV_ITEMS: readonly NavDestination[] = [
     gate: "mentor",
     section: "Review",
   },
+  {
+    label: "Absent members",
+    href: "/admin/absent-members",
+    group: "Admin",
+    gate: "mentor",
+    section: "Review",
+  },
   { label: "Reports", href: "/admin/reports", group: "Admin", gate: "mentor", section: "Review" },
   // Roster — admin
   { label: "People", href: "/admin/people", group: "Admin", gate: "admin", section: "Roster" },
