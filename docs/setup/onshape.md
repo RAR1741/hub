@@ -66,7 +66,7 @@ endpoint. Unlike `dev-login`, its token endpoint mints a token with no credentia
 its gate (`src/app/api/dev/onshape-mock/gate.ts`) is stricter: it 404s on **any** Vercel deployment
 (production or preview), guarded by the Vercel-injected `VERCEL_ENV` — which can't be overridden by
 adding an env var. It's reachable locally under `next dev`, and in non-Vercel production-mode
-`next start` (CI e2e) only when `ALLOW_ONSHAPE_MOCK=1` is explicitly set. Point the two URL env vars
+`next start` (CI e2e) only when `ALLOW_ONSHAPE_MOCK=1` is explicitly set. Note: the app refuses to start if `ALLOW_ONSHAPE_MOCK=1` is set while pointed at a non-local Supabase database or running on any Vercel deployment — a boot-time guard (`src/lib/startup-guard.ts`) enforces this. Point the two URL env vars
 at it in `.env.local`:
 
 ```bash
