@@ -84,6 +84,7 @@ describe("adminSections", () => {
     expect(sections.find((s) => s.label === "Review")!.items.map((i) => i.href)).toEqual([
       "/admin/requests",
       "/admin/sessions/flagged",
+      "/admin/absent-members",
       "/admin/reports",
     ]);
     expect(sections.find((s) => s.label === "Time")!.items.map((i) => i.href)).toEqual([
