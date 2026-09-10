@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ReminderPicker } from "@/components/ReminderPicker";
 
 type TypeRow = { type: string; label: string; description: string; enabled: boolean };
 
@@ -18,15 +19,18 @@ export function NotificationSettings({
   configured,
   publicKey,
   types,
+  meetingReminderMinutes,
 }: {
   configured: boolean;
   publicKey: string;
   types: TypeRow[];
+  meetingReminderMinutes: number[];
 }) {
   const [rows, setRows] = useState(types);
   const [deviceOn, setDeviceOn] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [leadMinutes, setLeadMinutes] = useState(meetingReminderMinutes);
 
   async function enableDevice() {
     setBusy(true);
@@ -78,6 +82,21 @@ export function NotificationSettings({
     }
   }
 
+  async function updateLeadMinutes(next: number[]) {
+    const prev = leadMinutes;
+    setLeadMinutes(next);
+    try {
+      const res = await fetch("/api/notifications/prefs", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ meetingReminderMinutes: next }),
+      });
+      if (!res.ok) setLeadMinutes(prev);
+    } catch {
+      setLeadMinutes(prev);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <section className="card flex flex-col gap-3">
@@ -122,6 +141,14 @@ export function NotificationSettings({
                   </span>
                 </span>
               </label>
+              {r.type === "meeting_reminder" && r.enabled && (
+                <ReminderPicker
+                  legend="How far ahead"
+                  testIdPrefix="lead"
+                  value={leadMinutes}
+                  onChange={updateLeadMinutes}
+                />
+              )}
             </li>
           ))}
         </ul>

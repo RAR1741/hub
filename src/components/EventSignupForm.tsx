@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { FieldWithOptions } from "@/lib/forms";
 import { Button } from "@/components/ui";
+import { ReminderPicker } from "@/components/ReminderPicker";
 
 type Props = { eventId: string; eventName: string; fields: FieldWithOptions[] };
 
@@ -13,6 +14,7 @@ export function EventSignupForm({ eventId, eventName, fields }: Props) {
   const [values, setValues] = useState<Record<string, string[]>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [reminderMinutes, setReminderMinutes] = useState<number[]>([]);
 
   function set(fieldId: string, vals: string[]) {
     setValues((v) => ({ ...v, [fieldId]: vals }));
@@ -39,7 +41,7 @@ export function EventSignupForm({ eventId, eventName, fields }: Props) {
     const res = await fetch(`/api/events/${eventId}/signup`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ answers }),
+      body: JSON.stringify({ answers, reminderMinutes }),
     });
     setBusy(false);
     if (res.ok) {
@@ -140,6 +142,12 @@ export function EventSignupForm({ eventId, eventName, fields }: Props) {
                   </div>
                 </fieldset>
               ))}
+              <ReminderPicker
+                value={reminderMinutes}
+                onChange={setReminderMinutes}
+                legend="Remind me before it starts (optional)"
+                testIdPrefix="event-remind"
+              />
             </div>
 
             {error ? (
