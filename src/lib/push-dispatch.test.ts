@@ -80,6 +80,20 @@ describe("sendPushToOptedIn", () => {
     expect(db._deleted).toContain("s1");
   });
 
+  test("type = null skips the opt-in gate; a real type still respects it", async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    const db = fakeDb([
+      { id: "s1", endpoint: "https://push/1", p256dh: "k1", auth: "a1", person: { is_active: true, notification_types: ["admin_alerts"] } },
+    ]);
+    const nullRes = await sendPushToOptedIn(["p1"], null, { title: "t", body: "b", url: "/" }, { db, push: { ...PUSH, send } });
+    expect(nullRes.sent).toBe(1);
+
+    send.mockClear();
+    const typedRes = await sendPushToOptedIn(["p1"], "meeting_reminder", { title: "t", body: "b", url: "/" }, { db, push: { ...PUSH, send } });
+    expect(typedRes.sent).toBe(0);
+    expect(send).not.toHaveBeenCalled();
+  });
+
   test("a single send failure is swallowed, others proceed", async () => {
     const send = vi
       .fn()
