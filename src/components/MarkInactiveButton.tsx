@@ -32,7 +32,7 @@ export function MarkInactiveButton({ personId, name }: { personId: string; name:
 
   return (
     <>
-      <button onClick={markInactive} className="btn" disabled={busy}>
+      <button onClick={markInactive} className="btn btn-danger" disabled={busy}>
         {busy ? "Marking…" : "Mark inactive"}
       </button>
       {status && <span role="status" className="text-sm text-[var(--muted)]"> {status}</span>}

@@ -109,6 +109,22 @@ describe("listAbsentMembers", () => {
     expect(absent.map((m) => m.id)).toEqual(["m1"]);
   });
 
+  test("fails closed (returns []) when the open-session query errors, even if people are active", async () => {
+    const db = fakeDb({
+      person: {
+        data: [
+          person({ id: "s1", first_name: "Ada", last_name: "Ng", role: "student", session: [] }),
+          person({ id: "m1", first_name: "Cy", last_name: "Ma", role: "mentor", session: [] }),
+        ],
+        error: null,
+      },
+      session: { data: null, error: { message: "boom" } },
+    });
+
+    const absent = await listAbsentMembers(db);
+    expect(absent).toEqual([]);
+  });
+
   test("orders never-seen first, then ascending by lastSeen, passing the raw ISO string through", async () => {
     const db = fakeDb({
       person: {

@@ -110,6 +110,10 @@ export async function listAbsentMembers(db?: SupabaseClient): Promise<AbsentMemb
   ]);
   if (peopleError) console.error("listAbsentMembers: person query failed", peopleError);
   if (openError) console.error("listAbsentMembers: session query failed", openError);
+  // Fail closed: without the open-session set we can't tell who is actually
+  // clocked in, and a fabricated "everyone is absent" list would put a live
+  // Mark-inactive button next to people who are present. Show nothing instead.
+  if (openError) return [];
   const openIds = new Set((open ?? []).map((s) => s.person_id as string));
   return (people ?? [])
     .filter((p) => !openIds.has(p.id as string))
