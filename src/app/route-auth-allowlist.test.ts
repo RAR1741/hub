@@ -82,7 +82,7 @@ const ROUTE_AUTH_ALLOWLIST: Record<string, string> = {
     "x-sync-secret compared in constant time (secureEqual); fails closed when unset.",
   "api/cron/push/clocked-in-late/route.ts":
     "x-sync-secret compared in constant time (secureEqual); fails closed when unset.",
-  "api/cron/push/meeting-reminder/route.ts":
+  "api/cron/push/reminders/route.ts":
     "x-sync-secret compared in constant time (secureEqual); fails closed when unset.",
   "api/admin/first/sync/route.ts":
     "x-sync-secret (constant time) OR getViewer()+hasRole('admin').",
