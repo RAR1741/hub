@@ -21,6 +21,9 @@ const masqueradingViewer = {
 };
 
 const ctx = { params: Promise.resolve({ id: "11111111-1111-1111-1111-111111111111" }) };
+const EVENT_ID = "11111111-1111-1111-1111-111111111111";
+
+const normalViewer = { person: { id: "p1" }, role: "student", masquerade: null };
 
 describe("events signup masquerade guard", () => {
   test("POST is blocked with 403 masquerade_read_only while masquerading", async () => {
@@ -50,5 +53,93 @@ describe("events signup masquerade guard", () => {
     expect(res.status).toBe(403);
     expect(await res.json()).toEqual({ error: "masquerade_read_only" });
     expect(cancelEventSignup).not.toHaveBeenCalled();
+  });
+});
+
+describe("events signup route — reminderMinutes", () => {
+  test("absent body (one-click) still works, minutes=[]", async () => {
+    const { getViewer } = await import("@/lib/viewer");
+    const { getEvent } = await import("@/lib/events");
+    const { signUpForEvent } = await import("@/lib/event-signups");
+    vi.mocked(getViewer).mockResolvedValue(normalViewer as never);
+    vi.mocked(getEvent).mockResolvedValue({ id: EVENT_ID, formId: null } as never);
+    vi.mocked(signUpForEvent).mockResolvedValue({ ok: true, status: 201 });
+
+    const { POST } = await import("./route");
+    const res = await POST(new Request("http://test/api/events/x/signup", { method: "POST" }), ctx);
+
+    expect(res.status).toBe(201);
+    expect(signUpForEvent).toHaveBeenCalledWith(EVENT_ID, "p1", undefined, undefined, []);
+  });
+
+  test("{ reminderMinutes: [30] } threads through on the one-click path", async () => {
+    const { getViewer } = await import("@/lib/viewer");
+    const { getEvent } = await import("@/lib/events");
+    const { signUpForEvent } = await import("@/lib/event-signups");
+    vi.mocked(getViewer).mockResolvedValue(normalViewer as never);
+    vi.mocked(getEvent).mockResolvedValue({ id: EVENT_ID, formId: null } as never);
+    vi.mocked(signUpForEvent).mockResolvedValue({ ok: true, status: 201 });
+
+    const { POST } = await import("./route");
+    const res = await POST(
+      new Request("http://test/api/events/x/signup", {
+        method: "POST",
+        body: JSON.stringify({ reminderMinutes: [30] }),
+      }),
+      ctx,
+    );
+
+    expect(res.status).toBe(201);
+    expect(signUpForEvent).toHaveBeenCalledWith(EVENT_ID, "p1", undefined, undefined, [30]);
+  });
+
+  test("invalid reminderMinutes -> 400", async () => {
+    const { getViewer } = await import("@/lib/viewer");
+    const { getEvent } = await import("@/lib/events");
+    const { signUpForEvent } = await import("@/lib/event-signups");
+    vi.mocked(getViewer).mockResolvedValue(normalViewer as never);
+    vi.mocked(getEvent).mockResolvedValue({ id: EVENT_ID, formId: null } as never);
+
+    const { POST } = await import("./route");
+    const res = await POST(
+      new Request("http://test/api/events/x/signup", {
+        method: "POST",
+        body: JSON.stringify({ reminderMinutes: [45] }),
+      }),
+      ctx,
+    );
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ ok: false, error: "invalid reminderMinutes" });
+    expect(signUpForEvent).not.toHaveBeenCalled();
+  });
+
+  test("form path threads both answers and reminderMinutes", async () => {
+    const { getViewer } = await import("@/lib/viewer");
+    const { getEvent } = await import("@/lib/events");
+    const { submitEventSignupResponse } = await import("@/lib/form-responses");
+    vi.mocked(getViewer).mockResolvedValue(normalViewer as never);
+    vi.mocked(getEvent).mockResolvedValue({ id: EVENT_ID, formId: "form1" } as never);
+    vi.mocked(submitEventSignupResponse).mockResolvedValue({ ok: true, status: 201 });
+
+    const { POST } = await import("./route");
+    const res = await POST(
+      new Request("http://test/api/events/x/signup", {
+        method: "POST",
+        body: JSON.stringify({ answers: [{ fieldId: "f1", values: ["yes"] }], reminderMinutes: [15, 60] }),
+      }),
+      ctx,
+    );
+
+    expect(res.status).toBe(201);
+    expect(submitEventSignupResponse).toHaveBeenCalledWith(
+      EVENT_ID,
+      "p1",
+      "form1",
+      [{ fieldId: "f1", values: ["yes"] }],
+      undefined,
+      undefined,
+      [15, 60],
+    );
   });
 });

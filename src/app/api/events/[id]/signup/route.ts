@@ -4,6 +4,7 @@ import { cancelEventSignup, signUpForEvent } from "@/lib/event-signups";
 import { getEvent } from "@/lib/events";
 import { submitEventSignupResponse } from "@/lib/form-responses";
 import { clientIp, createRateLimiter } from "@/lib/rate-limit";
+import { parseReminderMinutes } from "@/lib/reminder-minutes";
 import { reqUuid } from "@/lib/validate";
 import { getViewer } from "@/lib/viewer";
 
@@ -26,21 +27,28 @@ export async function POST(request: Request, context: Ctx) {
   const event = await getEvent(id);
   if (!event) return NextResponse.json({ ok: false }, { status: 404 });
 
+  // Body is optional on the one-click path (no body sent at all).
+  const body = await request.json().catch(() => ({}));
+  const minutes = parseReminderMinutes((body as { reminderMinutes?: unknown })?.reminderMinutes);
+  if (minutes === null) {
+    return NextResponse.json({ ok: false, error: "invalid reminderMinutes" }, { status: 400 });
+  }
+
   // person_id is ALWAYS the viewer's own id — never read from the body.
   if (event.formId) {
-    const body = (await request.json().catch(() => null)) as { answers?: unknown } | null;
-    const submitted = Array.isArray(body?.answers)
-      ? (body!.answers as Array<{ fieldId?: unknown; values?: unknown }>).map((a) => ({
+    const answers = (body as { answers?: unknown })?.answers;
+    const submitted = Array.isArray(answers)
+      ? (answers as Array<{ fieldId?: unknown; values?: unknown }>).map((a) => ({
           fieldId: typeof a?.fieldId === "string" ? a.fieldId : "",
           values: Array.isArray(a?.values) ? (a.values as unknown[]).filter((v): v is string => typeof v === "string") : [],
         }))
       : [];
-    const result = await submitEventSignupResponse(id, viewer.person.id, event.formId, submitted);
+    const result = await submitEventSignupResponse(id, viewer.person.id, event.formId, submitted, undefined, undefined, minutes);
     return NextResponse.json({ ok: result.ok }, { status: result.status });
   }
 
   // No form attached: existing one-click boolean sign-up, unchanged.
-  const result = await signUpForEvent(id, viewer.person.id);
+  const result = await signUpForEvent(id, viewer.person.id, undefined, undefined, minutes);
   return NextResponse.json({ ok: result.ok }, { status: result.status });
 }
 
