@@ -28,6 +28,7 @@ export default async function NotificationsPage() {
         configured={configured}
         publicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ""}
         types={types}
+        meetingReminderMinutes={viewer.person.meeting_reminder_minutes}
       />
       {!pushTestBlocked() && hasRole(viewer.role, "admin") && (
         <a href="/admin/push-test" className="text-sm" style={{ color: "var(--muted)" }}>

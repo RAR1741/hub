@@ -1,5 +1,11 @@
-import { describe, expect, test } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
+
+vi.mock("./event-signups", () => ({ insertSignupReminders: vi.fn(async () => true) }));
+
 import { submitEventSignupResponse } from "./form-responses";
+import { insertSignupReminders } from "./event-signups";
+
+beforeEach(() => vi.clearAllMocks());
 
 const FORM = {
   form: { id: "form1", title: "Outreach", description: null, kind: "event_signup", status: "published", createdBy: "m1", createdAt: "2020-01-01T00:00:00Z" },
@@ -36,5 +42,22 @@ describe("submitEventSignupResponse", () => {
     const r = await submitEventSignupResponse("e1", "p1", "form1",
       [{ fieldId: "f_att", values: ["yes"] }], fakeDb({ rpcError: { code: "P0100" } }), FORM);
     expect(r).toEqual({ ok: false, status: 409 });
+  });
+});
+
+describe("submitEventSignupResponse — reminders", () => {
+  test("reminders inserted only after RPC success", async () => {
+    const db = fakeDb();
+    const r = await submitEventSignupResponse("e1", "p1", "form1",
+      [{ fieldId: "f_att", values: ["yes"] }], db, FORM, [15, 30]);
+    expect(r).toEqual({ ok: true, status: 201 });
+    expect(insertSignupReminders).toHaveBeenCalledWith(db, "e1", "p1", [15, 30]);
+  });
+
+  test("RPC failure -> no reminder insert", async () => {
+    const r = await submitEventSignupResponse("e1", "p1", "form1",
+      [{ fieldId: "f_att", values: ["yes"] }], fakeDb({ rpcError: { code: "23505" } }), FORM, [15]);
+    expect(r).toEqual({ ok: false, status: 409 });
+    expect(insertSignupReminders).not.toHaveBeenCalled();
   });
 });

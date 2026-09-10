@@ -94,7 +94,7 @@ export async function notifyMeetingChanged(
     { db, push: push ?? pushDepsFromEnv() },
   );
   // Reset so the moved meeting re-reminds at its new time.
-  await db.from("meeting").update({ reminder_pushed_at: null }).eq("id", meeting.id);
+  await db.from("meeting").update({ reminder_pushed_minutes: [] }).eq("id", meeting.id);
 }
 
 export async function updateMeeting(

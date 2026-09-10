@@ -1,6 +1,8 @@
 import { getDb } from "@/lib/db";
 import { getSetting } from "@/lib/settings";
 import { secureEqual } from "@/lib/secure-compare";
+import { pushDepsFromEnv } from "@/lib/push-dispatch";
+import { pushEventReminders } from "@/lib/event-reminder";
 import { pushMeetingReminders } from "@/lib/meeting-reminder";
 
 export async function POST(request: Request) {
@@ -11,10 +13,14 @@ export async function POST(request: Request) {
     return Response.json({ error: "forbidden" }, { status: 403 });
   }
   try {
-    const result = await pushMeetingReminders({ db, nowIso: new Date().toISOString() });
-    return Response.json(result);
+    const push = pushDepsFromEnv();
+    const [events, meetings] = await Promise.all([
+      pushEventReminders({ db, push }),
+      pushMeetingReminders({ db, push }),
+    ]);
+    return Response.json({ ok: true, events, meetings });
   } catch (e) {
-    console.error("meeting-reminder push failed:", e);
+    console.error("push-reminders failed:", e);
     return Response.json({ error: "failed" }, { status: 502 });
   }
 }

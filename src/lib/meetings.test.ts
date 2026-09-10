@@ -142,7 +142,7 @@ describe("notifyMeetingChanged", () => {
       expect.objectContaining({ url: "/calendar" }),
       expect.objectContaining({ db }),
     );
-    expect(update).toHaveBeenCalledWith({ reminder_pushed_at: null });
+    expect(update).toHaveBeenCalledWith({ reminder_pushed_minutes: [] });
   });
 });
 

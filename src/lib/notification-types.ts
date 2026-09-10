@@ -48,7 +48,7 @@ export const NOTIFICATION_META: Record<NotificationType, NotificationMeta> = {
   meeting_reminder: {
     type: "meeting_reminder",
     label: "Meeting reminders",
-    description: "A reminder a few hours before a meeting starts.",
+    description: "A reminder before each meeting starts — pick how far ahead below.",
     roles: MEMBER,
   },
   consent_missing: {

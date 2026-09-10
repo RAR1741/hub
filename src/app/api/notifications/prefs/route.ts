@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { withRole } from "@/lib/api";
 import { getDb } from "@/lib/db";
 import { NOTIFICATION_META, isNotificationType } from "@/lib/notification-types";
+import { parseReminderMinutes } from "@/lib/reminder-minutes";
 import type { Viewer } from "@/lib/viewer";
 
 export async function prefsHandler(
@@ -11,7 +12,21 @@ export async function prefsHandler(
   db: SupabaseClient = getDb(),
 ): Promise<Response> {
   if (!viewer.person) return Response.json({ error: "no_person" }, { status: 400 });
-  const body = (await request.json().catch(() => null)) as { type?: unknown; enabled?: unknown } | null;
+  const body = (await request.json().catch(() => null)) as
+    | { type?: unknown; enabled?: unknown; meetingReminderMinutes?: unknown }
+    | null;
+
+  if (body && "meetingReminderMinutes" in body) {
+    const minutes = parseReminderMinutes(body.meetingReminderMinutes);
+    if (minutes === null) return Response.json({ error: "invalid_minutes" }, { status: 400 });
+    const { error } = await db
+      .from("person")
+      .update({ meeting_reminder_minutes: minutes })
+      .eq("id", viewer.person.id);
+    if (error) return Response.json({ error: "store_failed" }, { status: 500 });
+    return Response.json({ ok: true, meetingReminderMinutes: minutes });
+  }
+
   const type = body?.type;
   const enabled = body?.enabled === true;
   if (!isNotificationType(type)) return Response.json({ error: "unknown_type" }, { status: 400 });

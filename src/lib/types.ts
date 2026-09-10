@@ -35,6 +35,7 @@ export type PersonRow = {
   github_login?: string | null;
   github_user_id?: number | null;
   notification_types?: string[] | null;
+  meeting_reminder_minutes?: number[] | null;
 };
 
 export type Person = {
@@ -71,6 +72,7 @@ export type Person = {
   githubLogin?: string | null;
   githubUserId?: number | null;
   notification_types: string[];
+  meeting_reminder_minutes: number[];
 };
 
 export function personFromRow(row: PersonRow): Person {
@@ -108,6 +110,7 @@ export function personFromRow(row: PersonRow): Person {
     githubLogin: row.github_login ?? null,
     githubUserId: row.github_user_id ?? null,
     notification_types: row.notification_types ?? [],
+    meeting_reminder_minutes: row.meeting_reminder_minutes ?? [],
   };
 }
 

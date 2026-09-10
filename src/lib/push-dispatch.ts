@@ -79,16 +79,18 @@ export async function deliverToSubscriptions(
 }
 
 /** Send one payload to every subscription owned by an opted-in person.
- *  `personIds` may be "all" for team-wide types. Never throws. */
+ *  `personIds` may be "all" for team-wide types. `type` may be `null` — no type gate;
+ *  used by per-signup event reminders where picking the offset is itself the opt-in.
+ *  Never throws. */
 export async function sendPushToOptedIn(
   personIds: string[] | "all",
-  type: NotificationType,
+  type: NotificationType | null,
   payload: PushPayload,
   deps: { db: SupabaseClient; push?: PushDeps },
 ): Promise<{ sent: number; pruned: number }> {
   const push = deps.push;
   if (!push) {
-    console.log(`[push:unconfigured] would send ${type} to ${personIds === "all" ? "all" : personIds.length} person(s)`);
+    console.log(`[push:unconfigured] would send ${type ?? "untyped"} to ${personIds === "all" ? "all" : personIds.length} person(s)`);
     return { sent: 0, pruned: 0 };
   }
 
@@ -116,7 +118,7 @@ export async function sendPushToOptedIn(
   };
   const rows = ((data ?? []) as unknown as Row[]).filter((r) => {
     const person = Array.isArray(r.person) ? r.person[0] : r.person;
-    return person?.is_active && person.notification_types.includes(type);
+    return person?.is_active && (type === null || person.notification_types.includes(type));
   });
 
   const body = JSON.stringify(payload);

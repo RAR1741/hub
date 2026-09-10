@@ -1,5 +1,12 @@
-import { describe, expect, test } from "vitest";
-import { checkInPerson, listEventRoster, signUpForEvent, signedUpEventIds, uncheckIn } from "./event-signups";
+import { describe, expect, test, vi } from "vitest";
+import {
+  checkInPerson,
+  insertSignupReminders,
+  listEventRoster,
+  signUpForEvent,
+  signedUpEventIds,
+  uncheckIn,
+} from "./event-signups";
 import type { SlackDeps } from "./slack";
 
 /** A SlackDeps whose every real API call throws — used to prove Slack failures never affect the DB result. */
@@ -117,6 +124,110 @@ describe("signUpForEvent — Slack hook never changes the result", () => {
     const db = fakeDb({ slackChannelId: "C1", slackArchivedAt: null, personSlackId: "U123" });
     const result = await signUpForEvent("e1", "p1", db, throwingSlack);
     expect(result).toEqual({ ok: true, status: 201 });
+  });
+});
+
+describe("insertSignupReminders", () => {
+  test("empty minutes -> no insert call, returns true", async () => {
+    let called = false;
+    const db = {
+      from(table: string) {
+        if (table !== "event_signup_reminder") throw new Error(`unexpected table ${table}`);
+        called = true;
+        return { insert: async () => ({ error: null }) };
+      },
+    } as never;
+    expect(await insertSignupReminders(db, "e1", "p1", [])).toBe(true);
+    expect(called).toBe(false);
+  });
+
+  test("[15,60] -> two rows inserted", async () => {
+    let inserted: unknown[] = [];
+    const db = {
+      from(table: string) {
+        if (table !== "event_signup_reminder") throw new Error(`unexpected table ${table}`);
+        return {
+          insert: async (rows: unknown[]) => {
+            inserted = rows;
+            return { error: null };
+          },
+        };
+      },
+    } as never;
+    expect(await insertSignupReminders(db, "e1", "p1", [15, 60])).toBe(true);
+    expect(inserted).toEqual([
+      { event_id: "e1", person_id: "p1", minutes: 15 },
+      { event_id: "e1", person_id: "p1", minutes: 60 },
+    ]);
+  });
+
+  test("insert error -> logs and returns false", async () => {
+    const db = {
+      from(table: string) {
+        if (table !== "event_signup_reminder") throw new Error(`unexpected table ${table}`);
+        return { insert: async () => ({ error: { message: "boom" } }) };
+      },
+    } as never;
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(await insertSignupReminders(db, "e1", "p1", [15])).toBe(false);
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
+});
+
+describe("signUpForEvent — reminders", () => {
+  function fakeDb(opts: { reminderError?: boolean } = {}) {
+    const reminderRows: unknown[] = [];
+    const db = {
+      from(table: string) {
+        if (table === "event") {
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: {
+                    id: "e1", period_id: "pd1", name: "Demo", location: null, description: null,
+                    starts_at: "2099-01-01T18:00:00Z", ends_at: "2099-01-01T20:00:00Z",
+                    created_by: "m1", created_at: "2020-01-01T00:00:00Z",
+                  },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === "event_signup") {
+          return { insert: async () => ({ error: null }) };
+        }
+        if (table === "event_signup_reminder") {
+          return {
+            insert: async (rows: unknown[]) => {
+              reminderRows.push(...rows);
+              return { error: opts.reminderError ? { message: "boom" } : null };
+            },
+          };
+        }
+        throw new Error(`unexpected table ${table}`);
+      },
+    };
+    return Object.assign(db, { __reminderRows: reminderRows });
+  }
+
+  test("threads reminderMinutes into event_signup_reminder rows", async () => {
+    const db = fakeDb();
+    const result = await signUpForEvent("e1", "p1", db as never, undefined, [15, 60]);
+    expect(result).toEqual({ ok: true, status: 201 });
+    expect(db.__reminderRows).toEqual([
+      { event_id: "e1", person_id: "p1", minutes: 15 },
+      { event_id: "e1", person_id: "p1", minutes: 60 },
+    ]);
+  });
+
+  test("signup still returns 201 when the reminder insert fails", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const result = await signUpForEvent("e1", "p1", fakeDb({ reminderError: true }) as never, undefined, [15]);
+    expect(result).toEqual({ ok: true, status: 201 });
+    spy.mockRestore();
   });
 });
 

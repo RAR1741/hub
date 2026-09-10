@@ -41,24 +41,27 @@ mirrors the Slack "no token ⇒ no-op" pattern. Nothing errors; dispatch just sk
 
 Same pattern as the FIRST/Slack crons: the migration seeds dev defaults / an empty secret, so
 these **must** be overridden in prod or the two push crons (`clocked_in_late`,
-`meeting_reminder`) silently no-op forever. Run in the **prod** Supabase SQL editor:
+`push-reminders`) silently no-op forever. Run in the **prod** Supabase SQL editor:
 
 ```sql
 insert into app_setting (key, value) values
   ('push_cron_secret', '"REPLACE_WITH_A_LONG_RANDOM_SECRET"'),
   ('push_clocked_in_late_url', '"https://hub.redalert1741.org/api/cron/push/clocked-in-late"'),
-  ('push_meeting_reminder_url', '"https://hub.redalert1741.org/api/cron/push/meeting-reminder"')
+  ('push_reminders_url', '"https://hub.redalert1741.org/api/cron/push/reminders"')
 on conflict (key) do update set value = excluded.value;
 ```
 
 `push_cron_secret` is shared by both cron routes (`x-sync-secret` header, constant-time
 compared) — one secret, not two. The `value` column is `jsonb`; keep the inner double-quotes.
+`push_reminders_url` feeds the single `push-reminders` job, which sweeps both meeting and event
+reminders every 5 minutes — see [notifications-runbook.md](notifications-runbook.md) and
+[features/push-notifications.md](../features/push-notifications.md#meeting-and-event-reminders).
 
 Verify:
 
 ```sql
 select key, value from app_setting
-where key in ('push_cron_secret', 'push_clocked_in_late_url', 'push_meeting_reminder_url');
+where key in ('push_cron_secret', 'push_clocked_in_late_url', 'push_reminders_url');
 ```
 
 ## 4. iOS caveat
@@ -74,7 +77,7 @@ remove it without an alternative.
 - **Nothing sends anywhere** — check `VAPID_PRIVATE_KEY` / `NEXT_PUBLIC_VAPID_PUBLIC_KEY` are set
   and the app was redeployed after setting them.
 - **Cron never fires / always no-ops in prod** — `push_clocked_in_late_url` or
-  `push_meeting_reminder_url` still point at dev defaults, or `push_cron_secret` is still empty.
+  `push_reminders_url` still point at dev defaults, or `push_cron_secret` is still empty.
   Set all three (step 3).
 - **A member re-enabled push after it stopped working** — likely a VAPID key rotation; that's
   expected, not a bug.
