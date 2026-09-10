@@ -18,6 +18,7 @@ import { listPendingToolDeleteRequests } from "@/lib/tool-delete-requests";
 import { listEvents } from "@/lib/events";
 import { listBadges } from "@/lib/badges";
 import { listProjects } from "@/lib/parts";
+import { listAbsentMembers } from "@/lib/sessions";
 
 type IconName = Parameters<typeof Icon>[0]["name"];
 
@@ -95,6 +96,7 @@ export default async function AdminHubPage() {
     toolDeleteRequests,
     events,
     projects,
+    absent,
   ] = await Promise.all([
     // Admin-only rows skip their query for mentors (they can't see those
     // cards); the rest (excusal requests, tool-delete requests, events) run
@@ -114,6 +116,7 @@ export default async function AdminHubPage() {
     listPendingToolDeleteRequests(),
     listEvents(),
     listProjects(),
+    listAbsentMembers(),
   ]);
 
   // Requests queue, scoped to what the viewer can actually act on: admins
@@ -150,6 +153,13 @@ export default async function AdminHubPage() {
           count={flagged.length}
           alert={flagged.length > 0}
           hint="Over-limit, open, or overlapping sessions."
+        />
+        <Card
+          href="/admin/absent-members"
+          icon="users"
+          title="Absent members"
+          count={absent.length}
+          hint="Active members not clocked in, longest absent first."
         />
         <Card
           href="/admin/reports"
