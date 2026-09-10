@@ -110,6 +110,10 @@ scannable catalog of what's built, grouped by area, with a route per entry. The
 
 - **Requests queue** — one queue for account requests, team applications, and excusal requests.
   `/admin/requests`
+- **Absent members** — active members with no open attendance session, longest absent first with
+  last-seen date; admins can mark someone inactive directly from the list. A current-season
+  application import re-activates students, so someone deactivated here can reappear on the next
+  import. `/admin/absent-members`
 - **Settings** — timezone, calendar ID, auto-close/max-shift hours, season hours goal, and sync
   secrets. `/admin/settings`
 
