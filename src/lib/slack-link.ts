@@ -28,10 +28,11 @@ export async function fetchSlackMembers(deps: SlackDeps): Promise<SlackMember[]>
     const res = await deps.fetch(url, { headers: { Authorization: `Bearer ${deps.token}` } });
     const body = (await res.json()) as {
       ok: boolean;
+      error?: string;
       members?: RawMember[];
       response_metadata?: { next_cursor?: string };
     };
-    if (!body.ok) throw new Error(`slack users.list failed: ${JSON.stringify(body)}`);
+    if (!body.ok) throw new Error(`slack users.list failed: ${res.status} ${body.error ?? "unknown"}`);
     for (const m of body.members ?? []) {
       if (m.deleted || m.is_bot || m.is_restricted || m.is_ultra_restricted) continue;
       if (m.is_email_confirmed === false) continue;

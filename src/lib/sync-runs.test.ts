@@ -51,4 +51,8 @@ describe("parseSyncRunFilter", () => {
   test.each([["0"], ["-1"], ["1.5"], ["abc"], [undefined]])("clamps invalid page %j to 1", (p) => {
     expect(parseSyncRunFilter({ page: p as string | undefined })).toEqual({ page: 1 });
   });
+
+  test("falls back to page 1 for an absurdly large page", () => {
+    expect(parseSyncRunFilter({ page: "99999999999999" })).toEqual({ page: 1 });
+  });
 });

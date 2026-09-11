@@ -27,6 +27,10 @@ export type SyncRunFilter = { source?: AlertSource; ok?: boolean; from?: string;
 
 export const SYNC_RUN_PAGE_SIZE = 50;
 
+// ponytail: 10000 is a generous ceiling above the ~10k rows the 90-day retention keeps at this
+// page size; bump if retention grows.
+const MAX_PAGE = 10000;
+
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const SOURCES = new Set(SYNC_SOURCES.map((s) => s.source));
 
@@ -44,7 +48,7 @@ function isValidDay(s: string): boolean {
 
 /** Validate raw searchParams → SyncRunFilter. PURE. Arrays take the first element; unknown
  *  source / ok not in {"true","false"} / dates that are not real calendar days are dropped;
- *  page = positive int, else 1. */
+ *  page = positive int up to MAX_PAGE, else 1. */
 export function parseSyncRunFilter(params: Record<string, string | string[] | undefined>): SyncRunFilter {
   const filter: SyncRunFilter = { page: 1 };
 
@@ -63,7 +67,7 @@ export function parseSyncRunFilter(params: Record<string, string | string[] | un
 
   const page = first(params.page);
   const pageNum = page !== undefined ? Number(page) : NaN;
-  if (Number.isInteger(pageNum) && pageNum > 0) filter.page = pageNum;
+  if (Number.isInteger(pageNum) && pageNum > 0 && pageNum <= MAX_PAGE) filter.page = pageNum;
 
   return filter;
 }
