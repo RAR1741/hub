@@ -107,6 +107,7 @@ test.describe("admin hub is mentor-scoped", () => {
     "/admin/kiosk-devices",
     "/admin/drive-sync",
     "/admin/settings",
+    "/admin/sync-runs",
   ];
 
   test("a mentor reaches /admin and sees Review + Time, but not Roster/Config", async ({

@@ -18,6 +18,7 @@ const ADMIN_ONLY_HREFS = [
   "/admin/kiosk-devices",
   "/admin/drive-sync",
   "/admin/settings",
+  "/admin/sync-runs",
 ];
 
 const ctx = (role: NavContext["role"], kioskRegistered = false): NavContext => ({
@@ -114,6 +115,7 @@ describe("adminSections", () => {
       "/admin/slack",
       "/admin/settings",
       "/admin/cron",
+      "/admin/sync-runs",
     ]);
   });
 
