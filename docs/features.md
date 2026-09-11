@@ -135,6 +135,10 @@ scannable catalog of what's built, grouped by area, with a route per entry. The
   `/admin/teams/[id]` — see [features/team-external-accounts.md](features/team-external-accounts.md)
 - **Umbrella team resource inheritance** — being a member of a team also counts as membership in
   its ancestor teams' Slack channels, Google Group, and GitHub Team.
+- **Sync run history** — audit trail of every integration sync (FIRST roster, Google Calendar, Drive
+  groups, GitHub teams, Slack membership), with manual Run now buttons and 90-day retention. Admin
+  alerts deep-link to filtered history. `/admin/sync-runs` — see
+  [features/sync-run-history.md](features/sync-run-history.md)
 - **Onshape** — see [features/parts-and-shop.md](features/parts-and-shop.md),
   [setup/onshape.md](setup/onshape.md)
 - **Google Calendar sync** — see [setup/google-calendar.md](setup/google-calendar.md)
