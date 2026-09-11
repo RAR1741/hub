@@ -43,15 +43,22 @@ export async function POST(request: Request) {
     );
   }
 
+  const startedAt = Date.now();
   try {
     const result = await reconcileDriveGroups({ fetch: globalThis.fetch, db, credentials });
-    await reportSyncOutcome("drive_sync", true, { db });
+    const detail = {
+      groups: result.groups.length,
+      added: result.groups.reduce((n, g) => n + g.added.length, 0),
+      wouldRemove: result.groups.reduce((n, g) => n + g.wouldRemove.length, 0),
+      errors: result.groups.reduce((n, g) => n + g.errors.length, 0),
+    };
+    await reportSyncOutcome("drive_sync", true, { db, startedAt, detail });
     return Response.json(result);
   } catch (e) {
     // Surface the real cause server-side (bad group id, token/network failure)
     // while keeping the client response generic.
     console.error("drive-group sync failed:", e);
-    await reportSyncOutcome("drive_sync", false, { db, error: e instanceof Error ? e.message : String(e) });
+    await reportSyncOutcome("drive_sync", false, { db, startedAt, error: e instanceof Error ? e : String(e) });
     return Response.json({ error: "sync_failed" }, { status: 502 });
   }
 }

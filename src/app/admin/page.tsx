@@ -202,6 +202,7 @@ export default async function AdminHubPage() {
           <Card href="/admin/slack" icon="users" title="Slack" hint="Link people to Slack users and sync from the workspace." />
           <Card href="/admin/settings" icon="x" title="Settings" hint="Timezone, calendar sync, shift limits." />
           <Card href="/admin/cron" icon="clock" title="Cron jobs" hint="View and edit pg_cron schedules." />
+          <Card href="/admin/sync-runs" icon="clock" title="Sync runs" hint="Investigate integration sync failures over time." />
         </Section>
       )}
     </main>

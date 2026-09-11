@@ -25,26 +25,35 @@ export async function POST(request: Request) {
     if (blocked) return blocked;
   }
 
+  const startedAt = Date.now();
   try {
     const report = await syncFirstRoster({ db });
-    await reportSyncOutcome("first_sync", true, { db });
+    const detail = {
+      roster: report.rosterCount,
+      matched: report.matched,
+      updated: report.updated,
+      unmatchedFirst: report.unmatchedFirst.length,
+      unmatchedHub: report.unmatchedHub.length,
+    };
+    await reportSyncOutcome("first_sync", true, { db, startedAt, detail });
     return Response.json(report);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     // Distinguish the two admin-actionable states from a generic failure.
     if (msg === "first_not_configured") {
-      await reportSyncOutcome("first_sync", false, { db, error: msg });
+      await reportSyncOutcome("first_sync", false, { db, startedAt, error: msg });
       return Response.json({ error: "not_configured" }, { status: 400 });
     }
     if (msg === "first_session_expired") {
       await reportSyncOutcome("first_sync", false, {
         db,
+        startedAt,
         error: "FIRST session expired — re-paste a fresh cookie.",
       });
       return Response.json({ error: "session_expired" }, { status: 400 });
     }
     console.error("first sync failed:", e); // never logs the cookie
-    await reportSyncOutcome("first_sync", false, { db, error: msg });
+    await reportSyncOutcome("first_sync", false, { db, startedAt, error: e instanceof Error ? e : msg });
     return Response.json({ error: "sync_failed" }, { status: 502 });
   }
 }

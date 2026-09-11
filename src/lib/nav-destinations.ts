@@ -132,6 +132,7 @@ export const NAV_ITEMS: readonly NavDestination[] = [
   { label: "Slack", href: "/admin/slack", group: "Admin", gate: "admin", section: "Config" },
   { label: "Settings", href: "/admin/settings", group: "Admin", gate: "admin", section: "Config" },
   { label: "Cron jobs", href: "/admin/cron", group: "Admin", gate: "admin", section: "Config" },
+  { label: "Sync runs", href: "/admin/sync-runs", group: "Admin", gate: "admin", section: "Config" },
 ];
 
 export function isAllowed(item: NavDestination, ctx: NavContext): boolean {

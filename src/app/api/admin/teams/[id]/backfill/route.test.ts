@@ -103,12 +103,15 @@ describe("POST /api/admin/teams/[id]/backfill", () => {
     vi.mocked(directoryCredentialsFromEnv).mockReturnValue({} as never);
     vi.mocked(reconcileDriveGroups).mockResolvedValue({
       ranAt: "now",
-      groups: [{ added: ["a@x"], errors: [] }, { added: [], errors: ["boom"] }],
+      groups: [
+        { added: ["a@x"], wouldRemove: [], errors: [] },
+        { added: [], wouldRemove: [], errors: ["boom"] },
+      ],
     } as never);
     vi.mocked(githubAppCredentialsFromEnv).mockReturnValue({} as never);
     vi.mocked(reconcileGithubTeams).mockResolvedValue({
       ranAt: "now",
-      teams: [{ added: ["octocat"], errors: [] }],
+      teams: [{ added: ["octocat"], pending: [], wouldRemove: [], errors: [] }],
     } as never);
 
     const { POST } = await import("./route");
