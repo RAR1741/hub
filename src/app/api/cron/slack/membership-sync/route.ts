@@ -28,16 +28,26 @@ export async function POST(request: Request) {
   }
 
   const slack = slackDepsFromEnv();
+  const startedAt = Date.now();
   try {
     // Link sync first so anyone newly matched to a slack_user_id is included
     // in this same run's channel reconcile.
     const links = await syncSlackLinks({ db, slack });
     const channels = await reconcileAllTeamSlackChannels({ db, slack });
-    await reportSyncOutcome("slack_sync", true, { db });
+    const detail = {
+      linked: links.linked,
+      alreadyLinked: links.alreadyLinked,
+      ambiguous: links.ambiguous.length,
+      channels: channels.totals.channels,
+      invited: channels.totals.invited,
+      alreadyIn: channels.totals.alreadyIn,
+      failed: channels.totals.failed,
+    };
+    await reportSyncOutcome("slack_sync", true, { db, startedAt, detail });
     return Response.json({ ok: true, links, channels });
   } catch (e) {
     console.error("slack membership-sync failed:", e);
-    await reportSyncOutcome("slack_sync", false, { db, error: e instanceof Error ? e.message : String(e) });
+    await reportSyncOutcome("slack_sync", false, { db, startedAt, error: e instanceof Error ? e : String(e) });
     return Response.json({ error: "sync_failed" }, { status: 502 });
   }
 }

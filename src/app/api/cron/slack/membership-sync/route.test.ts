@@ -145,7 +145,11 @@ describe("POST /api/cron/slack/membership-sync", () => {
     expect(res.status).toBe(502);
     const body = await res.json();
     expect(body).toEqual({ error: "sync_failed" });
-    expect(reportSyncOutcome).toHaveBeenCalledWith("slack_sync", false, expect.objectContaining({ error: "boom" }));
+    expect(reportSyncOutcome).toHaveBeenCalledWith(
+      "slack_sync",
+      false,
+      expect.objectContaining({ error: expect.objectContaining({ message: "boom" }) }),
+    );
   });
 
   test("502 and reports failure when the channel reconcile throws after link sync succeeds", async () => {
@@ -169,6 +173,10 @@ describe("POST /api/cron/slack/membership-sync", () => {
     expect(res.status).toBe(502);
     const body = await res.json();
     expect(body).toEqual({ error: "sync_failed" });
-    expect(reportSyncOutcome).toHaveBeenCalledWith("slack_sync", false, expect.objectContaining({ error: "db error" }));
+    expect(reportSyncOutcome).toHaveBeenCalledWith(
+      "slack_sync",
+      false,
+      expect.objectContaining({ error: expect.objectContaining({ message: "db error" }) }),
+    );
   });
 });
