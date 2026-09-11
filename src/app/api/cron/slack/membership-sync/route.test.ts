@@ -8,6 +8,9 @@ vi.mock("@/lib/db", () => ({
 vi.mock("@/lib/settings", () => ({
   getSetting: vi.fn(),
 }));
+vi.mock("@/lib/viewer", () => ({
+  getViewer: vi.fn(),
+}));
 vi.mock("@/lib/slack-link", () => ({
   syncSlackLinks: vi.fn(),
 }));
@@ -35,7 +38,9 @@ describe("POST /api/cron/slack/membership-sync", () => {
 
   test("403 when the secret header is missing", async () => {
     const { getSetting } = await import("@/lib/settings");
+    const { getViewer } = await import("@/lib/viewer");
     vi.mocked(getSetting).mockResolvedValue(SECRET);
+    vi.mocked(getViewer).mockResolvedValue({ person: { id: "g" }, role: "guest" } as never);
 
     const { POST } = await import("./route");
     const res = await POST(req());
@@ -44,7 +49,9 @@ describe("POST /api/cron/slack/membership-sync", () => {
 
   test("403 when the provided secret is wrong", async () => {
     const { getSetting } = await import("@/lib/settings");
+    const { getViewer } = await import("@/lib/viewer");
     vi.mocked(getSetting).mockResolvedValue(SECRET);
+    vi.mocked(getViewer).mockResolvedValue({ person: { id: "g" }, role: "guest" } as never);
 
     const { POST } = await import("./route");
     const res = await POST(req({ "x-sync-secret": "wrong-secret" }));
@@ -53,10 +60,50 @@ describe("POST /api/cron/slack/membership-sync", () => {
 
   test("403 when the configured secret is empty (fails closed)", async () => {
     const { getSetting } = await import("@/lib/settings");
+    const { getViewer } = await import("@/lib/viewer");
     vi.mocked(getSetting).mockResolvedValue("");
+    vi.mocked(getViewer).mockResolvedValue({ person: { id: "g" }, role: "guest" } as never);
 
     const { POST } = await import("./route");
     const res = await POST(req({ "x-sync-secret": SECRET }));
+    expect(res.status).toBe(403);
+  });
+
+  test("200 when an admin session posts with no secret", async () => {
+    const { getSetting } = await import("@/lib/settings");
+    const { getViewer } = await import("@/lib/viewer");
+    const { syncSlackLinks } = await import("@/lib/slack-link");
+    const { reconcileAllTeamSlackChannels } = await import("@/lib/team-slack-backfill");
+    vi.mocked(getSetting).mockResolvedValue(SECRET);
+    vi.mocked(getViewer).mockResolvedValue({ person: { id: "a" }, role: "admin" } as never);
+    vi.mocked(syncSlackLinks).mockResolvedValue({
+      ranAt: "now",
+      linked: 1,
+      alreadyLinked: 0,
+      ambiguous: [],
+      unmatchedSlack: [],
+      unmatchedPeople: [],
+    });
+    vi.mocked(reconcileAllTeamSlackChannels).mockResolvedValue({
+      slackConfigured: true,
+      teamsWithChannels: 0,
+      totals: { invited: 0, alreadyIn: 0, wouldRemove: 0, failed: 0, skippedNoSlack: 0, channels: 0 },
+      teams: [],
+    });
+
+    const { POST } = await import("./route");
+    const res = await POST(req());
+    expect(res.status).toBe(200);
+  });
+
+  test("403 when a non-admin session posts with no secret", async () => {
+    const { getSetting } = await import("@/lib/settings");
+    const { getViewer } = await import("@/lib/viewer");
+    vi.mocked(getSetting).mockResolvedValue(SECRET);
+    vi.mocked(getViewer).mockResolvedValue({ person: { id: "m" }, role: "mentor" } as never);
+
+    const { POST } = await import("./route");
+    const res = await POST(req());
     expect(res.status).toBe(403);
   });
 

@@ -1,5 +1,8 @@
+import { masqueradeReadOnly } from "@/lib/api";
 import { getDb } from "@/lib/db";
 import { getSetting } from "@/lib/settings";
+import { getViewer } from "@/lib/viewer";
+import { hasRole } from "@/lib/authz";
 import { secureEqual } from "@/lib/secure-compare";
 import { slackDepsFromEnv } from "@/lib/slack";
 import { syncSlackLinks } from "@/lib/slack-link";
@@ -8,10 +11,20 @@ import { reportSyncOutcome } from "@/lib/slack-alerts";
 
 export async function POST(request: Request) {
   const db = getDb();
+
+  // Gate 1: shared secret (for pg_cron, which has no session). Empty secret never authorizes.
   const provided = request.headers.get("x-sync-secret");
   const secret = await getSetting<string>("slack_sync_secret", "", db);
-  if (!(secret.length > 0 && provided != null && secureEqual(provided, secret))) {
-    return Response.json({ error: "forbidden" }, { status: 403 });
+  const secretOk = secret.length > 0 && provided != null && secureEqual(provided, secret);
+
+  // Gate 2: an admin session.
+  if (!secretOk) {
+    const viewer = await getViewer();
+    if (!hasRole(viewer.role, "admin")) {
+      return Response.json({ error: "forbidden" }, { status: 403 });
+    }
+    const blocked = masqueradeReadOnly(viewer);
+    if (blocked) return blocked;
   }
 
   const slack = slackDepsFromEnv();
