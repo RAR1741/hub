@@ -39,6 +39,12 @@ describe("sanitizePushText", () => {
     expect(sanitizePushText(":rotating_light: FIRST sync is failing.\n```err```"))
       .toBe("FIRST sync is failing.");
   });
+
+  test("strips Slack mrkdwn links, keeping only the label text", () => {
+    const input = ":rotating_light: Google Calendar sync is failing.\n```meeting upsert failed: Gateway Timeout```\n<https://hub.redalert1741.org/admin/sync-runs?source=calendar_sync|View run history>";
+    expect(sanitizePushText(input))
+      .toBe("Google Calendar sync is failing.\n\nView run history");
+  });
 });
 
 describe("sendPushToOptedIn", () => {

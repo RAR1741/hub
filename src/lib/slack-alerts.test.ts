@@ -2,12 +2,23 @@ import { describe, expect, test } from "vitest";
 import { reportSyncOutcome } from "./slack-alerts";
 
 // Minimal fake app_setting store honoring getSetting's .select().eq().maybeSingle()
-// and .upsert(). Mirror the shape getSetting/first-sync use.
-function fakeDb(initial: Record<string, unknown> = {}) {
+// and .upsert(). Mirror the shape getSetting/first-sync use. Also fakes sync_run inserts.
+function fakeDb(initial: Record<string, unknown> = {}, opts: { insertShouldThrow?: boolean } = {}) {
   const store = new Map<string, unknown>(Object.entries(initial));
+  const inserted: Record<string, unknown>[] = [];
   return {
     store,
-    from() {
+    inserted,
+    from(table: string) {
+      if (table === "sync_run") {
+        return {
+          async insert(row: Record<string, unknown>) {
+            if (opts.insertShouldThrow) return { error: new Error("insert failed") };
+            inserted.push(row);
+            return { error: null };
+          },
+        };
+      }
       return {
         select() {
           return {
@@ -81,5 +92,39 @@ describe("reportSyncOutcome", () => {
     const deps = { fetch: fetchFn, token: "xoxb", isProd: true };
     await reportSyncOutcome("first_sync", false, { db: db as never, slack: deps, error: "session expired" });
     expect(db.store.get("slack_alert_state_first_sync")).toBe("ok");
+  });
+
+  test("writes a sync_run row on the success path", async () => {
+    const db = fakeDb();
+    const { deps } = spySlack();
+    await reportSyncOutcome("drive_sync", true, { db: db as never, slack: deps, startedAt: 123, detail: { added: 2 } });
+    expect(db.inserted).toHaveLength(1);
+    expect(db.inserted[0]).toMatchObject({ source: "drive_sync", ok: true, detail: { added: 2 } });
+  });
+
+  test("writes a sync_run row on the failure path", async () => {
+    const db = fakeDb({ slack_alert_state_first_sync: "ok" });
+    const { deps } = spySlack();
+    await reportSyncOutcome("first_sync", false, { db: db as never, slack: deps, error: "session expired" });
+    expect(db.inserted).toHaveLength(1);
+    expect(db.inserted[0]).toMatchObject({ source: "first_sync", ok: false, error: "session expired" });
+  });
+
+  test("still posts the alert when the sync_run insert throws", async () => {
+    const db = fakeDb({ slack_alert_state_first_sync: "ok" }, { insertShouldThrow: true });
+    const { posts, deps } = spySlack();
+    await reportSyncOutcome("first_sync", false, { db: db as never, slack: deps, error: "session expired" });
+    expect(posts).toHaveLength(1);
+    expect(db.store.get("slack_alert_state_first_sync")).toBe("failing");
+  });
+
+  test("Error input stores the stack in the row but only the message in Slack", async () => {
+    const db = fakeDb({ slack_alert_state_first_sync: "ok" });
+    const { posts, deps } = spySlack();
+    const err = new Error("session expired");
+    await reportSyncOutcome("first_sync", false, { db: db as never, slack: deps, error: err });
+    expect(db.inserted[0].error).toBe(err.stack);
+    expect(posts[0].text).toContain("session expired");
+    expect(posts[0].text).not.toContain(err.stack!.split("\n")[1] ?? "__no_second_line__");
   });
 });
