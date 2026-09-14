@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { getBattery, listUsage } from "@/lib/batteries";
-import { hasRole } from "@/lib/authz";
+import { hasRole, requirePageRole } from "@/lib/authz";
 import { BATTERY_KIND_LABELS } from "@/lib/types";
 import { getViewer } from "@/lib/viewer";
 import { BatteryForm } from "@/components/BatteryForm";
@@ -11,7 +11,7 @@ export const metadata: Metadata = { title: "Battery" };
 
 export default async function BatteryDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const viewer = await getViewer();
-  if (!hasRole(viewer.role, "student")) redirect("/login");
+  requirePageRole(viewer, "student");
 
   const { id } = await params;
   const battery = await getBattery(id);

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
-import { hasRole } from "@/lib/authz";
+import { notFound } from "next/navigation";
+import { requirePageRole } from "@/lib/authz";
 import { getProject, listParts } from "@/lib/parts";
 import { fullPartNumber } from "@/lib/types";
 import { getViewer } from "@/lib/viewer";
@@ -16,7 +16,7 @@ export const metadata: Metadata = { title: "Project" };
 
 export default async function ShopBoardPage({ params }: Params) {
   const viewer = await getViewer();
-  if (!hasRole(viewer.role, "student")) redirect("/login");
+  requirePageRole(viewer, "student");
 
   const { projectId } = await params;
   const project = await getProject(projectId);
