@@ -1,6 +1,6 @@
 import { withRole } from "@/lib/api";
 import { discardOnshapeToken, getConnection, listElementParts } from "@/lib/onshape";
-import { findPartByOnshapeIdentity, listParts, listProjects } from "@/lib/parts";
+import { findPartsByOnshapeIdentity, listAssembliesByProject, listProjects } from "@/lib/parts";
 import { fullPartNumber } from "@/lib/types";
 
 /**
@@ -26,30 +26,14 @@ export const GET = withRole("student", async (viewer, request) => {
     return Response.json({ error: "invalid" }, { status: 400 });
   }
 
-  const rawProjects = await listProjects();
-  const prefixByProjectId = new Map(rawProjects.map((p) => [p.id, p.partNumberPrefix]));
-  // ponytail: one listParts(p.id) call per project, and Onshape reloads this
-  // panel on every CAD selection change — an N+1 on every reload. Fine at
-  // team scale (a handful of projects); revisit with a single batched query
-  // if project count grows enough to matter.
-  const projects = await Promise.all(
-    rawProjects.map(async (p) => {
-      const parts = await listParts(p.id);
-      const assemblies = parts
-        .filter((part) => part.type === "assembly")
-        .map((a) => ({
-          id: a.id,
-          name: a.name,
-          fullPartNumber: fullPartNumber(p.partNumberPrefix, a.type, a.partNumber),
-        }));
-      return { id: p.id, name: p.name, assemblies };
-    }),
-  );
-
+  // Onshape reloads this panel on every CAD selection change, so the
+  // project/assembly payload is built only once we know it will be used — the
+  // non-connected states don't render it — and then in batched queries rather
+  // than one per project / per CAD part.
   const personId = viewer.person!.id;
   const connection = await getConnection(personId);
   if (!connection) {
-    return Response.json({ connectionState: "needs_connect", parts: [], projects });
+    return Response.json({ connectionState: "needs_connect", parts: [], projects: [] });
   }
 
   const result = await listElementParts(personId, {
@@ -60,16 +44,41 @@ export const GET = withRole("student", async (viewer, request) => {
     server,
   });
   if ("needsReconnect" in result) {
-    return Response.json({ connectionState: "needs_reconnect", parts: [], projects });
+    return Response.json({ connectionState: "needs_reconnect", parts: [], projects: [] });
   }
   if ("error" in result) {
-    return Response.json({ connectionState: "fetch_failed", parts: [], projects });
+    return Response.json({ connectionState: "fetch_failed", parts: [], projects: [] });
   }
 
-  const parts = await Promise.all(
-    result.parts.map(async (p) => {
-      const hub = await findPartByOnshapeIdentity(documentId, elementId, p.partId);
-      const hubPart = hub
+  const [rawProjects, assembliesByProject, hubByOnshapePartId] = await Promise.all([
+    listProjects(),
+    listAssembliesByProject(),
+    findPartsByOnshapeIdentity(
+      documentId,
+      elementId,
+      result.parts.map((p) => p.partId),
+    ),
+  ]);
+  const prefixByProjectId = new Map(rawProjects.map((p) => [p.id, p.partNumberPrefix]));
+
+  const projects = rawProjects.map((p) => ({
+    id: p.id,
+    name: p.name,
+    assemblies: (assembliesByProject[p.id] ?? []).map((a) => ({
+      id: a.id,
+      name: a.name,
+      fullPartNumber: fullPartNumber(p.partNumberPrefix, a.type, a.partNumber),
+    })),
+  }));
+
+  const parts = result.parts.map((p) => {
+    const hub = hubByOnshapePartId.get(p.partId);
+    return {
+      partId: p.partId,
+      name: p.name,
+      material: p.material,
+      onshapePartNumber: p.onshapePartNumber,
+      hubPart: hub
         ? {
             id: hub.id,
             fullPartNumber: fullPartNumber(
@@ -79,16 +88,9 @@ export const GET = withRole("student", async (viewer, request) => {
             ),
             status: hub.status,
           }
-        : null;
-      return {
-        partId: p.partId,
-        name: p.name,
-        material: p.material,
-        onshapePartNumber: p.onshapePartNumber,
-        hubPart,
-      };
-    }),
-  );
+        : null,
+    };
+  });
 
   return Response.json({ connectionState: "connected", parts, projects });
 });
