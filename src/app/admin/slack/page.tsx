@@ -5,6 +5,7 @@ import { hasRole } from "@/lib/authz";
 import { getDb } from "@/lib/db";
 import { getSetting, getTeamTimezone } from "@/lib/settings";
 import { displayName } from "@/lib/people";
+import { slackDepsFromEnv, verifyChannels, type ChannelCheck } from "@/lib/slack";
 import type { LinkReport } from "@/lib/slack-link";
 import { SlackLinkPanel } from "@/components/SlackLinkPanel";
 import { SlackLinkPicker } from "@/components/SlackLinkPicker";
@@ -21,18 +22,38 @@ type PersonSlackRow = {
 
 export const metadata: Metadata = { title: "Slack" };
 
+/** Plain-English line for a registry check, plus whether it's a problem *here*
+ *  — a bot that isn't in a channel this environment never posts to is fine. */
+function describeCheck(c: ChannelCheck): { text: string; bad: boolean } {
+  switch (c.status) {
+    case "ok":
+      return { text: "Exists, bot is a member.", bad: false };
+    case "not_a_member":
+      return { text: `Exists, but the bot isn't a member — /invite it in Slack.`, bad: c.routed };
+    case "archived":
+      return { text: "Channel is archived — posts will fail.", bad: true };
+    case "not_found":
+      return { text: "Not found — wrong ID, or a private channel this bot was never invited to.", bad: true };
+    case "missing_scope":
+      return { text: "Can't check — the bot token needs channels:read and groups:read (see docs/setup/slack.md).", bad: false };
+    default:
+      return { text: `Check failed: ${c.detail ?? "unknown error"}.`, bad: false };
+  }
+}
+
 export default async function AdminSlackPage() {
   const viewer = await getViewer();
   if (!hasRole(viewer.role, "admin")) redirect("/");
 
   const db = getDb();
-  const [{ data, error }, report, teamTz] = await Promise.all([
+  const [{ data, error }, report, teamTz, channelChecks] = await Promise.all([
     db
       .from("person")
       .select("id, first_name, last_name, display_name, role, is_active, slack_user_id")
       .order("last_name"),
     getSetting<LinkReport | null>("slack_last_sync_report", null, db),
     getTeamTimezone(db),
+    verifyChannels(slackDepsFromEnv()),
   ]);
   if (error) console.error("admin/slack: person select failed:", error.message);
   const people = (data ?? []) as PersonSlackRow[];
@@ -63,6 +84,31 @@ export default async function AdminSlackPage() {
 
       <section className="card flex flex-col gap-4">
         <SlackLinkPanel />
+      </section>
+
+      <section className="card flex flex-col gap-3">
+        <h2 className="text-base font-semibold">Channel registry</h2>
+        {channelChecks === null ? (
+          <p className="text-sm text-[var(--muted)]">Slack bot token not set — the hardcoded channel IDs can&rsquo;t be checked.</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {channelChecks.map((c) => {
+              const { text, bad } = describeCheck(c);
+              return (
+                <div key={c.channel} className="border-t border-[var(--hair)] pt-2 first:border-t-0 first:pt-0">
+                  <div className="font-medium">
+                    #{c.channel === "bot_test" ? "bot-test" : c.channel}{" "}
+                    <span className="font-normal text-[var(--muted)]">{c.id}</span>
+                  </div>
+                  <div className={`text-sm ${bad ? "text-[var(--red)]" : "text-[var(--muted)]"}`}>
+                    {text}
+                    {c.routed ? "" : " Not routed from this environment."}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </section>
 
       {error ? (
