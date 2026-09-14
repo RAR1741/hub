@@ -123,8 +123,13 @@ test("tool inventory + checks + delete requests: student logging, mentor review,
     expect(approveRes.status()).toBe(200);
     requestId = ""; // request row is gone along with the tool
 
+    // The root loading.tsx (#300) puts every page behind a Suspense boundary, so
+    // the response has already started streaming by the time notFound() runs and
+    // the status can no longer be set to 404. Next marks a streamed 404 with a
+    // noindex robots meta instead — see next/dist/docs/01-app/03-api-reference/
+    // 03-file-conventions/loading.md, "Status Codes".
     const goneRes = await page.request.get(`/tools/${toolId}`);
-    expect(goneRes.status()).toBe(404);
+    expect(await goneRes.text()).toContain('<meta name="robots" content="noindex"');
     toolId = ""; // already deleted
 
     // --- Guest: no session, redirected to /login ---
