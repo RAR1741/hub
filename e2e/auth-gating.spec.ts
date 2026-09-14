@@ -10,7 +10,7 @@ test.describe("teams hidden from guests", () => {
     const context = await browser.newContext();
     const page = await context.newPage();
     await page.goto("/teams");
-    expect(new URL(page.url()).pathname).toBe("/login");
+    await expect(page).toHaveURL(/\/login$/);
     await context.close();
   });
 
@@ -19,7 +19,7 @@ test.describe("teams hidden from guests", () => {
     await context.addCookies([await studentSessionCookie()]);
     const page = await context.newPage();
     await page.goto("/teams");
-    expect(new URL(page.url()).pathname).toBe("/teams");
+    await expect(page).toHaveURL(/\/teams$/);
     await expect(page.getByRole("heading", { name: "Teams" })).toBeVisible();
     await context.close();
   });
@@ -30,7 +30,7 @@ test.describe("people is mentor+ only", () => {
     const context = await browser.newContext();
     const page = await context.newPage();
     await page.goto("/people");
-    expect(new URL(page.url()).pathname).toBe("/login");
+    await expect(page).toHaveURL(/\/login$/);
     await context.close();
   });
 
@@ -39,7 +39,7 @@ test.describe("people is mentor+ only", () => {
     await context.addCookies([await studentSessionCookie()]);
     const page = await context.newPage();
     await page.goto("/people");
-    expect(new URL(page.url()).pathname).toBe("/login");
+    await expect(page).toHaveURL(/\/login$/);
     await context.close();
   });
 
@@ -48,7 +48,7 @@ test.describe("people is mentor+ only", () => {
     await context.addCookies([await mentorSessionCookie()]);
     const page = await context.newPage();
     await page.goto("/people");
-    expect(new URL(page.url()).pathname).toBe("/people");
+    await expect(page).toHaveURL(/\/people$/);
     await expect(page.getByRole("heading", { name: "People" })).toBeVisible();
     await context.close();
   });
@@ -117,7 +117,7 @@ test.describe("admin hub is mentor-scoped", () => {
     await context.addCookies([await mentorSessionCookie()]);
     const page = await context.newPage();
     await page.goto("/admin");
-    expect(new URL(page.url()).pathname).toBe("/admin");
+    await expect(page).toHaveURL(/\/admin$/);
     // Scope to the content column: the sidebar's Admin nav group also has an
     // "Admin" heading (h5), so match the page's own <h1> heading here.
     await expect(
@@ -163,7 +163,7 @@ test.describe("admin hub is mentor-scoped", () => {
     await context.addCookies([await adminSessionCookie()]);
     const page = await context.newPage();
     await page.goto("/admin");
-    expect(new URL(page.url()).pathname).toBe("/admin");
+    await expect(page).toHaveURL(/\/admin$/);
     // Scope to the content column: the sidebar's Admin flyout also links these
     // pages for an admin, so a page-wide count would be 2 (card + flyout). The
     // mentor assertion above stays page-wide (count 0 everywhere is the stronger
