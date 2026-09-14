@@ -62,15 +62,21 @@ export const POST = withRole<Ctx>("admin", async (_viewer, _request, context) =>
 async function runDriveReconcile(db: SupabaseClient): Promise<ReconcileOutcome> {
   const credentials = directoryCredentialsFromEnv();
   if (!credentials) return { status: "not_configured" };
+  const startedAt = Date.now();
   try {
     const result = await reconcileDriveGroups({ fetch: globalThis.fetch, db, credentials });
-    await reportSyncOutcome("drive_sync", true, { db });
     const added = result.groups.reduce((n, g) => n + g.added.length, 0);
+    const wouldRemove = result.groups.reduce((n, g) => n + g.wouldRemove.length, 0);
     const errors = result.groups.reduce((n, g) => n + g.errors.length, 0);
+    await reportSyncOutcome("drive_sync", true, {
+      db,
+      startedAt,
+      detail: { groups: result.groups.length, added, wouldRemove, errors },
+    });
     return { status: "ok", scope: result.groups.length, added, errors };
   } catch (e) {
     console.error("team backfill: drive reconcile failed:", e);
-    await reportSyncOutcome("drive_sync", false, { db, error: e instanceof Error ? e.message : String(e) });
+    await reportSyncOutcome("drive_sync", false, { db, startedAt, error: e instanceof Error ? e : String(e) });
     return { status: "error", message: "sync_failed" };
   }
 }
@@ -78,15 +84,22 @@ async function runDriveReconcile(db: SupabaseClient): Promise<ReconcileOutcome> 
 async function runGithubReconcile(db: SupabaseClient): Promise<ReconcileOutcome> {
   const credentials = githubAppCredentialsFromEnv();
   if (!credentials) return { status: "not_configured" };
+  const startedAt = Date.now();
   try {
     const result = await reconcileGithubTeams({ fetch: globalThis.fetch, db, credentials });
-    await reportSyncOutcome("github_sync", true, { db });
     const added = result.teams.reduce((n, t) => n + t.added.length, 0);
+    const pending = result.teams.reduce((n, t) => n + t.pending.length, 0);
+    const wouldRemove = result.teams.reduce((n, t) => n + t.wouldRemove.length, 0);
     const errors = result.teams.reduce((n, t) => n + t.errors.length, 0);
+    await reportSyncOutcome("github_sync", true, {
+      db,
+      startedAt,
+      detail: { teams: result.teams.length, added, pending, wouldRemove, errors },
+    });
     return { status: "ok", scope: result.teams.length, added, errors };
   } catch (e) {
     console.error("team backfill: github reconcile failed:", e);
-    await reportSyncOutcome("github_sync", false, { db, error: e instanceof Error ? e.message : String(e) });
+    await reportSyncOutcome("github_sync", false, { db, startedAt, error: e instanceof Error ? e : String(e) });
     return { status: "error", message: "sync_failed" };
   }
 }

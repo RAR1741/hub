@@ -79,7 +79,7 @@ const ROUTE_AUTH_ALLOWLIST: Record<string, string> = {
   "api/cron/slack/whats-new/route.ts":
     "x-sync-secret compared in constant time (secureEqual); fails closed when unset.",
   "api/cron/slack/membership-sync/route.ts":
-    "x-sync-secret compared in constant time (secureEqual); fails closed when unset.",
+    "x-sync-secret (constant time) OR getViewer()+hasRole('admin').",
   "api/cron/push/clocked-in-late/route.ts":
     "x-sync-secret compared in constant time (secureEqual); fails closed when unset.",
   "api/cron/push/reminders/route.ts":

@@ -28,6 +28,7 @@ export function pushDepsFromEnv(): PushDeps {
 export function sanitizePushText(s: string): string {
   return s
     .replace(/```[\s\S]*?```/g, "") // fenced code blocks (incl. raw error dumps)
+    .replace(/<[^|>]+\|([^>]+)>/g, "$1") // mrkdwn links <url|text> → text
     .replace(/:[a-z0-9_+-]+:/gi, "") // emoji shortcodes
     .replace(/[ \t]+\n/g, "\n")
     .trim();
