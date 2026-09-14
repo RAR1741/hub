@@ -30,10 +30,15 @@ heuristic, not a verdict — the admin reviews each pair and decides.
 ## What merge does
 
 Merging is a single atomic database operation (`merge_person`). It reassigns every reference from
-the loser to the winner — sessions, team memberships, emails/identities, excusals, applications,
-guardians, FIRST history, and any staff/actor references — then deletes the loser. It also records
-the loser's name as a `person_name_alias` on the winner, so a future re-import of that name resolves
-to the winner instead of recreating the duplicate.
+the loser to the winner — sessions (including event check-ins), team memberships, emails/identities,
+excusals, applications, guardians, FIRST history, event sign-ups with their form responses and
+reminder choices, badge awards, push subscriptions, the Onshape connection, and any staff/actor
+references — then deletes the loser. It also carries over the loser's Slack and GitHub account links
+and records the loser's name as a `person_name_alias` on the winner, so a future re-import of that
+name resolves to the winner instead of recreating the duplicate.
+
+Short-lived or pair-scoped rows are *not* carried over and disappear with the loser: pending login
+codes, masquerade sessions, and "not a duplicate" pair rejections.
 
 ## Caveats
 
@@ -44,6 +49,10 @@ to the winner instead of recreating the duplicate.
   secondary identities on the winner.
 - **Open sessions:** if both people have an open (unclosed) clock-in at merge time, the loser's open
   session is dropped — only the winner's stays open.
+- **Duplicate collisions:** where both sides hold the same one-per-person row — a check-in to the
+  same event, the same badge, a response to the same event's form, an Onshape connection, a linked
+  Slack or GitHub account — the winner's is kept and the loser's is dropped. Re-link Slack/GitHub by
+  hand afterwards if the wrong side was canonical.
 - **Manager flag:** when both people are on the same team, the merged membership keeps
   `is_manager = true` if *either* side had it.
 - **No dismiss action:** there's no "not a duplicate" control. A pair you judge to not be a
