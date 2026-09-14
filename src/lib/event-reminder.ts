@@ -4,11 +4,10 @@ import { pushDepsFromEnv, sendPushToOptedIn, type PushDeps } from "./push-dispat
 import { dueOffsets, MAX_REMINDER_MS } from "./reminder-minutes";
 
 type EventRow = { id: string; name: string; starts_at: string };
-type ReminderRow = { event_id: string; person_id: string; minutes: number };
 
-/** Sweeps event_signup_reminder rows due in the next 2h window, sends one push
- *  per recipient per event, then stamps every due offset. No direct FK from
- *  event_signup_reminder to event/person — load separately, join in JS. */
+/** Sweeps event_signup_reminder rows due in the next 2h window, claims every due
+ *  offset by stamping pushed_at, then sends one push per claimed recipient. No
+ *  direct FK from event_signup_reminder to event/person — load separately. */
 export async function pushEventReminders(deps: {
   db: SupabaseClient;
   push?: PushDeps;
@@ -29,30 +28,33 @@ export async function pushEventReminders(deps: {
   const events = (eventData ?? []) as EventRow[];
   if (events.length === 0) return { sent: 0, pruned: 0, events: 0 };
 
-  const ids = events.map((e) => e.id);
-  const { data: reminderData, error: reminderError } = await deps.db
-    .from("event_signup_reminder")
-    .select("event_id, person_id, minutes")
-    .in("event_id", ids)
-    .is("pushed_at", null);
-  if (reminderError) {
-    console.error("[event-reminder] load reminders failed:", reminderError.message);
-    return { sent: 0, pruned: 0, events: 0 };
-  }
-  const reminders = (reminderData ?? []) as ReminderRow[];
-
   const push = deps.push ?? pushDepsFromEnv();
   let sent = 0;
   let pruned = 0;
   let eventsSent = 0;
   for (const event of events) {
-    const pending = reminders.filter((r) => r.event_id === event.id);
-    if (pending.length === 0) continue;
     const dueM = dueOffsets(Date.parse(event.starts_at), Date.parse(nowIso), []);
     if (dueM.length === 0) continue;
-    const due = pending.filter((r) => (dueM as readonly number[]).includes(r.minutes));
-    if (due.length === 0) continue;
-    const recipients = [...new Set(due.map((r) => r.person_id))];
+
+    // Claim before sending. The conditional update is atomic, so an overlapping
+    // tick that reaches it second matches zero rows and sends nothing. Cost of
+    // stamping first: a reminder is dropped if the process dies mid-run
+    // (sendPushToOptedIn itself never throws).
+    const { data: claimed, error: claimError } = await deps.db
+      .from("event_signup_reminder")
+      .update({ pushed_at: nowIso })
+      .eq("event_id", event.id)
+      .in("minutes", dueM)
+      .is("pushed_at", null)
+      .select("person_id");
+    if (claimError) {
+      console.error("[event-reminder] claim reminders failed:", claimError.message);
+      continue;
+    }
+    const recipients = [
+      ...new Set(((claimed ?? []) as { person_id: string }[]).map((r) => r.person_id)),
+    ];
+    if (recipients.length === 0) continue;
 
     const when = new Date(event.starts_at).toLocaleString("en-US", {
       timeZone: "America/Indiana/Indianapolis",
@@ -68,16 +70,6 @@ export async function pushEventReminders(deps: {
     sent += res.sent;
     pruned += res.pruned;
     eventsSent += 1;
-
-    // ponytail: two overlapping 5-min cron ticks could both pass the pushed_at IS NULL
-    // check before either stamps, double-sending; fire-and-forget cron makes the race
-    // near-impossible in practice, so no lock/transaction here (accepted ceiling).
-    await deps.db
-      .from("event_signup_reminder")
-      .update({ pushed_at: nowIso })
-      .eq("event_id", event.id)
-      .in("minutes", dueM)
-      .is("pushed_at", null);
   }
   return { sent, pruned, events: eventsSent };
 }
