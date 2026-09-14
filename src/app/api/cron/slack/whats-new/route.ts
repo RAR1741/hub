@@ -17,6 +17,7 @@ export async function POST(request: Request) {
       fetch: globalThis.fetch,
       slack: slackDepsFromEnv(),
       githubCredentials: githubAppCredentialsFromEnv(),
+      db,
     });
     return Response.json(result);
   } catch (e) {

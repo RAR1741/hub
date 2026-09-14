@@ -3,14 +3,16 @@
 Every Monday, `sendWhatsNewDigest()` (`src/lib/whats-new.ts`), run by `POST
 /api/cron/slack/whats-new` (`src/app/api/cron/slack/whats-new/route.ts`, shared-secret gated on
 `app_setting.slack_reminder_secret` — same as [mentor reminders](slack-integration.md)), lists PRs
-merged to `master` in the trailing 7 days and posts them to `#hub-admin-alerts`. No LLM, no
-persisted cursor — the digest is deterministic and stateless.
+merged to `master` since the last digest and posts them to `#hub-admin-alerts`. No LLM — the
+digest is deterministic.
 
 ## What it posts
 
-One GitHub call lists closed PRs against `master`; `merged_at` in the last 7 days keeps a PR,
-everything else is dropped. Labelled PRs (see below) render first under a "Watch out for" section,
-everything else under "What's new". An empty week posts nothing.
+GitHub's closed-PR list for `master` is paged through (100 per page, up to 10 pages); `merged_at`
+inside the window keeps a PR, everything else is dropped. Paging stops as soon as a page runs
+short or ends before the window — merging bumps `updated_at`, and the list is sorted by `updated`
+descending, so nothing further down can still be in window. Labelled PRs (see below) render first
+under a "Watch out for" section, everything else under "What's new". An empty week posts nothing.
 
 Rendered example, with a heads-up PR:
 
@@ -44,8 +46,17 @@ so that's 9am EDT / 8am EST (drifts an hour across DST). Adjustable in `/admin/c
 
 ## Window
 
-Stateless: 7 days back from run time, filtered on `merged_at`. A run that fails or gets skipped
-just drops that week's PRs — no catch-up on the next run. Accepted by design.
+`app_setting.whats_new_cursor` holds the end of the last successfully posted window as an ISO
+string; the next run covers `[cursor, now)` on `merged_at`. With no cursor (first run) it falls
+back to 7 days. So a run that fails or gets skipped loses nothing — the next one catches up over
+the whole gap, and a PR merged in the jitter between two fires lands in exactly one digest.
+
+The cursor advances when the window is accounted for: a posted digest, or an empty window
+("nothing to say" is a success). A run that throws, or whose Slack post doesn't land, leaves the
+cursor where it is.
+
+Catch-up is capped at **21 days**. When the gap is wider the window is clipped to the last 21 days,
+the post gets a footer saying so, and the route returns `clipped: true`.
 
 ## Config
 
@@ -66,7 +77,9 @@ With `slack_reminder_secret` set locally:
 ```
 
 Posts to `#bot-test` (or logs `[slack:no-token]` if no dev Slack token is configured), and returns
-`{"posted":false,"count":0}` if nothing merged to `master` in the last 7 days.
+`{"posted":false,"count":0,"clipped":false}` if nothing merged to `master` since the cursor.
+Each successful run advances `app_setting.whats_new_cursor`, so a second run right after the
+first posts nothing; delete that row to replay a 7-day window.
 
 ## Observability gap
 
