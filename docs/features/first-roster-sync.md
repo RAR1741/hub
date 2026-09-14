@@ -16,7 +16,11 @@ before saving it to `app_setting.first_session`.
 
 The cookie has a sliding expiration — it renews on each authenticated request. `syncFirstRoster()`
 (`src/lib/first-sync.ts`) persists the rotated cookie back to `first_session` after every sync, so
-frequent syncing keeps the session alive. If FIRST rejects the cookie (login redirect instead of
+frequent syncing keeps the session alive. That write is a compare-and-swap on the `savedAt` /
+`rotatedAt` of the session it started from: a sync's fetches are slow enough for a cron tick or a
+fresh paste to land inside them, and the stale rotation must not overwrite the newer value (an
+overwritten re-paste looks like the paste didn't take). Losing the swap is not an error — the
+roster data is still applied. The paste route writes unconditionally: a human re-paste always wins. If FIRST rejects the cookie (login redirect instead of
 roster data), the sync fails with `session_expired`; the page surfaces a banner asking for a fresh
 paste, and the "unmatched" section is unavailable until a sync succeeds again.
 
