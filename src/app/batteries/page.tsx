@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { listBatteries, listUsage } from "@/lib/batteries";
-import { hasRole } from "@/lib/authz";
+import { hasRole, requirePageRole } from "@/lib/authz";
 import { BATTERY_KINDS, BATTERY_KIND_LABELS, type Battery } from "@/lib/types";
 import { getViewer } from "@/lib/viewer";
 import { BatteryForm } from "@/components/BatteryForm";
@@ -13,7 +12,7 @@ export const metadata: Metadata = { title: "Batteries" };
 
 export default async function BatteriesPage() {
   const viewer = await getViewer();
-  if (!hasRole(viewer.role, "student")) redirect("/login");
+  requirePageRole(viewer, "student");
 
   const [batteries, recentUsage] = await Promise.all([listBatteries(), listUsage({ limit: 50 })]);
   const active = batteries.filter((b) => b.status === "active");

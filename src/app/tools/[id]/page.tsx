@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { getTool, listChecks, nextDueAt } from "@/lib/tools";
 import { hasPendingDeleteRequest } from "@/lib/tool-delete-requests";
-import { hasRole } from "@/lib/authz";
+import { hasRole, requirePageRole } from "@/lib/authz";
 import { getViewer } from "@/lib/viewer";
 import { ToolForm } from "@/components/ToolForm";
 import { ToolCheckTable } from "@/components/ToolCheckTable";
@@ -13,7 +13,7 @@ export const metadata: Metadata = { title: "Tool" };
 
 export default async function ToolDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const viewer = await getViewer();
-  if (!hasRole(viewer.role, "student")) redirect("/login");
+  requirePageRole(viewer, "student");
 
   const { id } = await params;
   const tool = await getTool(id);

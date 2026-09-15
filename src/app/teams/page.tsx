@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
-import { hasRole } from "@/lib/authz";
+import { hasRole, requirePageRole } from "@/lib/authz";
 import {
   buildTeamTree,
   joinAction,
@@ -20,7 +19,7 @@ export const metadata: Metadata = { title: "Teams" };
 export default async function TeamsPage() {
   const viewer = await getViewer();
   // Teams is signed-in only — guests (the only role below student) are sent to login.
-  if (!hasRole(viewer.role, "student")) redirect("/login");
+  requirePageRole(viewer, "student");
   const [teams, counts] = await Promise.all([listTeams(), teamMemberCounts()]);
   const [memberIds, pendingIds] = viewer.person
     ? await Promise.all([
