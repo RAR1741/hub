@@ -4,15 +4,21 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CronJob } from "@/lib/cron-jobs";
 
+export type CronJobRow = CronJob & { stale: boolean };
+
 type RowState = { schedule: string; busy: boolean; status: string | null; error: string | null };
+
+function formatWhen(iso: string, teamTz: string): string {
+  return new Date(iso).toLocaleString(undefined, { timeZone: teamTz });
+}
 
 function formatLastRun(job: CronJob, teamTz: string): string {
   if (!job.lastRunStartedAt) return "never";
-  const when = new Date(job.lastRunStartedAt).toLocaleString(undefined, { timeZone: teamTz });
+  const when = formatWhen(job.lastRunStartedAt, teamTz);
   return job.lastRunStatus ? `${when} (${job.lastRunStatus})` : when;
 }
 
-export function CronJobsEditor({ jobs, teamTz }: { jobs: CronJob[]; teamTz: string }) {
+export function CronJobsEditor({ jobs, teamTz }: { jobs: CronJobRow[]; teamTz: string }) {
   const [rows, setRows] = useState<Record<number, RowState>>(() =>
     Object.fromEntries(jobs.map((job) => [job.jobid, { schedule: job.schedule, busy: false, status: null, error: null }])),
   );
@@ -57,7 +63,11 @@ export function CronJobsEditor({ jobs, teamTz }: { jobs: CronJob[]; teamTz: stri
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="font-medium">{job.jobname}</span>
                 <span className="text-[13px] text-[var(--muted)]">
-                  {job.active ? "active" : "inactive"} · last run: {formatLastRun(job, teamTz)}
+                  {job.active ? "active" : "inactive"} · last run: {formatLastRun(job, teamTz)} · last success:{" "}
+                  {job.lastSuccessAt ? formatWhen(job.lastSuccessAt, teamTz) : "never"}
+                  {job.stale && (
+                    <span className="ml-2 font-medium text-[var(--red)]">overdue</span>
+                  )}
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-2">

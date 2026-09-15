@@ -7,6 +7,7 @@ import { secureEqual } from "@/lib/secure-compare";
 import { directoryCredentialsFromEnv } from "@/lib/google-directory";
 import { reconcileDriveGroups } from "@/lib/drive-group-sync";
 import { reportSyncOutcome } from "@/lib/slack-alerts";
+import { recordCronHeartbeat } from "@/lib/cron-heartbeat";
 
 export async function POST(request: Request) {
   const db = getDb();
@@ -53,6 +54,8 @@ export async function POST(request: Request) {
       errors: result.groups.reduce((n, g) => n + g.errors.length, 0),
     };
     await reportSyncOutcome("drive_sync", true, { db, startedAt, detail });
+    // Cron path only: an admin clicking "Sync now" must not mask a cron that 403s.
+    if (secretOk) await recordCronHeartbeat("drive-group-nightly-sync", db);
     return Response.json(result);
   } catch (e) {
     // Surface the real cause server-side (bad group id, token/network failure)

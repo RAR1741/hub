@@ -10,6 +10,7 @@ import { syncSlackLinks } from "@/lib/slack-link";
 import { reconcileAllTeamSlackChannels } from "@/lib/team-slack-backfill";
 import { insertSyncRun } from "@/lib/sync-runs";
 import { reportSubsystemHealth } from "@/lib/system-health";
+import { recordCronHeartbeat } from "@/lib/cron-heartbeat";
 
 export async function POST(request: Request) {
   const db = getDb();
@@ -46,6 +47,8 @@ export async function POST(request: Request) {
       failed: channels.totals.failed,
     };
     await recordRun({ ok: true, startedAt, detail }, db);
+    // Cron path only: an admin clicking "Sync now" must not mask a cron that 403s.
+    if (secretOk) await recordCronHeartbeat("slack-nightly-sync", db);
     await reportSubsystemHealth("slack_membership_sync", true, { db });
     return Response.json({ ok: true, links, channels });
   } catch (e) {

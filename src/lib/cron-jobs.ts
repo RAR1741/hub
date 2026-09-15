@@ -7,6 +7,8 @@ export type CronJob = {
   active: boolean;
   lastRunStartedAt: string | null;
   lastRunStatus: string | null;
+  /** Last time the job's own work reported completion — see cron-heartbeat.ts. */
+  lastSuccessAt: string | null;
 };
 
 export async function listCronJobs(db?: SupabaseClient): Promise<CronJob[]> {
@@ -20,6 +22,7 @@ export async function listCronJobs(db?: SupabaseClient): Promise<CronJob[]> {
     active: row.active as boolean,
     lastRunStartedAt: row.last_run_started_at as string | null,
     lastRunStatus: row.last_run_status as string | null,
+    lastSuccessAt: (row.last_success_at as string | null) ?? null,
   }));
 }
 
