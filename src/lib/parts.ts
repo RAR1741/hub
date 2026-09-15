@@ -355,28 +355,49 @@ export async function createPart(
   return { ok: false, status: 409 };
 }
 
-/** Hub part already linked to this exact CAD part (identity triple), or null. */
-export async function findPartByOnshapeIdentity(
+/**
+ * Hub parts already linked to these CAD parts, keyed by Onshape part id. One
+ * query for the whole selection (avoids an N+1 of a lookup per CAD part).
+ * `part_onshape_identity_unique` guarantees at most one row per key.
+ */
+export async function findPartsByOnshapeIdentity(
   documentId: string,
   elementId: string,
-  partId: string,
+  partIds: string[],
   db?: SupabaseClient,
-): Promise<Part | null> {
+): Promise<Map<string, Part>> {
+  if (partIds.length === 0) return new Map();
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client
+  const { data, error } = await client
     .from("part")
     .select("*")
     .eq("onshape_document_id", documentId)
     .eq("onshape_element_id", elementId)
-    .eq("onshape_part_id", partId)
-    .maybeSingle();
-  return data ? partFromRow(data as PartRow) : null;
+    .in("onshape_part_id", partIds);
+  if (error) console.error("findPartsByOnshapeIdentity: query failed", error);
+  return new Map(
+    ((data ?? []) as PartRow[]).map((row) => [row.onshape_part_id as string, partFromRow(row)]),
+  );
 }
 
 export async function listParts(projectId: string, db?: SupabaseClient): Promise<Part[]> {
   const client = db ?? (await import("./db")).getDb();
   const { data } = await client.from("part").select("*").eq("project_id", projectId);
   return ((data ?? []) as PartRow[]).map(partFromRow);
+}
+
+/** Assemblies per project, one query for the whole table (avoids an N+1 of `listParts` per project). */
+export async function listAssembliesByProject(
+  db?: SupabaseClient,
+): Promise<Record<string, Part[]>> {
+  const client = db ?? (await import("./db")).getDb();
+  const { data, error } = await client.from("part").select("*").eq("type", "assembly");
+  if (error) console.error("listAssembliesByProject: query failed", error);
+  const byProject: Record<string, Part[]> = {};
+  for (const row of (data ?? []) as PartRow[]) {
+    (byProject[row.project_id] ??= []).push(partFromRow(row));
+  }
+  return byProject;
 }
 
 /** Part count per project, one query for the whole table (avoids an N+1 of `listParts` per project). */
