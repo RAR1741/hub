@@ -88,13 +88,13 @@ export async function removePersonIdentity(
   db?: SupabaseClient,
 ): Promise<{ ok: boolean; status: number; reason?: "primary_with_secondaries" }> {
   const c = await client(db);
-  const { data, error } = await c
+  const { data, error: lookupError } = await c
     .from("person_identity")
     .select("*")
     .eq("id", identityId)
     .eq("person_id", personId)
     .maybeSingle();
-  if (error) { console.error("identity lookup failed", error); return { ok: false, status: 500 }; }
+  if (lookupError) { console.error("identity lookup failed", lookupError); return { ok: false, status: 500 }; }
   const identity = data as PersonIdentityRow | null;
   if (!identity) return { ok: false, status: 404 };
 
@@ -130,13 +130,13 @@ export async function makePrimaryIdentity(
   db?: SupabaseClient,
 ): Promise<{ ok: boolean; status: number }> {
   const c = await client(db);
-  const { data, error } = await c
+  const { data, error: lookupError } = await c
     .from("person_identity")
     .select("*")
     .eq("id", identityId)
     .eq("person_id", personId)
     .maybeSingle();
-  if (error) { console.error("identity lookup failed", error); return { ok: false, status: 500 }; }
+  if (lookupError) { console.error("identity lookup failed", lookupError); return { ok: false, status: 500 }; }
   const identity = data as PersonIdentityRow | null;
   if (!identity) return { ok: false, status: 404 };
   if (identity.is_primary) return { ok: true, status: 200 };

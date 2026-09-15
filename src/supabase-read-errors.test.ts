@@ -23,6 +23,9 @@ import { describe, expect, test } from "vitest";
 
 const SRC = path.join(path.dirname(fileURLToPath(import.meta.url)));
 const DESTRUCTURE = /const\s*\{([^{}]*)\}\s*=\s*await\b/g;
+// `data` / `data: rows` bound at key position — not `{ rows: data }`, where
+// `data` is only the local name for someone else's already-checked result.
+const BINDS_DATA = /(^|,)\s*data\s*(:|,|$)/;
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -33,18 +36,34 @@ function sourceFiles(dir: string): string[] {
   });
 }
 
+/** Line numbers in `text` where a read destructures `data` without `error`. */
+function uncheckedReads(text: string): number[] {
+  const lines: number[] = [];
+  for (const match of text.matchAll(DESTRUCTURE)) {
+    const bindings = match[1];
+    if (!BINDS_DATA.test(bindings) || /\berror\b/.test(bindings)) continue;
+    lines.push(text.slice(0, match.index).split("\n").length);
+  }
+  return lines;
+}
+
 describe("supabase reads check error", () => {
+  test("the scan catches an unchecked read and passes a checked one", () => {
+    expect(uncheckedReads("const { data } = await db.from('x').select('*');")).toEqual([1]);
+    expect(uncheckedReads("const { data: rows } = await db.from('x').select('*');")).toEqual([1]);
+    expect(uncheckedReads("const { data, error } = await db.from('x').select('*');")).toEqual([]);
+    // `data` as the local alias of an already-checked result is not a read.
+    expect(uncheckedReads("const { rows: data } = await fetchAllRows(cb);")).toEqual([]);
+  });
+
   test("no `const { data }` destructure omits `error`", () => {
     const offenders: string[] = [];
     for (const file of sourceFiles(SRC)) {
       const text = readFileSync(file, "utf8");
-      for (const match of text.matchAll(DESTRUCTURE)) {
-        const bindings = match[1];
-        if (!/\bdata\b/.test(bindings) || /\berror\b/.test(bindings)) continue;
-        const line = text.slice(0, match.index).split("\n").length;
-        offenders.push(`${path.relative(SRC, file).replaceAll("\\", "/")}:${line}`);
-      }
+      const rel = path.relative(SRC, file).replaceAll("\\", "/");
+      offenders.push(...uncheckedReads(text).map((line) => `${rel}:${line}`));
     }
     expect(offenders).toEqual([]);
-  });
+    // Reads every source file — well past the 5s default on a loaded machine.
+  }, 30_000);
 });
