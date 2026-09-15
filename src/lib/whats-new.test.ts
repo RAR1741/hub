@@ -4,6 +4,22 @@ import type { SlackDeps } from "./slack";
 import type { GithubAppCredentials } from "./github-app";
 import { formatWhatsNew, sendWhatsNewDigest, type MergedPr, type Window } from "./whats-new";
 
+/** Minimal app_setting stub in the style of drive-group-sync.test.ts: one cursor row in, upserts out. */
+function fakeDb(cursor: string | null = null, upserts: unknown[] = []) {
+  return {
+    from() {
+      const chain: Record<string, unknown> = {};
+      for (const m of ["select", "eq"]) chain[m] = () => chain;
+      chain.maybeSingle = async () => ({ data: cursor == null ? null : { value: cursor }, error: null });
+      chain.upsert = async (payload: unknown) => {
+        upserts.push(payload);
+        return { data: null, error: null };
+      };
+      return chain;
+    },
+  } as never;
+}
+
 type CapturedRequest = { url: string; init?: RequestInit };
 
 function fakeFetch(responses: { status: number; body?: unknown }[] = []) {
@@ -30,6 +46,7 @@ function pr(overrides: Partial<{
   html_url: string;
   merged_at: string | null;
   user: { login: string } | null;
+  updated_at: string;
   labels: { name: string }[];
 }> = {}) {
   return {
@@ -38,6 +55,7 @@ function pr(overrides: Partial<{
     html_url: overrides.html_url ?? `https://github.com/RAR1741/hub/pull/${overrides.number ?? 1}`,
     merged_at: overrides.merged_at === undefined ? "2026-09-02T00:00:00Z" : overrides.merged_at,
     user: overrides.user === undefined ? { login: "dracco1993" } : overrides.user,
+    updated_at: overrides.updated_at ?? overrides.merged_at ?? "2026-09-02T00:00:00Z",
     labels: overrides.labels ?? [],
   };
 }
@@ -122,8 +140,8 @@ describe("sendWhatsNewDigest", () => {
       { status: 200, body: { ok: true } }, // chat.postMessage
     ]);
     vi.stubEnv("GITHUB_ORG", "RAR1741");
-    const result = await sendWhatsNewDigest({ fetch: fetchFn, slack: prodSlack(fetchFn), githubCredentials: null, now: NOW });
-    expect(result).toEqual({ posted: true, count: 1 });
+    const result = await sendWhatsNewDigest({ fetch: fetchFn, slack: prodSlack(fetchFn), githubCredentials: null, db: fakeDb(), now: NOW });
+    expect(result).toEqual({ posted: true, count: 1, clipped: false });
     const slackReq = requests.find((r) => r.url.includes("chat.postMessage"))!;
     expect(bodyOf(slackReq).text).toContain("In window");
     expect(bodyOf(slackReq).text).not.toContain("Too old");
@@ -135,11 +153,11 @@ describe("sendWhatsNewDigest", () => {
       { status: 200, body: [] },
     ]);
     vi.stubEnv("GITHUB_ORG", "RAR1741");
-    const result = await sendWhatsNewDigest({ fetch: fetchFn, slack: prodSlack(fetchFn), githubCredentials: null, now: NOW });
-    expect(result).toEqual({ posted: false, count: 0 });
+    const result = await sendWhatsNewDigest({ fetch: fetchFn, slack: prodSlack(fetchFn), githubCredentials: null, db: fakeDb(), now: NOW });
+    expect(result).toEqual({ posted: false, count: 0, clipped: false });
     expect(requests).toHaveLength(1);
     expect(requests[0].url).toBe(
-      "https://api.github.com/repos/RAR1741/hub/pulls?state=closed&base=master&sort=updated&direction=desc&per_page=100",
+      "https://api.github.com/repos/RAR1741/hub/pulls?state=closed&base=master&sort=updated&direction=desc&per_page=100&page=1",
     );
     const headers = requests[0].init!.headers as Record<string, string>;
     expect(headers.Accept).toBe("application/vnd.github+json");
@@ -164,8 +182,8 @@ describe("sendWhatsNewDigest", () => {
       { status: 200, body: [pr({ number: 1, title: "Creds PR", merged_at: "2026-09-02T00:00:00Z" })] }, // pulls
       { status: 200, body: { ok: true } }, // chat.postMessage
     ]);
-    const result = await sendWhatsNewDigest({ fetch: fetchFn, slack: prodSlack(fetchFn), githubCredentials: creds, now: NOW });
-    expect(result).toEqual({ posted: true, count: 1 });
+    const result = await sendWhatsNewDigest({ fetch: fetchFn, slack: prodSlack(fetchFn), githubCredentials: creds, db: fakeDb(), now: NOW });
+    expect(result).toEqual({ posted: true, count: 1, clipped: false });
     const pullsReq = requests.find((r) => r.url.includes("/pulls"))!;
     const headers = pullsReq.init!.headers as Record<string, string>;
     expect(headers.Authorization).toBe("Bearer ghs_x");
@@ -187,8 +205,8 @@ describe("sendWhatsNewDigest", () => {
       { status: 200, body: [pr({ number: 1, title: "Fallback PR", merged_at: "2026-09-02T00:00:00Z" })] }, // anonymous pulls
       { status: 200, body: { ok: true } }, // chat.postMessage
     ]);
-    const result = await sendWhatsNewDigest({ fetch: fetchFn, slack: prodSlack(fetchFn), githubCredentials: creds, now: NOW });
-    expect(result).toEqual({ posted: true, count: 1 });
+    const result = await sendWhatsNewDigest({ fetch: fetchFn, slack: prodSlack(fetchFn), githubCredentials: creds, db: fakeDb(), now: NOW });
+    expect(result).toEqual({ posted: true, count: 1, clipped: false });
     const pullsReq = requests.find((r) => r.url.includes("/pulls"))!;
     const headers = pullsReq.init!.headers as Record<string, string>;
     expect(headers.Authorization).toBeUndefined();
@@ -196,14 +214,14 @@ describe("sendWhatsNewDigest", () => {
 
   test("empty week -> no chat.postMessage, {posted:false,count:0}", async () => {
     const { fetchFn, requests } = fakeFetch([{ status: 200, body: [] }]);
-    const result = await sendWhatsNewDigest({ fetch: fetchFn, slack: prodSlack(fetchFn), githubCredentials: null, now: NOW });
-    expect(result).toEqual({ posted: false, count: 0 });
+    const result = await sendWhatsNewDigest({ fetch: fetchFn, slack: prodSlack(fetchFn), githubCredentials: null, db: fakeDb(), now: NOW });
+    expect(result).toEqual({ posted: false, count: 0, clipped: false });
     expect(requests.some((r) => r.url.includes("chat.postMessage"))).toBe(false);
   });
 
   test("GitHub 403 on pulls -> rejects", async () => {
     const { fetchFn } = fakeFetch([{ status: 403, body: { message: "rate limited" } }]);
-    await expect(sendWhatsNewDigest({ fetch: fetchFn, slack: prodSlack(fetchFn), githubCredentials: null, now: NOW })).rejects.toThrow(
+    await expect(sendWhatsNewDigest({ fetch: fetchFn, slack: prodSlack(fetchFn), githubCredentials: null, db: fakeDb(), now: NOW })).rejects.toThrow(
       "whats-new: list pulls failed: 403",
     );
   });
@@ -219,10 +237,148 @@ describe("sendWhatsNewDigest", () => {
       },
       { status: 200, body: { ok: true } },
     ]);
-    const result = await sendWhatsNewDigest({ fetch: fetchFn, slack: prodSlack(fetchFn), githubCredentials: null, now: NOW });
-    expect(result).toEqual({ posted: true, count: 2 });
+    const result = await sendWhatsNewDigest({ fetch: fetchFn, slack: prodSlack(fetchFn), githubCredentials: null, db: fakeDb(), now: NOW });
+    expect(result).toEqual({ posted: true, count: 2, clipped: false });
     const slackReq = requests.find((r) => r.url.includes("chat.postMessage"))!;
     expect(bodyOf(slackReq).channel).toBe("C0BTB9TMAE8");
     expect((bodyOf(slackReq).text as string).startsWith("*What's new in the hub*")).toBe(true);
+  });
+});
+
+describe("sendWhatsNewDigest window cursor", () => {
+  const prodSlack = (fetchFn: typeof globalThis.fetch): SlackDeps => ({ fetch: fetchFn, token: "xoxb", isProd: true });
+  const NOW = () => new Date("2026-09-07T13:00:00Z");
+
+  test("stored cursor sets the window start; PRs merged before it are dropped", async () => {
+    const { fetchFn, requests } = fakeFetch([
+      {
+        status: 200,
+        body: [
+          pr({ number: 1, title: "After cursor", merged_at: "2026-09-06T00:00:00Z" }),
+          pr({ number: 2, title: "Before cursor", merged_at: "2026-09-03T00:00:00Z" }),
+        ],
+      },
+      { status: 200, body: { ok: true } },
+    ]);
+    const result = await sendWhatsNewDigest({
+      fetch: fetchFn,
+      slack: prodSlack(fetchFn),
+      githubCredentials: null,
+      db: fakeDb("2026-09-05T00:00:00.000Z"),
+      now: NOW,
+    });
+    expect(result).toEqual({ posted: true, count: 1, clipped: false });
+    const text = bodyOf(requests.find((r) => r.url.includes("chat.postMessage"))!).text as string;
+    expect(text).toContain("After cursor");
+    expect(text).not.toContain("Before cursor");
+    expect(text).toContain("(2026-09-05 – 2026-09-07)");
+  });
+
+  test("a posted digest advances the cursor to the window end", async () => {
+    const upserts: unknown[] = [];
+    const { fetchFn } = fakeFetch([
+      { status: 200, body: [pr({ number: 1, merged_at: "2026-09-06T00:00:00Z" })] },
+      { status: 200, body: { ok: true } },
+    ]);
+    await sendWhatsNewDigest({
+      fetch: fetchFn,
+      slack: prodSlack(fetchFn),
+      githubCredentials: null,
+      db: fakeDb(null, upserts),
+      now: NOW,
+    });
+    expect(upserts).toEqual([{ key: "whats_new_cursor", value: "2026-09-07T13:00:00.000Z" }]);
+  });
+
+  test("an empty window still advances the cursor (nothing to say is a success)", async () => {
+    const upserts: unknown[] = [];
+    const { fetchFn } = fakeFetch([{ status: 200, body: [] }]);
+    await sendWhatsNewDigest({
+      fetch: fetchFn,
+      slack: prodSlack(fetchFn),
+      githubCredentials: null,
+      db: fakeDb(null, upserts),
+      now: NOW,
+    });
+    expect(upserts).toEqual([{ key: "whats_new_cursor", value: "2026-09-07T13:00:00.000Z" }]);
+  });
+
+  test("a failed Slack post leaves the cursor alone so the next run re-covers the gap", async () => {
+    const upserts: unknown[] = [];
+    const { fetchFn } = fakeFetch([{ status: 200, body: [pr({ number: 1, merged_at: "2026-09-06T00:00:00Z" })] }]);
+    const result = await sendWhatsNewDigest({
+      fetch: fetchFn,
+      slack: { fetch: fetchFn, token: null, isProd: true }, // no token ⇒ postChannelMessage returns false
+      githubCredentials: null,
+      db: fakeDb(null, upserts),
+      now: NOW,
+    });
+    expect(result).toEqual({ posted: false, count: 1, clipped: false });
+    expect(upserts).toEqual([]);
+  });
+
+  test("a gap wider than the cap clips the window to 21 days and says so in the post", async () => {
+    const { fetchFn, requests } = fakeFetch([
+      { status: 200, body: [pr({ number: 1, title: "Recent", merged_at: "2026-09-06T00:00:00Z" })] },
+      { status: 200, body: { ok: true } },
+    ]);
+    const result = await sendWhatsNewDigest({
+      fetch: fetchFn,
+      slack: prodSlack(fetchFn),
+      githubCredentials: null,
+      db: fakeDb("2026-06-01T00:00:00.000Z"), // ~3 months ago
+      now: NOW,
+    });
+    expect(result).toEqual({ posted: true, count: 1, clipped: true });
+    const text = bodyOf(requests.find((r) => r.url.includes("chat.postMessage"))!).text as string;
+    expect(text).toContain("(2026-08-17 – 2026-09-07)"); // 21 days back from 2026-09-07
+    expect(text).toContain("_Catch-up clipped to 21 days — PRs merged before 2026-08-17 were not included._");
+  });
+});
+
+describe("fetchMergedPrs pagination", () => {
+  const prodSlack = (fetchFn: typeof globalThis.fetch): SlackDeps => ({ fetch: fetchFn, token: "xoxb", isProd: true });
+  const NOW = () => new Date("2026-09-07T13:00:00Z");
+
+  function fullPage(startNumber: number) {
+    return Array.from({ length: 100 }, (_, i) =>
+      pr({ number: startNumber + i, title: `PR ${startNumber + i}`, merged_at: "2026-09-06T00:00:00Z" }),
+    );
+  }
+
+  test("a full page is followed by page=2; a short page stops the loop", async () => {
+    const { fetchFn, requests } = fakeFetch([
+      { status: 200, body: fullPage(1) },
+      { status: 200, body: [pr({ number: 999, title: "Second page PR", merged_at: "2026-09-04T00:00:00Z" })] },
+      { status: 200, body: { ok: true } },
+    ]);
+    const result = await sendWhatsNewDigest({
+      fetch: fetchFn,
+      slack: prodSlack(fetchFn),
+      githubCredentials: null,
+      db: fakeDb(),
+      now: NOW,
+    });
+    expect(result).toEqual({ posted: true, count: 101, clipped: false });
+    const pullPages = requests.filter((r) => r.url.includes("/pulls")).map((r) => r.url);
+    expect(pullPages).toHaveLength(2);
+    expect(pullPages[1]).toContain("&page=2");
+  });
+
+  test("a full page whose last item was updated before the window stops the loop", async () => {
+    const page = fullPage(1);
+    page[99] = pr({ number: 100, merged_at: "2026-07-01T00:00:00Z", updated_at: "2026-07-01T00:00:00Z" });
+    const { fetchFn, requests } = fakeFetch([
+      { status: 200, body: page },
+      { status: 200, body: { ok: true } },
+    ]);
+    await sendWhatsNewDigest({
+      fetch: fetchFn,
+      slack: prodSlack(fetchFn),
+      githubCredentials: null,
+      db: fakeDb(),
+      now: NOW,
+    });
+    expect(requests.filter((r) => r.url.includes("/pulls"))).toHaveLength(1);
   });
 });

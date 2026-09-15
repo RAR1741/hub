@@ -58,14 +58,14 @@ describe("POST /api/cron/slack/whats-new", () => {
     const { getSetting } = await import("@/lib/settings");
     const { sendWhatsNewDigest } = await import("@/lib/whats-new");
     vi.mocked(getSetting).mockResolvedValue(SECRET);
-    vi.mocked(sendWhatsNewDigest).mockResolvedValue({ posted: true, count: 3 });
+    vi.mocked(sendWhatsNewDigest).mockResolvedValue({ posted: true, count: 3, clipped: false });
 
     const { POST } = await import("./route");
     const res = await POST(req({ "x-sync-secret": SECRET }));
     expect(res.status).toBe(200);
     expect(sendWhatsNewDigest).toHaveBeenCalledTimes(1);
     const body = await res.json();
-    expect(body).toEqual({ posted: true, count: 3 });
+    expect(body).toEqual({ posted: true, count: 3, clipped: false });
   });
 
   test("502 when sendWhatsNewDigest rejects", async () => {
