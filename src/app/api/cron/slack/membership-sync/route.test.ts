@@ -88,7 +88,7 @@ describe("POST /api/cron/slack/membership-sync", () => {
       slackConfigured: true,
       teamsWithChannels: 0,
       totals: { invited: 0, alreadyIn: 0, wouldRemove: 0, failed: 0, skippedNoSlack: 0, channels: 0 },
-      teams: [],
+      channels: [],
     });
 
     const { POST } = await import("./route");
@@ -121,7 +121,7 @@ describe("POST /api/cron/slack/membership-sync", () => {
     });
     vi.mocked(reconcileAllTeamSlackChannels).mockImplementation(async () => {
       order.push("channels");
-      return { slackConfigured: true, teamsWithChannels: 0, totals: { invited: 0, alreadyIn: 0, wouldRemove: 0, failed: 0, skippedNoSlack: 0, channels: 0 }, teams: [] };
+      return { slackConfigured: true, teamsWithChannels: 0, totals: { invited: 0, alreadyIn: 0, wouldRemove: 0, failed: 0, skippedNoSlack: 0, channels: 0 }, channels: [] };
     });
 
     const { POST } = await import("./route");

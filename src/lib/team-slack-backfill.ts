@@ -14,6 +14,8 @@ export type EffectiveSlackMembers = {
   withSlack: SlackTarget[];
   /** Effective members lacking a `slack_user_id` — reported as skipped. */
   withoutSlackCount: number;
+  /** Person ids behind `withoutSlackCount`, so a shared channel can union them without double-counting. */
+  withoutSlack: string[];
 };
 
 type PersonRow = {
@@ -60,16 +62,16 @@ export async function computeEffectiveSlackMembers(
   }
 
   const withSlack: SlackTarget[] = [];
-  let withoutSlackCount = 0;
+  const withoutSlack: string[] = [];
   for (const p of byId.values()) {
     if (p.slack_user_id) {
       withSlack.push({ personId: p.id, slackUserId: p.slack_user_id, name: displayName(p) });
     } else {
-      withoutSlackCount++;
+      withoutSlack.push(p.id);
     }
   }
   withSlack.sort((a, b) => a.name.localeCompare(b.name));
-  return { effectiveActive: byId.size, withSlack, withoutSlackCount };
+  return { effectiveActive: byId.size, withSlack, withoutSlackCount: withoutSlack.length, withoutSlack };
 }
 
 export type ChannelBackfillResult = {
@@ -82,8 +84,8 @@ export type ChannelBackfillResult = {
   membersReadFailed?: boolean; // couldn't read current membership, so the invited/already-in split is unknown
   error?: string; // Slack error code when the invite failed
   /**
-   * Hub-managed channel members who are NOT effective members of the team —
-   * reported only, never removed (add-only reconcile, issue #236). Undefined
+   * Hub-managed channel members who are NOT effective members of the channel —
+   * reported only, never removed (add-only reconcile, issue #272). Undefined
    * when membership couldn't be read or no `managedSlackIds` was provided.
    */
   wouldRemove?: number;
@@ -109,6 +111,57 @@ function applyInvite(result: ChannelBackfillResult, invite: InviteResult, count:
 }
 
 /**
+ * Reconcile one Slack channel against the effective members it should contain:
+ * read its current membership, invite the genuinely-missing, and report the
+ * hub-managed members who aren't expected (`wouldRemove`) — never removing
+ * anyone. `targets` is the channel's whole expected set, which for a channel
+ * linked to several teams is the union across those teams.
+ */
+async function reconcileChannel(
+  slack: SlackDeps,
+  channel: { channelId: string; label: string | null },
+  targets: SlackTarget[],
+  skippedNoSlack: number,
+  managedSlackIds?: Set<string>,
+): Promise<ChannelBackfillResult> {
+  const result: ChannelBackfillResult = {
+    channelId: channel.channelId,
+    label: channel.label,
+    invited: 0,
+    alreadyIn: 0,
+    skippedNoSlack,
+    failed: 0,
+  };
+
+  // Nothing to invite, or Slack not wired up here: report the channel with
+  // zero activity rather than making pointless API calls.
+  if (!(slack.token && slack.isProd) || targets.length === 0) return result;
+
+  const read = await listChannelMembers(slack, channel.channelId);
+  if (read.ok) {
+    // We know the current membership, so invite only the genuinely-missing
+    // and report the exact already-in / invited split.
+    const missing = targets.filter((t) => !read.members.includes(t.slackUserId));
+    result.alreadyIn = targets.length - missing.length;
+    if (missing.length > 0) {
+      applyInvite(result, await inviteToChannelDetailed(slack, channel.channelId, missing.map((t) => t.slackUserId)), missing.length);
+    }
+    if (managedSlackIds) {
+      const expected = new Set(targets.map((t) => t.slackUserId));
+      result.wouldRemove = read.members.filter((m) => managedSlackIds.has(m) && !expected.has(m)).length;
+    }
+  } else {
+    // Couldn't read current membership: fall back to inviting everyone
+    // (already_in_channel is folded into invite success), but flag it so the
+    // report shows `invited` as an upper bound with already-in unknown rather
+    // than claiming a precise split the read couldn't support.
+    result.membersReadFailed = true;
+    applyInvite(result, await inviteToChannelDetailed(slack, channel.channelId, targets.map((t) => t.slackUserId)), targets.length);
+  }
+  return result;
+}
+
+/**
  * One-shot Slack backfill for a team: invite every effective (subtree) member
  * with a `slack_user_id` to each Slack channel linked to the team. ADD-ONLY —
  * this never removes anyone, matching the join-time sync. Idempotent: it reads
@@ -130,7 +183,6 @@ export async function backfillTeamSlack(
   const managedSlackIds = deps.managedSlackIds;
 
   const { effectiveActive, withSlack, withoutSlackCount } = await computeEffectiveSlackMembers(db, teamId);
-  const effectiveIds = new Set(withSlack.map((t) => t.slackUserId));
 
   const { data: channelData, error: channelError } = await db
     .from("team_slack_channel")
@@ -143,43 +195,15 @@ export async function backfillTeamSlack(
   const results: ChannelBackfillResult[] = [];
   for (let i = 0; i < channels.length; i++) {
     const ch = channels[i];
-    const result: ChannelBackfillResult = {
-      channelId: ch.slack_channel_id,
-      label: ch.label,
-      invited: 0,
-      alreadyIn: 0,
-      skippedNoSlack: withoutSlackCount,
-      failed: 0,
-    };
-
-    // Nothing to invite, or Slack not wired up here: report the channel with
-    // zero activity rather than making pointless API calls.
-    if (!slackConfigured || withSlack.length === 0) {
-      results.push(result);
-      continue;
-    }
-
-    const read = await listChannelMembers(slack, ch.slack_channel_id);
-    if (read.ok) {
-      // We know the current membership, so invite only the genuinely-missing
-      // and report the exact already-in / invited split.
-      const missing = withSlack.filter((t) => !read.members.includes(t.slackUserId));
-      result.alreadyIn = withSlack.length - missing.length;
-      if (missing.length > 0) {
-        applyInvite(result, await inviteToChannelDetailed(slack, ch.slack_channel_id, missing.map((t) => t.slackUserId)), missing.length);
-      }
-      if (managedSlackIds) {
-        result.wouldRemove = read.members.filter((m) => managedSlackIds.has(m) && !effectiveIds.has(m)).length;
-      }
-    } else {
-      // Couldn't read current membership: fall back to inviting everyone
-      // (already_in_channel is folded into invite success), but flag it so the
-      // report shows `invited` as an upper bound with already-in unknown rather
-      // than claiming a precise split the read couldn't support.
-      result.membersReadFailed = true;
-      applyInvite(result, await inviteToChannelDetailed(slack, ch.slack_channel_id, withSlack.map((t) => t.slackUserId)), withSlack.length);
-    }
-    results.push(result);
+    results.push(
+      await reconcileChannel(
+        slack,
+        { channelId: ch.slack_channel_id, label: ch.label },
+        withSlack,
+        withoutSlackCount,
+        managedSlackIds,
+      ),
+    );
     // ~1 req/sec between channels (mirrors the event sweep); no trailing sleep
     // after the final channel.
     if (i < channels.length - 1) await sleep(1100);
@@ -194,21 +218,30 @@ export async function backfillTeamSlack(
   };
 }
 
+/** One reconciled channel plus the teams whose links put it in scope. */
+export type ChannelReconcileResult = ChannelBackfillResult & { teamIds: string[] };
+
 export type AllTeamSlackReconcileSummary = {
   slackConfigured: boolean;
   teamsWithChannels: number;
   totals: { invited: number; alreadyIn: number; wouldRemove: number; failed: number; skippedNoSlack: number; channels: number };
-  teams: { teamId: string; summary: TeamSlackBackfillSummary }[];
+  channels: ChannelReconcileResult[];
 };
 
 /**
- * Nightly cron entry point: backfill every team that has at least one linked
- * Slack channel. Same add-only guarantees as `backfillTeamSlack` per team; a
- * DB failure inside any team's backfill propagates (caller returns a 5xx).
+ * Nightly cron entry point: reconcile every Slack channel that at least one
+ * team links to. Grouped by CHANNEL, not by team — the schema allows one
+ * channel linked to several teams (`team_slack_channel` PK is
+ * `(team_id, slack_channel_id)`), and the questions this answers are all
+ * channel-scoped: a shared channel is visited once, and its expected member
+ * set is the union of the effective members of every team linking it, so
+ * someone effective under one of those teams never shows up in `wouldRemove`.
  *
- * ponytail: no inter-team throttling beyond backfillTeamSlack's own 1.1s
- * inter-channel sleep — fine for a handful of teams, revisit if Slack ever
- * rate-limits a nightly run.
+ * Same add-only guarantees as `backfillTeamSlack`; a DB failure propagates
+ * (caller returns a 5xx).
+ *
+ * ponytail: 1.1s sleep between channels and no other throttling — fine for a
+ * handful of channels, revisit if Slack ever rate-limits a nightly run.
  */
 export async function reconcileAllTeamSlackChannels(
   deps: { db: SupabaseClient; slack?: SlackDeps; sleep?: (ms: number) => Promise<void> },
@@ -216,47 +249,76 @@ export async function reconcileAllTeamSlackChannels(
   const db = deps.db;
   const slack = deps.slack ?? slackDepsFromEnv();
 
+  const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+
   // ponytail: built from currently-present person rows, so a hard-deleted
   // (not just deactivated) linked person drops out of managedSlackIds and
-  // stops being tracked in wouldRemove.
+  // stops being tracked in wouldRemove. Deferred deliberately — tracking them
+  // needs a ledger that survives the delete (see the follow-up to #291).
   const { data: personData, error: personError } = await db.from("person").select("slack_user_id");
   if (personError) throw new Error(personError.message);
   const managedSlackIds = new Set<string>(
     ((personData ?? []) as { slack_user_id: string | null }[]).map((p) => p.slack_user_id).filter((id): id is string => Boolean(id)),
   );
 
-  // ponytail: dedupes teams by team_id only, not by slack_channel_id. Schema
-  // allows the same channel linked to two unrelated teams (PK is
-  // (team_id, slack_channel_id)), so that channel gets reconciled once per
-  // team: totals.channels double-counts it, and wouldRemove can false-positive
-  // a member who's effective under the other team. Report-only (nobody is
-  // removed) — group by channel instead if that reporting ever needs to be exact.
-  const { data: channelTeamData, error: channelTeamError } = await db.from("team_slack_channel").select("team_id");
-  if (channelTeamError) throw new Error(channelTeamError.message);
-  const teamIds = [...new Set(((channelTeamData ?? []) as { team_id: string }[]).map((r) => r.team_id))].sort();
+  // Every link row, grouped by channel. A channel linked to several teams
+  // appears once, carrying all of them; the label is the first link's in
+  // team_id order.
+  const { data: linkData, error: linkError } = await db
+    .from("team_slack_channel")
+    .select("team_id, slack_channel_id, label")
+    .order("slack_channel_id")
+    .order("team_id");
+  if (linkError) throw new Error(linkError.message);
+  const links = (linkData ?? []) as { team_id: string; slack_channel_id: string; label: string | null }[];
 
-  const teams: { teamId: string; summary: TeamSlackBackfillSummary }[] = [];
-  for (const teamId of teamIds) {
-    const summary = await backfillTeamSlack({ db, slack, sleep: deps.sleep, managedSlackIds }, teamId);
-    teams.push({ teamId, summary });
+  const byChannel = new Map<string, { label: string | null; teamIds: string[] }>();
+  for (const link of links) {
+    const entry = byChannel.get(link.slack_channel_id);
+    if (entry) entry.teamIds.push(link.team_id);
+    else byChannel.set(link.slack_channel_id, { label: link.label, teamIds: [link.team_id] });
   }
 
-  const totals = { invited: 0, alreadyIn: 0, wouldRemove: 0, failed: 0, skippedNoSlack: 0, channels: 0 };
-  for (const { summary } of teams) {
-    for (const ch of summary.channels) {
-      totals.invited += ch.invited;
-      totals.alreadyIn += ch.alreadyIn;
-      totals.wouldRemove += ch.wouldRemove ?? 0;
-      totals.failed += ch.failed;
-      totals.skippedNoSlack += ch.skippedNoSlack;
-      totals.channels += 1;
+  // Effective membership per linking team, computed once even when that team
+  // links several channels.
+  const effectiveByTeam = new Map<string, EffectiveSlackMembers>();
+  for (const teamId of [...new Set(links.map((l) => l.team_id))].sort()) {
+    effectiveByTeam.set(teamId, await computeEffectiveSlackMembers(db, teamId));
+  }
+
+  const channels: ChannelReconcileResult[] = [];
+  const entries = [...byChannel.entries()];
+  for (let i = 0; i < entries.length; i++) {
+    const [channelId, { label, teamIds }] = entries[i];
+    // Union across the linking teams, deduped by person: someone effective
+    // under two of them is one expected member, not two.
+    const targets = new Map<string, SlackTarget>();
+    const withoutSlack = new Set<string>();
+    for (const teamId of teamIds) {
+      const effective = effectiveByTeam.get(teamId);
+      if (!effective) continue;
+      for (const t of effective.withSlack) targets.set(t.slackUserId, t);
+      for (const personId of effective.withoutSlack) withoutSlack.add(personId);
     }
+    const union = [...targets.values()].sort((a, b) => a.name.localeCompare(b.name));
+    const result = await reconcileChannel(slack, { channelId, label }, union, withoutSlack.size, managedSlackIds);
+    channels.push({ ...result, teamIds });
+    if (i < entries.length - 1) await sleep(1100);
+  }
+
+  const totals = { invited: 0, alreadyIn: 0, wouldRemove: 0, failed: 0, skippedNoSlack: 0, channels: channels.length };
+  for (const ch of channels) {
+    totals.invited += ch.invited;
+    totals.alreadyIn += ch.alreadyIn;
+    totals.wouldRemove += ch.wouldRemove ?? 0;
+    totals.failed += ch.failed;
+    totals.skippedNoSlack += ch.skippedNoSlack;
   }
 
   return {
     slackConfigured: Boolean(slack.token) && slack.isProd,
-    teamsWithChannels: teams.length,
+    teamsWithChannels: effectiveByTeam.size,
     totals,
-    teams,
+    channels,
   };
 }
