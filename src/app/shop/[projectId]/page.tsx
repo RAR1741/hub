@@ -10,8 +10,8 @@ import { ShopBoard } from "@/components/ShopBoard";
 type Params = { params: Promise<{ projectId: string }> };
 
 // Student+: server shell (name + back link) renders the initial parts list
-// server-side (matches the WhosHere pattern) — the client board then polls
-// the student+ /api/shop/[projectId] route for refreshes.
+// server-side (matches the WhosHere pattern) — the client board then refetches
+// the student+ /api/shop/[projectId] route on a `hub:parts` broadcast.
 export const metadata: Metadata = { title: "Project" };
 
 export default async function ShopBoardPage({ params }: Params) {
