@@ -222,10 +222,11 @@ export async function signedUpEventIds(
 ): Promise<Set<string>> {
   if (eventIds.length === 0) return new Set();
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client
+  const { data, error } = await client
     .from("event_signup")
     .select("event_id")
     .eq("person_id", personId)
     .in("event_id", eventIds);
+  if (error) console.error("signedUpEventIds: query failed", error);
   return new Set((data ?? []).map((r) => r.event_id as string));
 }

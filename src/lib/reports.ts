@@ -47,12 +47,13 @@ export async function personSessions(
   db?: SupabaseClient,
 ): Promise<Session[]> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client
+  const { data, error } = await client
     .from("session")
     .select("*")
     .eq("person_id", personId)
     .eq("period_id", periodId)
     .order("time_in", { ascending: false });
+  if (error) console.error("personSessions: query failed", error);
   return ((data ?? []) as SessionRow[]).map(sessionFromRow);
 }
 

@@ -16,7 +16,8 @@ export async function notifyAdmins(
   const delivered = await postChannelMessage(deps.slack, "hub-admin-alerts", text);
   try {
     const push = deps.push ?? pushDepsFromEnv();
-    const { data } = await deps.db.from("person").select("id").eq("role", "admin");
+    const { data, error } = await deps.db.from("person").select("id").eq("role", "admin");
+    if (error) console.error("notifyAdmins: admin query failed", error);
     const adminIds = ((data ?? []) as { id: string }[]).map((r) => r.id);
     if (adminIds.length > 0) {
       await sendPushToOptedIn(

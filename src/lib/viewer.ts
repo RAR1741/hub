@@ -90,11 +90,13 @@ export async function getViewer(): Promise<Viewer> {
 
   const db = getDb();
   const findOne = async (col: string, val: string) => {
-    const { data } = await db
+    const { data, error } = await db
       .from("person")
       .select("*")
       .eq(col, val)
       .maybeSingle();
+    // A read failure here logs the viewer out; never let it pass silently.
+    if (error) console.error(`getViewer: person lookup by ${col} failed`, error);
     return data;
   };
 
@@ -104,11 +106,12 @@ export async function getViewer(): Promise<Viewer> {
     verifyToken: (t) =>
       verifyStudentSessionToken(t, process.env.STUDENT_SESSION_SECRET!),
     findPersonByAuthUserId: async (id) => {
-      const { data } = await db
+      const { data, error } = await db
         .from("person_identity")
         .select("person (*)")
         .eq("auth_user_id", id)
         .maybeSingle();
+      if (error) console.error("getViewer: identity lookup failed", error);
       const person = (data as { person: PersonRow | PersonRow[] | null } | null)?.person;
       return (Array.isArray(person) ? person[0] : person) ?? null;
     },

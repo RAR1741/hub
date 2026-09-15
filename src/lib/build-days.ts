@@ -33,12 +33,13 @@ export async function listBuildDays(
   db?: SupabaseClient,
 ): Promise<BuildDay[]> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client
+  const { data, error } = await client
     .from("build_day")
     .select("*")
     .gte("date", range.from)
     .lte("date", range.to)
     .order("date");
+  if (error) console.error("listBuildDays: query failed", error);
   return ((data ?? []) as BuildDayRow[]).map(buildDayFromRow);
 }
 

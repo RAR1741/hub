@@ -112,11 +112,12 @@ export async function attendanceSummaryForPeriod(
   db?: SupabaseClient,
 ): Promise<PeriodAttendanceSummary[]> {
   const client = db ?? (await import("./db")).getDb();
-  const { data: periodRow } = await client
+  const { data: periodRow, error: periodError } = await client
     .from("period")
     .select("*")
     .eq("id", periodId)
     .maybeSingle();
+  if (periodError) { console.error("attendanceSummaryForPeriod: period query failed", periodError); return []; }
   if (!periodRow) return [];
   const period = periodFromRow(periodRow as PeriodRow);
   const range = { from: period.startsOn, to: period.endsOn };
