@@ -23,6 +23,9 @@ vi.mock("@/lib/sync-runs", () => ({
 vi.mock("@/lib/system-health", () => ({
   reportSubsystemHealth: vi.fn(),
 }));
+vi.mock("@/lib/cron-heartbeat", () => ({
+  recordCronHeartbeat: vi.fn(),
+}));
 
 function req(headers?: Record<string, string>) {
   return new Request("http://localhost/api/cron/slack/membership-sync", {
@@ -97,6 +100,10 @@ describe("POST /api/cron/slack/membership-sync", () => {
     const { POST } = await import("./route");
     const res = await POST(req());
     expect(res.status).toBe(200);
+    // An admin's manual run must NOT refresh the heartbeat, or a cron that has been
+    // 403ing on an unset secret keeps looking alive (#301).
+    const { recordCronHeartbeat } = await import("@/lib/cron-heartbeat");
+    expect(recordCronHeartbeat).not.toHaveBeenCalled();
   });
 
   test("403 when a non-admin session posts with no secret", async () => {
@@ -136,6 +143,8 @@ describe("POST /api/cron/slack/membership-sync", () => {
     expect(order).toEqual(["links", "channels"]);
     expect(reportSubsystemHealth).toHaveBeenCalledWith("slack_membership_sync", true, expect.anything());
     expect(insertSyncRun).toHaveBeenCalledWith(expect.objectContaining({ source: "slack_sync", ok: true }), expect.anything());
+    const { recordCronHeartbeat } = await import("@/lib/cron-heartbeat");
+    expect(recordCronHeartbeat).toHaveBeenCalledWith("slack-nightly-sync", expect.anything());
   });
 
   test("502 and reports failure when the chain throws", async () => {

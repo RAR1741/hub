@@ -7,6 +7,7 @@ import { secureEqual } from "@/lib/secure-compare";
 import { githubAppCredentialsFromEnv, githubAppConfigPresence } from "@/lib/github-app";
 import { reconcileGithubTeams } from "@/lib/github-team-sync";
 import { reportSyncOutcome } from "@/lib/slack-alerts";
+import { recordCronHeartbeat } from "@/lib/cron-heartbeat";
 
 export async function POST(request: Request) {
   const db = getDb();
@@ -50,6 +51,8 @@ export async function POST(request: Request) {
       errors: result.teams.reduce((n, t) => n + t.errors.length, 0),
     };
     await reportSyncOutcome("github_sync", true, { db, startedAt, detail });
+    // Cron path only: an admin clicking "Sync now" must not mask a cron that 403s.
+    if (secretOk) await recordCronHeartbeat("github-team-nightly-sync", db);
     return Response.json(result);
   } catch (e) {
     // Surface the real cause server-side (bad group id, token/network failure)

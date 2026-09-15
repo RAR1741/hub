@@ -6,6 +6,7 @@ import { hasRole } from "@/lib/authz";
 import { secureEqual } from "@/lib/secure-compare";
 import { gcalCredentialsFromEnv, pickCalendarId, syncCalendar } from "@/lib/gcal";
 import { reportSyncOutcome } from "@/lib/slack-alerts";
+import { recordCronHeartbeat } from "@/lib/cron-heartbeat";
 
 export async function POST(request: Request) {
   const db = getDb();
@@ -52,6 +53,8 @@ export async function POST(request: Request) {
   try {
     const result = await syncCalendar({ fetch: globalThis.fetch, db, credentials, tz });
     await reportSyncOutcome("calendar_sync", true, { db, startedAt, detail: result });
+    // Cron path only: an admin clicking "Sync now" must not mask a cron that 403s.
+    if (secretOk) await recordCronHeartbeat("gcal-hourly-sync", db);
     return Response.json(result);
   } catch (e) {
     // Surface the real cause server-side (bad calendar id, unshared calendar,

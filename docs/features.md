@@ -139,6 +139,9 @@ scannable catalog of what's built, grouped by area, with a route per entry. The
   groups, GitHub teams, Slack membership), with manual Run now buttons and 90-day retention. Admin
   alerts deep-link to filtered history. `/admin/sync-runs` — see
   [features/sync-run-history.md](features/sync-run-history.md)
+- **Cron heartbeat** — per-job last-success timestamp plus an overdue check against each job's own
+  schedule, so a cron that silently stops firing (unset secret, dev-default URL, unscheduled) alerts
+  instead of looking green. `/admin/cron` — see [features/cron-heartbeat.md](features/cron-heartbeat.md)
 - **Onshape** — see [features/parts-and-shop.md](features/parts-and-shop.md),
   [setup/onshape.md](setup/onshape.md)
 - **Google Calendar sync** — see [setup/google-calendar.md](setup/google-calendar.md)
