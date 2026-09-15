@@ -11,6 +11,9 @@ vi.mock("@/lib/settings", () => ({
 vi.mock("@/lib/slack-channels", () => ({
   sweepEventChannels: vi.fn(),
 }));
+vi.mock("@/lib/system-health", () => ({
+  reportSubsystemHealth: vi.fn(),
+}));
 
 function req(headers?: Record<string, string>) {
   return new Request("http://localhost/api/cron/slack/event-channels", {
@@ -67,5 +70,20 @@ describe("POST /api/cron/slack/event-channels", () => {
     expect(sweepEventChannels).toHaveBeenCalledTimes(1);
     const body = await res.json();
     expect(body).toEqual({ ok: true, ...summary });
+    const { reportSubsystemHealth } = await import("@/lib/system-health");
+    expect(reportSubsystemHealth).toHaveBeenCalledWith("slack_event_channels", true, expect.anything());
+  });
+
+  test("200 but reports failing when the sweep had failures", async () => {
+    const { getSetting } = await import("@/lib/settings");
+    const { sweepEventChannels } = await import("@/lib/slack-channels");
+    const { reportSubsystemHealth } = await import("@/lib/system-health");
+    vi.mocked(getSetting).mockResolvedValue(SECRET);
+    vi.mocked(sweepEventChannels).mockResolvedValue({ archived: 0, renamed: 0, invited: 0, failed: 2 });
+
+    const { POST } = await import("./route");
+    const res = await POST(req({ "x-sync-secret": SECRET }));
+    expect(res.status).toBe(200);
+    expect(reportSubsystemHealth).toHaveBeenCalledWith("slack_event_channels", false, expect.anything());
   });
 });

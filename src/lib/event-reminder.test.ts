@@ -82,7 +82,7 @@ describe("pushEventReminders", () => {
     );
     const res = await pushEventReminders({ db, nowIso: "2026-09-06T21:35:00Z" });
     expect(sendPushToOptedIn).not.toHaveBeenCalled();
-    expect(res).toEqual({ sent: 0, pruned: 0, events: 0 });
+    expect(res).toEqual({ sent: 0, pruned: 0, events: 0, errors: 0 });
   });
 
   test("a second overlapping tick claims nothing → no second push", async () => {
@@ -94,7 +94,7 @@ describe("pushEventReminders", () => {
     await pushEventReminders({ db, nowIso: "2026-09-06T21:30:00Z" });
     const res = await pushEventReminders({ db, nowIso: "2026-09-06T21:31:00Z" });
     expect(sendPushToOptedIn).toHaveBeenCalledTimes(1);
-    expect(res).toEqual({ sent: 0, pruned: 0, events: 0 });
+    expect(res).toEqual({ sent: 0, pruned: 0, events: 0, errors: 0 });
   });
 
   test(".error on a select → returns zeros", async () => {
@@ -105,7 +105,7 @@ describe("pushEventReminders", () => {
       }),
     } as unknown as SupabaseClient;
     const res = await pushEventReminders({ db, nowIso: "2026-09-06T20:00:00Z" });
-    expect(res).toEqual({ sent: 0, pruned: 0, events: 0 });
+    expect(res).toEqual({ sent: 0, pruned: 0, events: 0, errors: 1 });
     expect(sendPushToOptedIn).not.toHaveBeenCalled();
   });
 

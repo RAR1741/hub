@@ -37,6 +37,6 @@ describe("pushClockedInLate", () => {
     const db = fakeDb([]);
     const res = await pushClockedInLate({ db });
     expect(sendPushToOptedIn).not.toHaveBeenCalled();
-    expect(res).toEqual({ sent: 0, pruned: 0 });
+    expect(res).toEqual({ sent: 0, pruned: 0, errors: 0 });
   });
 });

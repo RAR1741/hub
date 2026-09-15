@@ -17,7 +17,7 @@ export async function pushMeetingReminders(deps: {
   db: SupabaseClient;
   push?: PushDeps;
   nowIso?: string;
-}): Promise<{ sent: number; pruned: number; meetings: number }> {
+}): Promise<{ sent: number; pruned: number; meetings: number; errors: number }> {
   const nowIso = deps.nowIso ?? new Date().toISOString();
   const until = new Date(Date.parse(nowIso) + MAX_REMINDER_MS).toISOString();
   const { data, error } = await deps.db
@@ -27,15 +27,16 @@ export async function pushMeetingReminders(deps: {
     .lte("starts_at", until);
   if (error) {
     console.error("[meeting-reminder] load meetings failed:", error.message);
-    return { sent: 0, pruned: 0, meetings: 0 };
+    return { sent: 0, pruned: 0, meetings: 0, errors: 1 };
   }
   const meetings = (data ?? []) as MeetingRow[];
-  if (meetings.length === 0) return { sent: 0, pruned: 0, meetings: 0 };
+  if (meetings.length === 0) return { sent: 0, pruned: 0, meetings: 0, errors: 0 };
 
   const push = deps.push ?? pushDepsFromEnv();
   let sent = 0;
   let pruned = 0;
   let meetingsSent = 0;
+  let errors = 0;
   for (const m of meetings) {
     const dueM = dueOffsets(Date.parse(m.starts_at), Date.parse(nowIso), m.reminder_pushed_minutes);
     if (dueM.length === 0) continue;
@@ -46,6 +47,7 @@ export async function pushMeetingReminders(deps: {
       .overlaps("meeting_reminder_minutes", dueM);
     if (personError) {
       console.error("[meeting-reminder] load persons failed:", personError.message);
+      errors++;
       continue;
     }
     const ids = ((personData ?? []) as { id: string }[]).map((p) => p.id);
@@ -64,6 +66,7 @@ export async function pushMeetingReminders(deps: {
       .select("id");
     if (claimError) {
       console.error("[meeting-reminder] claim meeting failed:", claimError.message);
+      errors++;
       continue;
     }
     if (((claimed ?? []) as { id: string }[]).length === 0) continue;
@@ -85,5 +88,5 @@ export async function pushMeetingReminders(deps: {
       meetingsSent += 1;
     }
   }
-  return { sent, pruned, meetings: meetingsSent };
+  return { sent, pruned, meetings: meetingsSent, errors };
 }

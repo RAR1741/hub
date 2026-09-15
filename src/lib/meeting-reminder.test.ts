@@ -86,7 +86,7 @@ describe("pushMeetingReminders", () => {
     const res = await pushMeetingReminders({ db, nowIso: "2026-09-06T21:30:00Z" });
     expect(sendPushToOptedIn).not.toHaveBeenCalled();
     expect(db._stamped).toEqual([]);
-    expect(res).toEqual({ sent: 0, pruned: 0, meetings: 0 });
+    expect(res).toEqual({ sent: 0, pruned: 0, meetings: 0, errors: 0 });
   });
 
   test("a second overlapping tick loses the compare-and-swap → no second push", async () => {
@@ -100,7 +100,7 @@ describe("pushMeetingReminders", () => {
     const res = await pushMeetingReminders({ db, nowIso: "2026-09-06T21:31:00Z" });
     expect(sendPushToOptedIn).toHaveBeenCalledTimes(1);
     expect(db._stamped).toHaveLength(1);
-    expect(res).toEqual({ sent: 0, pruned: 0, meetings: 0 });
+    expect(res).toEqual({ sent: 0, pruned: 0, meetings: 0, errors: 0 });
   });
 
   test("person select errors → no push, no stamp (retried on next tick)", async () => {
@@ -139,7 +139,7 @@ describe("pushMeetingReminders", () => {
     const res = await pushMeetingReminders({ db, nowIso: "2026-09-06T21:30:00Z" });
     expect(sendPushToOptedIn).not.toHaveBeenCalled();
     expect(stamped).toEqual([]);
-    expect(res).toEqual({ sent: 0, pruned: 0, meetings: 0 });
+    expect(res).toEqual({ sent: 0, pruned: 0, meetings: 0, errors: 1 });
   });
 
   test("no overlapping persons → still stamped, no push", async () => {

@@ -4,6 +4,7 @@ import { secureEqual } from "@/lib/secure-compare";
 import { slackDepsFromEnv } from "@/lib/slack";
 import { githubAppCredentialsFromEnv } from "@/lib/github-app";
 import { sendWhatsNewDigest } from "@/lib/whats-new";
+import { reportSubsystemHealth } from "@/lib/system-health";
 
 export async function POST(request: Request) {
   const db = getDb();
@@ -19,9 +20,16 @@ export async function POST(request: Request) {
       githubCredentials: githubAppCredentialsFromEnv(),
       db,
     });
+    // An empty window is a real success (the cursor advances); only a digest that
+    // was formatted and then failed to post is a failure.
+    await reportSubsystemHealth("slack_whats_new", result.count === 0 || result.posted, {
+      db,
+      detail: `Digest of ${result.count} PR(s) did not post to #hub-admin-alerts.`,
+    });
     return Response.json(result);
   } catch (e) {
     console.error("whats-new digest failed:", e);
+    await reportSubsystemHealth("slack_whats_new", false, { db, detail: e instanceof Error ? e.message : String(e) });
     return Response.json({ error: "failed" }, { status: 502 });
   }
 }

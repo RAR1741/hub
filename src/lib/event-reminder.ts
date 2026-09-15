@@ -12,7 +12,7 @@ export async function pushEventReminders(deps: {
   db: SupabaseClient;
   push?: PushDeps;
   nowIso?: string;
-}): Promise<{ sent: number; pruned: number; events: number }> {
+}): Promise<{ sent: number; pruned: number; events: number; errors: number }> {
   const nowIso = deps.nowIso ?? new Date().toISOString();
   const until = new Date(Date.parse(nowIso) + MAX_REMINDER_MS).toISOString();
 
@@ -23,15 +23,16 @@ export async function pushEventReminders(deps: {
     .lte("starts_at", until);
   if (eventError) {
     console.error("[event-reminder] load events failed:", eventError.message);
-    return { sent: 0, pruned: 0, events: 0 };
+    return { sent: 0, pruned: 0, events: 0, errors: 1 };
   }
   const events = (eventData ?? []) as EventRow[];
-  if (events.length === 0) return { sent: 0, pruned: 0, events: 0 };
+  if (events.length === 0) return { sent: 0, pruned: 0, events: 0, errors: 0 };
 
   const push = deps.push ?? pushDepsFromEnv();
   let sent = 0;
   let pruned = 0;
   let eventsSent = 0;
+  let errors = 0;
   for (const event of events) {
     const dueM = dueOffsets(Date.parse(event.starts_at), Date.parse(nowIso), []);
     if (dueM.length === 0) continue;
@@ -49,6 +50,7 @@ export async function pushEventReminders(deps: {
       .select("person_id");
     if (claimError) {
       console.error("[event-reminder] claim reminders failed:", claimError.message);
+      errors++;
       continue;
     }
     const recipients = [
@@ -71,5 +73,5 @@ export async function pushEventReminders(deps: {
     pruned += res.pruned;
     eventsSent += 1;
   }
-  return { sent, pruned, events: eventsSent };
+  return { sent, pruned, events: eventsSent, errors };
 }
