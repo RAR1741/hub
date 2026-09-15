@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
-import { listCronJobs } from "@/lib/cron-jobs";
-import { isCronStale } from "@/lib/cron-heartbeat";
+import { listCronJobsWithStaleness } from "@/lib/cron-heartbeat";
 import { getTeamTimezone } from "@/lib/settings";
 import { CronJobsEditor } from "@/components/CronJobsEditor";
 
@@ -13,13 +12,9 @@ export default async function AdminCronPage() {
   const viewer = await getViewer();
   if (!hasRole(viewer.role, "admin")) redirect("/");
 
-  // Staleness is computed here, not in the client component, so the server-only
-  // cron-heartbeat module stays out of the client bundle.
-  const now = Date.now();
-  const jobs = (await listCronJobs()).map((job) => ({
-    ...job,
-    stale: job.active && isCronStale(job.schedule, job.lastSuccessAt, now),
-  }));
+  // Staleness resolved server-side so the client component stays free of the
+  // server-only cron-heartbeat module.
+  const jobs = await listCronJobsWithStaleness();
   const teamTz = await getTeamTimezone();
 
   return (

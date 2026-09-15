@@ -69,6 +69,16 @@ export function isCronStale(schedule: string, lastSuccessAt: string | null, now:
   return now - last > period + Math.max(15 * MINUTE, period / 4);
 }
 
+/** listCronJobs plus the overdue flag /admin/cron renders. Lives here rather than in the
+ *  page so Date.now() isn't called during render. */
+export async function listCronJobsWithStaleness(db?: SupabaseClient): Promise<(CronJob & { stale: boolean })[]> {
+  const now = Date.now();
+  return (await listCronJobs(db)).map((job) => ({
+    ...job,
+    stale: job.active && isCronStale(job.schedule, job.lastSuccessAt, now),
+  }));
+}
+
 function staleDetail(job: CronJob): string {
   return job.lastSuccessAt === null
     ? "Has never recorded a successful run."

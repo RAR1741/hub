@@ -22,7 +22,8 @@ describe("cronPeriodMs", () => {
     ["0 7 * * *", DAY],
     ["0 23 * * 4", 7 * DAY],
     ["nonsense", DAY],
-    ["*/0 * * * *", DAY],
+    ["0,30 * * * *", HOUR], // unrecognized minute field, but still hourly at most
+    ["*/0 * * * *", HOUR],
   ])("%s", (schedule, expected) => {
     expect(cronPeriodMs(schedule)).toBe(expected);
   });
