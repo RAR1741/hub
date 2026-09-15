@@ -151,7 +151,7 @@ export async function listTeams(db?: SupabaseClient): Promise<Team[]> {
 export async function getTeam(id: string, db?: SupabaseClient): Promise<Team | null> {
   const client = db ?? (await import("./db")).getDb();
   const { data, error } = await client.from("team").select("*").eq("id", id).maybeSingle();
-  if (error) { console.error("getTeam: query failed", error); return null; }
+  if (error) throw new Error(`getTeam(${id}) failed: ${error.message}`);
   return data ? teamFromRow(data as TeamRow) : null;
 }
 

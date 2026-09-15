@@ -95,8 +95,9 @@ export async function getViewer(): Promise<Viewer> {
       .select("*")
       .eq(col, val)
       .maybeSingle();
-    // A read failure here logs the viewer out; never let it pass silently.
-    if (error) console.error(`getViewer: person lookup by ${col} failed`, error);
+    // A read failure here would log the viewer out. Throw so it reaches an
+    // error boundary instead of silently degrading the viewer to GUEST.
+    if (error) throw new Error(`getViewer: person lookup by ${col} failed: ${error.message}`);
     return data;
   };
 
@@ -111,7 +112,7 @@ export async function getViewer(): Promise<Viewer> {
         .select("person (*)")
         .eq("auth_user_id", id)
         .maybeSingle();
-      if (error) console.error("getViewer: identity lookup failed", error);
+      if (error) throw new Error(`getViewer: identity lookup failed: ${error.message}`);
       const person = (data as { person: PersonRow | PersonRow[] | null } | null)?.person;
       return (Array.isArray(person) ? person[0] : person) ?? null;
     },

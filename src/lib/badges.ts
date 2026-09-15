@@ -51,7 +51,7 @@ export async function listBadges(db?: SupabaseClient): Promise<Badge[]> {
 export async function getBadge(id: string, db?: SupabaseClient): Promise<Badge | null> {
   const client = db ?? (await import("./db")).getDb();
   const { data, error } = await client.from("badge").select("*").eq("id", id).maybeSingle();
-  if (error) { console.error("getBadge: query failed", error); return null; }
+  if (error) throw new Error(`getBadge(${id}) failed: ${error.message}`);
   return data ? badgeFromRow(data as BadgeRow) : null;
 }
 

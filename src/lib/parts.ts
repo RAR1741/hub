@@ -222,7 +222,7 @@ export async function listProjects(db?: SupabaseClient): Promise<Project[]> {
 export async function getProject(id: string, db?: SupabaseClient): Promise<Project | null> {
   const client = db ?? (await import("./db")).getDb();
   const { data, error } = await client.from("project").select("*").eq("id", id).maybeSingle();
-  if (error) { console.error("getProject: query failed", error); return null; }
+  if (error) throw new Error(`getProject(${id}) failed: ${error.message}`);
   return data ? projectFromRow(data as ProjectRow) : null;
 }
 
@@ -424,7 +424,7 @@ export async function countPartsByProject(db?: SupabaseClient): Promise<Record<s
 export async function getPart(id: string, db?: SupabaseClient): Promise<Part | null> {
   const client = db ?? (await import("./db")).getDb();
   const { data, error } = await client.from("part").select("*").eq("id", id).maybeSingle();
-  if (error) { console.error("getPart: query failed", error); return null; }
+  if (error) throw new Error(`getPart(${id}) failed: ${error.message}`);
   return data ? partFromRow(data as PartRow) : null;
 }
 

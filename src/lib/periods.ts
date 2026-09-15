@@ -31,15 +31,15 @@ export async function listPeriods(db?: SupabaseClient): Promise<Period[]> {
 export async function getActivePeriod(db?: SupabaseClient): Promise<Period | null> {
   const client = db ?? (await import("./db")).getDb();
   const { data, error } = await client.from("period").select("*").eq("is_active", true).maybeSingle();
-  if (error) { console.error("getActivePeriod: query failed", error); return null; }
+  if (error) throw new Error(`getActivePeriod failed: ${error.message}`);
   return data ? periodFromRow(data as PeriodRow) : null;
 }
 
-/** Look up a period by id. Returns null if not found (or the id is malformed). */
+/** Look up a period by id. Null = no such period; a query failure throws. */
 export async function getPeriod(id: string, db?: SupabaseClient): Promise<Period | null> {
   const client = db ?? (await import("./db")).getDb();
   const { data, error } = await client.from("period").select("*").eq("id", id).maybeSingle();
-  if (error) { console.error("getPeriod: query failed", error); return null; }
+  if (error) throw new Error(`getPeriod(${id}) failed: ${error.message}`);
   return data ? periodFromRow(data as PeriodRow) : null;
 }
 

@@ -105,7 +105,8 @@ export type PeriodAttendanceSummary = {
  * Per-active-person attendance summary over a whole period's required build
  * days. Composes the existing `attendanceSummary`/`attendanceForDate` math —
  * this function only fetches and fans the data out per person, it doesn't
- * change how a day is scored. Returns `[]` if the period doesn't exist.
+ * change how a day is scored. Returns `[]` if the period doesn't exist, and
+ * throws if the period read itself fails.
  */
 export async function attendanceSummaryForPeriod(
   periodId: string,
@@ -117,7 +118,8 @@ export async function attendanceSummaryForPeriod(
     .select("*")
     .eq("id", periodId)
     .maybeSingle();
-  if (periodError) { console.error("attendanceSummaryForPeriod: period query failed", periodError); return []; }
+  if (periodError)
+    throw new Error(`attendanceSummaryForPeriod(${periodId}) period query failed: ${periodError.message}`);
   if (!periodRow) return [];
   const period = periodFromRow(periodRow as PeriodRow);
   const range = { from: period.startsOn, to: period.endsOn };

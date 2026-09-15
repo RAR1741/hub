@@ -159,7 +159,7 @@ export async function listUpcomingEvents(db?: SupabaseClient): Promise<Event[]> 
 export async function getEvent(id: string, db?: SupabaseClient): Promise<Event | null> {
   const client = db ?? (await import("./db")).getDb();
   const { data, error } = await client.from("event").select("*").eq("id", id).maybeSingle();
-  if (error) { console.error("getEvent: query failed", error); return null; }
+  if (error) throw new Error(`getEvent(${id}) failed: ${error.message}`);
   return data ? eventFromRow(data as EventRow) : null;
 }
 

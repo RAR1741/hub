@@ -204,7 +204,7 @@ export async function listTools(db?: SupabaseClient): Promise<(Tool & { lastChec
 export async function getTool(id: string, db?: SupabaseClient): Promise<Tool | null> {
   const client = db ?? (await import("./db")).getDb();
   const { data, error } = await client.from("tool").select("*").eq("id", id).maybeSingle();
-  if (error) { console.error("getTool: query failed", error); return null; }
+  if (error) throw new Error(`getTool(${id}) failed: ${error.message}`);
   return data ? toolFromRow(data as ToolRow) : null;
 }
 

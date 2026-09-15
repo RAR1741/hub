@@ -290,7 +290,7 @@ export async function listBatteries(db?: SupabaseClient): Promise<(Battery & { l
 export async function getBattery(id: string, db?: SupabaseClient): Promise<Battery | null> {
   const client = db ?? (await import("./db")).getDb();
   const { data, error } = await client.from("battery").select("*").eq("id", id).maybeSingle();
-  if (error) { console.error("getBattery: query failed", error); return null; }
+  if (error) throw new Error(`getBattery(${id}) failed: ${error.message}`);
   return data ? batteryFromRow(data as BatteryRow) : null;
 }
 

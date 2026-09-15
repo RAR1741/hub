@@ -167,7 +167,7 @@ export async function getConnection(
     .select("*")
     .eq("person_id", personId)
     .maybeSingle();
-  if (error) { console.error("getConnection: query failed", error); return null; }
+  if (error) throw new Error(`getConnection(${personId}) failed: ${error.message}`);
   return data ? onshapeConnectionFromRow(data as OnshapeConnectionRow) : null;
 }
 

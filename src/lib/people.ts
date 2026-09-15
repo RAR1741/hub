@@ -85,14 +85,15 @@ export async function getPersonWithTeams(
     .select("*")
     .eq("id", id)
     .maybeSingle();
-  if (personError) { console.error("getPersonWithTeams: person query failed", personError); return null; }
+  if (personError) throw new Error(`getPersonWithTeams(${id}) failed: ${personError.message}`);
   if (!personRow) return null;
 
   const { data: memberships, error: membershipError } = await client
     .from("team_membership")
     .select("is_manager, team (*)")
     .eq("person_id", id);
-  if (membershipError) console.error("getPersonWithTeams: membership query failed", membershipError);
+  if (membershipError)
+    throw new Error(`getPersonWithTeams(${id}) membership query failed: ${membershipError.message}`);
 
   const teams = (memberships ?? [])
     .filter((m) => m.team)
@@ -460,7 +461,9 @@ export async function findPersonForRosterRow(
       .select("person_id")
       .eq("email", row.email)
       .maybeSingle();
-    if (error) console.error("findPersonForRosterRow: identity query failed", error);
+    // Throw, never fall through: a swallowed error here reads as "no such
+    // person" and the importer would create a duplicate.
+    if (error) throw new Error(`findPersonForRosterRow: identity query failed: ${error.message}`);
     if (data) return data.person_id as string;
   }
   if (row.studentIdNumber) {
@@ -469,7 +472,7 @@ export async function findPersonForRosterRow(
       .select("id")
       .eq("student_id_number", row.studentIdNumber)
       .maybeSingle();
-    if (error) console.error("findPersonForRosterRow: student-id query failed", error);
+    if (error) throw new Error(`findPersonForRosterRow: student-id query failed: ${error.message}`);
     if (data) return data.id as string;
   }
   return null;
