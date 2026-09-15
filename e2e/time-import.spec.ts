@@ -10,7 +10,7 @@ test("a non-admin is redirected away from /admin/time-import", async ({ browser 
   await context.addCookies([await studentSessionCookie()]);
   const page = await context.newPage();
   await page.goto("/admin/time-import");
-  expect(new URL(page.url()).pathname).not.toBe("/admin/time-import");
+  await expect(page).not.toHaveURL(/\/admin\/time-import$/);
   await context.close();
 });
 

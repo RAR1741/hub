@@ -37,7 +37,7 @@ test("guest is redirected away from the admin page", async ({ browser }) => {
   const page = await context.newPage();
 
   await page.goto("/admin/absent-members", { waitUntil: "networkidle" });
-  expect(new URL(page.url()).pathname).toBe("/");
+  await expect(page).toHaveURL(/\/$/);
 
   await context.close();
 });

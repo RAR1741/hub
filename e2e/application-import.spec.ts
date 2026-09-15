@@ -11,7 +11,7 @@ test("a non-admin is redirected away from /admin/application-import", async ({ b
   await context.addCookies([await studentSessionCookie()]);
   const page = await context.newPage();
   await page.goto("/admin/application-import");
-  expect(new URL(page.url()).pathname).not.toBe("/admin/application-import");
+  await expect(page).not.toHaveURL(/\/admin\/application-import$/);
   await context.close();
 });
 
