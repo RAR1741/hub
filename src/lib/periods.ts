@@ -23,20 +23,23 @@ const UNIQUE_VIOLATION = "23505";
 
 export async function listPeriods(db?: SupabaseClient): Promise<Period[]> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client.from("period").select("*").order("starts_on", { ascending: false });
+  const { data, error } = await client.from("period").select("*").order("starts_on", { ascending: false });
+  if (error) console.error("listPeriods: query failed", error);
   return ((data ?? []) as PeriodRow[]).map(periodFromRow);
 }
 
 export async function getActivePeriod(db?: SupabaseClient): Promise<Period | null> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client.from("period").select("*").eq("is_active", true).maybeSingle();
+  const { data, error } = await client.from("period").select("*").eq("is_active", true).maybeSingle();
+  if (error) { console.error("getActivePeriod: query failed", error); return null; }
   return data ? periodFromRow(data as PeriodRow) : null;
 }
 
 /** Look up a period by id. Returns null if not found (or the id is malformed). */
 export async function getPeriod(id: string, db?: SupabaseClient): Promise<Period | null> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client.from("period").select("*").eq("id", id).maybeSingle();
+  const { data, error } = await client.from("period").select("*").eq("id", id).maybeSingle();
+  if (error) { console.error("getPeriod: query failed", error); return null; }
   return data ? periodFromRow(data as PeriodRow) : null;
 }
 
@@ -84,9 +87,11 @@ export async function deletePeriod(
   db?: SupabaseClient,
 ): Promise<{ ok: boolean; status: number }> {
   const client = db ?? (await import("./db")).getDb();
-  const { data: exists } = await client.from("period").select("id").eq("id", id).maybeSingle();
+  const { data: exists, error: existsError } = await client.from("period").select("id").eq("id", id).maybeSingle();
+  if (existsError) { console.error("deletePeriod: existence probe failed", existsError); return { ok: false, status: 500 }; }
   if (!exists) return { ok: false, status: 404 };
-  const { data: sessions } = await client.from("session").select("id").eq("period_id", id).limit(1);
+  const { data: sessions, error: sessionsError } = await client.from("session").select("id").eq("period_id", id).limit(1);
+  if (sessionsError) { console.error("deletePeriod: session probe failed", sessionsError); return { ok: false, status: 500 }; }
   if (sessions && sessions.length > 0) return { ok: false, status: 409 };
   const { error } = await client.from("period").delete().eq("id", id);
   if (error) return { ok: false, status: error.code === FOREIGN_KEY_VIOLATION ? 409 : 500 };
@@ -149,7 +154,8 @@ export async function setActivePeriod(
   db?: SupabaseClient,
 ): Promise<{ ok: boolean; status: number }> {
   const client = db ?? (await import("./db")).getDb();
-  const { data: exists } = await client.from("period").select("id").eq("id", id).maybeSingle();
+  const { data: exists, error: existsError } = await client.from("period").select("id").eq("id", id).maybeSingle();
+  if (existsError) { console.error("setActivePeriod: existence probe failed", existsError); return { ok: false, status: 500 }; }
   if (!exists) return { ok: false, status: 404 };
   // Clear the current active row first, then set this one. The partial unique
   // index rejects any state with two active periods, so concurrent callers can't

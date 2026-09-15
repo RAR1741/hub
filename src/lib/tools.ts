@@ -158,7 +158,8 @@ export async function updateTool(
 /** `deleteUsage` with the table swapped: checks and any pending delete request cascade. */
 export async function deleteTool(id: string, db?: SupabaseClient): Promise<{ ok: true } | { ok: false; status: number }> {
   const client = db ?? (await import("./db")).getDb();
-  const { data: exists } = await client.from("tool").select("id").eq("id", id).maybeSingle();
+  const { data: exists, error: existsError } = await client.from("tool").select("id").eq("id", id).maybeSingle();
+  if (existsError) { console.error("deleteTool: existence probe failed", existsError); return { ok: false, status: 500 }; }
   if (!exists) return { ok: false, status: 404 };
   const { error } = await client.from("tool").delete().eq("id", id);
   if (error) return { ok: false, status: mapWriteError(error.code) };
@@ -187,11 +188,12 @@ export function sortByLastChecked<T extends { status: ToolStatus; lastCheckedAt:
 /** All tools with their most recent check timestamp, in due-first order (spec §3). */
 export async function listTools(db?: SupabaseClient): Promise<(Tool & { lastCheckedAt: string | null })[]> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client
+  const { data, error } = await client
     .from("tool")
     .select("*, tool_check(checked_at)")
     .order("checked_at", { referencedTable: "tool_check", ascending: false })
     .limit(1, { referencedTable: "tool_check" });
+  if (error) console.error("listTools: query failed", error);
   const rows = ((data ?? []) as ToolWithCheckRow[]).map((row) => ({
     ...toolFromRow(row),
     lastCheckedAt: row.tool_check[0]?.checked_at ?? null,
@@ -201,7 +203,8 @@ export async function listTools(db?: SupabaseClient): Promise<(Tool & { lastChec
 
 export async function getTool(id: string, db?: SupabaseClient): Promise<Tool | null> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client.from("tool").select("*").eq("id", id).maybeSingle();
+  const { data, error } = await client.from("tool").select("*").eq("id", id).maybeSingle();
+  if (error) { console.error("getTool: query failed", error); return null; }
   return data ? toolFromRow(data as ToolRow) : null;
 }
 
@@ -235,7 +238,8 @@ export async function listChecks(
     .order("checked_at", { ascending: false });
   if (toolId) query = query.eq("tool_id", toolId);
   if (limit) query = query.limit(limit);
-  const { data } = await query;
+  const { data, error } = await query;
+  if (error) console.error("listChecks: query failed", error);
   return ((data ?? []) as ToolCheckRow[]).map(toolCheckFromRow);
 }
 
@@ -265,7 +269,8 @@ export async function createCheck(
 /** No edit path for a mistyped check entry, so a mentor deletes and re-logs instead. */
 export async function deleteCheck(id: string, db?: SupabaseClient): Promise<{ ok: true } | { ok: false; status: number }> {
   const client = db ?? (await import("./db")).getDb();
-  const { data: exists } = await client.from("tool_check").select("id").eq("id", id).maybeSingle();
+  const { data: exists, error: existsError } = await client.from("tool_check").select("id").eq("id", id).maybeSingle();
+  if (existsError) { console.error("deleteCheck: existence probe failed", existsError); return { ok: false, status: 500 }; }
   if (!exists) return { ok: false, status: 404 };
   const { error } = await client.from("tool_check").delete().eq("id", id);
   if (error) return { ok: false, status: mapWriteError(error.code) };
