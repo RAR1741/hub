@@ -33,7 +33,21 @@ and `src/lib/mentor-reminders.ts` (weekly reminders).
 | `hub-admin-alerts` | `#hub-admin-alerts` | Admin alerts + reminder run summaries |
 
 Bot-token scopes (both apps): `chat:write`, `chat:write.public`, `im:write`, `users:read`,
-`users:read.email`.
+`users:read.email`, `channels:read`, `groups:read`.
+
+The IDs above are hardcoded in `src/lib/slack-registry.ts` and nothing but a real send checks
+them, so a wrong-but-well-formed ID posts nowhere and typechecks fine. **Admin → Slack**
+(`/admin/slack`) has a **Channel registry** card that resolves each ID against
+`conversations.info` and reports, per channel, whether it exists, is archived, and has the bot as
+a member — plus whether this environment routes to it at all (prod uses `#hub-admin-alerts`,
+non-prod redirects everything to `#bot-test`, so a non-member bot in the other one is expected).
+Check it after adding or changing an ID.
+
+`conversations.info` is what needs `channels:read` (public channels) and `groups:read` (private
+ones, which `#hub-admin-alerts` is) — **add them to both apps and reinstall**. Until you do, every
+row on the card reads "Can't check — the bot token needs channels:read and groups:read"; nothing
+else breaks. Note `channel_not_found` is ambiguous: a bad ID and a private channel the bot was
+never invited to are indistinguishable from outside.
 
 ## Configuration surface
 

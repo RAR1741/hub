@@ -22,7 +22,8 @@ function fakeDb(
         return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: "pd1", name: "S", starts_on: "2026-01-01", ends_on: "2026-03-01", is_active: true } }) }) }) };
       }
       if (table === "app_setting") {
-        return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { value: "America/Indiana/Indianapolis" } }) }) }) };
+        const values: Record<string, unknown> = { team_timezone: "America/Indiana/Indianapolis", max_shift_hours: 18 };
+        return { select: () => ({ eq: (_col: string, key: string) => ({ maybeSingle: async () => ({ data: { value: values[key] } }) }) }) };
       }
       if (table === "person") {
         return {

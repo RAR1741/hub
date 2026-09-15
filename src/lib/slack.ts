@@ -96,3 +96,60 @@ export async function sendDM(deps: SlackDeps, slackUserId: string, text: string)
     return false;
   }
 }
+
+export type ChannelCheck = {
+  channel: ChannelName;
+  id: string;
+  /** Whether this environment's sends actually land here — prod uses every
+   *  registry channel except #bot-test, non-prod redirects everything to it
+   *  (the fork in postChannelMessage above). Membership only matters where
+   *  routed; elsewhere a non-member bot is expected, not a fault. */
+  routed: boolean;
+  status: "ok" | "not_a_member" | "archived" | "not_found" | "missing_scope" | "error";
+  /** Slack's raw error code, for the statuses that don't spell themselves out. */
+  detail?: string;
+};
+
+/**
+ * Resolve every hardcoded id in the registry against `conversations.info`, so a
+ * wrong-but-well-formed id is caught before something tries to send to it.
+ * Read only. Needs `channels:read` + `groups:read` on the bot token — without
+ * them every entry reports `missing_scope` rather than failing the caller.
+ *
+ * Note `channel_not_found` is ambiguous: a bad id and a private channel this
+ * bot was never invited to look identical from outside. Never throws; returns
+ * null when there is no token to check with.
+ */
+export async function verifyChannels(deps: SlackDeps): Promise<ChannelCheck[] | null> {
+  if (!deps.token) return null;
+  const names = Object.keys(CHANNELS) as ChannelName[];
+  return Promise.all(
+    names.map(async (channel): Promise<ChannelCheck> => {
+      const id = CHANNELS[channel];
+      const routed = deps.isProd ? channel !== "bot_test" : channel === "bot_test";
+      try {
+        // Slack's read methods take query params, not the JSON body post() sends.
+        const res = await deps.fetch(`${API}conversations.info?${new URLSearchParams({ channel: id })}`, {
+          method: "GET",
+          headers: { Authorization: `Bearer ${deps.token}` },
+          signal: AbortSignal.timeout(5000),
+        });
+        const body = (await res.json().catch(() => ({}))) as {
+          ok?: boolean;
+          error?: string;
+          channel?: { is_archived?: boolean; is_member?: boolean };
+        };
+        if (!(res.ok && body.ok === true)) {
+          const error = String(body.error ?? `http_${res.status}`);
+          const known = { missing_scope: "missing_scope", channel_not_found: "not_found" } as const;
+          return { channel, id, routed, status: known[error as keyof typeof known] ?? "error", detail: error };
+        }
+        if (body.channel?.is_archived) return { channel, id, routed, status: "archived" };
+        if (!body.channel?.is_member) return { channel, id, routed, status: "not_a_member" };
+        return { channel, id, routed, status: "ok" };
+      } catch (e) {
+        return { channel, id, routed, status: "error", detail: e instanceof Error ? e.message : "threw" };
+      }
+    }),
+  );
+}

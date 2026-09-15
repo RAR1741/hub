@@ -219,11 +219,6 @@ Once the Vercel deploy is live and DNS/domain is attached:
 
 ## Known follow-ups
 
-- **Local Playwright Chromium isn't baked into the devcontainer image.** `npx playwright install
-  chromium` installs into the container's writable layer, so a devcontainer rebuild (not just a
-  restart) loses it and `./dev npx playwright install chromium` needs to be re-run before `npm run
-  e2e` works locally again. CI is unaffected (it installs Chromium fresh every run). Consider adding
-  the install to the devcontainer's `Dockerfile`/`postCreateCommand` later so it survives rebuilds.
 - The real Google Calendar round-trip, production Google OAuth, and this deploy itself are all
   credential/account-gated on the team — nothing here can be verified without a human completing the
   account-creation steps above, the same posture as `docs/setup/google-oauth.md` and

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { createForm, getFormWithFields, parseFieldInput, parseFormInput, validateAnswers, type FieldWithOptions } from "./forms";
+import { addField, createForm, getFormWithFields, parseFieldInput, parseFormInput, validateAnswers, type FieldWithOptions } from "./forms";
 
 const attending: FieldWithOptions = {
   id: "f_att", formId: "form1", label: "Attending?", helpText: null,
@@ -104,44 +104,63 @@ describe("parseFieldInput", () => {
   });
 });
 
-describe("createForm", () => {
-  // createForm inserts the form, then auto-adds the attendance field (a
-  // form_field + its form_field_option rows), then optionally a notes field.
-  function fakeDb(insertError?: { code: string }) {
-    const inserts: Record<string, number> = {};
-    const db = {
-      from(table: string) {
-        inserts[table] = (inserts[table] ?? 0) + 1;
-        if (table === "form") return {
-          insert: () => ({ select: () => ({ single: async () => (insertError ? { data: null, error: insertError } : { data: { id: "form1" }, error: null }) }) }),
-        };
-        if (table === "form_field") return {
-          insert: () => ({ select: () => ({ single: async () => ({ data: { id: `field${inserts[table]}` }, error: null }) }) }),
-        };
-        if (table === "form_field_option") return { insert: async () => ({ error: null }) };
-        throw new Error(`unexpected table ${table}`);
+// The form/field writes go through plpgsql RPCs so they land atomically; the
+// fake records the call so we can assert what got handed to the transaction.
+type RpcCall = { name: string; args: Record<string, unknown> };
+function fakeRpcDb(id: string, error?: { code: string }) {
+  const calls: RpcCall[] = [];
+  return {
+    calls,
+    db: {
+      async rpc(name: string, args: Record<string, unknown>) {
+        calls.push({ name, args });
+        return error ? { data: null, error } : { data: id, error: null };
       },
-      inserts,
-    };
-    return db as never;
-  }
-  test("201 returns new id and auto-adds the attendance field", async () => {
-    const db = fakeDb();
+    } as never,
+  };
+}
+
+describe("createForm", () => {
+  test("201 returns new id and auto-adds the attendance field with its options", async () => {
+    const { db, calls } = fakeRpcDb("form1");
     expect(await createForm({ title: "Outreach", description: null, kind: "event_signup", status: "draft", notesEnabled: false, notesLabel: null }, "m1", db))
       .toEqual({ ok: true, id: "form1" });
-    // one attendance field, with its options; no notes field
-    expect((db as unknown as { inserts: Record<string, number> }).inserts.form_field).toBe(1);
-    expect((db as unknown as { inserts: Record<string, number> }).inserts.form_field_option).toBe(1);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].name).toBe("create_form");
+    const fields = calls[0].args.p_fields as { semantic_key: string | null; options: unknown[] }[];
+    expect(fields).toHaveLength(1);
+    expect(fields[0].semantic_key).toBe("attending");
+    expect(fields[0].options).toHaveLength(3);
   });
   test("adds a notes field when enabled", async () => {
-    const db = fakeDb();
+    const { db, calls } = fakeRpcDb("form1");
     await createForm({ title: "Outreach", description: null, kind: "event_signup", status: "draft", notesEnabled: true, notesLabel: "Notes" }, "m1", db);
-    // attendance + notes
-    expect((db as unknown as { inserts: Record<string, number> }).inserts.form_field).toBe(2);
+    const fields = calls[0].args.p_fields as { label: string; type: string }[];
+    expect(fields).toHaveLength(2);
+    expect(fields[1]).toMatchObject({ label: "Notes", type: "long_text" });
   });
   test("maps FK violation to 400", async () => {
-    expect(await createForm({ title: "x", description: null, kind: "event_signup", status: "draft", notesEnabled: false, notesLabel: null }, "m1", fakeDb({ code: "23503" })))
+    const { db } = fakeRpcDb("form1", { code: "23503" });
+    expect(await createForm({ title: "x", description: null, kind: "event_signup", status: "draft", notesEnabled: false, notesLabel: null }, "m1", db))
       .toEqual({ ok: false, status: 400 });
+  });
+});
+
+describe("addField", () => {
+  test("sends the field and its options to one RPC", async () => {
+    const { db, calls } = fakeRpcDb("field1");
+    const input = parseFieldInput({ label: "Which comps?", type: "multi_select", required: false, position: 2, options: [{ value: "state", label: "State" }] })!;
+    expect(await addField("form1", input, db)).toEqual({ ok: true, id: "field1" });
+    expect(calls[0].name).toBe("add_form_field");
+    expect(calls[0].args).toEqual({
+      p_form_id: "form1",
+      p_field: { label: "Which comps?", help_text: null, type: "multi_select", required: false, position: 2, semantic_key: null, options: [{ value: "state", label: "State", position: 0 }] },
+    });
+  });
+  test("maps unique violation to 409", async () => {
+    const { db } = fakeRpcDb("field1", { code: "23505" });
+    expect(await addField("form1", parseFieldInput({ label: "Q", type: "boolean", required: false, position: 0 })!, db))
+      .toEqual({ ok: false, status: 409 });
   });
 });
 

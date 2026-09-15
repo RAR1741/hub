@@ -39,7 +39,8 @@ test.describe("people is mentor+ only", () => {
     await context.addCookies([await studentSessionCookie()]);
     const page = await context.newPage();
     await page.goto("/people");
-    await expect(page).toHaveURL(/\/login$/);
+    // Home, not /login — they're already signed in (#286).
+    await expect(page).toHaveURL(/\/$/);
     await context.close();
   });
 

@@ -1706,7 +1706,10 @@
     position: sticky;
     top: 0;
     align-self: flex-start;
-    height: 100dvh;
+    /* min-height, not height: on a viewport shorter than the nav the box grows
+       instead of hiding the overflow past a fixed 100dvh, which is what lets
+       .sb-foot stick to the bottom of the viewport (see there). */
+    min-height: 100dvh;
     /* Above the main content column and its sticky table headers (which have no
        z-index), below the skip link (50) and the modal layer (100). Without
        this the opaque sticky `.table th` on People/Events/Admin lists — exactly
@@ -1735,10 +1738,14 @@
     /* No overflow scroll here on purpose: an overflow container computes
        overflow-x to `auto` as well, which clips the hover flyouts (they sit at
        left: 100% + 8px, past the sidebar edge) and makes the always-present
-       hidden flyouts add a phantom horizontal scrollbar. The nav is short
-       enough to fit; .sb-foot stays reachable via margin-top: auto.
-       ponytail: a nav taller than the viewport won't scroll to the footer;
-       upgrade to a JS/anchor-positioned popover flyout if that ever bites. */
+       hidden flyouts add a phantom horizontal scrollbar. (`overflow-x: clip`
+       is no escape hatch either: it computes to `hidden` once the other axis
+       scrolls.) .sb-foot stays reachable by sticking to the viewport bottom
+       instead — see there.
+       ponytail: nav *items* past the fold on a short viewport still can't be
+       reached from the sidebar (reach those pages via the command palette);
+       upgrade to a JS/anchor-positioned popover flyout, which would free this
+       to scroll, if that ever bites. */
   }
   .sb-group {
     padding: 9px 8px 1px;
@@ -1804,6 +1811,15 @@
   }
   .sb-foot {
     margin-top: auto;
+    /* Sticky so the collapse toggle stays reachable when the nav is taller than
+       the viewport (#296). .sb is pinned at top: 0 and body is not a scroll
+       container, so this sticks to the viewport bottom rather than falling off
+       the end of an overflowing .sb. When the nav fits, `margin-top: auto`
+       already parks it there and this is a no-op. Opaque background because it
+       then paints over whatever nav item is under it. */
+    position: sticky;
+    bottom: 0;
+    background: var(--surface-2);
     border-top: 1px solid var(--hair);
     padding: 8px;
     display: flex;
@@ -1949,7 +1965,7 @@
     position: sticky;
     top: 0;
     align-self: flex-start;
-    height: 100dvh;
+    min-height: 100dvh; /* grows past the viewport so .rail-foot can stick — see .sb */
     z-index: 40; /* same stacking role as .sb — above content, below modals */
   }
   .rail .badge-1741 {
@@ -2003,6 +2019,15 @@
   }
   .rail-foot {
     margin-top: auto;
+    /* Same sticky-to-the-viewport-bottom treatment as .sb-foot (#296) so the
+       expand toggle survives a nav taller than the viewport. Full width (the
+       rail centers its children) so the opaque background covers the icon it
+       paints over; padding-bottom replaces the .rail bottom padding it hides. */
+    position: sticky;
+    bottom: 0;
+    width: 100%;
+    background: var(--surface-2);
+    padding-bottom: 8px;
     display: flex;
     flex-direction: column;
     align-items: center;

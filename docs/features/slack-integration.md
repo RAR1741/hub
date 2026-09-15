@@ -70,6 +70,11 @@ All sends go through `src/lib/slack.ts` (`postChannelMessage()`, `sendDM()`):
   (`[dev → #channel]` / `[dev → DM <user>]`), gated on the unforgeable `VERCEL_ENV === "production"`
   — so a prod token pasted into a preview/dev environment still can't reach a real channel or DM.
 - Channel names are a fixed registry (`src/lib/slack-registry.ts`), not config — currently
-  `bot_test` and `hub-admin-alerts`.
+  `bot_test` and `hub-admin-alerts`. The *names* are typechecked; the hardcoded *IDs* are not, so
+  `verifyChannels()` (`src/lib/slack.ts`) resolves each one against `conversations.info` and the
+  **Channel registry** card on `/admin/slack` reports exists / archived / bot-is-member per
+  channel, flagged only where this environment actually routes. Needs `channels:read` +
+  `groups:read`; without them each row reports `missing_scope` and nothing else changes. See
+  [Slack setup](../setup/slack.md#channels-and-scopes).
 
 A `postChannelMessage` failure inside `notifyAdmins()` (`src/lib/admin-notify.ts`) is reported to `reportSubsystemHealth("slack_delivery", …)` (`src/lib/system-health.ts`), which pushes a `system_health` notification to opted-in admins on the ok→failing / failing→ok transition only, and re-observes health only when an admin alert is next attempted (no canary).

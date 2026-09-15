@@ -12,8 +12,12 @@ import { sendPushToOptedIn } from "./push-dispatch";
 type EventRow = { id: string; name: string; starts_at: string };
 type ReminderRow = { event_id: string; person_id: string; minutes: number };
 
+/** `reminders` is the unstamped pool; the claim update returns (and removes) the
+ *  rows matching event_id + minutes, mirroring `UPDATE ... WHERE pushed_at IS NULL
+ *  RETURNING`, so a second claim of the same offsets comes back empty. */
 function fakeDb(events: EventRow[], reminders: ReminderRow[]) {
   const updates: { eventId: string; minutes: number[] }[] = [];
+  const pool = [...reminders];
   const db = {
     _updates: updates,
     from: (table: string) => {
@@ -26,15 +30,20 @@ function fakeDb(events: EventRow[], reminders: ReminderRow[]) {
       }
       if (table === "event_signup_reminder") {
         return {
-          select: () => ({
-            in: () => ({ is: () => ({ data: reminders, error: null }) }),
-          }),
-          update: (body: { pushed_at: string }) => ({
+          update: (_body: { pushed_at: string }) => ({
             eq: (_c: string, eventId: string) => ({
-              in: (_c2: string, minutes: number[]) => {
-                updates.push({ eventId, minutes });
-                return { is: () => ({ error: null, ...body }) };
-              },
+              in: (_c2: string, minutes: number[]) => ({
+                is: () => ({
+                  select: () => {
+                    updates.push({ eventId, minutes });
+                    const claimed = pool.filter(
+                      (r) => r.event_id === eventId && minutes.includes(r.minutes),
+                    );
+                    for (const r of claimed) pool.splice(pool.indexOf(r), 1);
+                    return { data: claimed.map((r) => ({ person_id: r.person_id })), error: null };
+                  },
+                }),
+              }),
             }),
           }),
         };
@@ -46,7 +55,7 @@ function fakeDb(events: EventRow[], reminders: ReminderRow[]) {
 }
 
 describe("pushEventReminders", () => {
-  test("due offset → push to that person + row stamped", async () => {
+  test("due offset → row claimed then push to that person", async () => {
     vi.mocked(sendPushToOptedIn).mockClear();
     const db = fakeDb(
       [{ id: "e1", name: "Regionals", starts_at: "2026-09-06T22:00:00Z" }],
@@ -64,7 +73,7 @@ describe("pushEventReminders", () => {
     expect(res.sent).toBe(1);
   });
 
-  test("offset not yet due → no push, not stamped", async () => {
+  test("offset not yet due → no push", async () => {
     vi.mocked(sendPushToOptedIn).mockClear();
     const db = fakeDb(
       [{ id: "e1", name: "Regionals", starts_at: "2026-09-06T22:00:00Z" }],
@@ -73,7 +82,18 @@ describe("pushEventReminders", () => {
     );
     const res = await pushEventReminders({ db, nowIso: "2026-09-06T21:35:00Z" });
     expect(sendPushToOptedIn).not.toHaveBeenCalled();
-    expect(db._updates).toEqual([]);
+    expect(res).toEqual({ sent: 0, pruned: 0, events: 0 });
+  });
+
+  test("a second overlapping tick claims nothing → no second push", async () => {
+    vi.mocked(sendPushToOptedIn).mockClear();
+    const db = fakeDb(
+      [{ id: "e1", name: "Regionals", starts_at: "2026-09-06T22:00:00Z" }],
+      [{ event_id: "e1", person_id: "p1", minutes: 30 }],
+    );
+    await pushEventReminders({ db, nowIso: "2026-09-06T21:30:00Z" });
+    const res = await pushEventReminders({ db, nowIso: "2026-09-06T21:31:00Z" });
+    expect(sendPushToOptedIn).toHaveBeenCalledTimes(1);
     expect(res).toEqual({ sent: 0, pruned: 0, events: 0 });
   });
 
@@ -101,13 +121,8 @@ describe("pushEventReminders", () => {
     );
     const res = await pushEventReminders({ db, nowIso: "2026-09-06T21:00:00Z" });
     expect(sendPushToOptedIn).toHaveBeenCalledTimes(1);
-    expect(sendPushToOptedIn).toHaveBeenCalledWith(
-      expect.arrayContaining(["p1", "p2"]),
-      null,
-      expect.anything(),
-      expect.anything(),
-    );
     const [recipients] = vi.mocked(sendPushToOptedIn).mock.calls[0];
+    expect(recipients).toEqual(expect.arrayContaining(["p1", "p2"]));
     expect(recipients).toHaveLength(2);
     expect(db._updates).toEqual([{ eventId: "e1", minutes: [60, 120] }]);
     expect(res.events).toBe(1);

@@ -11,7 +11,8 @@ type MeetingRow = {
 };
 
 /** Reminds meetings whose next lead-time offset (person.meeting_reminder_minutes)
- *  is due, then stamps reminder_pushed_minutes so each (meeting, offset) fires once. */
+ *  is due, claiming the offsets in reminder_pushed_minutes before sending so each
+ *  (meeting, offset) fires once even across overlapping cron ticks. */
 export async function pushMeetingReminders(deps: {
   db: SupabaseClient;
   push?: PushDeps;
@@ -49,6 +50,24 @@ export async function pushMeetingReminders(deps: {
     }
     const ids = ((personData ?? []) as { id: string }[]).map((p) => p.id);
 
+    // Claim before sending. `not.ov` turns the stamp into a compare-and-swap on
+    // the array: an overlapping tick that lands second sees the offsets already
+    // present, updates zero rows, and neither re-sends nor clobbers the first
+    // tick's write. Cost of stamping first: a reminder is dropped if the process
+    // dies mid-run (sendPushToOptedIn itself never throws).
+    const union = [...new Set([...m.reminder_pushed_minutes, ...dueM])].sort((a, b) => a - b);
+    const { data: claimed, error: claimError } = await deps.db
+      .from("meeting")
+      .update({ reminder_pushed_minutes: union })
+      .eq("id", m.id)
+      .not("reminder_pushed_minutes", "ov", `{${dueM.join(",")}}`)
+      .select("id");
+    if (claimError) {
+      console.error("[meeting-reminder] claim meeting failed:", claimError.message);
+      continue;
+    }
+    if (((claimed ?? []) as { id: string }[]).length === 0) continue;
+
     if (ids.length > 0) {
       const when = new Date(m.starts_at).toLocaleString("en-US", {
         timeZone: "America/Indiana/Indianapolis",
@@ -65,9 +84,6 @@ export async function pushMeetingReminders(deps: {
       pruned += res.pruned;
       meetingsSent += 1;
     }
-
-    const union = [...new Set([...m.reminder_pushed_minutes, ...dueM])].sort((a, b) => a - b);
-    await deps.db.from("meeting").update({ reminder_pushed_minutes: union }).eq("id", m.id);
   }
   return { sent, pruned, meetings: meetingsSent };
 }

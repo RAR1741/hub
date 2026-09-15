@@ -129,36 +129,34 @@ function mapWriteError(code: string | undefined): number {
   return 500;
 }
 
+/** Shapes a field for the create_form/add_form_field RPCs (keys = column names). */
+function fieldPayload(f: FieldInput) {
+  return {
+    label: f.label, help_text: f.helpText, type: f.type, required: f.required,
+    position: f.position, semantic_key: f.semanticKey, options: f.options,
+  };
+}
+
 export async function createForm(
   input: { title: string; description: string | null; kind: string; status: string; notesEnabled: boolean; notesLabel: string | null },
   creatorId: string,
   db?: SupabaseClient,
 ): Promise<{ ok: true; id: string } | { ok: false; status: number }> {
   const client = db ?? (await import("./db")).getDb();
-  const { data, error } = await client
-    .from("form")
-    .insert({ title: input.title, description: input.description, kind: input.kind, status: input.status, created_by: creatorId })
-    .select("id")
-    .single();
-  if (error) return { ok: false, status: mapWriteError(error.code) };
-  const formId = data.id as string;
-
   // Every event-signup form always opens with the attendance question, and
   // optionally closes with a free-text notes field. Both are created here so
-  // mentors never have to (and can't misconfigure the attendance one).
-  // ponytail: not wrapped in a txn — admin-only, and a partial failure just
-  // means the mentor re-creates; upgrade to an RPC if that ever bites.
-  const attendance = await addField(formId, ATTENDANCE_FIELD, client);
-  if (!attendance.ok) return attendance;
+  // mentors never have to (and can't misconfigure the attendance one) — and
+  // in the same transaction as the form, so a half-built form can't persist.
+  const fields = [ATTENDANCE_FIELD];
   if (input.notesEnabled) {
-    const notes = await addField(
-      formId,
-      { label: input.notesLabel ?? "Anything else we should know?", helpText: null, type: "long_text", required: false, position: 1, semanticKey: null, options: [] },
-      client,
-    );
-    if (!notes.ok) return notes;
+    fields.push({ label: input.notesLabel ?? "Anything else we should know?", helpText: null, type: "long_text", required: false, position: 1, semanticKey: null, options: [] });
   }
-  return { ok: true, id: formId };
+  const { data, error } = await client.rpc("create_form", {
+    p_title: input.title, p_description: input.description, p_kind: input.kind,
+    p_status: input.status, p_created_by: creatorId, p_fields: fields.map(fieldPayload),
+  });
+  if (error) return { ok: false, status: mapWriteError(error.code) };
+  return { ok: true, id: data as string };
 }
 
 export async function listForms(db?: SupabaseClient): Promise<Form[]> {
@@ -227,18 +225,11 @@ export async function addField(
   db?: SupabaseClient,
 ): Promise<{ ok: true; id: string } | { ok: false; status: number }> {
   const client = db ?? (await import("./db")).getDb();
-  const { data, error } = await client
-    .from("form_field")
-    .insert({ form_id: formId, label: input.label, help_text: input.helpText, type: input.type, required: input.required, position: input.position, semantic_key: input.semanticKey })
-    .select("id").single();
+  // Field row + its options in one transaction: a choice field with zero
+  // options is unanswerable, so it must never be left behind.
+  const { data, error } = await client.rpc("add_form_field", { p_form_id: formId, p_field: fieldPayload(input) });
   if (error) return { ok: false, status: mapWriteError(error.code) };
-  const fieldId = data.id as string;
-  if (input.options.length) {
-    const { error: optErr } = await client.from("form_field_option")
-      .insert(input.options.map((o) => ({ field_id: fieldId, value: o.value, label: o.label, position: o.position })));
-    if (optErr) return { ok: false, status: mapWriteError(optErr.code) };
-  }
-  return { ok: true, id: fieldId };
+  return { ok: true, id: data as string };
 }
 
 export async function deleteField(fieldId: string, db?: SupabaseClient): Promise<{ ok: boolean; status: number }> {

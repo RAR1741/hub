@@ -29,7 +29,10 @@ export async function notifyAdmins(
     await reportSubsystemHealth("slack_delivery", delivered, {
       db: deps.db,
       push,
-      detail: "chat.postMessage to #hub-admin-alerts failed — check SLACK_BOT_TOKEN and that the bot is invited to the channel.",
+      // An expired token, an uninvited bot, and a wrong/archived channel ID all
+      // surface as the same channel_not_found — the Admin → Slack channel
+      // registry card says which.
+      detail: "Post to #hub-admin-alerts failed — bad token, bot not invited, or a wrong/archived channel ID. Admin → Slack shows which.",
     });
   } catch (e) {
     console.error("[admin-notify] push fan-out failed (Slack unaffected):", e);

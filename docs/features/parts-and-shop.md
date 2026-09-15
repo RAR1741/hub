@@ -50,9 +50,10 @@ Deleting a project or an assembly is refused (409) while it still has parts/chil
 `/shop` (student+) lists projects; `/shop/[projectId]` shows that project's parts grouped by status
 as a kanban-style board (`ShopBoard.tsx`), sorted by priority then part number within each status
 column. It's meant to run unattended on a shop TV: the server renders the initial parts list, then
-the client board polls `GET /api/shop/[projectId]` every 10 seconds and keeps the last good data on
-a failed poll instead of blanking. A status filter (`?status=`) narrows the board to one column; by
-default `done` parts are hidden. Tiles link to `/admin/parts/[id]` for detail/edit.
+the client board refetches `GET /api/shop/[projectId]` whenever a part is created, edited or deleted
+(a `hub:parts` Supabase Realtime broadcast), with a 60 s fallback poll if the socket is down, and
+keeps the last good data on a failed refetch instead of blanking. A status filter (`?status=`)
+narrows the board to one column; by default `done` parts are hidden. Tiles link to `/admin/parts/[id]` for detail/edit.
 
 ## Onshape panel
 

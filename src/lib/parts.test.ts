@@ -5,7 +5,8 @@ import {
   createPart,
   deletePart,
   deleteProject,
-  findPartByOnshapeIdentity,
+  findPartsByOnshapeIdentity,
+  listAssembliesByProject,
   parseOnshapePartInput,
   parsePartInput,
   parsePartPatch,
@@ -35,6 +36,9 @@ class QueryStub implements PromiseLike<Result> {
   }
   eq(...args: unknown[]) {
     return this.record("eq", args);
+  }
+  in(...args: unknown[]) {
+    return this.record("in", args);
   }
   is(...args: unknown[]) {
     return this.record("is", args);
@@ -432,45 +436,81 @@ describe("createPart — Onshape linkage", () => {
   });
 });
 
-describe("findPartByOnshapeIdentity", () => {
-  test("returns the matching hub part", async () => {
-    const { db } = fakeDb({
+function partRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "part-1",
+    project_id: PROJECT_ID,
+    parent_part_id: null,
+    part_number: 1,
+    type: "part",
+    name: "Bracket",
+    status: "designing",
+    priority: 1,
+    notes: null,
+    source_material: null,
+    have_material: false,
+    quantity: null,
+    cut_length: null,
+    drawing_created: false,
+    created_at: "2026-01-01T00:00:00.000Z",
+    onshape_document_id: "doc-1",
+    onshape_element_id: "elem-1",
+    onshape_part_id: "part-1",
+    onshape_url: null,
+    ...overrides,
+  };
+}
+
+describe("findPartsByOnshapeIdentity", () => {
+  test("keys the matching hub parts by Onshape part id in one query", async () => {
+    const { db, stubs } = fakeDb({
       part: [
         {
-          data: {
-            id: "part-1",
-            project_id: PROJECT_ID,
-            parent_part_id: null,
-            part_number: 1,
-            type: "part",
-            name: "Bracket",
-            status: "designing",
-            priority: 1,
-            notes: null,
-            source_material: null,
-            have_material: false,
-            quantity: null,
-            cut_length: null,
-            drawing_created: false,
-            created_at: "2026-01-01T00:00:00.000Z",
-            onshape_document_id: "doc-1",
-            onshape_element_id: "elem-1",
-            onshape_part_id: "part-1",
-            onshape_url: null,
-          },
+          data: [partRow(), partRow({ id: "part-2", onshape_part_id: "JHD" })],
           error: null,
         },
       ],
     });
-    const result = await findPartByOnshapeIdentity("doc-1", "elem-1", "part-1", db);
-    expect(result?.id).toBe("part-1");
-    expect(result?.onshapePartId).toBe("part-1");
+    const result = await findPartsByOnshapeIdentity("doc-1", "elem-1", ["part-1", "JHD", "JHE"], db);
+    expect(stubs.part).toHaveLength(1);
+    expect(stubs.part[0].calls).toContainEqual({
+      method: "in",
+      args: ["onshape_part_id", ["part-1", "JHD", "JHE"]],
+    });
+    expect([...result.keys()]).toEqual(["part-1", "JHD"]);
+    expect(result.get("JHD")?.id).toBe("part-2");
+    expect(result.get("JHE")).toBeUndefined();
   });
 
-  test("returns null when no match", async () => {
-    const { db } = fakeDb({ part: [{ data: null, error: null }] });
-    const result = await findPartByOnshapeIdentity("doc-1", "elem-1", "part-1", db);
-    expect(result).toBeNull();
+  test("empty selection yields an empty map without querying", async () => {
+    const { db } = fakeDb({});
+    expect(await findPartsByOnshapeIdentity("doc-1", "elem-1", [], db)).toEqual(new Map());
+  });
+});
+
+describe("listAssembliesByProject", () => {
+  test("groups assembly rows by project_id in one query", async () => {
+    const { db, stubs } = fakeDb({
+      part: [
+        {
+          data: [
+            partRow({ id: "a-1", type: "assembly" }),
+            partRow({ id: "a-2", type: "assembly" }),
+            partRow({ id: "a-3", type: "assembly", project_id: "proj-b" }),
+          ],
+          error: null,
+        },
+      ],
+    });
+    const result = await listAssembliesByProject(db);
+    expect(stubs.part[0].calls).toContainEqual({ method: "eq", args: ["type", "assembly"] });
+    expect(result[PROJECT_ID].map((a) => a.id)).toEqual(["a-1", "a-2"]);
+    expect(result["proj-b"].map((a) => a.id)).toEqual(["a-3"]);
+  });
+
+  test("empty table yields an empty record", async () => {
+    const { db } = fakeDb({ part: [{ data: [], error: null }] });
+    expect(await listAssembliesByProject(db)).toEqual({});
   });
 });
 

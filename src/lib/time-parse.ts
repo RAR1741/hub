@@ -1,6 +1,5 @@
 export const TIME_ANOMALY_THRESHOLD_MIN = 240; // 4h floor — a lone slip in a tight column still flags
 export const OUTLIER_MAD_K = 5;                // spread multiplier: threshold = max(floor, K * MAD)
-export const MAX_SHIFT_MIN = 1080;             // 18h, matches the max_shift_hours default
 // Normal meeting hours. A resolved time inside this window is plausible on its
 // own (weekend 9-5, weekday evenings, a little early/late, late-night mentor
 // sessions clocking out up to ~2am), so it is never flagged even if it's a

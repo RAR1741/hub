@@ -253,15 +253,21 @@ export async function syncFirstRoster(deps: {
       adult.trainingStatus = status?.training?.status ?? null;
     }
 
-    // ponytail: last-write-wins if a cron tick and a manual sync overlap — both
-    // get a valid rotation of the same session, so a lost update just keeps a
-    // slightly older still-valid cookie. Add a compare-and-swap only if that
-    // proves insufficient in practice.
+    // Compare-and-swap on the (savedAt, rotatedAt) pair we read at the top: a
+    // sync's fetches are slow enough for a cron tick or an admin re-paste to
+    // land inside them. If the stored session moved on, whatever is there now
+    // is newer than our rotation — leave it rather than parking a superseded
+    // cookie (an overwritten re-paste looks like "pasting didn't take").
+    // Losing the swap is not an error: the roster data we fetched is fine.
     if (liveCookie !== session.cookie) {
-      const { error: sessionError } = await db.from("app_setting").upsert(
-        { key: "first_session", value: { cookie: liveCookie, savedAt: session.savedAt, rotatedAt: new Date().toISOString() } },
-        { onConflict: "key" },
-      );
+      const swap = db
+        .from("app_setting")
+        .update({ value: { cookie: liveCookie, savedAt: session.savedAt, rotatedAt: new Date().toISOString() } })
+        .eq("key", "first_session")
+        .eq("value->>savedAt", session.savedAt);
+      const { error: sessionError } = await (session.rotatedAt
+        ? swap.eq("value->>rotatedAt", session.rotatedAt)
+        : swap.is("value->>rotatedAt", null));
       if (sessionError) throw new Error(`first-sync: failed to persist rotated session cookie: ${sessionError.message}`);
     }
   } catch (e) {

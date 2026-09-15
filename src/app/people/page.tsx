@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
-import { hasRole } from "@/lib/authz";
+import { hasRole, requirePageRole } from "@/lib/authz";
 import { listPeople } from "@/lib/people";
 import { personFromRow } from "@/lib/types";
 import { PeopleBrowser, type PeopleRow } from "@/components/PeopleBrowser";
@@ -10,8 +9,8 @@ export const metadata: Metadata = { title: "People" };
 
 export default async function PeoplePage() {
   const viewer = await getViewer();
-  // People is mentor+ only — students and guests are redirected to login.
-  if (!hasRole(viewer.role, "mentor")) redirect("/login");
+  // People is mentor+ only — students are sent home, guests to login.
+  requirePageRole(viewer, "mentor");
 
   // Fetch the full roster (active + inactive); search and the inactive filter
   // are applied live on the client, so no server-side query params here.

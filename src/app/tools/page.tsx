@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { listChecks, listTools, nextDueAt } from "@/lib/tools";
-import { hasRole } from "@/lib/authz";
+import { hasRole, requirePageRole } from "@/lib/authz";
 import type { Tool } from "@/lib/types";
 import { getViewer } from "@/lib/viewer";
 import { ToolForm } from "@/components/ToolForm";
@@ -13,7 +12,7 @@ export const metadata: Metadata = { title: "Tools" };
 
 export default async function ToolsPage() {
   const viewer = await getViewer();
-  if (!hasRole(viewer.role, "student")) redirect("/login");
+  requirePageRole(viewer, "student");
 
   const [tools, recentChecks] = await Promise.all([listTools(), listChecks({ limit: 50 })]);
   const notRetired = tools.filter((t) => t.status !== "retired");

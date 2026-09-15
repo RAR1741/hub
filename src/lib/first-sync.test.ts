@@ -90,14 +90,42 @@ describe("statusUrl", () => {
 });
 
 // Minimal fake db: app_setting get/set by key, empty person/person_identity rosters.
+// `update()` honours the .eq()/.is() filters against the stored value, so the
+// compare-and-swap in syncFirstRoster behaves like it does against PostgREST.
+type Cas = {
+  eq(path: string, value: string): Cas;
+  is(path: string, value: null): Cas;
+  then<T>(onFulfilled: (res: { error: null }) => T): Promise<T>;
+};
+
 function fakeDb(settings: Record<string, unknown>) {
-  const upserts: Record<string, unknown>[] = [];
+  function conditionalUpdate(row: Record<string, unknown>): Cas {
+    const filters: { path: string; value: string | null }[] = [];
+    const run = async () => {
+      const key = String(filters.find((f) => f.path === "key")?.value ?? "");
+      const current = settings[key] as Record<string, unknown> | undefined;
+      const matches =
+        current != null &&
+        filters.every(
+          (f) => f.path === "key" || (current[f.path.replace("value->>", "")] ?? null) === f.value,
+        );
+      if (matches) settings[key] = row.value;
+      return { error: null as null };
+    };
+    const builder: Cas = {
+      eq(path, value) { filters.push({ path, value }); return builder; },
+      is(path, value) { filters.push({ path, value }); return builder; },
+      then(onFulfilled) { return run().then(onFulfilled); },
+    };
+    return builder;
+  }
   const db = {
     from(table: string) {
       if (table === "app_setting") {
         return {
           select: () => ({ eq: (_col: string, key: string) => ({ maybeSingle: async () => ({ data: key in settings ? { value: settings[key] } : null, error: null }) }) }),
-          upsert: async (row: Record<string, unknown>) => { upserts.push(row); return { error: null }; },
+          upsert: async (row: Record<string, unknown>) => { settings[String(row.key)] = row.value; return { error: null }; },
+          update: (row: Record<string, unknown>) => conditionalUpdate(row),
         };
       }
       if (table === "person") {
@@ -109,7 +137,7 @@ function fakeDb(settings: Record<string, unknown>) {
       throw new Error(`unexpected table ${table}`);
     },
   } as never;
-  return { db, upserts };
+  return { db, settings };
 }
 
 const ROSTER_MODEL = { PeopleRoles: [] };
@@ -117,7 +145,7 @@ const ROSTER_HTML = `<html><script>window.teamContactsModel = ${JSON.stringify(R
 
 describe("syncFirstRoster cookie rotation", () => {
   test("persists the rotated cookie after both fetches succeed, preserving savedAt", async () => {
-    const { db, upserts } = fakeDb({
+    const { db, settings } = fakeDb({
       first_team_profile_id: "1790765",
       first_session: { cookie: "old=1", savedAt: "2026-01-01T00:00:00.000Z" },
     });
@@ -141,16 +169,38 @@ describe("syncFirstRoster cookie rotation", () => {
     const report = await syncFirstRoster({ db, fetchFn });
 
     expect(report.rosterCount).toBe(0);
-    const sessionUpsert = upserts.find((u) => u.key === "first_session");
-    expect(sessionUpsert).toBeDefined();
-    const value = sessionUpsert!.value as { cookie: string; savedAt: string; rotatedAt: string };
+    const value = settings.first_session as { cookie: string; savedAt: string; rotatedAt: string };
     expect(value.cookie).toBe("old=3"); // rotated on both requests, ends at the status fetch's cookie
     expect(value.savedAt).toBe("2026-01-01T00:00:00.000Z"); // preserved, not overwritten
     expect(value.rotatedAt).toBeTypeOf("string");
   });
 
-  test("skips the session upsert when the cookie never rotates", async () => {
-    const { db, upserts } = fakeDb({
+  test("leaves a cookie written by a concurrent paste/sync alone (compare-and-swap loses)", async () => {
+    const { db, settings } = fakeDb({
+      first_team_profile_id: "1790765",
+      first_session: { cookie: "old=1", savedAt: "2026-01-01T00:00:00.000Z" },
+    });
+    const fresh = { cookie: "pasted=9", savedAt: "2026-01-01T00:05:00.000Z" };
+    let call = 0;
+    const fetchFn = (async () => {
+      call++;
+      // An admin re-pastes (or another sync rotates) while our fetches are in flight.
+      if (call === 1) settings.first_session = fresh;
+      return {
+        status: 200,
+        headers: { getSetCookie: () => [`old=${call + 1}`], get: () => null },
+        text: async () => (call === 1 ? ROSTER_HTML : "[]"),
+      };
+    }) as unknown as typeof fetch;
+
+    const report = await syncFirstRoster({ db, fetchFn }); // must not throw
+
+    expect(report.rosterCount).toBe(0);
+    expect(settings.first_session).toBe(fresh); // our stale rotation did not clobber it
+  });
+
+  test("skips the session write when the cookie never rotates", async () => {
+    const { db, settings } = fakeDb({
       first_team_profile_id: "1790765",
       first_session: { cookie: "old=1", savedAt: "2026-01-01T00:00:00.000Z" },
     });
@@ -166,7 +216,7 @@ describe("syncFirstRoster cookie rotation", () => {
 
     await syncFirstRoster({ db, fetchFn });
 
-    expect(upserts.find((u) => u.key === "first_session")).toBeUndefined();
+    expect(settings.first_session).toEqual({ cookie: "old=1", savedAt: "2026-01-01T00:00:00.000Z" });
   });
 });
 

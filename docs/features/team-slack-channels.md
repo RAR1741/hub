@@ -75,10 +75,11 @@ in sequence, so newly-linked people are invited the same night:
 
 1. **Identity link sync** — refreshes `person.slack_user_id` from Slack membership (the same
    `syncSlackLinks` behind the manual **Sync now** button).
-2. **Channel-membership reconcile** — for every team with a linked Slack channel, invites its
-   effective (subtree) members. **Add-only**: it invites the missing and only *reports* a
-   `wouldRemove` count for hub-linked channel members who are no longer effective members — it
-   never kicks anyone.
+2. **Channel-membership reconcile** — for every linked Slack channel, invites the effective
+   (subtree) members of the teams that link it. Grouped by **channel**, so a channel shared by
+   several teams is visited once and measured against the union of their effective members.
+   **Add-only**: it invites the missing and only *reports* a `wouldRemove` count for hub-linked
+   channel members who are no longer effective members of any linking team — it never kicks anyone.
 
 The schedule is visible and editable at **Admin → Cron**. Migration:
 `supabase/migrations/20260909120000_slack_nightly_sync_cron.sql`.

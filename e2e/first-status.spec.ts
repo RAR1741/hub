@@ -167,7 +167,7 @@ test("authz: non-admin can't reach the dashboard, and the FIRST status card is s
 
   // A plain mentor is redirected away from the admin dashboard.
   await mentorPage.goto("/admin/first-status", { waitUntil: "networkidle" });
-  expect(new URL(mentorPage.url()).pathname).toBe("/");
+  await expect(mentorPage).toHaveURL(/\/$/);
 
   // A mentor viewing ANOTHER mentor's page does not see the FIRST status card.
   await mentorPage.goto(`/people/${MENTOR_A_ID}`, { waitUntil: "networkidle" });
