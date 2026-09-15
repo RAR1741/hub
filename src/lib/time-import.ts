@@ -1,6 +1,5 @@
 import { parseCsvRecords } from "./csv";
 import {
-  MAX_SHIFT_MIN,
   columnFlagThreshold,
   median,
   parseClockToken,
@@ -93,7 +92,7 @@ const cell = (rec: string[], i: number): string => (rec[i] ?? "").trim();
 /**
  * Resolve a whole Time-Out sub-column, row-aware. For an ambiguous (bare
  * small-hour) out, prefer whichever AM/PM reading yields a sensible shift
- * (0 < duration <= MAX_SHIFT_MIN) against that row's resolved Time-In — so a
+ * (0 < duration <= maxShiftMin) against that row's resolved Time-In — so a
  * real overnight out (e.g. "1:00" after an 18:00 in => 1 AM, 7h) resolves
  * correctly instead of being read as PM by column consensus. Falls back to
  * column consensus (nearest the confident median) when both or neither reading
@@ -101,7 +100,7 @@ const cell = (rec: string[], i: number): string => (rec[i] ?? "").trim();
  * over the resolved distribution (see columnFlagThreshold); a row-aware pick is
  * trusted and never flagged. PURE.
  */
-export function resolveOutColumn(outParses: ClockParse[], inMins: (number | null)[]): ResolvedCell[] {
+export function resolveOutColumn(outParses: ClockParse[], inMins: (number | null)[], maxShiftMin: number): ResolvedCell[] {
   const ref = median(outParses.flatMap((p) => (p.kind === "confident" ? [p.minutes] : [])));
   const rowAware: boolean[] = new Array(outParses.length).fill(false);
   const resolved = outParses.map((op, i) => {
@@ -110,8 +109,8 @@ export function resolveOutColumn(outParses: ClockParse[], inMins: (number | null
       const inM = inMins[i];
       if (inM !== null) {
         const dur = (c: number) => (c < inM ? c + 1440 : c) - inM;
-        const amOk = dur(op.am) > 0 && dur(op.am) <= MAX_SHIFT_MIN;
-        const pmOk = dur(op.pm) > 0 && dur(op.pm) <= MAX_SHIFT_MIN;
+        const amOk = dur(op.am) > 0 && dur(op.am) <= maxShiftMin;
+        const pmOk = dur(op.pm) > 0 && dur(op.pm) <= maxShiftMin;
         if (amOk && !pmOk) { rowAware[i] = true; return op.am; }
         if (pmOk && !amOk) { rowAware[i] = true; return op.pm; }
       }
@@ -128,7 +127,13 @@ export function resolveOutColumn(outParses: ClockParse[], inMins: (number | null
   }));
 }
 
-export function parseTimeSheet(csvText: string): ParsedTimeSheet {
+/**
+ * Parse a time-sheet CSV. maxShiftMin is the configured `max_shift_hours`
+ * setting in minutes — passed in (not a constant) because this parser runs on
+ * both sides of the wire: the server reads the setting, the upload preview gets
+ * it as a prop. PURE.
+ */
+export function parseTimeSheet(csvText: string, maxShiftMin: number): ParsedTimeSheet {
   const records = parseCsvRecords(csvText);
   const fileIssues: string[] = [];
 
@@ -185,6 +190,7 @@ export function parseTimeSheet(csvText: string): ParsedTimeSheet {
     resolveOutColumn(
       dataRows.map(({ rec }) => parseClockToken(cell(rec, b.col + 1))),
       inResolved[blockIdx].map((c) => c.minutes),
+      maxShiftMin,
     ),
   );
 
@@ -231,7 +237,7 @@ export function parseTimeSheet(csvText: string): ParsedTimeSheet {
         if (inCell.farFromColumn) person.anomalies.push({ date, kind: "time_far_from_column", detail: `Time In ${hhmm(inCell.minutes)} is far from the column norm` });
         if (outCell.farFromColumn) person.anomalies.push({ date, kind: "time_far_from_column", detail: `Time Out ${hhmm(outCell.minutes)} is far from the column norm` });
         if (durMin <= 0) person.anomalies.push({ date, kind: "zero_or_negative", detail: "Session has zero or negative length" });
-        else if (durMin > MAX_SHIFT_MIN) person.anomalies.push({ date, kind: "over_max_shift", detail: `Session is ${(durMin / 60).toFixed(1)}h (over ${MAX_SHIFT_MIN / 60}h)` });
+        else if (durMin > maxShiftMin) person.anomalies.push({ date, kind: "over_max_shift", detail: `Session is ${(durMin / 60).toFixed(1)}h (over ${maxShiftMin / 60}h)` });
         if (amPm) person.anomalies.push({ date, kind: "am_pm_uncertain", detail: `Time In ${cell(rec, b.col)} read as PM (${amPm.pm}) — could be ${amPm.am}` });
       } else if (inCell.minutes !== null && outCell.minutes === null) {
         person.skipped.push({ date, reason: "missing clock-out" });

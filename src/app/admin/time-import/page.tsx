@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
 import { listPeriods } from "@/lib/periods";
+import { getSetting } from "@/lib/settings";
 import { TimeImportForm } from "@/components/TimeImportForm";
 
 export const metadata: Metadata = { title: "Time Import" };
@@ -10,7 +11,7 @@ export const metadata: Metadata = { title: "Time Import" };
 export default async function AdminTimeImportPage() {
   const viewer = await getViewer();
   if (!hasRole(viewer.role, "admin")) redirect("/");
-  const periods = await listPeriods();
+  const [periods, maxShiftHours] = await Promise.all([listPeriods(), getSetting<number>("max_shift_hours", 18)]);
 
   return (
     <main className="flex flex-col gap-6">
@@ -20,7 +21,10 @@ export default async function AdminTimeImportPage() {
           <div className="sub">Bulk-import a season&apos;s attendance from a Google-Sheets CSV export</div>
         </div>
       </div>
-      <TimeImportForm periods={periods.map((p) => ({ id: p.id, name: p.name, isActive: p.isActive, startsOn: p.startsOn, endsOn: p.endsOn }))} />
+      <TimeImportForm
+        periods={periods.map((p) => ({ id: p.id, name: p.name, isActive: p.isActive, startsOn: p.startsOn, endsOn: p.endsOn }))}
+        maxShiftHours={maxShiftHours}
+      />
     </main>
   );
 }

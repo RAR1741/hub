@@ -14,7 +14,7 @@ const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 // a local-timezone off-by-one on the date.
 const withDow = (dateIso: string) => `${DOW[new Date(`${dateIso}T00:00:00Z`).getUTCDay()]} ${dateIso}`;
 
-export function TimeImportForm({ periods }: { periods: PeriodOpt[] }) {
+export function TimeImportForm({ periods, maxShiftHours }: { periods: PeriodOpt[]; maxShiftHours: number }) {
   const [text, setText] = useState("");
   const [periodId, setPeriodId] = useState(periods.find((p) => p.isActive)?.id ?? periods[0]?.id ?? "");
   const [preview, setPreview] = useState<ReturnType<typeof parseTimeSheet> | null>(null);
@@ -82,7 +82,7 @@ export function TimeImportForm({ periods }: { periods: PeriodOpt[] }) {
 
   async function doPreview() {
     setBusy(true); setStatus(null); setSummary(null);
-    setPreview(parseTimeSheet(text));
+    setPreview(parseTimeSheet(text, maxShiftHours * 60));
     try {
       // Dry-run (no confirm) — the server matches against the roster and reports role changes without writing.
       const res = await fetch("/api/admin/time-import", {

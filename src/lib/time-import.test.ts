@@ -24,36 +24,36 @@ const SHEET = [
 
 describe("parseTimeSheet", () => {
   test("detects dates from the date row (stride 3), ignoring summary columns", () => {
-    expect(parseTimeSheet(SHEET).dates).toEqual(["2026-01-08", "2026-01-10", "2026-01-11"]);
+    expect(parseTimeSheet(SHEET, 18 * 60).dates).toEqual(["2026-01-08", "2026-01-10", "2026-01-11"]);
   });
 
   test("keeps only rows with both names; drops reference/blank rows", () => {
-    const people = parseTimeSheet(SHEET).people;
+    const people = parseTimeSheet(SHEET, 18 * 60).people;
     expect(people.map((p) => `${p.firstName} ${p.lastName}`)).toEqual(["Ada Lovelace", "Bo Peep"]);
   });
 
   test("emits a session per Time-In+Time-Out pair", () => {
-    const ada = parseTimeSheet(SHEET).people[0];
+    const ada = parseTimeSheet(SHEET, 18 * 60).people[0];
     expect(ada.sessions).toContainEqual({ date: "2026-01-08", timeIn: "18:29", timeOut: "20:58", timeOutDate: "2026-01-08" });
     expect(ada.sessions).toContainEqual({ date: "2026-01-10", timeIn: "09:00", timeOut: "17:04", timeOutDate: "2026-01-10" });
   });
 
   test("Excused cell -> excusal", () => {
-    expect(parseTimeSheet(SHEET).people[0].excusals).toEqual([{ date: "2026-01-11" }]);
+    expect(parseTimeSheet(SHEET, 18 * 60).people[0].excusals).toEqual([{ date: "2026-01-11" }]);
   });
 
   test("overnight Time-Out rolls to the next day, hours belong to the start day", () => {
-    const bo = parseTimeSheet(SHEET).people[1];
+    const bo = parseTimeSheet(SHEET, 18 * 60).people[1];
     expect(bo.sessions).toContainEqual({ date: "2026-01-08", timeIn: "18:00", timeOut: "01:00", timeOutDate: "2026-01-09" });
   });
 
   test("Time-In with no Time-Out is skipped and reported", () => {
-    const bo = parseTimeSheet(SHEET).people[1];
+    const bo = parseTimeSheet(SHEET, 18 * 60).people[1];
     expect(bo.skipped).toContainEqual({ date: "2026-01-10", reason: "missing clock-out" });
   });
 
   test("the row-aware overnight resolution is not flagged as an anomaly", () => {
-    expect(parseTimeSheet(SHEET).people[1].anomalies).toEqual([]);
+    expect(parseTimeSheet(SHEET, 18 * 60).people[1].anomalies).toEqual([]);
   });
 });
 
@@ -85,29 +85,29 @@ const UNCERTAIN_SHEET = [
 
 describe("am_pm_uncertain flag", () => {
   test("flags a morning-looking clock-in that consensus flipped to PM", () => {
-    const mort = parseTimeSheet(UNCERTAIN_SHEET).people.find((x) => x.firstName === "Mort")!;
+    const mort = parseTimeSheet(UNCERTAIN_SHEET, 18 * 60).people.find((x) => x.firstName === "Mort")!;
     expect(mort.anomalies.some((a) => a.kind === "am_pm_uncertain")).toBe(true);
     expect(mort.sessions[0].timeIn).toBe("20:46"); // surfaced, not coerced — still the consensus guess
   });
   test("does not flag noon — the 00:xx morning reading is not a plausible arrival", () => {
-    const nora = parseTimeSheet(UNCERTAIN_SHEET).people.find((x) => x.firstName === "Nora")!;
+    const nora = parseTimeSheet(UNCERTAIN_SHEET, 18 * 60).people.find((x) => x.firstName === "Nora")!;
     expect(nora.anomalies.some((a) => a.kind === "am_pm_uncertain")).toBe(false);
     expect(nora.sessions[0].timeIn).toBe("12:30");
   });
   test("does not flag a confident 24-hour clock-in", () => {
-    const eve = parseTimeSheet(UNCERTAIN_SHEET).people.find((x) => x.firstName === "Eve")!;
+    const eve = parseTimeSheet(UNCERTAIN_SHEET, 18 * 60).people.find((x) => x.firstName === "Eve")!;
     expect(eve.anomalies).toEqual([]);
   });
   test("does not flag a morning clock-in resolved to AM (unremarkable)", () => {
     // In SHEET, Ada's Jan-10 "9:00" resolves to 09:00 — morning stays morning.
-    const anomalies = parseTimeSheet(SHEET).people.flatMap((p) => p.anomalies);
+    const anomalies = parseTimeSheet(SHEET, 18 * 60).people.flatMap((p) => p.anomalies);
     expect(anomalies.some((a) => a.kind === "am_pm_uncertain")).toBe(false);
   });
 });
 
 describe("student/mentor split", () => {
   test("splits on the largest gap: pre-gap people are students, post-gap are mentors", () => {
-    const p = parseTimeSheet(SPLIT_SHEET);
+    const p = parseTimeSheet(SPLIT_SHEET, 18 * 60);
     expect(p.people.map((x) => `${x.firstName}:${x.roleHint}`)).toEqual([
       "Ada:student", "Bo:student", "Cody:mentor", "Dana:mentor",
     ]);
@@ -115,8 +115,26 @@ describe("student/mentor split", () => {
   });
 
   test("no clear divider (contiguous rows) -> everyone a student, with a warning", () => {
-    const p = parseTimeSheet(SHEET); // Ada + Bo, no gap between them
+    const p = parseTimeSheet(SHEET, 18 * 60); // Ada + Bo, no gap between them
     expect(p.people.every((x) => x.roleHint === "student")).toBe(true);
     expect(p.fileIssues.some((f) => /divider/i.test(f))).toBe(true);
+  });
+});
+
+describe("max shift threshold", () => {
+  // Both Jan-8 sessions are 13h: fine under an 18h max, over a 12h one.
+  const LONG_SHEET = [
+    ",,,,,,Saturday,,,Sunday,,,,Varsity",
+    ',,,"January 8, 2026",,,"January 10, 2026",,,"January 11, 2026",,,,Letter',
+    ",Name,Hours Left,Time In,Time Out,Verified,Time In,Time Out,Day Total,Time In,Time Out,Day Total,Total Hours",
+    "Ada,Lovelace,0.00,7:00,20:00,OK,,,0:00,,,0:00,13",
+    "Bo,Peep,0.00,7:00,20:00,OK,,,0:00,,,0:00,13",
+  ].join("\n");
+
+  test("flags over_max_shift against the configured max, not a hardcoded 18h", () => {
+    expect(parseTimeSheet(LONG_SHEET, 18 * 60).people[0].anomalies).toEqual([]);
+    expect(parseTimeSheet(LONG_SHEET, 12 * 60).people[0].anomalies).toEqual([
+      { date: "2026-01-08", kind: "over_max_shift", detail: "Session is 13.0h (over 12h)" },
+    ]);
   });
 });
