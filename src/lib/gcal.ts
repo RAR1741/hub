@@ -77,19 +77,20 @@ export type SyncResult = { meetings: number; buildDays: number; backfilledPeriod
  * Does this period already have at least one meeting? Used to decide whether a
  * past period still needs a backfill. The bounds are generous by a few hours at
  * each edge — good enough to answer "is this period empty?", which is all we
- * need. Returns false on a query error (treat as empty → try to backfill).
+ * need. Throws on a query error — the sync aborts rather than guessing.
  */
 async function periodHasMeetings(
   db: SupabaseClient,
   startsOn: string,
   endsOn: string,
 ): Promise<boolean> {
-  const { data } = await db
+  const { data, error } = await db
     .from("meeting")
     .select("id")
     .gte("starts_at", `${startsOn}T00:00:00Z`)
     .lte("starts_at", `${endsOn}T23:59:59Z`)
     .limit(1);
+  if (error) throw new Error(`periodHasMeetings failed: ${error.message}`);
   return (data?.length ?? 0) > 0;
 }
 
@@ -208,18 +209,20 @@ async function fetchAllEvents(
  * name/starts_at/ends_at actually changed (not counting flag-only writes).
  */
 async function syncLinkedEvents(db: SupabaseClient, nowIso: string): Promise<number> {
-  const { data: linkedData } = await db
+  const { data: linkedData, error: linkedError } = await db
     .from("event")
     .select("id, gcal_event_id, name, starts_at, ends_at, gcal_missing")
     .not("gcal_event_id", "is", null)
     .gte("ends_at", nowIso);
+  if (linkedError) throw new Error(`syncLinkedEvents: event query failed: ${linkedError.message}`);
   const linked = (linkedData ?? []) as LinkedEventRow[];
   if (linked.length === 0) return 0;
 
-  const { data: meetingData } = await db
+  const { data: meetingData, error: meetingError } = await db
     .from("meeting")
     .select("gcal_event_id, title, starts_at, ends_at")
     .in("gcal_event_id", linked.map((r) => r.gcal_event_id));
+  if (meetingError) throw new Error(`syncLinkedEvents: meeting query failed: ${meetingError.message}`);
   const meetingsByGcalId = new Map(
     ((meetingData ?? []) as MeetingLite[]).map((m) => [m.gcal_event_id, m] as const),
   );
@@ -243,10 +246,11 @@ export async function syncCalendar(deps: GcalDeps): Promise<SyncResult> {
   // period, never at the (dynamic) fetch window — otherwise a run made after
   // everything is backfilled would collapse the window to `now − 1yr` and
   // delete all the history the previous runs built.
-  const { data: periodData } = await deps.db
+  const { data: periodData, error: periodError } = await deps.db
     .from("period")
     .select("id, starts_on, ends_on")
     .order("starts_on", { ascending: true });
+  if (periodError) throw new Error(`list periods failed: ${periodError.message}`);
   const periods = (periodData ?? []) as { id: string; starts_on: string; ends_on: string }[];
 
   // Extend the fetch window back over each empty past period. A period starting
@@ -288,10 +292,14 @@ export async function syncCalendar(deps: GcalDeps): Promise<SyncResult> {
   });
   // Prior starts_at per gcal_event_id, read before the upsert overwrites them —
   // used below to detect a moved meeting and fan out meeting_changed.
-  const { data: priorMeetingsData } = await deps.db
+  const { data: priorMeetingsData, error: priorMeetingsError } = await deps.db
     .from("meeting")
     .select("id, gcal_event_id, starts_at")
     .in("gcal_event_id", meetingRows.map((r) => r.gcal_event_id));
+  // Abort before the upsert: without the prior starts_at we cannot tell which
+  // meetings moved, and would silently skip every meeting_changed notification.
+  if (priorMeetingsError)
+    throw new Error(`gcal sync: prior meeting query failed: ${priorMeetingsError.message}`);
   const priorByGcalId = new Map(
     ((priorMeetingsData ?? []) as { id: string; gcal_event_id: string; starts_at: string }[]).map(
       (m) => [m.gcal_event_id, m] as const,

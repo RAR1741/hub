@@ -27,13 +27,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false }, { status: 400 });
   }
 
-  const { data: row } = await getDb()
+  const { data: row, error } = await getDb()
     .from("person")
     .select("id, is_active, role")
     .eq("student_id_number", studentId)
     // ID login is for students only (spec §3.3); staff sign in with Google.
     .eq("role", "student")
     .maybeSingle();
+
+  // A read failure is not "no such student" — 500 so the login surfaces as broken.
+  if (error) {
+    console.error("student login: person lookup failed", error);
+    return NextResponse.json({ ok: false }, { status: 500 });
+  }
 
   if (!row || !row.is_active) {
     return NextResponse.json({ ok: false }, { status: 401 });

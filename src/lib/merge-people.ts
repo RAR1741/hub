@@ -44,10 +44,11 @@ export async function listDuplicateCandidates(
 ): Promise<CandidatePair[]> {
   const c = await client(db);
 
-  const { data: peopleData } = await c
+  const { data: peopleData, error: peopleError } = await c
     .from("person")
     .select("id, first_name, last_name, role, is_active")
     .order("last_name");
+  if (peopleError) console.error("merge candidates: person query failed", peopleError);
   const people = (peopleData ?? []) as PersonRow[];
 
   const allCandidates = findDuplicateCandidates(
@@ -55,9 +56,10 @@ export async function listDuplicateCandidates(
   );
 
   // Load dismissed pairs and filter before capping and enriching.
-  const { data: rejData } = await c
+  const { data: rejData, error: rejError } = await c
     .from("person_merge_rejection")
     .select("a, b");
+  if (rejError) console.error("merge candidates: rejection query failed", rejError);
   const dismissed = new Set<string>(
     ((rejData ?? []) as { a: string; b: string }[]).map((r) => `${r.a}|${r.b}`),
   );
@@ -103,11 +105,12 @@ async function loadEmailsByPerson(
 ): Promise<Map<string, string[]>> {
   const map = new Map<string, string[]>();
   if (ids.length === 0) return map;
-  const { data } = await c
+  const { data, error } = await c
     .from("person_identity")
     .select("person_id, email, is_primary")
     .in("person_id", ids)
     .order("is_primary", { ascending: false });
+  if (error) console.error("loadEmailsByPerson: query failed", error);
   for (const row of (data ?? []) as { person_id: string; email: string }[]) {
     const list = map.get(row.person_id) ?? [];
     list.push(row.email);
@@ -122,10 +125,11 @@ async function loadSessionCountsByPerson(
 ): Promise<Map<string, number>> {
   const map = new Map<string, number>();
   if (ids.length === 0) return map;
-  const { data } = await c
+  const { data, error } = await c
     .from("session")
     .select("person_id")
     .in("person_id", ids);
+  if (error) console.error("loadSessionCountsByPerson: query failed", error);
   for (const row of (data ?? []) as { person_id: string }[]) {
     map.set(row.person_id, (map.get(row.person_id) ?? 0) + 1);
   }
@@ -138,10 +142,11 @@ async function loadTeamsByPerson(
 ): Promise<Map<string, string[]>> {
   const map = new Map<string, string[]>();
   if (ids.length === 0) return map;
-  const { data } = await c
+  const { data, error } = await c
     .from("team_membership")
     .select("person_id, team (name)")
     .in("person_id", ids);
+  if (error) console.error("loadTeamsByPerson: query failed", error);
   for (const row of (data ?? []) as unknown as {
     person_id: string;
     team: Pick<TeamRow, "name"> | null;
@@ -237,19 +242,21 @@ export async function listRejectedPairs(
 ): Promise<RejectedPair[]> {
   const c = await client(db);
 
-  const { data: rejData } = await c
+  const { data: rejData, error: rejError } = await c
     .from("person_merge_rejection")
     .select("a, b")
     .order("created_at", { ascending: false });
+  if (rejError) console.error("dismissed pairs: rejection query failed", rejError);
   const rejected = (rejData ?? []) as { a: string; b: string }[];
   if (rejected.length === 0) return [];
 
   const ids = Array.from(new Set(rejected.flatMap((r) => [r.a, r.b])));
 
-  const { data: peopleData } = await c
+  const { data: peopleData, error: peopleError } = await c
     .from("person")
     .select("id, first_name, last_name, role, is_active")
     .in("id", ids);
+  if (peopleError) console.error("dismissed pairs: person query failed", peopleError);
   const people = (peopleData ?? []) as PersonRow[];
   const byId = new Map(people.map((p) => [p.id, p]));
 

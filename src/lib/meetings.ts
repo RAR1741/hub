@@ -10,23 +10,25 @@ export async function listUpcomingMeetings(
   db?: SupabaseClient,
 ): Promise<Meeting[]> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client
+  const { data, error } = await client
     .from("meeting")
     .select("*")
     .gte("starts_at", nowIso)
     .order("starts_at", { ascending: true })
     .limit(limit);
+  if (error) console.error("listUpcomingMeetings: query failed", error);
   return ((data ?? []) as MeetingRow[]).map(meetingFromRow);
 }
 
 /** All meetings, most recent first — for the admin Meetings page. */
 export async function listAllMeetings(db?: SupabaseClient): Promise<Meeting[]> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client
+  const { data, error } = await client
     .from("meeting")
     .select("*")
     .order("starts_at", { ascending: false })
     .limit(500);
+  if (error) console.error("listAllMeetings: query failed", error);
   return ((data ?? []) as MeetingRow[]).map(meetingFromRow);
 }
 
@@ -103,7 +105,10 @@ export async function updateMeeting(
   db?: SupabaseClient,
 ): Promise<{ ok: boolean; status: number }> {
   const client = db ?? (await import("./db")).getDb();
-  const { data: prior } = await client.from("meeting").select("starts_at").eq("id", id).maybeSingle();
+  const { data: prior, error: priorError } = await client.from("meeting").select("starts_at").eq("id", id).maybeSingle();
+  // Bail before the update: without the prior starts_at we cannot tell whether
+  // the meeting moved, and would silently skip the meeting_changed fan-out.
+  if (priorError) { console.error("updateMeeting: prior starts_at query failed", priorError); return { ok: false, status: 500 }; }
   const { data, error } = await client
     .from("meeting")
     .update({ title: input.title, starts_at: input.startsAt, ends_at: input.endsAt })

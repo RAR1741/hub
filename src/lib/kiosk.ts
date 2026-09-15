@@ -32,10 +32,11 @@ export async function listKioskDevices(
   db?: SupabaseClient,
 ): Promise<{ id: string; name: string; lastSeenAt: string | null }[]> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client
+  const { data, error } = await client
     .from("kiosk_device")
     .select("id, name, last_seen_at")
     .order("name");
+  if (error) console.error("listKioskDevices: query failed", error);
   return (data ?? []).map((d) => ({
     id: d.id as string,
     name: d.name as string,
@@ -77,11 +78,14 @@ export async function verifyKioskToken(
 ): Promise<boolean> {
   if (!token) return false;
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client
+  const { data, error } = await client
     .from("kiosk_device")
     .select("id")
     .eq("token_hash", hashKioskToken(token))
     .maybeSingle();
+  // A read failure is not a valid token, but log it — otherwise every kiosk
+  // going dead at once looks like every kiosk being deregistered at once.
+  if (error) console.error("verifyKioskToken: query failed", error);
   if (!data) return false;
   await client
     .from("kiosk_device")

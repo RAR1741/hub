@@ -26,12 +26,16 @@ export async function POST(request: Request) {
   } else if (role === "admin") {
     personId = SEEDED_ADMIN_ID;
   } else if (role === "student") {
-    const { data: row } = await getDb()
+    const { data: row, error } = await getDb()
       .from("person")
       .select("id")
       .eq("student_id_number", "1741")
       .eq("role", "student")
       .maybeSingle();
+    if (error) {
+      console.error("dev-login: person lookup failed", error);
+      return NextResponse.json({ ok: false, error: "lookup failed" }, { status: 500 });
+    }
     personId = row?.id ?? null;
   } else {
     return NextResponse.json({ ok: false, error: "invalid role" }, { status: 400 });
