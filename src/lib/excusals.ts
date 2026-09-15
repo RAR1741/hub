@@ -33,8 +33,10 @@ export async function listExcusals(
       .select("*")
       .gte("date", range.from)
       .lte("date", range.to)
+      // excusal's PK is (person_id, date) — there is no `id` column, and
+      // ordering by one silently errored the whole read away (#287).
       .order("date")
-      .order("id")
+      .order("person_id")
       .range(from, to);
     return { data: r.data as ExcusalRow[] | null, error: r.error };
   });
