@@ -70,7 +70,8 @@ export async function listPeople(
       `first_name.ilike."%${term}%",last_name.ilike."%${term}%",display_name.ilike."%${term}%"`,
     );
   }
-  const { data } = await query;
+  const { data, error } = await query;
+  if (error) console.error("listPeople: query failed", error);
   return (data ?? []) as PersonRow[];
 }
 
@@ -79,17 +80,19 @@ export async function getPersonWithTeams(
   db?: SupabaseClient,
 ): Promise<{ person: Person; teams: { team: Team; isManager: boolean }[] } | null> {
   const client = db ?? (await import("./db")).getDb();
-  const { data: personRow } = await client
+  const { data: personRow, error: personError } = await client
     .from("person")
     .select("*")
     .eq("id", id)
     .maybeSingle();
+  if (personError) { console.error("getPersonWithTeams: person query failed", personError); return null; }
   if (!personRow) return null;
 
-  const { data: memberships } = await client
+  const { data: memberships, error: membershipError } = await client
     .from("team_membership")
     .select("is_manager, team (*)")
     .eq("person_id", id);
+  if (membershipError) console.error("getPersonWithTeams: membership query failed", membershipError);
 
   const teams = (memberships ?? [])
     .filter((m) => m.team)
@@ -452,19 +455,21 @@ export async function findPersonForRosterRow(
     // primary) so a CSV row carrying someone's secondary email still
     // resolves to their existing person. Identity emails are a superset of
     // person.email after Task 1's backfill, so nothing is lost.
-    const { data } = await client
+    const { data, error } = await client
       .from("person_identity")
       .select("person_id")
       .eq("email", row.email)
       .maybeSingle();
+    if (error) console.error("findPersonForRosterRow: identity query failed", error);
     if (data) return data.person_id as string;
   }
   if (row.studentIdNumber) {
-    const { data } = await client
+    const { data, error } = await client
       .from("person")
       .select("id")
       .eq("student_id_number", row.studentIdNumber)
       .maybeSingle();
+    if (error) console.error("findPersonForRosterRow: student-id query failed", error);
     if (data) return data.id as string;
   }
   return null;

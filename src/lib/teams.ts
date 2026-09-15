@@ -143,13 +143,15 @@ async function replaceTeamSlackChannels(
 
 export async function listTeams(db?: SupabaseClient): Promise<Team[]> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client.from("team").select("*").order("name");
+  const { data, error } = await client.from("team").select("*").order("name");
+  if (error) console.error("listTeams: query failed", error);
   return ((data ?? []) as TeamRow[]).map(teamFromRow);
 }
 
 export async function getTeam(id: string, db?: SupabaseClient): Promise<Team | null> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client.from("team").select("*").eq("id", id).maybeSingle();
+  const { data, error } = await client.from("team").select("*").eq("id", id).maybeSingle();
+  if (error) { console.error("getTeam: query failed", error); return null; }
   return data ? teamFromRow(data as TeamRow) : null;
 }
 
@@ -237,10 +239,11 @@ export async function listTeamMembers(
   db?: SupabaseClient,
 ): Promise<{ personId: string; name: string; isManager: boolean }[]> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client
+  const { data, error } = await client
     .from("team_membership")
     .select("is_manager, person (id, first_name, last_name, display_name)")
     .eq("team_id", teamId);
+  if (error) console.error("listTeamMembers: query failed", error);
   return (data ?? [])
     .filter((m) => m.person)
     .map((m) => {
@@ -307,10 +310,11 @@ export async function memberTeamIds(
   db?: SupabaseClient,
 ): Promise<Set<string>> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client
+  const { data, error } = await client
     .from("team_membership")
     .select("team_id")
     .eq("person_id", personId);
+  if (error) console.error("teamIdsForPerson: query failed", error);
   return new Set((data ?? []).map((r) => r.team_id as string));
 }
 
@@ -319,7 +323,8 @@ export async function memberTeamIds(
  *  problems against team_membership. Missing team → 0 via `?? 0` at call sites. */
 export async function teamMemberCounts(db?: SupabaseClient): Promise<Map<string, number>> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client.from("team_membership").select("team_id");
+  const { data, error } = await client.from("team_membership").select("team_id");
+  if (error) console.error("teamMemberCounts: query failed", error);
   const counts = new Map<string, number>();
   for (const row of data ?? []) {
     const teamId = row.team_id as string;
@@ -333,11 +338,12 @@ export async function pendingApplicationTeamIds(
   db?: SupabaseClient,
 ): Promise<Set<string>> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client
+  const { data, error } = await client
     .from("membership_application")
     .select("team_id")
     .eq("person_id", personId)
     .eq("status", "pending");
+  if (error) console.error("pendingApplicationTeamIds: query failed", error);
   return new Set((data ?? []).map((r) => r.team_id as string));
 }
 
