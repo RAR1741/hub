@@ -17,8 +17,11 @@ vi.mock("@/lib/slack-link", () => ({
 vi.mock("@/lib/team-slack-backfill", () => ({
   reconcileAllTeamSlackChannels: vi.fn(),
 }));
-vi.mock("@/lib/slack-alerts", () => ({
-  reportSyncOutcome: vi.fn(),
+vi.mock("@/lib/sync-runs", () => ({
+  insertSyncRun: vi.fn(),
+}));
+vi.mock("@/lib/system-health", () => ({
+  reportSubsystemHealth: vi.fn(),
 }));
 
 function req(headers?: Record<string, string>) {
@@ -111,7 +114,8 @@ describe("POST /api/cron/slack/membership-sync", () => {
     const { getSetting } = await import("@/lib/settings");
     const { syncSlackLinks } = await import("@/lib/slack-link");
     const { reconcileAllTeamSlackChannels } = await import("@/lib/team-slack-backfill");
-    const { reportSyncOutcome } = await import("@/lib/slack-alerts");
+    const { insertSyncRun } = await import("@/lib/sync-runs");
+    const { reportSubsystemHealth } = await import("@/lib/system-health");
     vi.mocked(getSetting).mockResolvedValue(SECRET);
 
     const order: string[] = [];
@@ -130,13 +134,15 @@ describe("POST /api/cron/slack/membership-sync", () => {
     const body = await res.json();
     expect(body.ok).toBe(true);
     expect(order).toEqual(["links", "channels"]);
-    expect(reportSyncOutcome).toHaveBeenCalledWith("slack_sync", true, expect.anything());
+    expect(reportSubsystemHealth).toHaveBeenCalledWith("slack_membership_sync", true, expect.anything());
+    expect(insertSyncRun).toHaveBeenCalledWith(expect.objectContaining({ source: "slack_sync", ok: true }), expect.anything());
   });
 
   test("502 and reports failure when the chain throws", async () => {
     const { getSetting } = await import("@/lib/settings");
     const { syncSlackLinks } = await import("@/lib/slack-link");
-    const { reportSyncOutcome } = await import("@/lib/slack-alerts");
+    const { insertSyncRun } = await import("@/lib/sync-runs");
+    const { reportSubsystemHealth } = await import("@/lib/system-health");
     vi.mocked(getSetting).mockResolvedValue(SECRET);
     vi.mocked(syncSlackLinks).mockRejectedValue(new Error("boom"));
 
@@ -145,10 +151,14 @@ describe("POST /api/cron/slack/membership-sync", () => {
     expect(res.status).toBe(502);
     const body = await res.json();
     expect(body).toEqual({ error: "sync_failed" });
-    expect(reportSyncOutcome).toHaveBeenCalledWith(
-      "slack_sync",
+    expect(reportSubsystemHealth).toHaveBeenCalledWith(
+      "slack_membership_sync",
       false,
-      expect.objectContaining({ error: expect.objectContaining({ message: "boom" }) }),
+      expect.objectContaining({ detail: "boom" }),
+    );
+    expect(insertSyncRun).toHaveBeenCalledWith(
+      expect.objectContaining({ source: "slack_sync", ok: false, error: expect.stringContaining("boom") }),
+      expect.anything(),
     );
   });
 
@@ -156,7 +166,7 @@ describe("POST /api/cron/slack/membership-sync", () => {
     const { getSetting } = await import("@/lib/settings");
     const { syncSlackLinks } = await import("@/lib/slack-link");
     const { reconcileAllTeamSlackChannels } = await import("@/lib/team-slack-backfill");
-    const { reportSyncOutcome } = await import("@/lib/slack-alerts");
+    const { reportSubsystemHealth } = await import("@/lib/system-health");
     vi.mocked(getSetting).mockResolvedValue(SECRET);
     vi.mocked(syncSlackLinks).mockResolvedValue({
       ranAt: "now",
@@ -173,10 +183,10 @@ describe("POST /api/cron/slack/membership-sync", () => {
     expect(res.status).toBe(502);
     const body = await res.json();
     expect(body).toEqual({ error: "sync_failed" });
-    expect(reportSyncOutcome).toHaveBeenCalledWith(
-      "slack_sync",
+    expect(reportSubsystemHealth).toHaveBeenCalledWith(
+      "slack_membership_sync",
       false,
-      expect.objectContaining({ error: expect.objectContaining({ message: "db error" }) }),
+      expect.objectContaining({ detail: "db error" }),
     );
   });
 });

@@ -11,6 +11,9 @@ vi.mock("@/lib/settings", () => ({
 vi.mock("@/lib/whats-new", () => ({
   sendWhatsNewDigest: vi.fn(),
 }));
+vi.mock("@/lib/system-health", () => ({
+  reportSubsystemHealth: vi.fn(),
+}));
 
 function req(headers?: Record<string, string>) {
   return new Request("http://localhost/api/cron/slack/whats-new", {
@@ -66,6 +69,24 @@ describe("POST /api/cron/slack/whats-new", () => {
     expect(sendWhatsNewDigest).toHaveBeenCalledTimes(1);
     const body = await res.json();
     expect(body).toEqual({ posted: true, count: 3, clipped: false });
+    const { reportSubsystemHealth } = await import("@/lib/system-health");
+    expect(reportSubsystemHealth).toHaveBeenCalledWith("slack_whats_new", true, expect.anything());
+  });
+
+  test("an empty window is healthy, but a formatted digest that did not post is not", async () => {
+    const { getSetting } = await import("@/lib/settings");
+    const { sendWhatsNewDigest } = await import("@/lib/whats-new");
+    const { reportSubsystemHealth } = await import("@/lib/system-health");
+    vi.mocked(getSetting).mockResolvedValue(SECRET);
+
+    vi.mocked(sendWhatsNewDigest).mockResolvedValue({ posted: false, count: 0, clipped: false });
+    const { POST } = await import("./route");
+    await POST(req({ "x-sync-secret": SECRET }));
+    expect(reportSubsystemHealth).toHaveBeenLastCalledWith("slack_whats_new", true, expect.anything());
+
+    vi.mocked(sendWhatsNewDigest).mockResolvedValue({ posted: false, count: 4, clipped: false });
+    await POST(req({ "x-sync-secret": SECRET }));
+    expect(reportSubsystemHealth).toHaveBeenLastCalledWith("slack_whats_new", false, expect.anything());
   });
 
   test("502 when sendWhatsNewDigest rejects", async () => {

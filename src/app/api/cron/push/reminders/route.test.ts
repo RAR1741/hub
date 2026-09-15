@@ -14,6 +14,9 @@ vi.mock("@/lib/event-reminder", () => ({
 vi.mock("@/lib/meeting-reminder", () => ({
   pushMeetingReminders: vi.fn(),
 }));
+vi.mock("@/lib/system-health", () => ({
+  reportSubsystemHealth: vi.fn(),
+}));
 
 function req(headers?: Record<string, string>) {
   return new Request("http://localhost/api/cron/push/reminders", {
@@ -62,8 +65,8 @@ describe("POST /api/cron/push/reminders", () => {
     const { pushEventReminders } = await import("@/lib/event-reminder");
     const { pushMeetingReminders } = await import("@/lib/meeting-reminder");
     vi.mocked(getSetting).mockResolvedValue(SECRET);
-    const eventsResult = { sent: 1, pruned: 0, events: 1 };
-    const meetingsResult = { sent: 2, pruned: 0, meetings: 1 };
+    const eventsResult = { sent: 1, pruned: 0, events: 1, errors: 0 };
+    const meetingsResult = { sent: 2, pruned: 0, meetings: 1, errors: 0 };
     vi.mocked(pushEventReminders).mockResolvedValue(eventsResult);
     vi.mocked(pushMeetingReminders).mockResolvedValue(meetingsResult);
 
@@ -72,6 +75,23 @@ describe("POST /api/cron/push/reminders", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual({ ok: true, events: eventsResult, meetings: meetingsResult });
+    const { reportSubsystemHealth } = await import("@/lib/system-health");
+    expect(reportSubsystemHealth).toHaveBeenCalledWith("push_reminders", true, expect.anything());
+  });
+
+  test("200 but reports failing when a lib swallowed a query error", async () => {
+    const { getSetting } = await import("@/lib/settings");
+    const { pushEventReminders } = await import("@/lib/event-reminder");
+    const { pushMeetingReminders } = await import("@/lib/meeting-reminder");
+    const { reportSubsystemHealth } = await import("@/lib/system-health");
+    vi.mocked(getSetting).mockResolvedValue(SECRET);
+    vi.mocked(pushEventReminders).mockResolvedValue({ sent: 0, pruned: 0, events: 0, errors: 1 });
+    vi.mocked(pushMeetingReminders).mockResolvedValue({ sent: 0, pruned: 0, meetings: 0, errors: 0 });
+
+    const { POST } = await import("./route");
+    const res = await POST(req({ "x-sync-secret": SECRET }));
+    expect(res.status).toBe(200);
+    expect(reportSubsystemHealth).toHaveBeenCalledWith("push_reminders", false, expect.anything());
   });
 
   test("502 when a sweep throws", async () => {
@@ -80,10 +100,12 @@ describe("POST /api/cron/push/reminders", () => {
     const { pushMeetingReminders } = await import("@/lib/meeting-reminder");
     vi.mocked(getSetting).mockResolvedValue(SECRET);
     vi.mocked(pushEventReminders).mockRejectedValue(new Error("boom"));
-    vi.mocked(pushMeetingReminders).mockResolvedValue({ sent: 0, pruned: 0, meetings: 0 });
+    vi.mocked(pushMeetingReminders).mockResolvedValue({ sent: 0, pruned: 0, meetings: 0, errors: 0 });
 
     const { POST } = await import("./route");
     const res = await POST(req({ "x-sync-secret": SECRET }));
     expect(res.status).toBe(502);
+    const { reportSubsystemHealth } = await import("@/lib/system-health");
+    expect(reportSubsystemHealth).toHaveBeenCalledWith("push_reminders", false, expect.anything());
   });
 });

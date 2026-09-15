@@ -2,10 +2,23 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSetting } from "./settings";
 import { pushDepsFromEnv, sanitizePushText, sendPushToOptedIn, type PushDeps } from "./push-dispatch";
 
-export type HealthSubsystem = "slack_delivery"; // extend the union per subsystem later
+export type HealthSubsystem =
+  | "slack_delivery"
+  | "push_reminders"
+  | "push_clocked_in_late"
+  | "slack_whats_new"
+  | "slack_mentor_reminders"
+  | "slack_event_channels"
+  | "slack_membership_sync";
 
 const LABELS: Record<HealthSubsystem, string> = {
   slack_delivery: "Slack admin-alert delivery",
+  push_reminders: "Event/meeting reminder push",
+  push_clocked_in_late: "Clocked-in-late push",
+  slack_whats_new: "What's-New digest",
+  slack_mentor_reminders: "Weekly mentor reminders",
+  slack_event_channels: "Event channel sweep",
+  slack_membership_sync: "Slack membership sync",
 };
 
 /**
