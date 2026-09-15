@@ -27,7 +27,7 @@ export async function listExcusals(
 ): Promise<Excusal[]> {
   const client = db ?? (await import("./db")).getDb();
   // Page past the 1000-row cap — a full season's excusals can exceed it.
-  const { rows: data } = await fetchAllRows(async (from, to) => {
+  const { rows: data, error } = await fetchAllRows(async (from, to) => {
     const r = await client
       .from("excusal")
       .select("*")
@@ -38,6 +38,7 @@ export async function listExcusals(
       .range(from, to);
     return { data: r.data as ExcusalRow[] | null, error: r.error };
   });
+  if (error) throw new Error(`listExcusals failed: ${error.message}`);
   return (data as ExcusalRow[]).map(excusalFromRow);
 }
 

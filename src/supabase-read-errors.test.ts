@@ -17,15 +17,19 @@ import { describe, expect, test } from "vitest";
  * call (log and fall back to empty for a list, 500 instead of 404 for a probe);
  * naming it is not.
  *
+ * `fetchAllRows` (src/lib/paginate.ts) returns `{ rows, error }` and neither
+ * logs nor throws, so `const { rows: data } = await fetchAllRows(...)` swallows
+ * a page failure exactly the same way — `rows` counts as a read binding too.
+ *
  * Nested destructures (`const { data: { user } } = await supabase.auth...`) are
  * skipped — those are auth-client calls, not table reads.
  */
 
 const SRC = path.join(path.dirname(fileURLToPath(import.meta.url)));
 const DESTRUCTURE = /const\s*\{([^{}]*)\}\s*=\s*await\b/g;
-// `data` / `data: rows` bound at key position — not `{ rows: data }`, where
-// `data` is only the local name for someone else's already-checked result.
-const BINDS_DATA = /(^|,)\s*data\s*(:|,|$)/;
+// A read binding at KEY position: `data` (Supabase) or `rows` (fetchAllRows),
+// however it is renamed. `{ rows: data }` binds `rows`, so it is still a read.
+const BINDS_ROWS = /(^|,)\s*(data|rows)\s*(:|,|$)/;
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -36,12 +40,12 @@ function sourceFiles(dir: string): string[] {
   });
 }
 
-/** Line numbers in `text` where a read destructures `data` without `error`. */
+/** Line numbers in `text` where a read destructures rows without `error`. */
 function uncheckedReads(text: string): number[] {
   const lines: number[] = [];
   for (const match of text.matchAll(DESTRUCTURE)) {
     const bindings = match[1];
-    if (!BINDS_DATA.test(bindings) || /\berror\b/.test(bindings)) continue;
+    if (!BINDS_ROWS.test(bindings) || /\berror\b/.test(bindings)) continue;
     lines.push(text.slice(0, match.index).split("\n").length);
   }
   return lines;
@@ -52,11 +56,16 @@ describe("supabase reads check error", () => {
     expect(uncheckedReads("const { data } = await db.from('x').select('*');")).toEqual([1]);
     expect(uncheckedReads("const { data: rows } = await db.from('x').select('*');")).toEqual([1]);
     expect(uncheckedReads("const { data, error } = await db.from('x').select('*');")).toEqual([]);
-    // `data` as the local alias of an already-checked result is not a read.
-    expect(uncheckedReads("const { rows: data } = await fetchAllRows(cb);")).toEqual([]);
+    // fetchAllRows hands back `{ rows, error }` and swallows nothing itself —
+    // dropping `error` here is the same bug under a different key name.
+    expect(uncheckedReads("const { rows: data } = await fetchAllRows(cb);")).toEqual([1]);
+    expect(uncheckedReads("const { rows: data, error } = await fetchAllRows(cb);")).toEqual([]);
+    // A value named `data` on the right of the colon is somebody else's
+    // already-checked result being renamed, not a new read.
+    expect(uncheckedReads("const { ok: data } = await maybe();")).toEqual([]);
   });
 
-  test("no `const { data }` destructure omits `error`", () => {
+  test("no `const { data }` or `{ rows }` destructure omits `error`", () => {
     const offenders: string[] = [];
     for (const file of sourceFiles(SRC)) {
       const text = readFileSync(file, "utf8");

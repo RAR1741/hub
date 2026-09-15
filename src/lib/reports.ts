@@ -272,7 +272,7 @@ export async function sessionsForPeriod(
   db?: SupabaseClient,
 ): Promise<Session[]> {
   const client = db ?? (await import("./db")).getDb();
-  const { rows: data } = await fetchAllRows(async (from, to) => {
+  const { rows: data, error } = await fetchAllRows(async (from, to) => {
     const r = await client
       .from("session")
       .select("*")
@@ -282,5 +282,6 @@ export async function sessionsForPeriod(
       .range(from, to);
     return { data: r.data as SessionRow[] | null, error: r.error };
   });
+  if (error) throw new Error(`sessionsForPeriod(${periodId}) failed: ${error.message}`);
   return (data as SessionRow[]).map(sessionFromRow);
 }
