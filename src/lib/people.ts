@@ -280,15 +280,29 @@ export async function createPerson(
 const FOREIGN_KEY_VIOLATION = "23503";
 
 /**
- * Hard-delete a person. `session.person_id` and `team_membership.person_id`
- * are `on delete cascade` (see 20260811060855_attendance.sql /
- * 20260811032027_roster_teams.sql), so a person's own attendance history and
- * team memberships are removed along with them. Other tables that reference a
- * person as staff — `session.edited_by`, `excusal.created_by`,
- * `membership_application.reviewed_by`, `account_request.reviewed_by`,
- * `kiosk_device.created_by` — have no delete action (default RESTRICT), so
- * deleting a mentor/admin who edited/reviewed/created those rows is blocked
- * with a foreign-key-violation surfaced as 409.
+ * Hard-delete a person. Unlike a merge, this is destructive: every table that
+ * references the person with `on delete cascade` loses its rows along with
+ * them — their attendance history (`session`), team memberships and pending
+ * applications, excusals and excusal requests, sign-in identities and name
+ * aliases, guardian links, FIRST experience, event sign-ups (and the
+ * `form_response` / `event_signup_reminder` rows hanging off them), badge
+ * awards, push subscriptions, Onshape connection, login OTPs, masquerade
+ * sessions, duplicate-pair rejections, and their open tool-delete requests.
+ *
+ * Tables that reference a person as *staff* have no delete action (default
+ * RESTRICT), so deleting a mentor/admin who created, edited, reviewed or
+ * submitted those rows is blocked by a foreign-key violation surfaced as 409:
+ * `session.edited_by`, `excusal.created_by`,
+ * `membership_application.reviewed_by`, `excusal_request.reviewed_by`,
+ * `account_request.reviewed_by`, `kiosk_device.created_by`,
+ * `event.created_by`, `badge.created_by`, `badge_award.awarded_by`,
+ * `form.created_by`, `form_response.person_id`, `battery_usage.tech_id`,
+ * `tool_check.checked_by` and `tool_delete_request.reviewed_by`.
+ *
+ * Merging (`merge_person`, see 20260914130000_merge_person_fks.sql) is the
+ * non-destructive path: it moves all of the above onto the winner instead.
+ * The person-FK list above is kept honest by
+ * src/lib/merge-person-fk-coverage.test.ts.
  */
 export async function deletePerson(
   id: string,
