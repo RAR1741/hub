@@ -106,7 +106,9 @@ export async function updateMeeting(
 ): Promise<{ ok: boolean; status: number }> {
   const client = db ?? (await import("./db")).getDb();
   const { data: prior, error: priorError } = await client.from("meeting").select("starts_at").eq("id", id).maybeSingle();
-  if (priorError) console.error("updateMeeting: prior starts_at query failed", priorError);
+  // Bail before the update: without the prior starts_at we cannot tell whether
+  // the meeting moved, and would silently skip the meeting_changed fan-out.
+  if (priorError) { console.error("updateMeeting: prior starts_at query failed", priorError); return { ok: false, status: 500 }; }
   const { data, error } = await client
     .from("meeting")
     .update({ title: input.title, starts_at: input.startsAt, ends_at: input.endsAt })
