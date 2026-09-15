@@ -31,11 +31,12 @@ export async function MasqueradeBanner() {
 
   // Get admin person name (select only needed columns to avoid excess PII)
   const db = getDb();
-  const { data: adminRow } = await db
+  const { data: adminRow, error } = await db
     .from("person")
     .select("first_name, last_name")
     .eq("id", viewer.masquerade.adminPersonId)
     .maybeSingle();
+  if (error) console.error("MasqueradeBanner: admin lookup failed", error);
 
   const adminName = adminRow ? getName(adminRow) : "Unknown admin";
   const targetName = viewer.person ? getName(viewer.person) : "Unknown target";
