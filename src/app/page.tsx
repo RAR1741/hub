@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
 import { WhosHere } from "@/components/WhosHere";
+import { EnablePushCard } from "@/components/EnablePushCard";
 import { listWhosHere } from "@/lib/sessions";
 import { getActivePeriod } from "@/lib/periods";
 import { personPeriodHours } from "@/lib/reports";
@@ -65,6 +66,7 @@ export default async function HomePage() {
 
       {viewer.person ? (
         <>
+          <EnablePushCard />
           <div className="card flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="text-[var(--muted)]">
@@ -88,6 +90,9 @@ export default async function HomePage() {
                 </Link>
                 <Link href="/me/attendance" className="text-sm font-medium text-[var(--red)]">
                   My attendance
+                </Link>
+                <Link href="/me/notifications" className="text-sm font-medium text-[var(--red)]">
+                  Notifications
                 </Link>
               </nav>
             </div>

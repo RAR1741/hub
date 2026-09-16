@@ -178,6 +178,14 @@ describe("approveApplication", () => {
               upsert: async () => ({ error: opts.membershipError ?? null }),
             };
           }
+          if (table === "team") {
+            // loadTree() in membership-sync.ts awaits this select directly
+            // (no .eq()/.single() chained). Empty tree: no ancestor teams to
+            // sync, and every sub-sync bails on missing credentials anyway.
+            return {
+              select: () => Promise.resolve({ data: [], error: null }),
+            };
+          }
           throw new Error(`unexpected table ${table}`);
         },
       } as never,

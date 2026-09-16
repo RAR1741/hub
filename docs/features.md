@@ -71,6 +71,11 @@ scannable catalog of what's built, grouped by area, with a route per entry. The
   [features/excusal-requests.md](features/excusal-requests.md)
 - **Home dashboard** — who's-here board, personal hours + goal progress, and upcoming meetings with
   Required tags. `/`
+- **Push notifications** — opt-in Web Push for admin alerts, late clock-outs, meeting reminders
+  (global per-person lead time), event reminders (picked per signup), outstanding FIRST items, and
+  moved meetings; off by default. `/me/notifications` — see
+  [features/push-notifications.md](features/push-notifications.md),
+  [setup/web-push.md](setup/web-push.md), [runbook](setup/notifications-runbook.md)
 
 ## Calendar & meetings
 
@@ -97,17 +102,27 @@ scannable catalog of what's built, grouped by area, with a route per entry. The
   `/admin/projects`, `/admin/parts/[id]`
 - **Onshape panel** — Onshape integration surfaced in-app. `/onshape` — see
   [features/parts-and-shop.md](features/parts-and-shop.md), [setup/onshape.md](setup/onshape.md)
+- **Battery tracking** — inventory and per-match usage log replacing paper log sheets. `/batteries`,
+  `/batteries/[id]` — see [features/battery-tracking.md](features/battery-tracking.md)
+- **Tool maintenance** — tool inventory and check-log with student deletion requests. `/tools`,
+  `/tools/[id]` — see [features/tool-maintenance.md](features/tool-maintenance.md)
 
 ## Admin review & settings
 
 - **Requests queue** — one queue for account requests, team applications, and excusal requests.
   `/admin/requests`
+- **Absent members** — active members with no open attendance session, longest absent first with
+  last-seen date; admins can mark someone inactive directly from the list. A current-season
+  application import re-activates students, so someone deactivated here can reappear on the next
+  import. `/admin/absent-members`
 - **Settings** — timezone, calendar ID, auto-close/max-shift hours, season hours goal, and sync
   secrets. `/admin/settings`
 
 ## Integrations
 
 - **Slack** — account linking, weekly mentor FIRST reminders, and sync-failure alerts. `/admin/slack` — see [features/slack-integration.md](features/slack-integration.md), [setup/slack.md](setup/slack.md)
+- **Weekly "What's new" Slack digest** — Monday post to #hub-admin-alerts listing last week's merged PRs, with a "Watch out for" section for PRs labelled `heads-up`. — see [features/whats-new-digest.md](features/whats-new-digest.md)
+- **Team Slack channel auto-invites** — teams linked to Slack channels auto-invite members when they join. `/admin/teams/[id]` — see [features/team-slack-channels.md](features/team-slack-channels.md)
 - **FIRST roster sync** — syncs roster data from FIRST, with a status dashboard.
   `/admin/first-status` — see [features/first-roster-sync.md](features/first-roster-sync.md)
 - **Google Drive group sync** — syncs team membership to Google Groups. `/admin/drive-sync` — see
@@ -118,6 +133,12 @@ scannable catalog of what's built, grouped by area, with a route per entry. The
   [setup/github-app.md](setup/github-app.md)
 - **Team external accounts** — role-owned service accounts linked to a team's Google Group or GitHub Team.
   `/admin/teams/[id]` — see [features/team-external-accounts.md](features/team-external-accounts.md)
+- **Umbrella team resource inheritance** — being a member of a team also counts as membership in
+  its ancestor teams' Slack channels, Google Group, and GitHub Team.
+- **Sync run history** — audit trail of every integration sync (FIRST roster, Google Calendar, Drive
+  groups, GitHub teams, Slack membership), with manual Run now buttons and 90-day retention. Admin
+  alerts deep-link to filtered history. `/admin/sync-runs` — see
+  [features/sync-run-history.md](features/sync-run-history.md)
 - **Onshape** — see [features/parts-and-shop.md](features/parts-and-shop.md),
   [setup/onshape.md](setup/onshape.md)
 - **Google Calendar sync** — see [setup/google-calendar.md](setup/google-calendar.md)
@@ -131,6 +152,7 @@ scannable catalog of what's built, grouped by area, with a route per entry. The
 
 ## Cross-cutting
 
+- **Command palette** — ⌘K / Ctrl+K to jump to any accessible page; mentors and admins can search people by name.
 - **Global activity indicator** — a loading/saving/saved pill reflecting in-flight requests.
 - **Light/dark theme toggle**
 

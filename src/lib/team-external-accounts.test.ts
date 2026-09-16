@@ -29,6 +29,10 @@ const GITHUB_CREDS: GithubAppCredentials = {
 // Minimal chained-query fake, in the style of drive-group-sync.test.ts / identities.test.ts.
 function fakeDb(opts: {
   team?: { data: unknown; error?: unknown };
+  /** Per-team-id team config, for ancestor-walk tests. Falls back to `team` when unset. */
+  teamById?: Record<string, { google_group_email: string | null; github_team_slug: string | null }>;
+  /** team tree rows for the ancestor walk; select("id, parent_team_id") with no filter. */
+  tree?: { id: string; parent_team_id: string | null }[];
   insertResult?: { error?: { code: string } | null };
   onInsert?: (payload: unknown) => void;
   onDelete?: (match: Record<string, unknown>) => void;
@@ -38,7 +42,19 @@ function fakeDb(opts: {
     from(table: string) {
       if (table === "team") {
         return {
-          select: () => ({ eq: () => ({ maybeSingle: async () => opts.team ?? { data: null } }) }),
+          select: (cols: string) => {
+            if (cols === "id, parent_team_id") {
+              return Promise.resolve({ data: opts.tree ?? [], error: null });
+            }
+            return {
+              eq: (_col: string, id: string) => ({
+                maybeSingle: async () => {
+                  if (opts.teamById) return { data: opts.teamById[id] ?? null };
+                  return opts.team ?? { data: null };
+                },
+              }),
+            };
+          },
         };
       }
       if (table === "team_external_account") {
@@ -267,6 +283,40 @@ describe("addTeamExternalAccount live sync", () => {
   });
 });
 
+describe("addTeamExternalAccount ancestor walk", () => {
+  test("add on a child with a linked parent hits both the child's and the parent's resource", async () => {
+    const putCalls: string[] = [];
+    const db = fakeDb({
+      tree: [
+        { id: "child", parent_team_id: "parent" },
+        { id: "parent", parent_team_id: null },
+      ],
+      teamById: {
+        child: { github_team_slug: "child-slug", google_group_email: null },
+        parent: { github_team_slug: "parent-slug", google_group_email: null },
+      },
+    });
+    const fetchFn = fakeGithubFetch((url) => {
+      if (url.includes("/users/")) {
+        return new Response(JSON.stringify({ id: 42, login: "bot" }), { status: 200 });
+      }
+      if (url.includes("/memberships/")) {
+        putCalls.push(url);
+        return new Response(JSON.stringify({ state: "active" }), { status: 200 });
+      }
+      throw new Error(`unexpected url ${url}`);
+    });
+    const result = await addTeamExternalAccount(
+      "child",
+      { provider: "github", identifier: "bot", label: "Bot" },
+      baseDeps({ db, fetch: fetchFn }),
+    );
+    expect(result.ok).toBe(true);
+    expect(putCalls.some((u) => u.includes("child-slug"))).toBe(true);
+    expect(putCalls.some((u) => u.includes("parent-slug"))).toBe(true);
+  });
+});
+
 describe("removeTeamExternalAccount", () => {
   test("deletes the row and syncs via deleteGroupMember when linked", async () => {
     let deleted: unknown;
@@ -293,6 +343,28 @@ describe("removeTeamExternalAccount", () => {
     const result = await removeTeamExternalAccount("t1", "github", "bot", baseDeps({ db, fetch: fetchFn }));
     expect(result.ok).toBe(true);
     expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  test("remove stays scoped to the child even when the parent is also linked", async () => {
+    const putCalls: string[] = [];
+    const db = fakeDb({
+      tree: [
+        { id: "child", parent_team_id: "parent" },
+        { id: "parent", parent_team_id: null },
+      ],
+      teamById: {
+        child: { github_team_slug: "child-slug", google_group_email: null },
+        parent: { github_team_slug: "parent-slug", google_group_email: null },
+      },
+    });
+    const fetchFn = fakeGithubFetch((url) => {
+      putCalls.push(url);
+      return new Response(null, { status: 204 });
+    });
+    const result = await removeTeamExternalAccount("child", "github", "bot", baseDeps({ db, fetch: fetchFn }));
+    expect(result.ok).toBe(true);
+    expect(putCalls.some((u) => u.includes("child-slug"))).toBe(true);
+    expect(putCalls.some((u) => u.includes("parent-slug"))).toBe(false);
   });
 
   test("zero rows matched: returns ok:true and does not sync (would strip a real member otherwise)", async () => {

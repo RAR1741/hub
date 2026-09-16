@@ -33,7 +33,21 @@ and `src/lib/mentor-reminders.ts` (weekly reminders).
 | `hub-admin-alerts` | `#hub-admin-alerts` | Admin alerts + reminder run summaries |
 
 Bot-token scopes (both apps): `chat:write`, `chat:write.public`, `im:write`, `users:read`,
-`users:read.email`.
+`users:read.email`, `channels:read`, `groups:read`.
+
+The IDs above are hardcoded in `src/lib/slack-registry.ts` and nothing but a real send checks
+them, so a wrong-but-well-formed ID posts nowhere and typechecks fine. **Admin → Slack**
+(`/admin/slack`) has a **Channel registry** card that resolves each ID against
+`conversations.info` and reports, per channel, whether it exists, is archived, and has the bot as
+a member — plus whether this environment routes to it at all (prod uses `#hub-admin-alerts`,
+non-prod redirects everything to `#bot-test`, so a non-member bot in the other one is expected).
+Check it after adding or changing an ID.
+
+`conversations.info` is what needs `channels:read` (public channels) and `groups:read` (private
+ones, which `#hub-admin-alerts` is) — **add them to both apps and reinstall**. Until you do, every
+row on the card reads "Can't check — the bot token needs channels:read and groups:read"; nothing
+else breaks. Note `channel_not_found` is ambiguous: a bad ID and a private channel the bot was
+never invited to are indistinguishable from outside.
 
 ## Configuration surface
 
@@ -42,6 +56,9 @@ Bot-token scopes (both apps): `chat:write`, `chat:write.public`, `im:write`, `us
 | Env var | `SLACK_BOT_TOKEN` | Bot token. Prod token in Vercel Production; dev token locally/Preview. Unset ⇒ no-op. |
 | `app_setting` | `slack_reminder_url` | URL pg_cron POSTs to for the weekly run. **Seeded to a dev default — must be set per-env.** |
 | `app_setting` | `slack_reminder_secret` | Shared secret the cron sends and the endpoint checks. **Seeded empty (no-op) — must be set in prod.** |
+| `app_setting` | `whats_new_url` | URL pg_cron POSTs to for the Monday what's-new digest. **Seeded to a dev default — must be set per-env.** |
+| `app_setting` | `slack_sync_url` | URL pg_cron POSTs to for the nightly Slack membership sync. **Seeded to a dev default — must be set per-env.** |
+| `app_setting` | `slack_sync_secret` | Shared secret the nightly sync cron sends and the endpoint checks. **Seeded empty (no-op) — must be set in prod.** |
 | `app_setting` | `slack_alert_state_<source>` | Last-known ok/failing per sync source. Managed automatically; don't touch. |
 
 ---
@@ -89,7 +106,10 @@ the **prod** Supabase SQL editor (replace the secret with a long random value; n
 ```sql
 insert into app_setting (key, value) values
   ('slack_reminder_url', '"https://hub.redalert1741.org/api/cron/slack/mentor-reminders"'),
-  ('slack_reminder_secret', '"REPLACE_WITH_A_LONG_RANDOM_SECRET"')
+  ('slack_reminder_secret', '"REPLACE_WITH_A_LONG_RANDOM_SECRET"'),
+  ('whats_new_url', '"https://hub.redalert1741.org/api/cron/slack/whats-new"'),
+  ('slack_sync_url', '"https://hub.redalert1741.org/api/cron/slack/membership-sync"'),
+  ('slack_sync_secret', '"REPLACE_WITH_A_LONG_RANDOM_SECRET"')
 on conflict (key) do update set value = excluded.value;
 ```
 
@@ -98,8 +118,8 @@ The `value` column is `jsonb`, so keep the inner double-quotes exactly as shown.
 ### 5. Verify the schedule and settings
 
 ```sql
-select jobname, schedule, active from cron.job where jobname = 'slack-mentor-reminders-weekly';
-select key, value from app_setting where key in ('slack_reminder_url','slack_reminder_secret');
+select jobname, schedule, active from cron.job where jobname in ('slack-mentor-reminders-weekly','slack-whats-new-weekly','slack-nightly-sync');
+select key, value from app_setting where key in ('slack_reminder_url','slack_reminder_secret','whats_new_url','slack_sync_url','slack_sync_secret');
 ```
 
 Expect `0 23 * * 4`, `active = t`, the prod URL, and your secret.
@@ -155,7 +175,7 @@ worktree's `APP_PORT` (not 3000), inside the container it's always 3000.
 ## Troubleshooting
 
 - **`200` but nothing posts** — token not loaded (restart/redeploy after setting it) or the bot
-  isn't in the target channel.
+  isn't in the target channel. A swallowed `#hub-admin-alerts` post also surfaces as a `system_health` push to opted-in admins.
 - **`403` from the cron endpoint** — the `x-sync-secret` header doesn't match
   `app_setting.slack_reminder_secret`, or the secret is still empty.
 - **`/admin/slack` errors** — migrations not pushed to prod (`person.slack_user_id` missing).

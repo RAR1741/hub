@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { withRole } from "./api";
+import { masqueradeReadOnly, withRole } from "./api";
 import type { Viewer } from "./viewer";
 
 function handlerFor(viewer: Viewer) {
@@ -23,6 +23,8 @@ describe("withRole", () => {
         interests: null, lastApplicationAt: null,
         firstPeopleId: null, firstConsentRelease: null, firstScreeningStatus: null,
         firstScreeningText: null, firstTrainingStatus: null, firstSyncedAt: null,
+        notification_types: [],
+        meeting_reminder_minutes: [],
       },
       role: "admin",
     })(new Request("http://test/api/admin/ping"));
@@ -54,6 +56,8 @@ describe("withRole", () => {
           interests: null, lastApplicationAt: null,
           firstPeopleId: null, firstConsentRelease: null, firstScreeningStatus: null,
           firstScreeningText: null, firstTrainingStatus: null, firstSyncedAt: null,
+          notification_types: [],
+          meeting_reminder_minutes: [],
         },
         role: "admin",
       }),
@@ -76,6 +80,8 @@ describe("withRole", () => {
         interests: null, lastApplicationAt: null,
         firstPeopleId: null, firstConsentRelease: null, firstScreeningStatus: null,
         firstScreeningText: null, firstTrainingStatus: null, firstSyncedAt: null,
+        notification_types: [] as string[],
+        meeting_reminder_minutes: [] as number[],
       },
       role: "student",
       masquerade: {
@@ -108,5 +114,24 @@ describe("withRole", () => {
     const patchRes = await handler(new Request("http://test/api/student/profile", { method: "PATCH" }));
     expect(patchRes.status).toBe(403);
     expect(await patchRes.json()).toEqual({ error: "masquerade_read_only" });
+  });
+});
+
+describe("masqueradeReadOnly", () => {
+  test("returns null when the viewer is not masquerading", () => {
+    const viewer = { person: null, role: "student" } as Viewer;
+    expect(masqueradeReadOnly(viewer)).toBeNull();
+  });
+
+  test("returns a 403 masquerade_read_only response when masquerading", async () => {
+    const viewer = {
+      person: null,
+      role: "student",
+      masquerade: { adminPersonId: "a1", targetPersonId: "t1", sessionId: "s1" },
+    } as Viewer;
+    const res = masqueradeReadOnly(viewer);
+    expect(res).not.toBeNull();
+    expect(res!.status).toBe(403);
+    expect(await res!.json()).toEqual({ error: "masquerade_read_only" });
   });
 });

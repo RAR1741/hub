@@ -411,6 +411,20 @@ export async function seedAppSetting(key: string, value: unknown): Promise<void>
   }
 }
 
+/** The lead-time minutes (e.g. [30]) recorded in event_signup_reminder for an event+person. */
+export async function eventSignupReminderMinutes(eventId: string, personId: string): Promise<number[]> {
+  const res = await fetch(
+    `${restBaseUrl()}/event_signup_reminder?event_id=eq.${eventId}&person_id=eq.${personId}&select=minutes`,
+    { headers: authHeaders() },
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`eventSignupReminderMinutes lookup failed: ${res.status} ${body}`);
+  }
+  const rows = (await res.json()) as { minutes: number }[];
+  return rows.map((r) => r.minutes);
+}
+
 /** True if a badge_award row exists for the given badge+person. */
 export async function badgeAwardExists(badgeId: string, personId: string): Promise<boolean> {
   const res = await fetch(

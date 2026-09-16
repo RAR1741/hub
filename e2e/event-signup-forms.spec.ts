@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { mentorSessionCookie, studentSessionCookie } from "./helpers/session";
-import { activePeriodId } from "./helpers/db";
+import { activePeriodId, eventSignupReminderMinutes, seededStudentPersonId } from "./helpers/db";
 
 // Happy path for the generic form engine's first consumer (event sign-up
 // forms, issue #181): a mentor builds a form + event, a student fills it out
@@ -60,6 +60,9 @@ test("mentor builds a form, student submits it, mentor sees the response", async
     const dialog = studentPage.getByRole("dialog", { name: `Sign up for ${eventName}` });
     await dialog.getByRole("radio", { name: "Yes" }).check();
     await dialog.getByRole("textbox").fill("Bringing snacks!");
+    // Reminder lead-time picker (issue's task 14): pick a 30-minute reminder
+    // before submitting and verify it lands in event_signup_reminder below.
+    await dialog.getByTestId("event-remind-30").check();
     await dialog.getByRole("button", { name: "Submit" }).click();
     // On success the modal closes and the card shows the signed-up state.
     // Generous timeout: this hits the RPC + a full-page re-render, which can
@@ -67,6 +70,19 @@ test("mentor builds a form, student submits it, mentor sees the response", async
     // alongside this spec).
     await expect(eventCard.getByRole("button", { name: "Cancel sign-up" })).toBeVisible({ timeout: 15_000 });
     await studentContext.close();
+
+    // The picked lead time was persisted to event_signup_reminder — no UI
+    // read-back path exists (the picker doesn't reopen once signed up), so
+    // verify via the DB directly.
+    const studentPersonId = await seededStudentPersonId();
+    await expect
+      .poll(() => eventSignupReminderMinutes(eventId, studentPersonId))
+      .toEqual([30]);
+    // ponytail: EventSignupButton's one-click path renders the same
+    // ReminderPicker (event-remind-*) but has no dedicated e2e spec/seed
+    // event of its own; its request-building logic is covered by
+    // src/lib/event-reminder.test.ts and the signup route's
+    // route.test.ts. Add a browser spec if the one-click path regresses.
 
     // Mentor sees the student's name and answers on the event admin page.
     const mentorPage = await mentorContext.newPage();

@@ -31,6 +31,15 @@ result is saved to `app_setting.github_last_reconcile` and rendered on the page,
 active hub person not currently on that team — i.e. "this person is already in the GitHub Team,
 consider adding them to the team instead."
 
+## Umbrella teams (subtree inheritance)
+
+Teams form a tree (`team.parent_team_id`). A linked GitHub Team's expected member set is computed
+over the team **and all its descendants**, not just its direct members — so a GitHub Team linked
+to a parent hub team automatically contains everyone in its sub-teams too, with no one added to
+the parent directly. Realtime **add** walks up and syncs the joined team plus every ancestor;
+realtime **remove** stays scoped to the directly-changed team only — the nightly reconcile reports
+a true orphan under `wouldRemove` rather than an automatic cross-team removal.
+
 ## Real-time sync (the one path that does remove)
 
 Adding or removing someone from a linked team in the hub UI fires `syncGithubMembershipChange()`
@@ -42,9 +51,11 @@ doesn't go through this real-time hook — the next nightly reconcile self-heals
 
 ## Limitations
 
-- **Leaf teams only**: the GitHub API members endpoint includes child-team members. Linking a parent
-  team inflates the `wouldRemove` count to include all children's members. Link only leaf teams
-  (teams with no sub-teams).
+- **Link parent teams only when the hub tree and the GitHub team nesting match**: the GitHub API
+  members endpoint includes child-team members, so linking a parent hub team to a GitHub Team whose
+  own child teams don't mirror the hub sub-teams inflates `wouldRemove` with everyone in the
+  mismatched children. When the two trees do mirror each other, the umbrella expected set (above)
+  already counts descendants as expected, so a matching parent link reconciles clean.
 - **Invitation expiry**: GitHub org invitations expire after ~7 days. A pending invite will reappear
   in `missing` on the next nightly run and be re-invited; this is intentional and expected.
 - **IdP and Enterprise sync**: on Enterprise accounts with IdP team sync enabled, GitHub's team

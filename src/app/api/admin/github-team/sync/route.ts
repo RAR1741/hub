@@ -1,3 +1,4 @@
+import { masqueradeReadOnly } from "@/lib/api";
 import { getDb } from "@/lib/db";
 import { getSetting } from "@/lib/settings";
 import { getViewer } from "@/lib/viewer";
@@ -21,6 +22,8 @@ export async function POST(request: Request) {
     if (!hasRole(viewer.role, "mentor")) {
       return Response.json({ error: "forbidden" }, { status: 403 });
     }
+    const blocked = masqueradeReadOnly(viewer);
+    if (blocked) return blocked;
   }
 
   const credentials = githubAppCredentialsFromEnv();
@@ -36,15 +39,23 @@ export async function POST(request: Request) {
     );
   }
 
+  const startedAt = Date.now();
   try {
     const result = await reconcileGithubTeams({ fetch: globalThis.fetch, db, credentials });
-    await reportSyncOutcome("github_sync", true, { db });
+    const detail = {
+      teams: result.teams.length,
+      added: result.teams.reduce((n, t) => n + t.added.length, 0),
+      pending: result.teams.reduce((n, t) => n + t.pending.length, 0),
+      wouldRemove: result.teams.reduce((n, t) => n + t.wouldRemove.length, 0),
+      errors: result.teams.reduce((n, t) => n + t.errors.length, 0),
+    };
+    await reportSyncOutcome("github_sync", true, { db, startedAt, detail });
     return Response.json(result);
   } catch (e) {
     // Surface the real cause server-side (bad group id, token/network failure)
     // while keeping the client response generic.
     console.error("github-team sync failed:", e);
-    await reportSyncOutcome("github_sync", false, { db, error: e instanceof Error ? e.message : String(e) });
+    await reportSyncOutcome("github_sync", false, { db, startedAt, error: e instanceof Error ? e : String(e) });
     return Response.json({ error: "sync_failed" }, { status: 502 });
   }
 }

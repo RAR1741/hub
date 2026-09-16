@@ -1,11 +1,34 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { displayName } from "./people";
 import { getEvent } from "./events";
+import type { ReminderMinutes } from "./reminder-minutes";
 import { afterEventSignup } from "./slack-channels";
 import { slackDepsFromEnv, type SlackDeps } from "./slack";
 
 const UNIQUE_VIOLATION = "23505";
 const FOREIGN_KEY_VIOLATION = "23503";
+
+/**
+ * Insert reminder rows for a signup. Never throws; logs + returns false on
+ * DB error — reminders are best-effort, never the reason a signup fails.
+ * No-op (returns true) when minutes is empty.
+ */
+export async function insertSignupReminders(
+  db: SupabaseClient,
+  eventId: string,
+  personId: string,
+  minutes: readonly ReminderMinutes[],
+): Promise<boolean> {
+  if (minutes.length === 0) return true;
+  const { error } = await db
+    .from("event_signup_reminder")
+    .insert(minutes.map((m) => ({ event_id: eventId, person_id: personId, minutes: m })));
+  if (error) {
+    console.error("insertSignupReminders: insert failed", error);
+    return false;
+  }
+  return true;
+}
 
 /** 409 if the event doesn't exist or has already ended — no signing up for the past. */
 export async function signUpForEvent(
@@ -13,6 +36,7 @@ export async function signUpForEvent(
   personId: string,
   db?: SupabaseClient,
   slack?: SlackDeps,
+  reminderMinutes: readonly ReminderMinutes[] = [],
 ): Promise<{ ok: boolean; status: number }> {
   const client = db ?? (await import("./db")).getDb();
   // getEvent selects "*", so event already carries slackChannelId/slackArchivedAt.
@@ -24,6 +48,8 @@ export async function signUpForEvent(
     if (error.code === FOREIGN_KEY_VIOLATION) return { ok: false, status: 400 };
     return { ok: false, status: 500 };
   }
+  // Reminders are best-effort; their outcome never changes the signup result below.
+  await insertSignupReminders(client, eventId, personId, reminderMinutes);
   // DB write above already committed; Slack can never change the result below.
   try {
     await afterEventSignup(

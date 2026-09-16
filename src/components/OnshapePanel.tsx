@@ -281,6 +281,14 @@ export function OnshapePanel({ context }: { context: PanelContext }) {
       const res = await fetch(`/api/onshape/panel/context?${params.toString()}`, {
         headers: { Authorization: `Bearer ${tok}` },
       });
+      if (res.status === 401 || res.status === 403) {
+        // Bearer rejected (expired, signed with a rotated secret, or the person
+        // was deactivated). Drop it so the `!token` branch renders Connect —
+        // otherwise the panel dead-ends on "Couldn't load parts" forever.
+        localStorage.removeItem(TOKEN_KEY);
+        setToken(null);
+        return;
+      }
       if (!res.ok) {
         setError("Couldn't load parts.");
         return;

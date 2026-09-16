@@ -161,4 +161,22 @@ test.describe("Onshape panel", () => {
       await setupContext.close();
     }
   });
+
+  test("rejected bearer token falls back to Connect instead of dead-ending", async ({ page }) => {
+    // A token the server rejects (rotated STUDENT_SESSION_SECRET, expired,
+    // deactivated person) 403s on /api/onshape/panel/context. The panel must
+    // drop it and offer Connect again, not sit on "Couldn't load parts".
+    const panelUrl =
+      `${BASE}/onshape?documentId=e2e-doc-bad&workspaceOrVersion=w` +
+      `&workspaceOrVersionId=e2e-ws-bad&elementId=e2e-elem-bad`;
+    await page.goto(panelUrl);
+    await page.evaluate(
+      ([key, token]) => localStorage.setItem(key, token),
+      [PANEL_TOKEN_KEY, "not-a-real-jwt"],
+    );
+    await page.reload();
+
+    await expect(page.getByRole("button", { name: "Connect" })).toBeVisible({ timeout: 10_000 });
+    expect(await page.evaluate((k) => localStorage.getItem(k), PANEL_TOKEN_KEY)).toBeNull();
+  });
 });

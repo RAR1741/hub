@@ -166,6 +166,20 @@ export default async function PersonPage({
         />
       )}
 
+      {viewer.person?.id === person.id && (
+        <section className="card flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-lg font-semibold">Notifications</h2>
+            <p className="text-sm text-[var(--muted)]">
+              Manage push notifications and reminder preferences.
+            </p>
+          </div>
+          <Link href="/me/notifications" className="btn">
+            Edit Notifications
+          </Link>
+        </section>
+      )}
+
       {canViewGuardians && (
         <section className="card flex flex-col gap-3">
           <h2 className="text-lg font-semibold">Guardians</h2>

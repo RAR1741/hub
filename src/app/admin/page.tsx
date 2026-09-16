@@ -14,9 +14,11 @@ import { listSessionsForPeriod, flaggedSessions } from "@/lib/reports";
 import { listKioskDevices } from "@/lib/kiosk";
 import { listPendingAccountRequests, listPendingApplications } from "@/lib/requests";
 import { listPendingExcusalRequests } from "@/lib/excusal-requests";
+import { listPendingToolDeleteRequests } from "@/lib/tool-delete-requests";
 import { listEvents } from "@/lib/events";
 import { listBadges } from "@/lib/badges";
 import { listProjects } from "@/lib/parts";
+import { listAbsentMembers } from "@/lib/sessions";
 
 type IconName = Parameters<typeof Icon>[0]["name"];
 
@@ -91,11 +93,14 @@ export default async function AdminHubPage() {
     accountRequests,
     applications,
     excusalRequests,
+    toolDeleteRequests,
     events,
     projects,
+    absent,
   ] = await Promise.all([
     // Admin-only rows skip their query for mentors (they can't see those
-    // cards); the rest (excusal requests, events) run for every viewer.
+    // cards); the rest (excusal requests, tool-delete requests, events) run
+    // for every viewer.
     isAdmin ? listPeople() : Promise.resolve([]),
     isAdmin ? listTeams() : Promise.resolve([]),
     isAdmin ? listBadges() : Promise.resolve([]),
@@ -108,15 +113,18 @@ export default async function AdminHubPage() {
     isAdmin ? listPendingAccountRequests() : Promise.resolve([]),
     isAdmin ? listPendingApplications() : Promise.resolve([]),
     listPendingExcusalRequests(),
+    listPendingToolDeleteRequests(),
     listEvents(),
     listProjects(),
+    listAbsentMembers(),
   ]);
 
-  // Requests queue, scoped to what the viewer can actually act on:
-  // admins review account + team-join + excusal; mentors only excusals.
+  // Requests queue, scoped to what the viewer can actually act on: admins
+  // review account + team-join + excusal + tool-delete; mentors review
+  // excusal + tool-delete.
   const requestsCount = isAdmin
-    ? accountRequests.length + applications.length + excusalRequests.length
-    : excusalRequests.length;
+    ? accountRequests.length + applications.length + excusalRequests.length + toolDeleteRequests.length
+    : excusalRequests.length + toolDeleteRequests.length;
 
   return (
     <main className="flex flex-col gap-8">
@@ -136,7 +144,7 @@ export default async function AdminHubPage() {
           title="Requests"
           count={requestsCount}
           alert={requestsCount > 0}
-          hint={isAdmin ? "Pending account, team-join, and excusal approvals." : "Pending excusal approvals."}
+          hint={isAdmin ? "Pending account, team-join, excusal, and tool deletion approvals." : "Pending excusal and tool deletion approvals."}
         />
         <Card
           href="/admin/sessions/flagged"
@@ -145,6 +153,13 @@ export default async function AdminHubPage() {
           count={flagged.length}
           alert={flagged.length > 0}
           hint="Over-limit, open, or overlapping sessions."
+        />
+        <Card
+          href="/admin/absent-members"
+          icon="users"
+          title="Absent members"
+          count={absent.length}
+          hint="Active members not clocked in, longest absent first."
         />
         <Card
           href="/admin/reports"
@@ -187,6 +202,7 @@ export default async function AdminHubPage() {
           <Card href="/admin/slack" icon="users" title="Slack" hint="Link people to Slack users and sync from the workspace." />
           <Card href="/admin/settings" icon="x" title="Settings" hint="Timezone, calendar sync, shift limits." />
           <Card href="/admin/cron" icon="clock" title="Cron jobs" hint="View and edit pg_cron schedules." />
+          <Card href="/admin/sync-runs" icon="clock" title="Sync runs" hint="Investigate integration sync failures over time." />
         </Section>
       )}
     </main>

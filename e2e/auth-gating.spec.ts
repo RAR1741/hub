@@ -10,7 +10,7 @@ test.describe("teams hidden from guests", () => {
     const context = await browser.newContext();
     const page = await context.newPage();
     await page.goto("/teams");
-    expect(new URL(page.url()).pathname).toBe("/login");
+    await expect(page).toHaveURL(/\/login$/);
     await context.close();
   });
 
@@ -19,7 +19,7 @@ test.describe("teams hidden from guests", () => {
     await context.addCookies([await studentSessionCookie()]);
     const page = await context.newPage();
     await page.goto("/teams");
-    expect(new URL(page.url()).pathname).toBe("/teams");
+    await expect(page).toHaveURL(/\/teams$/);
     await expect(page.getByRole("heading", { name: "Teams" })).toBeVisible();
     await context.close();
   });
@@ -30,7 +30,7 @@ test.describe("people is mentor+ only", () => {
     const context = await browser.newContext();
     const page = await context.newPage();
     await page.goto("/people");
-    expect(new URL(page.url()).pathname).toBe("/login");
+    await expect(page).toHaveURL(/\/login$/);
     await context.close();
   });
 
@@ -39,7 +39,8 @@ test.describe("people is mentor+ only", () => {
     await context.addCookies([await studentSessionCookie()]);
     const page = await context.newPage();
     await page.goto("/people");
-    expect(new URL(page.url()).pathname).toBe("/login");
+    // Home, not /login — they're already signed in (#286).
+    await expect(page).toHaveURL(/\/$/);
     await context.close();
   });
 
@@ -48,7 +49,7 @@ test.describe("people is mentor+ only", () => {
     await context.addCookies([await mentorSessionCookie()]);
     const page = await context.newPage();
     await page.goto("/people");
-    expect(new URL(page.url()).pathname).toBe("/people");
+    await expect(page).toHaveURL(/\/people$/);
     await expect(page.getByRole("heading", { name: "People" })).toBeVisible();
     await context.close();
   });
@@ -107,6 +108,7 @@ test.describe("admin hub is mentor-scoped", () => {
     "/admin/kiosk-devices",
     "/admin/drive-sync",
     "/admin/settings",
+    "/admin/sync-runs",
   ];
 
   test("a mentor reaches /admin and sees Review + Time, but not Roster/Config", async ({
@@ -116,7 +118,7 @@ test.describe("admin hub is mentor-scoped", () => {
     await context.addCookies([await mentorSessionCookie()]);
     const page = await context.newPage();
     await page.goto("/admin");
-    expect(new URL(page.url()).pathname).toBe("/admin");
+    await expect(page).toHaveURL(/\/admin$/);
     // Scope to the content column: the sidebar's Admin nav group also has an
     // "Admin" heading (h5), so match the page's own <h1> heading here.
     await expect(
@@ -139,18 +141,49 @@ test.describe("admin hub is mentor-scoped", () => {
     await context.close();
   });
 
+  test("a mentor's nav flyout omits Roster/Config sections but keeps Review/Time", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext();
+    await context.addCookies([await mentorSessionCookie()]);
+    const page = await context.newPage();
+    await page.goto("/admin");
+    // 100%-admin-only sections don't render at all for a mentor: no trigger,
+    // no submenu, anywhere on the page (expanded sidebar or collapsed rail).
+    await expect(page.locator(".fly-sec-trigger", { hasText: "Roster" })).toHaveCount(0);
+    await expect(page.locator(".fly-sec-trigger", { hasText: "Config" })).toHaveCount(0);
+    // Positive control: sections a mentor does get render in both the
+    // expanded sidebar (.sb) and the collapsed rail (.rail), so count 2.
+    await expect(page.locator(".fly-sec-trigger", { hasText: "Review" })).toHaveCount(2);
+    await expect(page.locator(".fly-sec-trigger", { hasText: "Time" })).toHaveCount(2);
+    await context.close();
+  });
+
   test("an admin sees all admin-hub cards, including Roster and Config", async ({ browser }) => {
     const context = await browser.newContext();
     await context.addCookies([await adminSessionCookie()]);
     const page = await context.newPage();
     await page.goto("/admin");
-    expect(new URL(page.url()).pathname).toBe("/admin");
+    await expect(page).toHaveURL(/\/admin$/);
     // Scope to the content column: the sidebar's Admin flyout also links these
     // pages for an admin, so a page-wide count would be 2 (card + flyout). The
     // mentor assertion above stays page-wide (count 0 everywhere is the stronger
     // authz property, and it verifies the flyout is role-gated too).
     for (const href of ADMIN_ONLY_HREFS) {
       await expect(page.locator(`#main a[href="${href}"]`)).toHaveCount(1);
+    }
+    await context.close();
+  });
+
+  test("an admin's nav flyout shows all four sections in both sidebar and rail", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext();
+    await context.addCookies([await adminSessionCookie()]);
+    const page = await context.newPage();
+    await page.goto("/admin");
+    for (const s of ["Review", "Roster", "Time", "Config"]) {
+      await expect(page.locator(".fly-sec-trigger", { hasText: s })).toHaveCount(2);
     }
     await context.close();
   });

@@ -1,3 +1,4 @@
+import { masqueradeReadOnly } from "@/lib/api";
 import { getDb } from "@/lib/db";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
@@ -9,6 +10,8 @@ export async function PATCH(request: Request) {
   if (!hasRole(viewer.role, "admin")) {
     return Response.json({ error: "forbidden" }, { status: 403 });
   }
+  const blocked = masqueradeReadOnly(viewer);
+  if (blocked) return blocked;
 
   const body = await request.json().catch(() => null);
   const personId = body?.personId;

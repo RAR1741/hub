@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useRealtimeRefetch } from "@/hooks/useRealtimeRefetch";
 import { PART_STATUSES, PRIORITY_MAP, STATUS_MAP, STATUS_TONE } from "@/lib/types";
 import type { PartPriority, PartStatus } from "@/lib/types";
 
@@ -16,16 +17,18 @@ export type ShopPart = {
   priority: PartPriority;
 };
 
-const POLL_MS = 10_000;
+// Tighter than the hook's 5 min default: this is a shop TV, so if the
+// websocket is down a minute of staleness is the most we want to accept.
+const FALLBACK_MS = 60_000;
 
 function priorityClass(priority: PartPriority): string {
   return `priority-${priority === 0 ? "high" : priority === 1 ? "normal" : "low"}`;
 }
 
 /** Student+ shop board (issue #11): server-rendered initial parts (matches the
- * WhosHere pattern), then polls /api/shop/[projectId] every 10s — no
- * websockets, no visibility pause, it's a TV. Keeps last good data on a
- * failed refresh instead of blanking mid-shift. Tiles link to the part
+ * WhosHere pattern), then refetches /api/shop/[projectId] on a `hub:parts`
+ * realtime broadcast — no visibility pause, it's a TV. Keeps last good data
+ * on a failed refresh instead of blanking mid-shift. Tiles link to the part
  * detail page (now that only student+ viewers ever see them). */
 export function ShopBoard({ projectId, initial }: { projectId: string; initial: ShopPart[] }) {
   const router = useRouter();
@@ -37,19 +40,16 @@ export function ShopBoard({ projectId, initial }: { projectId: string; initial: 
 
   const [parts, setParts] = useState<ShopPart[]>(initial);
 
-  useEffect(() => {
-    const id = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/shop/${projectId}`, { cache: "no-store" });
-        if (!res.ok) throw new Error(String(res.status));
-        const json = (await res.json()) as { parts: ShopPart[] };
-        setParts(json.parts);
-      } catch {
-        // A blip shouldn't blank the TV — keep showing the last good data.
-      }
-    }, POLL_MS);
-    return () => clearInterval(id);
+  const refetchParts = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/shop/${projectId}`, { cache: "no-store" });
+      if (res.ok) setParts(((await res.json()) as { parts: ShopPart[] }).parts);
+    } catch {
+      // A blip shouldn't blank the TV — keep showing the last good data.
+    }
   }, [projectId]);
+
+  useRealtimeRefetch("hub:parts", refetchParts, { fallbackMs: FALLBACK_MS });
 
   function onFilterChange(value: string) {
     const params = new URLSearchParams(searchParams);

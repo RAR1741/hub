@@ -89,6 +89,8 @@ describe("canViewProfile", () => {
             interests: null, lastApplicationAt: null,
             firstPeopleId: null, firstConsentRelease: null, firstScreeningStatus: null,
             firstScreeningText: null, firstTrainingStatus: null, firstSyncedAt: null,
+            notification_types: [],
+            meeting_reminder_minutes: [],
           },
           role,
         }

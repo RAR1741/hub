@@ -1,6 +1,12 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { outstandingItems, sendMentorReminders, type MentorReq } from "./mentor-reminders";
+import { sendPushToOptedIn } from "./push-dispatch";
 import type { SlackDeps } from "./slack";
+
+vi.mock("./push-dispatch", () => ({
+  pushDepsFromEnv: () => null,
+  sendPushToOptedIn: vi.fn().mockResolvedValue({ sent: 0, pruned: 0 }),
+}));
 
 describe("outstandingItems", () => {
   const base: MentorReq = { personId: "p", name: "M", slackUserId: "U", consent: true, screeningStatus: "green", trainingStatus: "green" };
@@ -96,6 +102,29 @@ describe("sendMentorReminders", () => {
     const summaryPost = posts.find((p) => p.text.startsWith("[dev → #hub-admin-alerts]"));
     expect(summaryPost).toBeDefined();
     expect(summaryPost!.text).toContain("B Name");
+
+    // pA has outstanding items and a Slack link → gets a push too.
+    expect(sendPushToOptedIn).toHaveBeenCalledWith(
+      ["pA"],
+      "consent_missing",
+      expect.objectContaining({ url: "/admin/first-status" }),
+      expect.objectContaining({ db }),
+    );
+    // pC is fully complete → no push.
+    expect(sendPushToOptedIn).not.toHaveBeenCalledWith(
+      ["pC"],
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+    );
+    // pB has outstanding items but NO Slack link → still gets the push;
+    // it's additive and independent of the Slack DM.
+    expect(sendPushToOptedIn).toHaveBeenCalledWith(
+      ["pB"],
+      "consent_missing",
+      expect.objectContaining({ url: "/admin/first-status" }),
+      expect.objectContaining({ db }),
+    );
   });
 
   test("a linked incomplete mentor whose DM fails is reported as failed, not reminded", async () => {

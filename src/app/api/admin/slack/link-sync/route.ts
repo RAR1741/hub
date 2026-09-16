@@ -1,3 +1,4 @@
+import { masqueradeReadOnly } from "@/lib/api";
 import { getDb } from "@/lib/db";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
@@ -7,6 +8,8 @@ import { syncSlackLinks } from "@/lib/slack-link";
 export async function POST() {
   const viewer = await getViewer();
   if (!hasRole(viewer.role, "admin")) return Response.json({ error: "forbidden" }, { status: 403 });
+  const blocked = masqueradeReadOnly(viewer);
+  if (blocked) return blocked;
 
   const slack = slackDepsFromEnv();
   if (!slack.token) return Response.json({ error: "not_configured", have: { token: false } }, { status: 400 });

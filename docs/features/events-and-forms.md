@@ -21,10 +21,19 @@ only) use is collecting richer answers than a plain "I'm in" at sign-up time.
 - **Already signed up:** the plain toggle button shows regardless of whether a form is attached,
   so canceling a form-based sign-up is still one click.
 
+Either sign-up path (button or form) also shows an optional **reminder picker** — pick any of
+`15 / 30 / 60 / 120` minutes before the event starts, sent as a push notification to devices
+enabled in `/me/notifications`. Picking an offset is itself the opt-in; there's no separate
+notification-type toggle for it. The chosen offsets are posted alongside the sign-up and stored
+one row per `(event, person, minutes)` in `event_signup_reminder`, which cascades away when the
+signup is canceled. See [push-notifications.md](push-notifications.md#meeting-and-event-reminders)
+for how the reminder sweep fires.
+
 `POST /api/events/[id]/signup` (`src/app/api/events/[id]/signup/route.ts`) branches on
 `event.formId`: with a form it validates and stores answers via `submitEventSignupResponse`
 (`src/lib/form-responses.ts`); without one it falls through to the plain boolean
-`signUpForEvent` (`src/lib/event-signups.ts`). `person_id` always comes from the session, never
+`signUpForEvent` (`src/lib/event-signups.ts`). Both also insert the chosen reminder rows via
+`insertSignupReminders`. `person_id` always comes from the session, never
 the request body. Both directions are rate-limited (10/min per IP) and reject sign-up for an event
 that has already ended.
 

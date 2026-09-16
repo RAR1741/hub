@@ -120,27 +120,89 @@ export async function archiveChannel(deps: SlackDeps, channelId: string): Promis
   }
 }
 
-/** Invite Slack users to a channel. `already_in_channel` counts as success. */
-export async function inviteToChannel(deps: SlackDeps, channelId: string, slackUserIds: string[]): Promise<boolean> {
+export type InviteResult = { ok: true } | { ok: false; error?: string };
+
+/**
+ * Invite Slack users to a channel. `already_in_channel` counts as success.
+ * Unlike `inviteToChannel`, a real Slack-side failure carries its `error` code
+ * so a caller can alert with the specifics (e.g. `not_in_channel`); a skip
+ * (no token / non-prod) carries no error — it's not a failure.
+ */
+export async function inviteToChannelDetailed(deps: SlackDeps, channelId: string, slackUserIds: string[]): Promise<InviteResult> {
   if (!deps.token) {
     console.log(`[slack:no-token] would invite ${slackUserIds.join(",")} to ${channelId}`);
-    return false;
+    return { ok: false };
   }
   if (!deps.isProd) {
     console.log(`[slack:dev] would invite ${slackUserIds.join(",")} to ${channelId}`);
-    return false;
+    return { ok: false };
   }
   try {
     const { ok, body } = await post(deps, "conversations.invite", { channel: channelId, users: slackUserIds.join(",") });
     if (!ok && body.error !== "already_in_channel") {
       console.error(`[slack] conversations.invite failed:`, body.error ?? body);
-      return false;
+      return { ok: false, error: String(body.error ?? "unknown") };
     }
-    return true;
+    return { ok: true };
   } catch (e) {
     console.error(`[slack] conversations.invite threw:`, e);
-    return false;
+    return { ok: false, error: e instanceof Error ? e.message : "threw" };
   }
+}
+
+/** Invite Slack users to a channel. `already_in_channel` counts as success. */
+export async function inviteToChannel(deps: SlackDeps, channelId: string, slackUserIds: string[]): Promise<boolean> {
+  return (await inviteToChannelDetailed(deps, channelId, slackUserIds)).ok;
+}
+
+export type ChannelMembersResult = { ok: true; members: string[] } | { ok: false; error: string };
+
+/**
+ * List the Slack user ids currently in a channel, following pagination. Read
+ * only. Returns a discriminated result so a caller can tell a genuinely-empty
+ * channel (`{ ok: true, members: [] }`) from a failed read (`{ ok: false }`):
+ * `not_configured` on no-token / non-prod, or the Slack error code / thrown
+ * message otherwise. A caller that can't learn current membership can still
+ * fall back to "invite everyone" (`already_in_channel` is folded into invite
+ * success), but should avoid reporting exact already-in / invited counts.
+ *
+ * Uses GET with query params — Slack's read methods (`conversations.members`)
+ * take form/query params, not the JSON body the write helpers `post()` with.
+ */
+export async function listChannelMembers(deps: SlackDeps, channelId: string): Promise<ChannelMembersResult> {
+  if (!deps.token || !deps.isProd) return { ok: false, error: "not_configured" };
+  const members: string[] = [];
+  let cursor = "";
+  try {
+    // Hard page cap: a channel that never stops paginating (bug or hostile
+    // cursor) must not spin forever. 50 × 200 = 10k members is far past any
+    // real team channel.
+    for (let page = 0; page < 50; page++) {
+      const params = new URLSearchParams({ channel: channelId, limit: "200" });
+      if (cursor) params.set("cursor", cursor);
+      const res = await deps.fetch(`${API}conversations.members?${params.toString()}`, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${deps.token}` },
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        members?: string[];
+        response_metadata?: { next_cursor?: string };
+      };
+      if (!(res.ok && body.ok === true)) {
+        console.error(`[slack] conversations.members failed:`, body.error ?? body);
+        return { ok: false, error: String(body.error ?? "unknown") };
+      }
+      for (const m of body.members ?? []) members.push(m);
+      cursor = body.response_metadata?.next_cursor ?? "";
+      if (!cursor) break;
+    }
+  } catch (e) {
+    console.error(`[slack] conversations.members threw:`, e);
+    return { ok: false, error: e instanceof Error ? e.message : "threw" };
+  }
+  return { ok: true, members };
 }
 
 /** Post the kickoff message to an event's channel. */

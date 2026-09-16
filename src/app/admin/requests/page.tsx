@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
@@ -7,11 +8,13 @@ import {
   listPendingApplications,
 } from "@/lib/requests";
 import { listPendingExcusalRequests } from "@/lib/excusal-requests";
+import { listPendingToolDeleteRequests } from "@/lib/tool-delete-requests";
 import { getTeamTimezone } from "@/lib/settings";
 import {
   AccountRequestActions,
   ApplicationActions,
   ExcusalRequestActions,
+  ToolDeleteRequestActions,
 } from "@/components/RequestActions";
 
 export const metadata: Metadata = { title: "Requests" };
@@ -22,10 +25,11 @@ export default async function AdminRequestsPage() {
   if (!hasRole(viewer.role, "mentor")) redirect("/");
 
   const isAdmin = hasRole(viewer.role, "admin");
-  const [accountRequests, applications, excusalRequests, teamTz] = await Promise.all([
+  const [accountRequests, applications, excusalRequests, toolDeleteRequests, teamTz] = await Promise.all([
     isAdmin ? listPendingAccountRequests() : Promise.resolve([]),
     isAdmin ? listPendingApplications() : Promise.resolve([]),
     listPendingExcusalRequests(),
+    listPendingToolDeleteRequests(),
     getTeamTimezone(),
   ]);
 
@@ -116,6 +120,34 @@ export default async function AdminRequestsPage() {
                       <td className="mono">{r.date}</td>
                       <td>{r.reason ?? ""}</td>
                       <td><ExcusalRequestActions requestId={r.id} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-base font-semibold">Tool deletion requests ({toolDeleteRequests.length})</h2>
+        {toolDeleteRequests.length === 0 ? (
+          <p className="card text-sm text-[var(--muted)]">No pending tool deletion requests.</p>
+        ) : (
+          <div className="tablewrap">
+            <div style={{ overflowX: "auto" }}>
+              <table className="table">
+                <thead>
+                  <tr><th>Tool</th><th>Requested by</th><th>Reason</th><th>Requested</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                  {toolDeleteRequests.map((r) => (
+                    <tr key={r.id}>
+                      <td><Link href={`/tools/${r.toolId}`}>{r.toolName}</Link></td>
+                      <td>{r.name}</td>
+                      <td>{r.reason}</td>
+                      <td className="mono">{new Date(r.createdAt).toLocaleDateString(undefined, { timeZone: teamTz })}</td>
+                      <td><ToolDeleteRequestActions requestId={r.id} /></td>
                     </tr>
                   ))}
                 </tbody>

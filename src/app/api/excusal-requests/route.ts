@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { masqueradeReadOnly } from "@/lib/api";
 import { createExcusalRequest, parseExcusalRequestInput } from "@/lib/excusal-requests";
 import { clientIp, createRateLimiter } from "@/lib/rate-limit";
 import { getViewer } from "@/lib/viewer";
@@ -12,6 +13,8 @@ export async function POST(request: Request) {
 
   const viewer = await getViewer();
   if (!viewer.person) return NextResponse.json({ ok: false }, { status: 401 });
+  const blocked = masqueradeReadOnly(viewer);
+  if (blocked) return blocked;
 
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   const input = parseExcusalRequestInput(body);

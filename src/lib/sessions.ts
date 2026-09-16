@@ -89,3 +89,50 @@ export async function activeMembersForKiosk(
     mentors: members.filter((m) => m.role !== "student"),
   };
 }
+
+export type AbsentMember = { id: string; name: string; role: string; lastSeen: string | null };
+
+/**
+ * Active members not currently clocked in, with their most recent session
+ * time_in (ISO) or null if they've never clocked in. Sorted longest-absent
+ * first: never-seen at the top, then ascending by lastSeen.
+ */
+export async function listAbsentMembers(db?: SupabaseClient): Promise<AbsentMember[]> {
+  const client = db ?? (await import("./db")).getDb();
+  const [{ data: people, error: peopleError }, { data: open, error: openError }] = await Promise.all([
+    client
+      .from("person")
+      .select("id, first_name, last_name, display_name, role, session!person_id (time_in)")
+      .eq("is_active", true)
+      .order("time_in", { referencedTable: "session", ascending: false })
+      .limit(1, { referencedTable: "session" }),
+    client.from("session").select("person_id").is("time_out", null),
+  ]);
+  if (peopleError) console.error("listAbsentMembers: person query failed", peopleError);
+  if (openError) console.error("listAbsentMembers: session query failed", openError);
+  // Fail closed: without the open-session set we can't tell who is actually
+  // clocked in, and a fabricated "everyone is absent" list would put a live
+  // Mark-inactive button next to people who are present. Show nothing instead.
+  if (openError) return [];
+  const openIds = new Set((open ?? []).map((s) => s.person_id as string));
+  return (people ?? [])
+    .filter((p) => !openIds.has(p.id as string))
+    .map((p) => {
+      const row = p as unknown as {
+        id: string; first_name: string; last_name: string; display_name: string | null; role: string;
+        session: { time_in: string }[];
+      };
+      return {
+        id: row.id,
+        name: displayName(row),
+        role: row.role,
+        lastSeen: row.session[0]?.time_in ?? null,
+      };
+    })
+    .sort((a, b) => {
+      if (a.lastSeen === null && b.lastSeen === null) return a.name.localeCompare(b.name);
+      if (a.lastSeen === null) return -1;
+      if (b.lastSeen === null) return 1;
+      return a.lastSeen.localeCompare(b.lastSeen);
+    });
+}

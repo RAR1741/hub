@@ -23,16 +23,26 @@ function fakeDb(tables: Record<string, { data: unknown; error: unknown }>, upser
   return {
     from(table: string) {
       const result = tables[table] ?? { data: null, error: null };
+      // `current` starts as the canned result; `.in()` narrows `current.data` when the rows
+      // carry the filtered column, so later `.then`/`.maybeSingle` see the filtered rows.
+      let current = result;
       const chain: Record<string, unknown> = {};
       for (const m of ["select", "eq", "not"]) {
         chain[m] = () => chain;
       }
-      chain.maybeSingle = async () => result;
+      chain.in = (column: string, ids: readonly unknown[]) => {
+        const rows = current.data;
+        if (Array.isArray(rows) && rows.length > 0 && Object.prototype.hasOwnProperty.call(rows[0], column)) {
+          current = { ...current, data: rows.filter((row) => ids.includes((row as Record<string, unknown>)[column])) };
+        }
+        return chain;
+      };
+      chain.maybeSingle = async () => current;
       chain.upsert = async (payload: unknown) => {
         upserts.push({ table, payload });
         return { data: null, error: null };
       };
-      chain.then = (onF: (v: unknown) => unknown) => onF(result);
+      chain.then = (onF: (v: unknown) => unknown) => onF(current);
       return chain;
     },
   } as never;
@@ -249,6 +259,128 @@ describe("reconcileDriveGroups", () => {
     });
 
     expect(result.groups[0].errors).toEqual(["boom"]);
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  function fetchAddAll() {
+    return vi.fn(async (url: string, init?: RequestInit) => {
+      const u = String(url);
+      if (u.includes("oauth2")) {
+        return new Response(JSON.stringify({ access_token: "tok", expires_in: 3600 }), { status: 200 });
+      }
+      if (u.includes("/members") && !init?.method) {
+        return new Response(JSON.stringify({ members: [] }), { status: 200 });
+      }
+      if (init?.method === "POST") {
+        return new Response(JSON.stringify({}), { status: 200 });
+      }
+      throw new Error(`unexpected fetch: ${u} ${init?.method}`);
+    });
+  }
+
+  test("umbrella team's expected set unions a descendant's members and external accounts; descendant's own report stays scoped", async () => {
+    const db = fakeDb({
+      team: {
+        data: [
+          { id: "parent", name: "FRC", google_group_email: "frc@example.org", parent_team_id: null },
+          { id: "child", name: "FRC Students", google_group_email: "frc-students@example.org", parent_team_id: "parent" },
+        ],
+        error: null,
+      },
+      team_membership: {
+        data: [
+          { team_id: "parent", person: { is_active: true, person_identity: { email: "mentor@x.com" } } },
+          { team_id: "child", person: { is_active: true, person_identity: { email: "student@x.com" } } },
+        ],
+        error: null,
+      },
+      team_external_account: {
+        data: [{ team_id: "child", provider: "google", identifier: "bot@x.com" }],
+        error: null,
+      },
+    });
+
+    const result = await reconcileDriveGroups({
+      db: db as never,
+      fetch: fetchAddAll() as unknown as typeof globalThis.fetch,
+      credentials,
+    });
+
+    const parentReport = result.groups.find((g) => g.teamName === "FRC")!;
+    const childReport = result.groups.find((g) => g.teamName === "FRC Students")!;
+
+    expect(new Set(parentReport.added)).toEqual(new Set(["mentor@x.com", "student@x.com", "bot@x.com"]));
+    expect(parentReport.expectedCount).toBe(3);
+
+    expect(childReport.added).toEqual(["student@x.com", "bot@x.com"]);
+    expect(childReport.expectedCount).toBe(2);
+  });
+
+  test("a person in both parent and child is counted and inserted once", async () => {
+    const db = fakeDb({
+      team: {
+        data: [{ id: "parent", name: "FRC", google_group_email: "frc@example.org", parent_team_id: null },
+          { id: "child", name: "FRC Students", google_group_email: "frc-students@example.org", parent_team_id: "parent" }],
+        error: null,
+      },
+      team_membership: {
+        data: [
+          { team_id: "parent", person: { is_active: true, person_identity: { email: "both@x.com" } } },
+          { team_id: "child", person: { is_active: true, person_identity: { email: "BOTH@x.com" } } },
+        ],
+        error: null,
+      },
+    });
+
+    const result = await reconcileDriveGroups({
+      db: db as never,
+      fetch: fetchAddAll() as unknown as typeof globalThis.fetch,
+      credentials,
+    });
+
+    const parentReport = result.groups.find((g) => g.teamName === "FRC")!;
+    expect(parentReport.expectedCount).toBe(1);
+    expect(parentReport.added).toEqual(["both@x.com"]);
+  });
+
+  test("a cyclic tree still produces one report per linked team and terminates", async () => {
+    const db = fakeDb({
+      team: {
+        data: [
+          { id: "a", name: "Team A", google_group_email: "a@example.org", parent_team_id: "b" },
+          { id: "b", name: "Team B", google_group_email: "b@example.org", parent_team_id: "a" },
+        ],
+        error: null,
+      },
+      team_membership: { data: [], error: null },
+    });
+
+    const result = await reconcileDriveGroups({
+      db: db as never,
+      fetch: fetchAddAll() as unknown as typeof globalThis.fetch,
+      credentials,
+    });
+
+    expect(result.groups).toHaveLength(2);
+    expect(result.groups.map((g) => g.teamName).sort()).toEqual(["Team A", "Team B"]);
+  });
+
+  test("a team-tree read error aborts the run and makes no external calls", async () => {
+    const db = fakeDb({
+      team: { data: null, error: { message: "tree boom" } },
+    });
+
+    const fetchFn = vi.fn(async () => {
+      throw new Error("should not be called");
+    });
+
+    await expect(
+      reconcileDriveGroups({
+        db: db as never,
+        fetch: fetchFn as unknown as typeof globalThis.fetch,
+        credentials,
+      }),
+    ).rejects.toThrow("tree boom");
     expect(fetchFn).not.toHaveBeenCalled();
   });
 });

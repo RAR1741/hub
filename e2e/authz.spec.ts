@@ -12,5 +12,5 @@ test("guest gets 403 from an admin API (server-enforced, not just hidden UI)", a
 test("guest is redirected away from /calendar", async ({ page }) => {
   await page.goto("/calendar");
   // redirect("/") lands the guest on the dashboard
-  expect(new URL(page.url()).pathname).toBe("/");
+  await expect(page).toHaveURL(/\/$/);
 });

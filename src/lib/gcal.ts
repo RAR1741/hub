@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { localDateOf } from "./attendance";
 import { buildServiceAccountJwt as buildJwt, fetchGoogleAccessToken } from "./google-auth";
+import { notifyMeetingChanged } from "./meetings";
 
 export type GcalTransport = typeof globalThis.fetch;
 
@@ -285,10 +286,37 @@ export async function syncCalendar(deps: GcalDeps): Promise<SyncResult> {
       synced_at: syncedAt,
     };
   });
+  // Prior starts_at per gcal_event_id, read before the upsert overwrites them —
+  // used below to detect a moved meeting and fan out meeting_changed.
+  const { data: priorMeetingsData } = await deps.db
+    .from("meeting")
+    .select("id, gcal_event_id, starts_at")
+    .in("gcal_event_id", meetingRows.map((r) => r.gcal_event_id));
+  const priorByGcalId = new Map(
+    ((priorMeetingsData ?? []) as { id: string; gcal_event_id: string; starts_at: string }[]).map(
+      (m) => [m.gcal_event_id, m] as const,
+    ),
+  );
+
   const { error: meetingError } = await deps.db
     .from("meeting")
     .upsert(meetingRows, { onConflict: "gcal_event_id" });
   if (meetingError) throw new Error(`meeting upsert failed: ${meetingError.message}`);
+
+  // Fan out meeting_changed only for a meeting that existed before this run
+  // (never a fresh insert) whose start time actually moved to a still-future
+  // time (never an already-past meeting). Never aborts the sync.
+  for (const row of meetingRows) {
+    const prior = priorByGcalId.get(row.gcal_event_id);
+    if (!prior) continue; // new event, not a change
+    if (Date.parse(prior.starts_at) === Date.parse(row.starts_at)) continue; // unchanged (same instant, maybe different format)
+    if (new Date(row.starts_at).getTime() <= nowMs) continue; // past
+    try {
+      await notifyMeetingChanged(deps.db, { id: prior.id, title: row.title, starts_at: row.starts_at });
+    } catch (e) {
+      console.error("[gcal] meeting_changed push failed:", e);
+    }
+  }
 
   // Prune gcal-sourced meetings that fell out of the calendar entirely (deleted
   // upstream) but sit within the window this run actually fetched — the upsert

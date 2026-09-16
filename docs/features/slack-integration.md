@@ -15,6 +15,11 @@ writes `person.slack_user_id`.
   then matches each by lowercased email against `person.email` and every `person_identity.email`.
   An email matching more than one hub person is reported as **ambiguous** and not written; an
   already-correct link is counted separately from a new one.
+- **Nightly link sync**: a pg_cron job (`slack-nightly-sync`, `40 7 * * *` UTC) runs the same
+  `syncSlackLinks()` unattended via `POST /api/cron/slack/membership-sync` (shared-secret
+  `slack_sync_secret`), then reconciles team→Slack-channel membership. See
+  [team-slack-channels.md](team-slack-channels.md#nightly-reconcile-slack-nightly-sync). The secret
+  is not seeded, so the cron is a no-op until prod sets it.
 - **Manual per-person link/unlink**: `PUT` / `DELETE /api/admin/people/[id]/slack`
   (`src/app/api/admin/people/[id]/slack/route.ts`) sets or clears one person's `slack_user_id`
   directly — for people whose Slack email doesn't match their hub email. A `slackUserId` already
@@ -42,6 +47,10 @@ gated on `app_setting.slack_reminder_secret`):
 A pg_cron job (`slack-mentor-reminders-weekly`) runs this on `0 23 * * 4` — Thursdays 23:00 UTC
 (6pm EST / 7pm EDT; pg_cron runs in UTC and doesn't follow daylight saving).
 
+## Weekly what's-new digest
+
+Weekly what's-new digest — see [whats-new-digest.md](whats-new-digest.md)
+
 ## Sync-failure alerts
 
 `reportSyncOutcome()` (`src/lib/slack-alerts.ts`) posts to `#hub-admin-alerts` when the FIRST,
@@ -61,4 +70,11 @@ All sends go through `src/lib/slack.ts` (`postChannelMessage()`, `sendDM()`):
   (`[dev → #channel]` / `[dev → DM <user>]`), gated on the unforgeable `VERCEL_ENV === "production"`
   — so a prod token pasted into a preview/dev environment still can't reach a real channel or DM.
 - Channel names are a fixed registry (`src/lib/slack-registry.ts`), not config — currently
-  `bot_test` and `hub-admin-alerts`.
+  `bot_test` and `hub-admin-alerts`. The *names* are typechecked; the hardcoded *IDs* are not, so
+  `verifyChannels()` (`src/lib/slack.ts`) resolves each one against `conversations.info` and the
+  **Channel registry** card on `/admin/slack` reports exists / archived / bot-is-member per
+  channel, flagged only where this environment actually routes. Needs `channels:read` +
+  `groups:read`; without them each row reports `missing_scope` and nothing else changes. See
+  [Slack setup](../setup/slack.md#channels-and-scopes).
+
+A `postChannelMessage` failure inside `notifyAdmins()` (`src/lib/admin-notify.ts`) is reported to `reportSubsystemHealth("slack_delivery", …)` (`src/lib/system-health.ts`), which pushes a `system_health` notification to opted-in admins on the ok→failing / failing→ok transition only, and re-observes health only when an admin alert is next attempted (no canary).

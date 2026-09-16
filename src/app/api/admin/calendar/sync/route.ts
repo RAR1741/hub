@@ -1,3 +1,4 @@
+import { masqueradeReadOnly } from "@/lib/api";
 import { getDb } from "@/lib/db";
 import { getSetting, getTeamTimezone } from "@/lib/settings";
 import { getViewer } from "@/lib/viewer";
@@ -20,6 +21,8 @@ export async function POST(request: Request) {
     if (!hasRole(viewer.role, "mentor")) {
       return Response.json({ error: "forbidden" }, { status: 403 });
     }
+    const blocked = masqueradeReadOnly(viewer);
+    if (blocked) return blocked;
   }
 
   // GOOGLE_CALENDAR_ID env var wins; otherwise the gcal_calendar_id app setting.
@@ -45,15 +48,16 @@ export async function POST(request: Request) {
   }
 
   const tz = await getTeamTimezone(db);
+  const startedAt = Date.now();
   try {
     const result = await syncCalendar({ fetch: globalThis.fetch, db, credentials, tz });
-    await reportSyncOutcome("calendar_sync", true, { db });
+    await reportSyncOutcome("calendar_sync", true, { db, startedAt, detail: result });
     return Response.json(result);
   } catch (e) {
     // Surface the real cause server-side (bad calendar id, unshared calendar,
     // token/network failure) while keeping the client response generic.
     console.error("calendar sync failed:", e);
-    await reportSyncOutcome("calendar_sync", false, { db, error: e instanceof Error ? e.message : String(e) });
+    await reportSyncOutcome("calendar_sync", false, { db, startedAt, error: e instanceof Error ? e : String(e) });
     return Response.json({ error: "sync_failed" }, { status: 502 });
   }
 }

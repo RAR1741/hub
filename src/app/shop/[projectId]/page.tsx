@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
-import { hasRole } from "@/lib/authz";
+import { notFound } from "next/navigation";
+import { requirePageRole } from "@/lib/authz";
 import { getProject, listParts } from "@/lib/parts";
 import { fullPartNumber } from "@/lib/types";
 import { getViewer } from "@/lib/viewer";
@@ -10,13 +10,13 @@ import { ShopBoard } from "@/components/ShopBoard";
 type Params = { params: Promise<{ projectId: string }> };
 
 // Student+: server shell (name + back link) renders the initial parts list
-// server-side (matches the WhosHere pattern) — the client board then polls
-// the student+ /api/shop/[projectId] route for refreshes.
+// server-side (matches the WhosHere pattern) — the client board then refetches
+// the student+ /api/shop/[projectId] route on a `hub:parts` broadcast.
 export const metadata: Metadata = { title: "Project" };
 
 export default async function ShopBoardPage({ params }: Params) {
   const viewer = await getViewer();
-  if (!hasRole(viewer.role, "student")) redirect("/login");
+  requirePageRole(viewer, "student");
 
   const { projectId } = await params;
   const project = await getProject(projectId);

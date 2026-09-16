@@ -38,13 +38,27 @@ describe("GET /api/realtime-token", () => {
     expect(res.status).toBe(401);
   });
 
+  test("401 (fails closed) for a non-guest viewer with no person, rather than an unattributable token", async () => {
+    const { cookies } = await import("next/headers");
+    const { verifyKioskToken } = await import("@/lib/kiosk");
+    const { getViewer } = await import("@/lib/viewer");
+    vi.mocked(cookies).mockResolvedValue({ get: () => undefined } as never);
+    vi.mocked(verifyKioskToken).mockResolvedValue(false);
+    vi.mocked(getViewer).mockResolvedValue({ person: null, role: "mentor" } as never);
+    vi.stubEnv("SUPABASE_JWT_SECRET", SECRET);
+
+    const { GET } = await import("./route");
+    const res = await GET();
+    expect(res.status).toBe(401);
+  });
+
   test("503 when SUPABASE_JWT_SECRET is missing, even for an authorized viewer", async () => {
     const { cookies } = await import("next/headers");
     const { verifyKioskToken } = await import("@/lib/kiosk");
     const { getViewer } = await import("@/lib/viewer");
     vi.mocked(cookies).mockResolvedValue({ get: () => undefined } as never);
     vi.mocked(verifyKioskToken).mockResolvedValue(false);
-    vi.mocked(getViewer).mockResolvedValue({ person: null, role: "mentor" });
+    vi.mocked(getViewer).mockResolvedValue({ person: { id: "p-1" }, role: "mentor" } as never);
     vi.stubEnv("SUPABASE_JWT_SECRET", "");
 
     const { GET } = await import("./route");
@@ -52,7 +66,7 @@ describe("GET /api/realtime-token", () => {
     expect(res.status).toBe(503);
   });
 
-  test("200 with a token for a registered kiosk", async () => {
+  test("200 with a kiosk-subject token for a registered kiosk", async () => {
     const { cookies } = await import("next/headers");
     const { verifyKioskToken } = await import("@/lib/kiosk");
     const { getViewer } = await import("@/lib/viewer");
@@ -67,5 +81,30 @@ describe("GET /api/realtime-token", () => {
     const body = (await res.json()) as { token: string; expiresAt: number };
     expect(body.token.split(".")).toHaveLength(3);
     expect(body.expiresAt).toBeGreaterThan(Date.now());
+    expect(subOf(body.token)).toBe("kiosk");
+  });
+
+  test("200 with a person-scoped subject for a logged-in viewer", async () => {
+    const { cookies } = await import("next/headers");
+    const { verifyKioskToken } = await import("@/lib/kiosk");
+    const { getViewer } = await import("@/lib/viewer");
+    vi.mocked(cookies).mockResolvedValue({ get: () => undefined } as never);
+    vi.mocked(verifyKioskToken).mockResolvedValue(false);
+    vi.mocked(getViewer).mockResolvedValue({
+      person: { id: "p-123" },
+      role: "student",
+    } as never);
+    vi.stubEnv("SUPABASE_JWT_SECRET", SECRET);
+
+    const { GET } = await import("./route");
+    const res = await GET();
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { token: string };
+    expect(subOf(body.token)).toBe("person:p-123");
   });
 });
+
+function subOf(jwt: string): unknown {
+  const [, payloadB64] = jwt.split(".");
+  return JSON.parse(Buffer.from(payloadB64, "base64url").toString()).sub;
+}

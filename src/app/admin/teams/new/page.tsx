@@ -21,7 +21,7 @@ export default async function NewTeamPage() {
         </div>
       </div>
       <section className="card flex flex-col gap-4">
-        <TeamForm teams={teams.map((t) => ({ id: t.id, name: t.name }))} />
+        <TeamForm teams={teams.map((t) => ({ id: t.id, name: t.name, parentTeamId: t.parentTeamId }))} />
       </section>
     </main>
   );

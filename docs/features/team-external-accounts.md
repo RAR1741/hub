@@ -18,6 +18,10 @@ an account syncs to the linked Google Group or GitHub Team immediately (best-eff
 the nightly reconcile self-heals). These accounts never get hub access; a human holding the role gets
 their own person row.
 
+Adding an account also syncs it to the team's **ancestor** teams' Google Group/GitHub Team — a bot
+account attached to a sub-team belongs in a linked parent team's resources for the same reason a
+human member does. Removing an account stays scoped to the one team it was removed from.
+
 ## GitHub identity exception
 
 GitHub logins are normally verified via OAuth. External accounts are a deliberate exception: admins type

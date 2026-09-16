@@ -7,7 +7,7 @@ import { nameKey } from "./name-match";
 export type AnomalyDecision = "accept" | "reject" | "am" | "pm";
 import { localDateTimeToInstant } from "./tz";
 import { getPeriod } from "./periods";
-import { getTeamTimezone } from "./settings";
+import { getSetting, getTeamTimezone } from "./settings";
 
 export type RoleChange = { name: string; from: string; to: string };
 export type TimeImportSummary = {
@@ -45,8 +45,9 @@ export async function runTimeImport(args: {
   const period = await getPeriod(args.periodId, db);
   if (!period) return { error: "period_not_found" };
   const tz = args.tz ?? (await getTeamTimezone(db));
+  const maxShiftMin = (await getSetting<number>("max_shift_hours", 18, db)) * 60;
 
-  const parsed = parseTimeSheet(args.csv);
+  const parsed = parseTimeSheet(args.csv, maxShiftMin);
   if (parsed.people.length === 0) return { error: parsed.fileIssues[0] ?? "no_data" };
 
   // Every flagged session must have an accept/reject decision before a real

@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { insertSignupReminders } from "./event-signups";
 import { getFormWithFields, validateAnswers, type FieldWithOptions, type SubmittedAnswer } from "./forms";
 import { displayName } from "./people";
+import type { ReminderMinutes } from "./reminder-minutes";
 import type { Form } from "./types";
 
 const UNIQUE_VIOLATION = "23505";
@@ -14,6 +16,7 @@ export async function submitEventSignupResponse(
   submitted: SubmittedAnswer[],
   db?: SupabaseClient,
   form?: { form: Form; fields: FieldWithOptions[] } | null,
+  reminderMinutes: readonly ReminderMinutes[] = [],
 ): Promise<{ ok: boolean; status: number }> {
   const client = db ?? (await import("./db")).getDb();
   const loaded = form !== undefined ? form : await getFormWithFields(formId, client);
@@ -31,6 +34,7 @@ export async function submitEventSignupResponse(
     if (error.code === FOREIGN_KEY_VIOLATION) return { ok: false, status: 400 };
     return { ok: false, status: 500 };
   }
+  await insertSignupReminders(client, eventId, personId, reminderMinutes);
   return { ok: true, status: 201 };
 }
 

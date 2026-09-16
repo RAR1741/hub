@@ -1,0 +1,110 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { listBatteries, listUsage } from "@/lib/batteries";
+import { hasRole, requirePageRole } from "@/lib/authz";
+import { BATTERY_KINDS, BATTERY_KIND_LABELS, type Battery } from "@/lib/types";
+import { getViewer } from "@/lib/viewer";
+import { BatteryForm } from "@/components/BatteryForm";
+import { UsageLogForm } from "@/components/UsageLogForm";
+import { UsageLogTable } from "@/components/UsageLogTable";
+
+export const metadata: Metadata = { title: "Batteries" };
+
+export default async function BatteriesPage() {
+  const viewer = await getViewer();
+  requirePageRole(viewer, "student");
+
+  const [batteries, recentUsage] = await Promise.all([listBatteries(), listUsage({ limit: 50 })]);
+  const active = batteries.filter((b) => b.status === "active");
+  const retired = batteries.filter((b) => b.status === "retired");
+  const isMentor = hasRole(viewer.role, "mentor");
+  const batteryNumbers = new Map(batteries.map((b) => [b.id, b.number]));
+
+  return (
+    <main className="flex flex-col gap-6">
+      <div className="page-head">
+        <div>
+          <h1>Batteries</h1>
+          <div className="sub">Log usage and track the pack inventory.</div>
+        </div>
+      </div>
+
+      <div className="card">
+        <h2 className="font-semibold">Log usage</h2>
+        <div className="mt-4">
+          <UsageLogForm batteries={active} />
+        </div>
+      </div>
+
+      {active.length === 0 ? (
+        <BatteryTable batteries={active} emptyLabel="No active batteries." />
+      ) : (
+        BATTERY_KINDS.map((k) => {
+          const inKind = active.filter((b) => b.kind === k);
+          if (inKind.length === 0) return null;
+          return (
+            <div key={k}>
+              <h2 className="font-semibold mb-2">{BATTERY_KIND_LABELS[k]}</h2>
+              <BatteryTable batteries={inKind} emptyLabel="No active batteries." />
+            </div>
+          );
+        })
+      )}
+
+      {isMentor && (
+        <details className="card">
+          <summary className="cursor-pointer font-semibold">New battery</summary>
+          <div className="mt-4">
+            <BatteryForm />
+          </div>
+        </details>
+      )}
+
+      <div>
+        <h2 className="font-semibold mb-2">Recent log</h2>
+        <UsageLogTable rows={recentUsage} batteryNumbers={batteryNumbers} canDelete={isMentor} />
+      </div>
+
+      {retired.length > 0 && (
+        <details className="card">
+          <summary className="cursor-pointer font-semibold">Retired batteries ({retired.length})</summary>
+          <div className="mt-4">
+            <BatteryTable batteries={retired} emptyLabel="No retired batteries." />
+          </div>
+        </details>
+      )}
+    </main>
+  );
+}
+
+function BatteryTable({
+  batteries,
+  emptyLabel,
+}: {
+  batteries: (Battery & { lastUsedAt: string | null })[];
+  emptyLabel: string;
+}) {
+  if (batteries.length === 0) return <p className="card text-sm text-[var(--muted)]">{emptyLabel}</p>;
+  return (
+    <div className="tablewrap">
+      <div style={{ overflowX: "auto" }}>
+        <table className="table">
+          <thead>
+            <tr><th>Number</th><th>Kind</th><th>Model</th><th>Ah</th><th>Last used</th></tr>
+          </thead>
+          <tbody>
+            {batteries.map((b) => (
+              <tr key={b.id}>
+                <td className="mono"><Link href={`/batteries/${b.id}`}>{b.number}</Link></td>
+                <td>{BATTERY_KIND_LABELS[b.kind]}</td>
+                <td>{b.model ?? ""}</td>
+                <td>{b.ampHourRating ?? ""}</td>
+                <td className="mono">{b.lastUsedAt ? new Date(b.lastUsedAt).toLocaleString() : "Never"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { subtreeIds } from "@/lib/team-tree";
 
 export type TeamFormValues = {
   name: string;
@@ -10,21 +11,32 @@ export type TeamFormValues = {
   joinMode: string;
   googleGroupEmail: string;
   githubTeamSlug: string;
+  githubSyncAllowInactive: boolean;
+  slackChannels: { channelId: string; label: string }[];
 };
+
+type ChannelRow = { key: string; channelId: string; label: string };
 
 export function TeamForm({
   teams,
   initial,
   teamId,
 }: {
-  teams: { id: string; name: string }[]; // parent options
+  teams: { id: string; name: string; parentTeamId: string | null }[]; // parent options
   initial?: TeamFormValues;
   teamId?: string; // present = edit
 }) {
+  // Exclude the team itself and its whole subtree — re-parenting under a
+  // descendant would create a cycle (also rejected server-side in updateTeam).
+  const excludedParentIds = teamId ? new Set(subtreeIds(teams, teamId)) : new Set<string>();
   const EMPTY: TeamFormValues = {
-    name: "", parentTeamId: "", description: "", joinMode: "admin_only", googleGroupEmail: "", githubTeamSlug: "",
+    name: "", parentTeamId: "", description: "", joinMode: "admin_only", googleGroupEmail: "", githubTeamSlug: "", githubSyncAllowInactive: false, slackChannels: [],
   };
   const [values, setValues] = useState<TeamFormValues>(initial ?? EMPTY);
+  const [channels, setChannels] = useState<ChannelRow[]>(() =>
+    (initial?.slackChannels ?? []).map((c, i) => ({ key: `init-${i}`, ...c })),
+  );
+  const nextKey = useRef(0);
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const router = useRouter();
@@ -44,6 +56,10 @@ export function TeamForm({
           joinMode: values.joinMode,
           googleGroupEmail: values.googleGroupEmail || undefined,
           githubTeamSlug: values.githubTeamSlug || undefined,
+          githubSyncAllowInactive: values.githubSyncAllowInactive,
+          slackChannels: channels
+            .filter((c) => c.channelId.trim())
+            .map((c) => ({ channelId: c.channelId.trim(), label: c.label.trim() || null })),
         }),
       });
       if (res.ok) {
@@ -70,7 +86,7 @@ export function TeamForm({
       <label className="label">Parent{" "}
         <select className="input" value={values.parentTeamId} onChange={(e) => setValues({ ...values, parentTeamId: e.target.value })}>
           <option value="">(none — top level)</option>
-          {teams.filter((t) => t.id !== teamId).map((t) => (
+          {teams.filter((t) => !excludedParentIds.has(t.id)).map((t) => (
             <option key={t.id} value={t.id}>{t.name}</option>
           ))}
         </select>
@@ -96,6 +112,64 @@ export function TeamForm({
           onChange={(e) => setValues({ ...values, githubTeamSlug: e.target.value })}
         />
       </label>
+      <label className="label flex-row items-center gap-2" style={{ flexDirection: "row" }}>
+        <input
+          type="checkbox"
+          checked={values.githubSyncAllowInactive}
+          onChange={(e) => setValues({ ...values, githubSyncAllowInactive: e.target.checked })}
+        />
+        Allow inactive members
+      </label>
+      <span className="text-sm text-[var(--muted)]">
+        When on, alumni and other inactive members stay on the linked GitHub team instead of being flagged for removal during sync.
+      </span>
+      <div className="label">
+        Slack channels
+        <div className="flex flex-col gap-2">
+          {channels.map((c) => (
+            <div key={c.key} className="flex gap-2">
+              <input
+                className="input"
+                type="text"
+                placeholder="C0123ABC"
+                aria-label="Slack channel ID"
+                value={c.channelId}
+                onChange={(e) => {
+                  setChannels(channels.map((row) => (row.key === c.key ? { ...row, channelId: e.target.value } : row)));
+                }}
+              />
+              <input
+                className="input"
+                type="text"
+                placeholder="#frc"
+                aria-label="Channel label (optional)"
+                value={c.label}
+                onChange={(e) => {
+                  setChannels(channels.map((row) => (row.key === c.key ? { ...row, label: e.target.value } : row)));
+                }}
+              />
+              <button
+                type="button"
+                className="btn"
+                aria-label={`Remove channel ${c.channelId || "row"}`}
+                onClick={() => setChannels(channels.filter((row) => row.key !== c.key))}
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+        <button
+          type="button"
+          className="btn"
+          onClick={() => setChannels([...channels, { key: `new-${nextKey.current++}`, channelId: "", label: "" }])}
+        >
+          Add channel
+        </button>
+        <span className="text-sm text-[var(--muted)]">
+          Members of this team are auto-invited to these Slack channels. The bot must already be in each channel.
+        </span>
+      </div>
       <label className="label">Join mode{" "}
         <select className="input" value={values.joinMode} onChange={(e) => setValues({ ...values, joinMode: e.target.value })}>
           <option value="admin_only">admin only</option>

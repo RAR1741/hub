@@ -34,6 +34,8 @@ export type PersonRow = {
   slack_user_id?: string | null;
   github_login?: string | null;
   github_user_id?: number | null;
+  notification_types?: string[] | null;
+  meeting_reminder_minutes?: number[] | null;
 };
 
 export type Person = {
@@ -69,6 +71,8 @@ export type Person = {
   slackUserId?: string | null;
   githubLogin?: string | null;
   githubUserId?: number | null;
+  notification_types: string[];
+  meeting_reminder_minutes: number[];
 };
 
 export function personFromRow(row: PersonRow): Person {
@@ -105,6 +109,8 @@ export function personFromRow(row: PersonRow): Person {
     slackUserId: row.slack_user_id ?? null,
     githubLogin: row.github_login ?? null,
     githubUserId: row.github_user_id ?? null,
+    notification_types: row.notification_types ?? [],
+    meeting_reminder_minutes: row.meeting_reminder_minutes ?? [],
   };
 }
 
@@ -118,6 +124,7 @@ export type TeamRow = {
   join_mode: JoinMode;
   google_group_email: string | null;
   github_team_slug: string | null;
+  github_sync_allow_inactive: boolean;
 };
 
 export type Team = {
@@ -128,6 +135,7 @@ export type Team = {
   joinMode: JoinMode;
   googleGroupEmail: string | null;
   githubTeamSlug: string | null;
+  githubSyncAllowInactive: boolean;
 };
 
 export function teamFromRow(row: TeamRow): Team {
@@ -139,6 +147,7 @@ export function teamFromRow(row: TeamRow): Team {
     joinMode: row.join_mode,
     googleGroupEmail: row.google_group_email,
     githubTeamSlug: row.github_team_slug,
+    githubSyncAllowInactive: row.github_sync_allow_inactive,
   };
 }
 
@@ -522,6 +531,41 @@ export function excusalRequestFromRow(row: ExcusalRequestRow): ExcusalRequest {
   };
 }
 
+export type ToolDeleteRequestRow = {
+  id: string;
+  tool_id: string;
+  requested_by: string;
+  reason: string;
+  status: ExcusalRequestStatus;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+};
+
+export type ToolDeleteRequest = {
+  id: string;
+  toolId: string;
+  requestedBy: string;
+  reason: string;
+  status: ExcusalRequestStatus;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+};
+
+export function toolDeleteRequestFromRow(row: ToolDeleteRequestRow): ToolDeleteRequest {
+  return {
+    id: row.id,
+    toolId: row.tool_id,
+    requestedBy: row.requested_by,
+    reason: row.reason,
+    status: row.status,
+    reviewedBy: row.reviewed_by,
+    reviewedAt: row.reviewed_at,
+    createdAt: row.created_at,
+  };
+}
+
 export type GuardianRow = {
   id: string;
   first_name: string;
@@ -776,5 +820,219 @@ export function onshapeConnectionFromRow(row: OnshapeConnectionRow): OnshapeConn
     expiresAt: row.expires_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+export type BatteryStatus = "active" | "retired";
+
+export const BATTERY_KINDS = ["frc_robot", "ftc_robot", "tool", "camera", "computer", "other"] as const;
+export type BatteryKind = (typeof BATTERY_KINDS)[number];
+export const BATTERY_KIND_LABELS: Record<BatteryKind, string> = {
+  frc_robot: "FRC robot", ftc_robot: "FTC robot", tool: "Tool", camera: "Camera", computer: "Computer", other: "Other",
+};
+
+export type BatteryRow = {
+  id: string;
+  number: string;
+  kind: BatteryKind;
+  year_acquired: number | null;
+  model: string | null;
+  serial_date_code: string | null;
+  manufacturer: string | null;
+  trade_name: string | null;
+  amp_hour_rating: number | string | null;
+  notes: string | null;
+  status: BatteryStatus;
+  retired_at: string | null;
+  retired_reason: string | null;
+  created_at: string;
+};
+
+export type Battery = {
+  id: string;
+  number: string;
+  kind: BatteryKind;
+  yearAcquired: number | null;
+  model: string | null;
+  serialDateCode: string | null;
+  manufacturer: string | null;
+  tradeName: string | null;
+  ampHourRating: number | null;
+  notes: string | null;
+  status: BatteryStatus;
+  retiredAt: string | null;
+  retiredReason: string | null;
+  createdAt: string;
+};
+
+export function batteryFromRow(row: BatteryRow): Battery {
+  return {
+    id: row.id,
+    number: row.number,
+    kind: row.kind,
+    yearAcquired: row.year_acquired,
+    model: row.model,
+    serialDateCode: row.serial_date_code,
+    manufacturer: row.manufacturer,
+    tradeName: row.trade_name,
+    ampHourRating: row.amp_hour_rating == null ? null : Number(row.amp_hour_rating),
+    notes: row.notes,
+    status: row.status,
+    retiredAt: row.retired_at,
+    retiredReason: row.retired_reason,
+    createdAt: row.created_at,
+  };
+}
+
+export type BatteryUsageRow = {
+  id: string;
+  battery_id: string;
+  tech_id: string;
+  used_at: string;
+  event_key: string | null;
+  match_key: string | null;
+  had_problem: boolean;
+  problem_description: string | null;
+  wiggle_test_ok: boolean | null;
+  charger_test_ok: boolean | null;
+  rint_ohms: number | string | null;
+  charge_pre_pct: number | null;
+  charge_post_pct: number | null;
+  notes: string | null;
+  created_at: string;
+  // Embedded via `person (first_name, last_name, display_name)` — one FK, no hint needed.
+  person: { first_name: string; last_name: string; display_name: string | null };
+};
+
+export type BatteryUsage = {
+  id: string;
+  batteryId: string;
+  techId: string;
+  usedAt: string;
+  eventKey: string | null;
+  matchKey: string | null;
+  hadProblem: boolean;
+  problemDescription: string | null;
+  wiggleTestOk: boolean | null;
+  chargerTestOk: boolean | null;
+  rintOhms: number | null;
+  chargePrePct: number | null;
+  chargePostPct: number | null;
+  notes: string | null;
+  createdAt: string;
+  tech: { firstName: string; lastName: string; displayName: string | null };
+};
+
+export function batteryUsageFromRow(row: BatteryUsageRow): BatteryUsage {
+  return {
+    id: row.id,
+    batteryId: row.battery_id,
+    techId: row.tech_id,
+    usedAt: row.used_at,
+    eventKey: row.event_key,
+    matchKey: row.match_key,
+    hadProblem: row.had_problem,
+    problemDescription: row.problem_description,
+    wiggleTestOk: row.wiggle_test_ok,
+    chargerTestOk: row.charger_test_ok,
+    rintOhms: row.rint_ohms == null ? null : Number(row.rint_ohms),
+    chargePrePct: row.charge_pre_pct,
+    chargePostPct: row.charge_post_pct,
+    notes: row.notes,
+    createdAt: row.created_at,
+    tech: {
+      firstName: row.person.first_name,
+      lastName: row.person.last_name,
+      displayName: row.person.display_name,
+    },
+  };
+}
+
+export type ToolStatus = "in_service" | "needs_attention" | "out_of_service" | "retired";
+export type ToolStatusAfter = Exclude<ToolStatus, "retired">;
+export type ToolCheckKind = "inspection" | "maintenance" | "repair";
+export type ToolCondition = "good" | "fair" | "poor";
+
+export type ToolRow = {
+  id: string;
+  name: string;
+  category: string | null;
+  location: string | null;
+  asset_tag: string | null;
+  status: ToolStatus;
+  maintenance_interval_days: number | null;
+  notes: string | null;
+  created_at: string;
+};
+
+export type Tool = {
+  id: string;
+  name: string;
+  category: string | null;
+  location: string | null;
+  assetTag: string | null;
+  status: ToolStatus;
+  maintenanceIntervalDays: number | null;
+  notes: string | null;
+  createdAt: string;
+};
+
+export function toolFromRow(row: ToolRow): Tool {
+  return {
+    id: row.id,
+    name: row.name,
+    category: row.category,
+    location: row.location,
+    assetTag: row.asset_tag,
+    status: row.status,
+    maintenanceIntervalDays: row.maintenance_interval_days,
+    notes: row.notes,
+    createdAt: row.created_at,
+  };
+}
+
+export type ToolCheckRow = {
+  id: string;
+  tool_id: string;
+  checked_by: string;
+  checked_at: string;
+  kind: ToolCheckKind;
+  condition: ToolCondition;
+  status_after: ToolStatusAfter | null;
+  notes: string | null;
+  created_at: string;
+  // Embedded via `person (first_name, last_name, display_name)` — one FK, no hint needed.
+  person: { first_name: string; last_name: string; display_name: string | null };
+};
+
+export type ToolCheck = {
+  id: string;
+  toolId: string;
+  checkedById: string;
+  checkedAt: string;
+  kind: ToolCheckKind;
+  condition: ToolCondition;
+  statusAfter: ToolStatusAfter | null;
+  notes: string | null;
+  createdAt: string;
+  checkedBy: { firstName: string; lastName: string; displayName: string | null };
+};
+
+export function toolCheckFromRow(row: ToolCheckRow): ToolCheck {
+  return {
+    id: row.id,
+    toolId: row.tool_id,
+    checkedById: row.checked_by,
+    checkedAt: row.checked_at,
+    kind: row.kind,
+    condition: row.condition,
+    statusAfter: row.status_after,
+    notes: row.notes,
+    createdAt: row.created_at,
+    checkedBy: {
+      firstName: row.person.first_name,
+      lastName: row.person.last_name,
+      displayName: row.person.display_name,
+    },
   };
 }

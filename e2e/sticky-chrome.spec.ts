@@ -54,3 +54,29 @@ test("topbar and sidebar stay pinned to the top when the page scrolls", async ({
   expect(sidebarBox).not.toBeNull();
   expect(Math.abs(sidebarBox!.y)).toBeLessThanOrEqual(1);
 });
+
+// Regression guard for #296: on a viewport shorter than the nav (a landscape
+// phone, or a 768px laptop at 150% zoom), the sidebar/rail footer — which holds
+// the only collapse/expand control — fell off the bottom of a `height: 100dvh`
+// box that nothing could scroll. `min-height` plus `position: sticky; bottom: 0`
+// on .sb-foot / .rail-foot pins it to the viewport bottom instead.
+test("sidebar and rail footers stay reachable on a viewport shorter than the nav", async ({
+  page,
+}) => {
+  // Mentor nav (4 groups, 10 inline links) is ~505px tall; 300px is well under.
+  await page.goto("/people");
+  await page.setViewportSize({ width: 1280, height: 300 });
+
+  // Each click asserts more than visibility: Playwright fails it if the control
+  // is off-screen or covered, which is exactly the broken state.
+  const collapse = page.getByRole("button", { name: "Collapse sidebar" });
+  await expect(collapse).toBeInViewport();
+  await collapse.click();
+
+  const expand = page.getByRole("button", { name: "Expand sidebar" });
+  await expect(page.locator(".rail")).toBeVisible();
+  await expect(expand).toBeInViewport();
+  await expand.click();
+
+  await expect(page.locator(".sb")).toBeVisible();
+});

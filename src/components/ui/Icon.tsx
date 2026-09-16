@@ -19,7 +19,9 @@ type IconName =
   | "sliders"
   | "sun"
   | "moon"
-  | "logout";
+  | "logout"
+  | "battery"
+  | "tools";
 const paths: Record<IconName, React.ReactNode> = {
   edit: <path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3z" />,
   trash: <path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13" />,
@@ -101,6 +103,18 @@ const paths: Record<IconName, React.ReactNode> = {
     <>
       <path d="M9.5 21H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.5" />
       <path d="m15.5 16.5 4.5-4.5-4.5-4.5M20 12H9.5" />
+    </>
+  ),
+  battery: (
+    <>
+      <rect x="3" y="9" width="12" height="6" rx="1" />
+      <path d="M18 10v4" />
+    </>
+  ),
+  tools: (
+    <>
+      <path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4M20.1 12c0 1.71-1.39 3.1-3.1 3.1h-4M9 19h6v-2.5M9 5h6v2.5" />
+      <circle cx="12" cy="12" r="1.5" />
     </>
   ),
 };

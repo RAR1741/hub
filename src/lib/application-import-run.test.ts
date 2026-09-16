@@ -474,7 +474,7 @@ describe("runApplicationImport roster sweep (current-season membership)", () => 
     expect(deactivate!.filters["role"]?.val).toBe("student");
     expect(deactivate!.filters["is_active"]?.val).toBe(true);
     expect(deactivate!.filters["not:id:in"]?.val).toContain("p1");
-    expect(summary.deactivated).toBe(1); // only p2 (p1 excluded as written)
+    expect(summary.deactivated).toEqual([{ name: "Gone Missing", personId: "p2" }]); // only p2 (p1 is in the import)
   });
 
   test("an OLD/historical import never deactivates current students", async () => {
@@ -487,22 +487,57 @@ describe("runApplicationImport roster sweep (current-season membership)", () => 
     const summary = await runApplicationImport({ csvText: csv, dryRun: false, db, now: NOW_AUG });
     if ("error" in summary) throw new Error(summary.error);
     expect(calls.personUpdate.some((u) => u.patch.is_active === false)).toBe(false);
-    expect(summary.deactivated).toBe(0);
+    expect(summary.deactivated).toEqual([]);
   });
 
-  test("a current-season import that writes NOBODY (all stale) never deactivates the roster", async () => {
-    // Grace already has a newer application on file → matched-as-stale → skipped,
-    // so writtenPersonIds is empty. This must NOT wipe the active roster.
+  test("a current-season import that writes NOBODY (all stale) keeps the stale applicant active", async () => {
+    // Grace already has this response on file → matched-as-stale → no data write.
+    // She still applied this season, so she is on the team: a re-import of the
+    // same file must never deactivate her.
     const { db, calls } = fakeDb([
       { id: "p1", first_name: "Grace", last_name: "Hopper", role: "student", email: "grace@example.com", is_active: true, last_application_at: "2026-09-01T00:00:00Z" },
-      { id: "p2", first_name: "Other", last_name: "Active", role: "student", is_active: true },
     ]);
     const csv = csvFor([row({})]); // Grace only; she's stale
     const summary = await runApplicationImport({ csvText: csv, dryRun: false, db, now: NOW_AUG });
     if ("error" in summary) throw new Error(summary.error);
     expect(summary.stale.length).toBe(1);
-    expect(calls.personUpdate.some((u) => u.patch.is_active === false)).toBe(false);
-    expect(summary.deactivated).toBe(0);
+    const deactivate = calls.personUpdate.find((u) => u.patch.is_active === false);
+    if (deactivate) expect(deactivate.filters["not:id:in"]?.val).toContain("p1");
+    expect(summary.deactivated).toEqual([]);
+  });
+
+  test("re-importing the current-season file with one new applicant keeps stale applicants active", async () => {
+    // Regression for the 2026-09-03 re-import: every previously-imported student
+    // was stale (already had this response on file) and so was NOT in the
+    // written set; one new late applicant made the set non-empty, and the sweep
+    // then deactivated every stale-but-legit applicant. Stale applicants are
+    // still in the application and must be excluded from the sweep.
+    const { db, calls } = fakeDb([
+      { id: "p1", first_name: "Grace", last_name: "Hopper", role: "student", email: "grace@example.com", is_active: true, last_application_at: "2026-09-01T00:00:00Z" },
+      { id: "p2", first_name: "Gone", last_name: "Missing", role: "student", is_active: true },
+    ]);
+    const csv = csvFor([row({}), row({ first: "New", last: "Student", email: "new@example.com" })]);
+    const summary = await runApplicationImport({ csvText: csv, dryRun: false, db, now: NOW_AUG });
+    if ("error" in summary) throw new Error(summary.error);
+    expect(summary.stale).toEqual([{ name: "Grace Hopper" }]);
+    const deactivate = calls.personUpdate.find((u) => u.patch.is_active === false);
+    expect(deactivate).toBeDefined();
+    expect(deactivate!.filters["not:id:in"]?.val).toContain("p1");
+    expect(deactivate!.filters["not:id:in"]?.val).toContain("new-person-0");
+    expect(summary.deactivated).toEqual([{ name: "Gone Missing", personId: "p2" }]);
+  });
+
+  test("a stale applicant who was wrongly inactive is re-activated by a re-import", async () => {
+    const { db, calls } = fakeDb([
+      { id: "p1", first_name: "Grace", last_name: "Hopper", role: "student", email: "grace@example.com", is_active: false, last_application_at: "2026-09-01T00:00:00Z" },
+    ]);
+    const csv = csvFor([row({})]);
+    const summary = await runApplicationImport({ csvText: csv, dryRun: false, db, now: NOW_AUG });
+    if ("error" in summary) throw new Error(summary.error);
+    const activate = calls.personUpdate.find((u) => u.patch.is_active === true);
+    expect(activate).toBeDefined();
+    expect(activate!.filters["id"]?.val).toContain("p1");
+    expect(summary.activated).toEqual([{ name: "Grace Hopper", personId: "p1" }]);
   });
 
   test("new applicants from the current-season import are created active", async () => {
@@ -513,18 +548,21 @@ describe("runApplicationImport roster sweep (current-season membership)", () => 
     expect(calls.personInsert[0].is_active).toBe(true);
   });
 
-  test("dry-run projects wouldDeactivate for the current season without writing", async () => {
+  test("dry-run lists who would flip either way for the current season without writing", async () => {
     const { db, calls } = fakeDb([
       { id: "p1", first_name: "Grace", last_name: "Hopper", role: "student", email: "grace@example.com", is_active: true },
       { id: "p2", first_name: "Gone", last_name: "Missing", role: "student", is_active: true },
       { id: "p3", first_name: "Already", last_name: "Inactive", role: "student", is_active: false },
+      // Stale (already imported) but wrongly inactive → would be re-activated.
+      { id: "p4", first_name: "Ada", last_name: "Lovelace", role: "student", email: "ada@example.com", is_active: false, last_application_at: "2026-09-01T00:00:00Z" },
     ]);
-    const csv = csvFor([row({})]); // matches p1 only
+    const csv = csvFor([row({}), row({ first: "Ada", last: "Lovelace", email: "ada@example.com" })]);
     const summary = await runApplicationImport({ csvText: csv, dryRun: true, db, now: NOW_AUG });
     if ("error" in summary) throw new Error(summary.error);
-    // p2 is active and not in the import; p1 is written (kept); p3 already inactive.
-    expect(summary.wouldDeactivate).toBe(1);
-    expect(summary.deactivated).toBe(0);
+    // p2 is active and not in the import; p1 kept; p3 already inactive; p4 flips on.
+    expect(summary.wouldDeactivate).toEqual([{ name: "Gone Missing", personId: "p2" }]);
+    expect(summary.wouldActivate).toEqual([{ name: "Ada Lovelace", personId: "p4" }]);
+    expect(summary.deactivated).toEqual([]);
     expect(calls.personUpdate).toEqual([]);
     expect(calls.personInsert).toEqual([]);
   });

@@ -408,7 +408,7 @@ Round 3 surfaced a large cluster of inventory implementations — this is the mo
 - **HS** — an **equipment registry** (name, location, status, documentation link, images) tagged with which manufacturing processes each machine supports (`HS: app/routes/api/equipment.index.ts`).
 - **[rev_parts_tracker](sources/rev_parts_tracker.md)** *(new variant — review)* — **quantity-aware checkout with a per-item loaner toggle** at dispensing and a distinct admin "mark loaner returned" workflow that stamps `loanerReturned`/`At` on the original transaction — checkout and loaner-return are two mutations on one record, not a reservation system. Next.js/Firebase/Dexie, no license (ideas only).
 - *Also seen in round 3:* [frc-shop-tool-tracker / 6632](sources/frc-shop-tool-tracker.md) (QR-tag tool lookup — concept only, unimplemented), [floorrunner](sources/floorrunner.md) (a machine roster with a running/idle/down/maintenance status enum).
-- **Decision:**
+- **Decision:** Need · Preferred variant: FM-style inventory + maintenance log. Shipped v1 (#75): inventory + check log + student deletion requests; checkout, certifications, reservations deferred.
 
 ### 3.14 Package/shipment tracking *(new — OT)*
 - **OT only** — ordered parts carry a tracking number + carrier (Amazon/FedEx/UPS/USPS); the backend evidently polls a shipment-tracking API and the client maps raw carrier states to Ordered/Shipped/Arrived color coding on the shared shopping list (`OT: lib/services/database.dart Part`). Answers the shop-floor question "where's my part?" without anyone checking email.

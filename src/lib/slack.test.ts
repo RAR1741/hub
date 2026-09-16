@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { CHANNELS } from "./slack-registry";
-import { postChannelMessage, sendDM, type SlackDeps } from "./slack";
+import { postChannelMessage, sendDM, verifyChannels, type SlackDeps } from "./slack";
 
 type CapturedRequest = { url: string; init?: RequestInit };
 
@@ -116,5 +116,42 @@ describe("sendDM", () => {
     }) as unknown as typeof globalThis.fetch;
     const ok = await sendDM(prodDeps(fetchFn), "U123", "hi");
     expect(ok).toBe(false);
+  });
+});
+
+describe("verifyChannels", () => {
+  test("returns null without a token", async () => {
+    const { fetchFn } = fakeFetch();
+    expect(await verifyChannels({ fetch: fetchFn, token: null, isProd: true })).toBeNull();
+  });
+
+  test("maps Slack's answers to statuses and reads conversations.info per registry entry", async () => {
+    const { fetchFn, requests } = fakeFetch([
+      { status: 200, body: { ok: true, channel: { is_member: true } } },
+      { status: 200, body: { ok: false, error: "channel_not_found" } },
+    ]);
+    const checks = await verifyChannels(prodDeps(fetchFn));
+    expect(requests.map((r) => r.url)).toEqual(
+      (Object.keys(CHANNELS) as (keyof typeof CHANNELS)[]).map(
+        (n) => `https://slack.com/api/conversations.info?channel=${CHANNELS[n]}`,
+      ),
+    );
+    expect(checks!.map((c) => c.status)).toEqual(["ok", "not_found"]);
+    // Prod routes to every channel except #bot-test, which it never posts to.
+    expect(checks!.map((c) => c.routed)).toEqual([false, true]);
+  });
+
+  test("distinguishes archived, non-member and missing_scope", async () => {
+    const { fetchFn } = fakeFetch([
+      { status: 200, body: { ok: true, channel: { is_member: true, is_archived: true } } },
+      { status: 200, body: { ok: false, error: "missing_scope" } },
+    ]);
+    const checks = await verifyChannels(devDeps(fetchFn));
+    expect(checks!.map((c) => c.status)).toEqual(["archived", "missing_scope"]);
+    // Non-prod redirects everything to #bot-test, so only it is routed.
+    expect(checks!.map((c) => c.routed)).toEqual([true, false]);
+
+    const notMember = fakeFetch([{ status: 200, body: { ok: true, channel: { is_member: false } } }]);
+    expect((await verifyChannels(prodDeps(notMember.fetchFn)))![0].status).toBe("not_a_member");
   });
 });

@@ -709,6 +709,53 @@
     outline-offset: 2px;
   }
 
+  /* Segmented control — native radios in a fieldset (arrow-key nav + one tab
+     stop come free from the browser). Used for the People role/active filters. */
+  .seg {
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    margin: 0;
+    min-width: 0;
+    border: 1px solid var(--hair);
+    border-radius: 9px;
+    background: var(--surface-2);
+  }
+  .seg label {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 11px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 650;
+    color: var(--muted);
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+  .seg label:hover { color: var(--ink); }
+  /* Keep the radio inside the box (not visually-hidden off-screen) so a click
+     on the label lands on it; opacity:0 removes the UA ring — restored below. */
+  .seg input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    margin: 0;
+    cursor: pointer;
+  }
+  .seg label:has(input:checked) {
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: var(--shadow);
+  }
+  /* Visible focus depends on THIS rule since the input is opacity:0. Required. */
+  .seg label:has(input:focus-visible) {
+    outline: 2px solid var(--red);
+    outline-offset: 2px;
+  }
+
   .table {
     width: 100%;
     border-collapse: collapse;
@@ -1471,10 +1518,120 @@
     z-index: 30;
   }
   .tb-actions {
-    margin-left: auto;
     display: flex;
     align-items: center;
     gap: 10px;
+  }
+  .tb-search {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 250px;
+    height: 30px;
+    padding: 0 8px;
+    background: var(--canvas);
+    border: 1px solid var(--hair);
+    border-radius: 7px;
+    color: var(--muted);
+    font: inherit;
+    font-size: 12.5px;
+    cursor: pointer;
+    text-align: left;
+  }
+  .tb-search:hover {
+    color: var(--ink);
+    border-color: color-mix(in srgb, var(--muted) 40%, var(--hair));
+  }
+  .tb-search .ic {
+    width: 14px;
+    height: 14px;
+    flex: none;
+  }
+  .tb-search kbd {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    background: var(--surface);
+    border: 1px solid var(--hair);
+    border-radius: 4px;
+    padding: 0 5px;
+    color: var(--muted);
+  }
+  .palette-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(0, 0, 0, 0.5);
+  }
+  .palette {
+    position: fixed;
+    z-index: 101;
+    top: 14vh;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(560px, calc(100vw - 32px));
+    max-height: 70vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    border: 1px solid var(--hair);
+    border-radius: 12px;
+    box-shadow: 0 12px 40px -12px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+  }
+  .palette [cmdk-input] {
+    width: 100%;
+    padding: 14px 16px;
+    font: inherit;
+    font-size: 14px;
+    color: var(--ink);
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--hair);
+    outline: none;
+  }
+  .palette [cmdk-list] {
+    overflow-y: auto;
+    padding: 6px;
+  }
+  .palette [cmdk-group-heading] {
+    padding: 8px 10px 4px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .palette [cmdk-item] {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 11px;
+    border-radius: 7px;
+    font-size: 13.5px;
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .palette [cmdk-item][data-selected="true"] {
+    background: var(--surface-2);
+  }
+  .palette [cmdk-item] .meta {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .palette [cmdk-item] .ic {
+    width: 15px;
+    height: 15px;
+    flex: none;
+    color: var(--muted);
+  }
+  .palette [cmdk-empty] {
+    padding: 18px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--muted);
   }
   .tb-btn {
     width: 30px;
@@ -1549,7 +1706,10 @@
     position: sticky;
     top: 0;
     align-self: flex-start;
-    height: 100dvh;
+    /* min-height, not height: on a viewport shorter than the nav the box grows
+       instead of hiding the overflow past a fixed 100dvh, which is what lets
+       .sb-foot stick to the bottom of the viewport (see there). */
+    min-height: 100dvh;
     /* Above the main content column and its sticky table headers (which have no
        z-index), below the skip link (50) and the modal layer (100). Without
        this the opaque sticky `.table th` on People/Events/Admin lists — exactly
@@ -1578,10 +1738,14 @@
     /* No overflow scroll here on purpose: an overflow container computes
        overflow-x to `auto` as well, which clips the hover flyouts (they sit at
        left: 100% + 8px, past the sidebar edge) and makes the always-present
-       hidden flyouts add a phantom horizontal scrollbar. The nav is short
-       enough to fit; .sb-foot stays reachable via margin-top: auto.
-       ponytail: a nav taller than the viewport won't scroll to the footer;
-       upgrade to a JS/anchor-positioned popover flyout if that ever bites. */
+       hidden flyouts add a phantom horizontal scrollbar. (`overflow-x: clip`
+       is no escape hatch either: it computes to `hidden` once the other axis
+       scrolls.) .sb-foot stays reachable by sticking to the viewport bottom
+       instead — see there.
+       ponytail: nav *items* past the fold on a short viewport still can't be
+       reached from the sidebar (reach those pages via the command palette);
+       upgrade to a JS/anchor-positioned popover flyout, which would free this
+       to scroll, if that ever bites. */
   }
   .sb-group {
     padding: 9px 8px 1px;
@@ -1647,6 +1811,15 @@
   }
   .sb-foot {
     margin-top: auto;
+    /* Sticky so the collapse toggle stays reachable when the nav is taller than
+       the viewport (#296). .sb is pinned at top: 0 and body is not a scroll
+       container, so this sticks to the viewport bottom rather than falling off
+       the end of an overflowing .sb. When the nav fits, `margin-top: auto`
+       already parks it there and this is a no-op. Opaque background because it
+       then paints over whatever nav item is under it. */
+    position: sticky;
+    bottom: 0;
+    background: var(--surface-2);
     border-top: 1px solid var(--hair);
     padding: 8px;
     display: flex;
@@ -1731,16 +1904,43 @@
     background: var(--surface-2);
     text-decoration: none;
   }
-  .fly-scroll {
-    max-height: 264px;
-    overflow-y: auto;
+  /* ---- second-level (section) flyouts inside the Admin flyout / rail-fly ---- */
+  .fly-sec {
+    position: relative;
   }
-  .fly-scroll::-webkit-scrollbar {
-    width: 8px;
+  .fly-sec-trigger {
+    display: flex;
+    align-items: center;
+    cursor: default;
   }
-  .fly-scroll::-webkit-scrollbar-thumb {
-    background: var(--hair);
-    border-radius: 4px;
+  .fly-sec-trigger .ic {
+    margin-left: auto;
+    width: 11px;
+    height: 11px;
+    flex: none;
+    color: var(--muted);
+    opacity: 0.7;
+  }
+  .fly-sec:hover > .fly-sec-trigger {
+    background: var(--surface-2);
+  }
+  /* Reuses .flyout for surface/shadow/arrow/hidden-state; only position + the
+     open selectors differ. Opens to the right of the parent flyout (parent has
+     5px padding + 1px border, so +14px yields the same ~8px visible gap as the
+     first level). The parent flyout must NOT be a scroll container or this is
+     clipped — that's why .fly-scroll was removed. */
+  .fly-sub {
+    left: calc(100% + 14px);
+  }
+  .fly-sub::after {
+    left: -14px;
+    width: 14px;
+  }
+  .fly-sec:hover > .fly-sub,
+  .fly-sec:has(:focus-visible) > .fly-sub {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(0);
   }
 
   /* ---- icon rail (collapsed sidebar) — the .sb/.rail pair are both always in
@@ -1765,7 +1965,7 @@
     position: sticky;
     top: 0;
     align-self: flex-start;
-    height: 100dvh;
+    min-height: 100dvh; /* grows past the viewport so .rail-foot can stick — see .sb */
     z-index: 40; /* same stacking role as .sb — above content, below modals */
   }
   .rail .badge-1741 {
@@ -1819,6 +2019,15 @@
   }
   .rail-foot {
     margin-top: auto;
+    /* Same sticky-to-the-viewport-bottom treatment as .sb-foot (#296) so the
+       expand toggle survives a nav taller than the viewport. Full width (the
+       rail centers its children) so the opaque background covers the icon it
+       paints over; padding-bottom replaces the .rail bottom padding it hides. */
+    position: sticky;
+    bottom: 0;
+    width: 100%;
+    background: var(--surface-2);
+    padding-bottom: 8px;
     display: flex;
     flex-direction: column;
     align-items: center;
