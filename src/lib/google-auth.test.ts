@@ -81,10 +81,10 @@ describe("fetchGoogleAccessToken", () => {
   });
 
   test("throws on a non-OK response", async () => {
-    const fetchFn = (async () => new Response("nope", { status: 403 })) as typeof globalThis.fetch;
+    const fetchFn = (async () => new Response('{"error":"invalid_grant"}', { status: 403 })) as typeof globalThis.fetch;
     await expect(
       fetchGoogleAccessToken(fetchFn, CREDS, { scope: "scope-a" }),
-    ).rejects.toThrow(/403/);
+    ).rejects.toThrow(/403 .*invalid_grant/);
   });
 
   test("throws when the response has no access_token", async () => {
