@@ -8,10 +8,15 @@ import { EmailOtpForm } from "@/components/EmailOtpForm";
 
 export const metadata: Metadata = { title: "Sign In" };
 
-export default async function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
   // Nothing here helps someone who's already signed in — send them home.
   const viewer = await getViewer();
   if (viewer.person) redirect("/");
+  const { error } = await searchParams;
 
   return (
     <main className="mx-auto flex max-w-md flex-col gap-6 py-8">
@@ -42,6 +47,11 @@ export default async function LoginPage() {
         <hr style={{ border: 0, borderTop: "1px solid var(--hair)" }} />
         <section className="flex flex-col gap-3">
           <h2 className="eyebrow">Mentors</h2>
+          {error === "oauth" && (
+            <p role="alert" className="text-sm" style={{ color: "var(--absent)" }}>
+              Google sign-in failed. Try again, or ask an admin if it keeps happening.
+            </p>
+          )}
           <GoogleSignInButton />
         </section>
         {process.env.NODE_ENV !== "production" && (

@@ -12,7 +12,18 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
   const redirect = NextResponse.redirect(clientUrl(request, "/"));
-  if (!code) return redirect;
+
+  // Supabase lands here with ?error=… (no code) when the provider leg fails,
+  // e.g. Google rejecting the client secret. Show it instead of bouncing home.
+  if (!code) {
+    const providerError = url.searchParams.get("error");
+    if (!providerError) return redirect;
+    console.error("oauth callback: provider returned an error", {
+      error: providerError,
+      description: url.searchParams.get("error_description"),
+    });
+    return NextResponse.redirect(clientUrl(request, "/login?error=oauth"));
+  }
 
   // Preserves the auth cookies already attached to `redirect` (set below via
   // the Supabase client's setAll callback) when we need to redirect somewhere
@@ -47,7 +58,7 @@ export async function GET(request: Request) {
       hasCode: Boolean(code),
       error: error?.message ?? "no user returned",
     });
-    return redirect;
+    return toErrorRedirect();
   }
 
   const email = data.user.email?.toLowerCase();
