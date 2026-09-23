@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { GET } from "./route";
 
+vi.mock("@/lib/db", () => ({ getDb: vi.fn() }));
+
 const call = (query: string) =>
   GET(new Request(`http://localhost:3000/auth/callback${query}`));
 
