@@ -68,10 +68,11 @@ export async function getGuardiansForPerson(
   db?: SupabaseClient,
 ): Promise<{ guardian: Guardian; relationship: string | null }[]> {
   const c = await client(db);
-  const { data } = await c
+  const { data, error } = await c
     .from("person_guardian")
     .select("relationship, guardian(*)")
     .eq("person_id", personId);
+  if (error) console.error("getGuardiansForPerson: query failed", error);
   const rows = (data ?? []) as unknown as { relationship: string | null; guardian: GuardianRow }[];
   return rows
     .map((row) => ({
@@ -195,11 +196,12 @@ export async function searchGuardians(q: string, db?: SupabaseClient): Promise<G
   const term = q.trim();
   if (!term) return [];
   const c = await client(db);
-  const { data } = await c
+  const { data, error } = await c
     .from("guardian")
     .select("*")
     .or(`first_name.ilike.%${term}%,last_name.ilike.%${term}%`)
     .order("last_name")
     .limit(10);
+  if (error) console.error("searchGuardians: query failed", error);
   return ((data ?? []) as GuardianRow[]).map(guardianFromRow);
 }

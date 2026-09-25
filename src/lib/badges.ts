@@ -43,13 +43,15 @@ const FOREIGN_KEY_VIOLATION = "23503";
 
 export async function listBadges(db?: SupabaseClient): Promise<Badge[]> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client.from("badge").select("*").order("name");
+  const { data, error } = await client.from("badge").select("*").order("name");
+  if (error) console.error("listBadges: query failed", error);
   return ((data ?? []) as BadgeRow[]).map(badgeFromRow);
 }
 
 export async function getBadge(id: string, db?: SupabaseClient): Promise<Badge | null> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client.from("badge").select("*").eq("id", id).maybeSingle();
+  const { data, error } = await client.from("badge").select("*").eq("id", id).maybeSingle();
+  if (error) throw new Error(`getBadge(${id}) failed: ${error.message}`);
   return data ? badgeFromRow(data as BadgeRow) : null;
 }
 
@@ -210,21 +212,23 @@ export async function awardBadge(
   db?: SupabaseClient,
 ): Promise<{ ok: boolean; status: number }> {
   const client = db ?? (await import("./db")).getDb();
-  const { data: badge } = await client
+  const { data: badge, error: badgeError } = await client
     .from("badge")
     .select("team_id")
     .eq("id", badgeId)
     .maybeSingle();
+  if (badgeError) { console.error("awardBadge: badge probe failed", badgeError); return { ok: false, status: 500 }; }
   if (!badge) return { ok: false, status: 404 };
   const badgeRow = badge as { team_id: string | null };
   const teamId = badgeRow.team_id;
   if (teamId) {
-    const { data: membership } = await client
+    const { data: membership, error: membershipError } = await client
       .from("team_membership")
       .select("team_id")
       .eq("team_id", teamId)
       .eq("person_id", personId)
       .maybeSingle();
+    if (membershipError) { console.error("awardBadge: membership probe failed", membershipError); return { ok: false, status: 500 }; }
     if (!membership) return { ok: false, status: 409 };
   }
   const { error } = await client.from("badge_award").insert({

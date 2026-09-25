@@ -214,13 +214,15 @@ export async function createProject(
 
 export async function listProjects(db?: SupabaseClient): Promise<Project[]> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client.from("project").select("*").order("name", { ascending: true });
+  const { data, error } = await client.from("project").select("*").order("name", { ascending: true });
+  if (error) console.error("listProjects: query failed", error);
   return ((data ?? []) as ProjectRow[]).map(projectFromRow);
 }
 
 export async function getProject(id: string, db?: SupabaseClient): Promise<Project | null> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client.from("project").select("*").eq("id", id).maybeSingle();
+  const { data, error } = await client.from("project").select("*").eq("id", id).maybeSingle();
+  if (error) throw new Error(`getProject(${id}) failed: ${error.message}`);
   return data ? projectFromRow(data as ProjectRow) : null;
 }
 
@@ -244,9 +246,11 @@ export async function updateProject(
 /** Refuses (409) when the project still has parts; the FK (restrict) is the backstop. */
 export async function deleteProject(id: string, db?: SupabaseClient): Promise<{ ok: boolean; status: number }> {
   const client = db ?? (await import("./db")).getDb();
-  const { data: exists } = await client.from("project").select("id").eq("id", id).maybeSingle();
+  const { data: exists, error: existsError } = await client.from("project").select("id").eq("id", id).maybeSingle();
+  if (existsError) { console.error("deleteProject: existence probe failed", existsError); return { ok: false, status: 500 }; }
   if (!exists) return { ok: false, status: 404 };
-  const { data: parts } = await client.from("part").select("id").eq("project_id", id).limit(1);
+  const { data: parts, error: partsError } = await client.from("part").select("id").eq("project_id", id).limit(1);
+  if (partsError) { console.error("deleteProject: child probe failed", partsError); return { ok: false, status: 500 }; }
   if (parts && parts.length > 0) return { ok: false, status: 409 };
   const { error } = await client.from("project").delete().eq("id", id);
   if (error) return { ok: false, status: error.code === FOREIGN_KEY_VIOLATION ? 409 : 500 };
@@ -261,7 +265,7 @@ async function nextPartNumber(
   client: SupabaseClient,
 ): Promise<{ ok: true; number: number } | { ok: false; status: number }> {
   if (input.type === "assembly") {
-    const { data } = await client
+    const { data, error } = await client
       .from("part")
       .select("part_number")
       .eq("project_id", input.projectId)
@@ -269,6 +273,7 @@ async function nextPartNumber(
       .order("part_number", { ascending: false })
       .limit(1)
       .maybeSingle();
+    if (error) { console.error("nextPartNumber: assembly query failed", error); return { ok: false, status: 500 }; }
     const max = (data as { part_number: number } | null)?.part_number;
     return { ok: true, number: (max ?? -1000) + 1000 };
   }
@@ -277,7 +282,7 @@ async function nextPartNumber(
   // parent validation in createPart), so this is always an .eq(), never the
   // top-level/.is(null) branch — that's what keeps a part's number seeded
   // from its parent's block instead of colliding with the top of the range.
-  const { data: sibling } = await client
+  const { data: sibling, error: siblingError } = await client
     .from("part")
     .select("part_number")
     .eq("project_id", input.projectId)
@@ -286,14 +291,16 @@ async function nextPartNumber(
     .order("part_number", { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (siblingError) { console.error("nextPartNumber: sibling query failed", siblingError); return { ok: false, status: 500 }; }
   const siblingMax = (sibling as { part_number: number } | null)?.part_number;
   if (siblingMax !== undefined && siblingMax !== null) return { ok: true, number: siblingMax + 1 };
 
-  const { data: parent } = await client
+  const { data: parent, error: parentError } = await client
     .from("part")
     .select("part_number, project_id, type")
     .eq("id", input.parentPartId)
     .maybeSingle();
+  if (parentError) { console.error("nextPartNumber: parent query failed", parentError); return { ok: false, status: 500 }; }
   const parentRow = parent as { part_number: number; project_id: string; type: string } | null;
   if (!parentRow || parentRow.project_id !== input.projectId || parentRow.type !== "assembly") {
     return { ok: false, status: 400 };
@@ -313,11 +320,12 @@ export async function createPart(
   const client = db ?? (await import("./db")).getDb();
 
   if (input.parentPartId) {
-    const { data: parent } = await client
+    const { data: parent, error: parentError } = await client
       .from("part")
       .select("project_id, type")
       .eq("id", input.parentPartId)
       .maybeSingle();
+    if (parentError) { console.error("createPart: parent query failed", parentError); return { ok: false, status: 500 }; }
     const parentRow = parent as { project_id: string; type: string } | null;
     if (!parentRow || parentRow.project_id !== input.projectId || parentRow.type !== "assembly") {
       return { ok: false, status: 400 };
@@ -382,7 +390,8 @@ export async function findPartsByOnshapeIdentity(
 
 export async function listParts(projectId: string, db?: SupabaseClient): Promise<Part[]> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client.from("part").select("*").eq("project_id", projectId);
+  const { data, error } = await client.from("part").select("*").eq("project_id", projectId);
+  if (error) console.error("listParts: query failed", error);
   return ((data ?? []) as PartRow[]).map(partFromRow);
 }
 
@@ -403,7 +412,8 @@ export async function listAssembliesByProject(
 /** Part count per project, one query for the whole table (avoids an N+1 of `listParts` per project). */
 export async function countPartsByProject(db?: SupabaseClient): Promise<Record<string, number>> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client.from("part").select("project_id");
+  const { data, error } = await client.from("part").select("project_id");
+  if (error) console.error("countPartsByProject: query failed", error);
   const counts: Record<string, number> = {};
   for (const row of (data ?? []) as { project_id: string }[]) {
     counts[row.project_id] = (counts[row.project_id] ?? 0) + 1;
@@ -413,7 +423,8 @@ export async function countPartsByProject(db?: SupabaseClient): Promise<Record<s
 
 export async function getPart(id: string, db?: SupabaseClient): Promise<Part | null> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client.from("part").select("*").eq("id", id).maybeSingle();
+  const { data, error } = await client.from("part").select("*").eq("id", id).maybeSingle();
+  if (error) throw new Error(`getPart(${id}) failed: ${error.message}`);
   return data ? partFromRow(data as PartRow) : null;
 }
 
@@ -448,9 +459,11 @@ export async function updatePart(
 /** Refuses (409) when the part (an assembly) still has children; the FK (restrict) is the backstop. */
 export async function deletePart(id: string, db?: SupabaseClient): Promise<{ ok: boolean; status: number }> {
   const client = db ?? (await import("./db")).getDb();
-  const { data: exists } = await client.from("part").select("id").eq("id", id).maybeSingle();
+  const { data: exists, error: existsError } = await client.from("part").select("id").eq("id", id).maybeSingle();
+  if (existsError) { console.error("deletePart: existence probe failed", existsError); return { ok: false, status: 500 }; }
   if (!exists) return { ok: false, status: 404 };
-  const { data: children } = await client.from("part").select("id").eq("parent_part_id", id).limit(1);
+  const { data: children, error: childrenError } = await client.from("part").select("id").eq("parent_part_id", id).limit(1);
+  if (childrenError) { console.error("deletePart: child probe failed", childrenError); return { ok: false, status: 500 }; }
   if (children && children.length > 0) return { ok: false, status: 409 };
   const { error } = await client.from("part").delete().eq("id", id);
   if (error) return { ok: false, status: error.code === FOREIGN_KEY_VIOLATION ? 409 : 500 };

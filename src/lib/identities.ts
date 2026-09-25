@@ -21,12 +21,13 @@ export async function listPersonIdentities(
   db?: SupabaseClient,
 ): Promise<PersonIdentityRow[]> {
   const c = await client(db);
-  const { data } = await c
+  const { data, error } = await c
     .from("person_identity")
     .select("*")
     .eq("person_id", personId)
     .order("is_primary", { ascending: false })
     .order("created_at", { ascending: true });
+  if (error) console.error("listPersonIdentities: query failed", error);
   return (data ?? []) as PersonIdentityRow[];
 }
 
@@ -45,11 +46,12 @@ export async function addPersonEmail(
   if (!normalized || !normalized.includes("@")) return { ok: false, status: 400 };
   const c = await client(db);
 
-  const { data: person } = await c
+  const { data: person, error: personError } = await c
     .from("person")
     .select("id, email")
     .eq("id", personId)
     .maybeSingle();
+  if (personError) { console.error("addIdentity: person query failed", personError); return { ok: false, status: 500 }; }
   if (!person) return { ok: false, status: 404 };
 
   if (!(person as { email: string | null }).email) {
@@ -86,12 +88,13 @@ export async function removePersonIdentity(
   db?: SupabaseClient,
 ): Promise<{ ok: boolean; status: number; reason?: "primary_with_secondaries" }> {
   const c = await client(db);
-  const { data } = await c
+  const { data, error: lookupError } = await c
     .from("person_identity")
     .select("*")
     .eq("id", identityId)
     .eq("person_id", personId)
     .maybeSingle();
+  if (lookupError) { console.error("identity lookup failed", lookupError); return { ok: false, status: 500 }; }
   const identity = data as PersonIdentityRow | null;
   if (!identity) return { ok: false, status: 404 };
 
@@ -127,12 +130,13 @@ export async function makePrimaryIdentity(
   db?: SupabaseClient,
 ): Promise<{ ok: boolean; status: number }> {
   const c = await client(db);
-  const { data } = await c
+  const { data, error: lookupError } = await c
     .from("person_identity")
     .select("*")
     .eq("id", identityId)
     .eq("person_id", personId)
     .maybeSingle();
+  if (lookupError) { console.error("identity lookup failed", lookupError); return { ok: false, status: 500 }; }
   const identity = data as PersonIdentityRow | null;
   if (!identity) return { ok: false, status: 404 };
   if (identity.is_primary) return { ok: true, status: 200 };

@@ -162,11 +162,12 @@ export async function getConnection(
   db?: SupabaseClient,
 ): Promise<OnshapeConnection | null> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client
+  const { data, error } = await client
     .from("onshape_connection")
     .select("*")
     .eq("person_id", personId)
     .maybeSingle();
+  if (error) throw new Error(`getConnection(${personId}) failed: ${error.message}`);
   return data ? onshapeConnectionFromRow(data as OnshapeConnectionRow) : null;
 }
 

@@ -45,11 +45,12 @@ export async function listPendingAccountRequests(
   db?: SupabaseClient,
 ): Promise<AccountRequestRow[]> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client
+  const { data, error } = await client
     .from("account_request")
     .select("*")
     .eq("status", "pending")
     .order("created_at");
+  if (error) console.error("listPendingAccountRequests: query failed", error);
   return (data ?? []) as AccountRequestRow[];
 }
 
@@ -98,12 +99,13 @@ export async function approveAccountRequest(
   db?: SupabaseClient,
 ): Promise<{ ok: boolean; status: number }> {
   const client = db ?? (await import("./db")).getDb();
-  const { data: request } = await client
+  const { data: request, error: requestError } = await client
     .from("account_request")
     .select("*")
     .eq("id", id)
     .eq("status", "pending")
     .maybeSingle();
+  if (requestError) { console.error("approveAccountRequest: request probe failed", requestError); return { ok: false, status: 500 }; }
   if (!request) return { ok: false, status: 404 };
   const r = request as AccountRequestRow;
 
@@ -169,12 +171,13 @@ export async function approveApplication(
   db?: SupabaseClient,
 ): Promise<{ ok: boolean; status: number }> {
   const client = db ?? (await import("./db")).getDb();
-  const { data: app } = await client
+  const { data: app, error: appError } = await client
     .from("membership_application")
     .select("id, person_id, team_id")
     .eq("id", id)
     .eq("status", "pending")
     .maybeSingle();
+  if (appError) { console.error("approveApplication: application probe failed", appError); return { ok: false, status: 500 }; }
   if (!app) return { ok: false, status: 404 };
 
   const membership = await upsertMember(
