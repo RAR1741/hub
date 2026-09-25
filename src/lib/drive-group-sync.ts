@@ -44,10 +44,11 @@ export async function reconcileDriveGroups(deps: {
   const { db, fetch, credentials, now } = deps;
   const dirDeps = { fetch, credentials, now };
 
-  const { data } = await db
+  const { data, error } = await db
     .from("team")
     .select("id, name, google_group_email")
     .not("google_group_email", "is", null);
+  if (error) throw new Error(`list linked teams failed: ${error.message}`);
   const linkedTeams = (data ?? []) as LinkedTeamRow[];
 
   const { data: teamRows, error: treeError } = await db.from("team").select("id, parent_team_id");
@@ -72,10 +73,15 @@ export async function reconcileDriveGroups(deps: {
       errors: [],
     };
     try {
-      const { data: memberships } = await db
+      const { data: memberships, error: membershipError } = await db
         .from("team_membership")
         .select("person (is_active, person_identity (email))")
         .in("team_id", subtree);
+      if (membershipError) {
+        report.errors.push(membershipError.message ?? String(membershipError));
+        groups.push(report);
+        continue;
+      }
       type IdentityJoin = { email: string };
       type PersonJoin = {
         is_active: boolean;
@@ -160,19 +166,21 @@ export async function syncMembershipChange(
     const credentials = directoryCredentialsFromEnv();
     if (!credentials) return;
 
-    const { data: team } = await db
+    const { data: team, error: teamError } = await db
       .from("team")
       .select("google_group_email")
       .eq("id", teamId)
       .maybeSingle();
+    if (teamError) { console.error("drive group sync: team query failed", teamError); return; }
     const groupEmail = (team as { google_group_email: string | null } | null)?.google_group_email;
     if (!groupEmail) return;
 
-    const { data: person } = await db
+    const { data: person, error: personError } = await db
       .from("person")
       .select("is_active, person_identity (email)")
       .eq("id", personId)
       .maybeSingle();
+    if (personError) { console.error("drive group sync: person query failed", personError); return; }
     type IdentityJoin = { email: string };
     const p = person as { is_active: boolean; person_identity: IdentityJoin | IdentityJoin[] | null } | null;
     const emails = !p || !p.is_active

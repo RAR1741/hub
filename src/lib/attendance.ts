@@ -105,18 +105,21 @@ export type PeriodAttendanceSummary = {
  * Per-active-person attendance summary over a whole period's required build
  * days. Composes the existing `attendanceSummary`/`attendanceForDate` math —
  * this function only fetches and fans the data out per person, it doesn't
- * change how a day is scored. Returns `[]` if the period doesn't exist.
+ * change how a day is scored. Returns `[]` if the period doesn't exist, and
+ * throws if the period read itself fails.
  */
 export async function attendanceSummaryForPeriod(
   periodId: string,
   db?: SupabaseClient,
 ): Promise<PeriodAttendanceSummary[]> {
   const client = db ?? (await import("./db")).getDb();
-  const { data: periodRow } = await client
+  const { data: periodRow, error: periodError } = await client
     .from("period")
     .select("*")
     .eq("id", periodId)
     .maybeSingle();
+  if (periodError)
+    throw new Error(`attendanceSummaryForPeriod(${periodId}) period query failed: ${periodError.message}`);
   if (!periodRow) return [];
   const period = periodFromRow(periodRow as PeriodRow);
   const range = { from: period.startsOn, to: period.endsOn };

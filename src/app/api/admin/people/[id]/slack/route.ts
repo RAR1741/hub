@@ -9,9 +9,15 @@ type Ctx = { params: Promise<{ id: string }> };
 // Manually link/unlink a person's Slack user id. Complements the bulk
 // email-based sync (syncSlackLinks) for people whose personal email doesn't
 // match their Slack account. Admin-only.
-async function personExists(db: ReturnType<typeof getDb>, id: string): Promise<boolean> {
-  const { data } = await db.from("person").select("id").eq("id", id).maybeSingle();
-  return data !== null;
+/** Null = the person exists. Otherwise the response to bail out with — a read
+ * failure is a 500, not the false 404 that swallowing `error` produced. */
+async function personGate(db: ReturnType<typeof getDb>, id: string): Promise<Response | null> {
+  const { data, error } = await db.from("person").select("id").eq("id", id).maybeSingle();
+  if (error) {
+    console.error("slack link: person lookup failed", error);
+    return Response.json({ error: "failed" }, { status: 500 });
+  }
+  return data !== null ? null : Response.json({ error: "not_found" }, { status: 404 });
 }
 
 export const PUT = withRole<Ctx>("admin", async (_viewer, request, context) => {
@@ -21,7 +27,8 @@ export const PUT = withRole<Ctx>("admin", async (_viewer, request, context) => {
   if (!slackUserId) return Response.json({ error: "invalid" }, { status: 400 });
 
   const db = getDb();
-  if (!(await personExists(db, id))) return Response.json({ error: "not_found" }, { status: 404 });
+  const gate = await personGate(db, id);
+  if (gate) return gate;
 
   const { error } = await db.from("person").update({ slack_user_id: slackUserId }).eq("id", id);
   if (error) {
@@ -36,7 +43,8 @@ export const PUT = withRole<Ctx>("admin", async (_viewer, request, context) => {
 export const DELETE = withRole<Ctx>("admin", async (_viewer, _request, context) => {
   const { id } = await context.params;
   const db = getDb();
-  if (!(await personExists(db, id))) return Response.json({ error: "not_found" }, { status: 404 });
+  const gate = await personGate(db, id);
+  if (gate) return gate;
 
   const { error } = await db.from("person").update({ slack_user_id: null }).eq("id", id);
   if (error) return Response.json({ error: "failed" }, { status: 500 });

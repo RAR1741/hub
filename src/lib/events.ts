@@ -65,16 +65,19 @@ function mapWriteError(code: string | undefined): number {
 
 type LinkedMeeting = { title: string; starts_at: string; ends_at: string };
 
-/** The meeting a gcal_event_id points at, or null if it doesn't match one. */
+/** The meeting a gcal_event_id points at, null if it doesn't match one, or
+ * "error" if the lookup itself failed — a read failure must not read as
+ * "no such meeting" and turn into a 400. */
 async function lookupMeetingByGcalId(
   gcalEventId: string,
   db: SupabaseClient,
-): Promise<LinkedMeeting | null> {
-  const { data } = await db
+): Promise<LinkedMeeting | null | "error"> {
+  const { data, error } = await db
     .from("meeting")
     .select("title, starts_at, ends_at")
     .eq("gcal_event_id", gcalEventId)
     .maybeSingle();
+  if (error) { console.error("lookupMeetingByGcalId: query failed", error); return "error"; }
   return (data as LinkedMeeting | null) ?? null;
 }
 
@@ -87,9 +90,10 @@ async function lookupMeetingByGcalId(
 async function resolveLinkedFields(
   input: EventInput,
   db: SupabaseClient,
-): Promise<{ name: string; startsAt: string; endsAt: string } | null> {
+): Promise<{ name: string; startsAt: string; endsAt: string } | null | "error"> {
   if (!input.gcalEventId) return { name: input.name, startsAt: input.startsAt, endsAt: input.endsAt };
   const meeting = await lookupMeetingByGcalId(input.gcalEventId, db);
+  if (meeting === "error") return "error";
   if (!meeting) return null;
   return { name: meeting.title, startsAt: meeting.starts_at, endsAt: meeting.ends_at };
 }
@@ -102,6 +106,7 @@ export async function createEvent(
 ): Promise<{ ok: true; id: string } | { ok: false; status: number }> {
   const client = db ?? (await import("./db")).getDb();
   const resolved = await resolveLinkedFields(input, client);
+  if (resolved === "error") return { ok: false, status: 500 };
   if (!resolved) return { ok: false, status: 400 };
   const { data, error } = await client
     .from("event")
@@ -134,24 +139,27 @@ export async function createEvent(
 
 export async function listEvents(db?: SupabaseClient): Promise<Event[]> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client.from("event").select("*").order("starts_at", { ascending: false });
+  const { data, error } = await client.from("event").select("*").order("starts_at", { ascending: false });
+  if (error) console.error("listEvents: query failed", error);
   return ((data ?? []) as EventRow[]).map(eventFromRow);
 }
 
 /** Events that haven't ended yet, soonest first — the sign-up page's list. */
 export async function listUpcomingEvents(db?: SupabaseClient): Promise<Event[]> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client
+  const { data, error } = await client
     .from("event")
     .select("*")
     .gte("ends_at", new Date().toISOString())
     .order("starts_at", { ascending: true });
+  if (error) console.error("listUpcomingEvents: query failed", error);
   return ((data ?? []) as EventRow[]).map(eventFromRow);
 }
 
 export async function getEvent(id: string, db?: SupabaseClient): Promise<Event | null> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client.from("event").select("*").eq("id", id).maybeSingle();
+  const { data, error } = await client.from("event").select("*").eq("id", id).maybeSingle();
+  if (error) throw new Error(`getEvent(${id}) failed: ${error.message}`);
   return data ? eventFromRow(data as EventRow) : null;
 }
 
@@ -163,6 +171,7 @@ export async function updateEvent(
 ): Promise<{ ok: boolean; status: number }> {
   const client = db ?? (await import("./db")).getDb();
   const resolved = await resolveLinkedFields(input, client);
+  if (resolved === "error") return { ok: false, status: 500 };
   if (!resolved) return { ok: false, status: 400 };
   const { data, error } = await client
     .from("event")
@@ -211,9 +220,11 @@ export async function deleteEvent(
   slack?: SlackDeps,
 ): Promise<{ ok: boolean; status: number }> {
   const client = db ?? (await import("./db")).getDb();
-  const { data: exists } = await client.from("event").select("id, slack_channel_id").eq("id", id).maybeSingle();
+  const { data: exists, error: existsError } = await client.from("event").select("id, slack_channel_id").eq("id", id).maybeSingle();
+  if (existsError) { console.error("deleteEvent: existence probe failed", existsError); return { ok: false, status: 500 }; }
   if (!exists) return { ok: false, status: 404 };
-  const { data: sessions } = await client.from("session").select("id").eq("event_id", id).limit(1);
+  const { data: sessions, error: sessionsError } = await client.from("session").select("id").eq("event_id", id).limit(1);
+  if (sessionsError) { console.error("deleteEvent: session probe failed", sessionsError); return { ok: false, status: 500 }; }
   if (sessions && sessions.length > 0) return { ok: false, status: 409 };
   const { error } = await client.from("event").delete().eq("id", id);
   if (error) return { ok: false, status: error.code === FOREIGN_KEY_VIOLATION ? 409 : 500 };

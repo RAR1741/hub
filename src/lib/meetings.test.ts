@@ -172,6 +172,26 @@ describe("updateMeeting", () => {
       }),
     } as never;
   }
+  test("a failed prior-starts_at read 500s before the update runs", async () => {
+    // Swallowing it would update the row but silently skip meeting_changed,
+    // because "did it move?" is unanswerable without the prior value (#287).
+    const update = vi.fn();
+    const db = {
+      from: () => ({
+        select: () => ({
+          eq: () => ({ maybeSingle: async () => ({ data: null, error: { message: "boom" } }) }),
+        }),
+        update,
+      }),
+    } as never;
+    const result = await updateMeeting(
+      "m1",
+      { title: "X", startsAt: "2026-09-01T18:00:00Z", endsAt: "2026-09-01T20:00:00Z" },
+      db,
+    );
+    expect(result).toEqual({ ok: false, status: 500 });
+    expect(update).not.toHaveBeenCalled();
+  });
   test("404 when missing", async () => {
     const result = await updateMeeting(
       "m1",

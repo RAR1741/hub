@@ -274,11 +274,12 @@ export function sortByLastUsed<T extends { status: BatteryStatus; lastUsedAt: st
 /** All batteries with their most recent usage timestamp, in LRU order (spec §3). */
 export async function listBatteries(db?: SupabaseClient): Promise<(Battery & { lastUsedAt: string | null })[]> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client
+  const { data, error } = await client
     .from("battery")
     .select("*, battery_usage(used_at)")
     .order("used_at", { referencedTable: "battery_usage", ascending: false })
     .limit(1, { referencedTable: "battery_usage" });
+  if (error) console.error("listBatteries: query failed", error);
   const rows = ((data ?? []) as BatteryWithUsageRow[]).map((row) => ({
     ...batteryFromRow(row),
     lastUsedAt: row.battery_usage[0]?.used_at ?? null,
@@ -288,7 +289,8 @@ export async function listBatteries(db?: SupabaseClient): Promise<(Battery & { l
 
 export async function getBattery(id: string, db?: SupabaseClient): Promise<Battery | null> {
   const client = db ?? (await import("./db")).getDb();
-  const { data } = await client.from("battery").select("*").eq("id", id).maybeSingle();
+  const { data, error } = await client.from("battery").select("*").eq("id", id).maybeSingle();
+  if (error) throw new Error(`getBattery(${id}) failed: ${error.message}`);
   return data ? batteryFromRow(data as BatteryRow) : null;
 }
 
@@ -305,7 +307,8 @@ export async function listUsage(
     .order("used_at", { ascending: false });
   if (batteryId) query = query.eq("battery_id", batteryId);
   if (limit) query = query.limit(limit);
-  const { data } = await query;
+  const { data, error } = await query;
+  if (error) console.error("listUsage: query failed", error);
   return ((data ?? []) as BatteryUsageRow[]).map(batteryUsageFromRow);
 }
 
@@ -348,7 +351,8 @@ export async function createUsage(
 /** No edit path for a mistyped usage entry, so a mentor deletes and re-logs instead. */
 export async function deleteUsage(id: string, db?: SupabaseClient): Promise<{ ok: true } | { ok: false; status: number }> {
   const client = db ?? (await import("./db")).getDb();
-  const { data: exists } = await client.from("battery_usage").select("id").eq("id", id).maybeSingle();
+  const { data: exists, error: existsError } = await client.from("battery_usage").select("id").eq("id", id).maybeSingle();
+  if (existsError) { console.error("deleteUsage: existence probe failed", existsError); return { ok: false, status: 500 }; }
   if (!exists) return { ok: false, status: 404 };
   const { error } = await client.from("battery_usage").delete().eq("id", id);
   if (error) return { ok: false, status: mapWriteError(error.code) };

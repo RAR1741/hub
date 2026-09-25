@@ -104,7 +104,15 @@ export const POST = withRole("admin", async (_viewer, request) => {
   };
 
   for (const row of rows) {
-    const result = await importRow(row);
+    // A thrown lookup failure aborts this row only — never fall through to
+    // createPerson, which would duplicate an existing person.
+    const result = await importRow(row).catch(
+      (e: unknown): RowResult => ({
+        line: row.line,
+        status: "error",
+        message: e instanceof Error ? e.message : "Lookup failed",
+      }),
+    );
     summary.results.push(result);
     if (result.status === "created") summary.created += 1;
     else if (result.status === "updated") summary.updated += 1;

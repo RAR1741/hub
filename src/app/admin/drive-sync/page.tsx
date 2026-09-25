@@ -36,9 +36,10 @@ export default async function AdminDriveSyncPage() {
   }
 
   // email (lowercase) -> display name, for resolving added/wouldRemove lists.
-  const { data: identityRows } = await db
+  const { data: identityRows, error: identityError } = await db
     .from("person_identity")
     .select("email, person (id, is_active, first_name, last_name)");
+  if (identityError) console.error("drive-sync page: identity query failed", identityError);
   const nameByEmail: Record<string, string> = {};
   const personByEmail = new Map<string, { personId: string; name: string; isActive: boolean }>();
   for (const row of (identityRows ?? []) as unknown as {
@@ -64,10 +65,11 @@ export default async function AdminDriveSyncPage() {
   const linkedTeamIds = linkedTeams.map((t) => t.id);
   const membersByTeam = new Map<string, Set<string>>();
   if (linkedTeamIds.length > 0) {
-    const { data: memberRows } = await db
+    const { data: memberRows, error: memberError } = await db
       .from("team_membership")
       .select("team_id, person_id")
       .in("team_id", linkedTeamIds);
+    if (memberError) console.error("drive-sync page: membership query failed", memberError);
     for (const row of (memberRows ?? []) as { team_id: string; person_id: string }[]) {
       const set = membersByTeam.get(row.team_id) ?? new Set<string>();
       set.add(row.person_id);

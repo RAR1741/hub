@@ -66,6 +66,8 @@ function fakeDb(seed?: {
   linkedEvents?: { id: string; gcal_event_id: string; name: string; starts_at: string; ends_at: string; gcal_missing: boolean }[];
   meetingsByGcalId?: { gcal_event_id: string; title: string; starts_at: string; ends_at: string }[];
   priorMeetings?: { id: string; gcal_event_id: string; starts_at: string }[];
+  /** Tables whose reads fail, to prove the sync aborts before any write. */
+  errorTable?: string;
 }) {
   const calls: { table: string; rows: unknown; opts: unknown }[] = [];
   const deletes: { table: string; filters: { op: string; col: string; val: unknown }[] }[] = [];
@@ -122,7 +124,11 @@ function fakeDb(seed?: {
                 inVal = vals;
                 return chain;
               },
-              then(resolve: (v: { data: unknown; error: null }) => void) {
+              then(resolve: (v: { data: unknown; error: unknown }) => void) {
+                if (table === seed?.errorTable) {
+                  resolve({ data: null, error: { message: "boom" } });
+                  return;
+                }
                 if (table === "period") {
                   resolve({ data: periods, error: null });
                   return;
@@ -242,6 +248,27 @@ function fakeFetchPaged(pages: { token: string | undefined; events: unknown[]; n
   }) as unknown as GcalTransport;
   return { transport, requestedUrls };
 }
+
+describe("a failed read aborts the sync before it writes", () => {
+  // Swallowing the error used to return 0/false and let the upsert run against
+  // a half-read picture — silently dropping every meeting_changed push (#287).
+  test("a failing meeting read rejects and writes nothing", async () => {
+    const db = fakeDb({ errorTable: "meeting" });
+    await expect(
+      syncCalendar({
+        fetch: fakeFetch([
+          { id: "evt-1", summary: "Build", start: { dateTime: "2026-09-02T03:00:00Z" }, end: { dateTime: "2026-09-02T05:00:00Z" } },
+        ]),
+        db: db.client,
+        credentials: CREDS,
+        tz: TZ,
+        now: () => NOW,
+      }),
+    ).rejects.toThrow(/boom/);
+    expect(db.calls).toEqual([]);
+    expect(db.updates).toEqual([]);
+  });
+});
 
 describe("isRequiredEvent", () => {
   const TZ = "America/Indiana/Indianapolis";
