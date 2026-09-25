@@ -55,7 +55,9 @@ export async function fetchGoogleAccessToken(
       assertion,
     }),
   });
-  if (!res.ok) throw new Error(`token exchange failed: ${res.status}`);
+  // Include Google's body (e.g. invalid_grant: Invalid JWT Signature) so a
+  // rotated/deleted SA key is diagnosable from the log, not just "400".
+  if (!res.ok) throw new Error(`token exchange failed: ${res.status} ${await res.text()}`);
   const json = (await res.json()) as { access_token?: string };
   if (!json.access_token) throw new Error("token exchange returned no access_token");
   return json.access_token;
