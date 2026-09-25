@@ -84,6 +84,7 @@ first posts nothing; delete that row to replay a 7-day window.
 ## Observability gap
 
 pg_cron's `net.http_post` reports success as a SQL statement even when the route itself returns
-403 or 502 — so a broken digest still shows green in `/admin/cron`. The only real signal is a
-missing Monday post. This is the same limitation the [mentor-reminder cron](slack-integration.md#weekly-mentor-reminders)
-has.
+403 or 502, so `/admin/cron`'s "last run" column stays green for a broken digest. The
+[cron heartbeat](cron-heartbeat.md) is the real signal: the route records
+`app_setting.cron_heartbeat_slack-whats-new-weekly` when it finishes, and admins are pushed an alert
+once that is more than ~8.75 days old.

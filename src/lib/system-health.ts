@@ -2,7 +2,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSetting } from "./settings";
 import { pushDepsFromEnv, sanitizePushText, sendPushToOptedIn, type PushDeps } from "./push-dispatch";
 
-export type HealthSubsystem =
+/** Fixed subsystems, plus one key per pg_cron job (`cron_<jobname>`, from
+ *  src/lib/cron-heartbeat.ts) so each stale job alerts independently. */
+export type HealthSubsystem = FixedSubsystem | `cron_${string}`;
+
+type FixedSubsystem =
   | "slack_delivery"
   | "push_reminders"
   | "push_clocked_in_late"
@@ -11,7 +15,7 @@ export type HealthSubsystem =
   | "slack_event_channels"
   | "slack_membership_sync";
 
-const LABELS: Record<HealthSubsystem, string> = {
+const LABELS: Record<FixedSubsystem, string> = {
   slack_delivery: "Slack admin-alert delivery",
   push_reminders: "Event/meeting reminder push",
   push_clocked_in_late: "Clocked-in-late push",
@@ -20,6 +24,12 @@ const LABELS: Record<HealthSubsystem, string> = {
   slack_event_channels: "Event channel sweep",
   slack_membership_sync: "Slack membership sync",
 };
+
+function label(subsystem: HealthSubsystem): string {
+  return subsystem in LABELS
+    ? LABELS[subsystem as FixedSubsystem]
+    : `Cron job ${subsystem.slice("cron_".length)}`;
+}
 
 /**
  * Push to opted-in admins only when a subsystem's health CHANGES (ok→failing
@@ -54,7 +64,7 @@ export async function reportSubsystemHealth(
     const adminIds = ((data ?? []) as { id: string }[]).map((r) => r.id);
 
     const payload = {
-      title: ok ? `${LABELS[subsystem]} recovered` : `${LABELS[subsystem]} failing`,
+      title: ok ? `${label(subsystem)} recovered` : `${label(subsystem)} failing`,
       body: sanitizePushText(ok ? "Working again." : (deps.detail ?? "Check server logs.")),
       url: "/admin",
     };

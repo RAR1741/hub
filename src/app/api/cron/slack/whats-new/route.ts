@@ -5,6 +5,7 @@ import { slackDepsFromEnv } from "@/lib/slack";
 import { githubAppCredentialsFromEnv } from "@/lib/github-app";
 import { sendWhatsNewDigest } from "@/lib/whats-new";
 import { reportSubsystemHealth } from "@/lib/system-health";
+import { recordCronHeartbeat } from "@/lib/cron-heartbeat";
 
 export async function POST(request: Request) {
   const db = getDb();
@@ -20,6 +21,7 @@ export async function POST(request: Request) {
       githubCredentials: githubAppCredentialsFromEnv(),
       db,
     });
+    await recordCronHeartbeat("slack-whats-new-weekly", db);
     // An empty window is a real success (the cursor advances); only a digest that
     // was formatted and then failed to post is a failure.
     await reportSubsystemHealth("slack_whats_new", result.count === 0 || result.posted, {

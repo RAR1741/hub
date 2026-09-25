@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
-import { listCronJobs } from "@/lib/cron-jobs";
+import { listCronJobsWithStaleness } from "@/lib/cron-heartbeat";
 import { getTeamTimezone } from "@/lib/settings";
 import { CronJobsEditor } from "@/components/CronJobsEditor";
 
@@ -12,7 +12,9 @@ export default async function AdminCronPage() {
   const viewer = await getViewer();
   if (!hasRole(viewer.role, "admin")) redirect("/");
 
-  const jobs = await listCronJobs();
+  // Staleness resolved server-side so the client component stays free of the
+  // server-only cron-heartbeat module.
+  const jobs = await listCronJobsWithStaleness();
   const teamTz = await getTeamTimezone();
 
   return (
@@ -25,7 +27,9 @@ export default async function AdminCronPage() {
       </div>
       <p className="text-[13px] text-[var(--muted)]">
         Schedules are seeded by migrations, then editable here. Edits reschedule the job
-        immediately and override the migration value until changed again.
+        immediately and override the migration value until changed again. &ldquo;Last run&rdquo; is
+        pg_cron firing the job; &ldquo;last success&rdquo; is the work itself reporting back, so a job
+        marked overdue is reaching pg_cron but not finishing (or not reaching the app at all).
       </p>
       <section className="card flex flex-col gap-4">
         <CronJobsEditor jobs={jobs} teamTz={teamTz} />

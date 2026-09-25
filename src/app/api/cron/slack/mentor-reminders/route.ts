@@ -4,6 +4,7 @@ import { secureEqual } from "@/lib/secure-compare";
 import { slackDepsFromEnv } from "@/lib/slack";
 import { sendMentorReminders } from "@/lib/mentor-reminders";
 import { reportSubsystemHealth } from "@/lib/system-health";
+import { recordCronHeartbeat } from "@/lib/cron-heartbeat";
 
 export async function POST(request: Request) {
   const db = getDb();
@@ -14,6 +15,7 @@ export async function POST(request: Request) {
   }
   try {
     const result = await sendMentorReminders({ db, slack: slackDepsFromEnv() });
+    await recordCronHeartbeat("slack-mentor-reminders-weekly", db);
     // `unlinked` is a data gap already named in the admin summary, not a delivery
     // failure — only a DM that Slack rejected counts against health.
     await reportSubsystemHealth("slack_mentor_reminders", result.failed.length === 0, {

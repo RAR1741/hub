@@ -3,6 +3,7 @@ import { getSetting } from "@/lib/settings";
 import { secureEqual } from "@/lib/secure-compare";
 import { pushClockedInLate } from "@/lib/clocked-in-late";
 import { reportSubsystemHealth } from "@/lib/system-health";
+import { recordCronHeartbeat } from "@/lib/cron-heartbeat";
 
 export async function POST(request: Request) {
   const db = getDb();
@@ -13,6 +14,7 @@ export async function POST(request: Request) {
   }
   try {
     const result = await pushClockedInLate({ db });
+    await recordCronHeartbeat("push-clocked-in-late", db);
     await reportSubsystemHealth("push_clocked_in_late", result.errors === 0, {
       db,
       detail: "Loading open sessions failed — check server logs.",
