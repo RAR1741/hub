@@ -1,9 +1,16 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-vi.mock("./event-signups", () => ({ insertSignupReminders: vi.fn(async () => true) }));
+vi.mock("./event-signups", () => ({
+  insertSignupReminders: vi.fn(async () => true),
+  inviteSignupToEventChannel: vi.fn(async () => {}),
+}));
+vi.mock("./events", () => ({
+  getEvent: vi.fn(async () => ({ id: "e1", slackChannelId: "C1", slackArchivedAt: null })),
+}));
 
 import { submitEventSignupResponse } from "./form-responses";
-import { insertSignupReminders } from "./event-signups";
+import { insertSignupReminders, inviteSignupToEventChannel } from "./event-signups";
+import { getEvent } from "./events";
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -59,5 +66,30 @@ describe("submitEventSignupResponse — reminders", () => {
       [{ fieldId: "f_att", values: ["yes"] }], fakeDb({ rpcError: { code: "23505" } }), FORM, [15]);
     expect(r).toEqual({ ok: false, status: 409 });
     expect(insertSignupReminders).not.toHaveBeenCalled();
+  });
+});
+
+describe("submitEventSignupResponse — Slack channel invite", () => {
+  const answers = [{ fieldId: "f_att", values: ["yes"] }];
+
+  test("successful form signup invites the person to the event's channel", async () => {
+    const db = fakeDb();
+    const slack = { fetch: vi.fn(), token: "t", isProd: true };
+    const r = await submitEventSignupResponse("e1", "p1", "form1", answers, db, FORM, [], slack as never);
+    expect(r).toEqual({ ok: true, status: 201 });
+    expect(inviteSignupToEventChannel).toHaveBeenCalledWith(
+      db, { id: "e1", slackChannelId: "C1", slackArchivedAt: null }, "p1", slack);
+  });
+
+  test("RPC failure -> no invite", async () => {
+    await submitEventSignupResponse("e1", "p1", "form1", answers, fakeDb({ rpcError: { code: "23505" } }), FORM);
+    expect(inviteSignupToEventChannel).not.toHaveBeenCalled();
+  });
+
+  test("event lookup throwing still returns 201", async () => {
+    vi.mocked(getEvent).mockRejectedValueOnce(new Error("boom"));
+    const r = await submitEventSignupResponse("e1", "p1", "form1", answers, fakeDb(), FORM);
+    expect(r).toEqual({ ok: true, status: 201 });
+    expect(inviteSignupToEventChannel).not.toHaveBeenCalled();
   });
 });

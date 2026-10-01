@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { insertSignupReminders } from "./event-signups";
+import { insertSignupReminders, inviteSignupToEventChannel } from "./event-signups";
+import { getEvent } from "./events";
+import type { SlackDeps } from "./slack";
 import { getFormWithFields, validateAnswers, type FieldWithOptions, type SubmittedAnswer } from "./forms";
 import { displayName } from "./people";
 import type { ReminderMinutes } from "./reminder-minutes";
@@ -17,6 +19,7 @@ export async function submitEventSignupResponse(
   db?: SupabaseClient,
   form?: { form: Form; fields: FieldWithOptions[] } | null,
   reminderMinutes: readonly ReminderMinutes[] = [],
+  slack?: SlackDeps,
 ): Promise<{ ok: boolean; status: number }> {
   const client = db ?? (await import("./db")).getDb();
   const loaded = form !== undefined ? form : await getFormWithFields(formId, client);
@@ -35,6 +38,13 @@ export async function submitEventSignupResponse(
     return { ok: false, status: 500 };
   }
   await insertSignupReminders(client, eventId, personId, reminderMinutes);
+  // Signup already committed; a failed event read only skips the Slack invite.
+  try {
+    const event = await getEvent(eventId, client);
+    if (event) await inviteSignupToEventChannel(client, event, personId, slack);
+  } catch (e) {
+    console.error("submitEventSignupResponse: Slack invite skipped:", e);
+  }
   return { ok: true, status: 201 };
 }
 

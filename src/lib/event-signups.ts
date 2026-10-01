@@ -30,6 +30,27 @@ export async function insertSignupReminders(
   return true;
 }
 
+/**
+ * Invite a just-signed-up person to the event's Slack channel. Never throws:
+ * the signup DB write already committed, so Slack can't change the result.
+ */
+export async function inviteSignupToEventChannel(
+  client: SupabaseClient,
+  event: { id: string; slackChannelId: string | null; slackArchivedAt: string | null },
+  personId: string,
+  slack?: SlackDeps,
+): Promise<void> {
+  try {
+    await afterEventSignup(
+      { db: client, slack: slack ?? slackDepsFromEnv() },
+      { id: event.id, slackChannelId: event.slackChannelId, slackArchivedAt: event.slackArchivedAt },
+      personId,
+    );
+  } catch (e) {
+    console.error("inviteSignupToEventChannel: afterEventSignup threw:", e);
+  }
+}
+
 /** 409 if the event doesn't exist or has already ended — no signing up for the past. */
 export async function signUpForEvent(
   eventId: string,
@@ -50,16 +71,7 @@ export async function signUpForEvent(
   }
   // Reminders are best-effort; their outcome never changes the signup result below.
   await insertSignupReminders(client, eventId, personId, reminderMinutes);
-  // DB write above already committed; Slack can never change the result below.
-  try {
-    await afterEventSignup(
-      { db: client, slack: slack ?? slackDepsFromEnv() },
-      { id: eventId, slackChannelId: event.slackChannelId, slackArchivedAt: event.slackArchivedAt },
-      personId,
-    );
-  } catch (e) {
-    console.error("signUpForEvent: afterEventSignup threw:", e);
-  }
+  await inviteSignupToEventChannel(client, event, personId, slack);
   return { ok: true, status: 201 };
 }
 
