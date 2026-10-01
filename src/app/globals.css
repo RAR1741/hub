@@ -1080,6 +1080,11 @@
     text-decoration: none;
   }
 
+  /* .card.meets clips overflow, so keep the focus ring inside the row. */
+  a.meet:focus-visible {
+    outline-offset: -2px;
+  }
+
   a.meet:hover {
     background: var(--surface-2);
   }
