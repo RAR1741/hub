@@ -1040,6 +1040,10 @@
     padding: 0;
   }
 
+  .card.meets {
+    overflow: hidden;
+  }
+
   .card.pit > .card-head,
   .card.meets > .card-head {
     margin: 0;

@@ -291,11 +291,12 @@ describe("listGcalCandidates", () => {
 });
 
 describe("eventIdsByGcalId", () => {
-  function fakeDb(result: { data: unknown; error: unknown }, calls: string[][] = []) {
+  function fakeDb(result: { data: unknown; error: unknown }, calls: string[][] = [], cols: string[] = []) {
     return {
       from: () => ({
         select: () => ({
-          in: async (_col: string, ids: string[]) => {
+          in: async (col: string, ids: string[]) => {
+            cols.push(col);
             calls.push(ids);
             return result;
           },
@@ -311,13 +312,16 @@ describe("eventIdsByGcalId", () => {
   });
 
   test("maps gcal id to event id", async () => {
-    const db = fakeDb({ data: [{ id: "ev1", gcal_event_id: "g1" }], error: null });
+    const cols: string[] = [];
+    const db = fakeDb({ data: [{ id: "ev1", gcal_event_id: "g1" }], error: null }, [], cols);
     expect(await eventIdsByGcalId(["g1", "g2"], db)).toEqual(new Map([["g1", "ev1"]]));
+    expect(cols[0]).toBe("gcal_event_id");
   });
 
   test("query error yields an empty map", async () => {
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     expect(await eventIdsByGcalId(["g1"], fakeDb({ data: null, error: { message: "boom" } }))).toEqual(new Map());
+    expect(spy).toHaveBeenCalled();
     spy.mockRestore();
   });
 });
