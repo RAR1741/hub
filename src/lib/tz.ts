@@ -57,15 +57,15 @@ export function datetimeLocalToInstant(value: string, tz: string): string {
 }
 
 /**
- * All-day = both instants are exactly local midnight in `tz` and the span is
- * at least 24h (Google all-day events are stored this way, end exclusive). PURE.
+ * All-day = both instants are exactly local midnight in `tz` and the end's
+ * local date is later than the start's (Google all-day events are stored this
+ * way, end exclusive). Compares calendar dates, not elapsed ms, so a 23h
+ * spring-forward day still counts. PURE.
  */
 export function isAllDayRange(startsAt: string, endsAt: string, tz: string): boolean {
-  return (
-    instantToDatetimeLocal(startsAt, tz).endsWith("T00:00") &&
-    instantToDatetimeLocal(endsAt, tz).endsWith("T00:00") &&
-    new Date(endsAt).getTime() - new Date(startsAt).getTime() >= 24 * 3600 * 1000
-  );
+  const s = instantToDatetimeLocal(startsAt, tz);
+  const e = instantToDatetimeLocal(endsAt, tz);
+  return s.endsWith("T00:00") && e.endsWith("T00:00") && e.slice(0, 10) > s.slice(0, 10);
 }
 
 /**

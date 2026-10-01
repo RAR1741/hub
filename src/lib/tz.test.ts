@@ -52,6 +52,13 @@ describe("formatEventRange", () => {
     expect(range("2026-11-01", "2026-11-02")).toBe("11/1/2026");
     expect(range("2026-10-31", "2026-11-02")).toBe("10/31/2026 – 11/1/2026");
   });
+  test("single-day all-day on spring-forward day (23h) is date only", () => {
+    expect(range("2026-03-08", "2026-03-09")).toBe("3/8/2026");
+  });
+  test("zero-length midnight-to-same-midnight is not all-day", () => {
+    const s = localDateTimeToInstant("2026-10-03", 0, tz);
+    expect(isAllDayRange(s, s, tz)).toBe(false);
+  });
   test("timed event keeps the date-time pair", () => {
     const s = localDateTimeToInstant("2026-10-03", 18 * 60, tz);
     const e = localDateTimeToInstant("2026-10-03", 20 * 60, tz);
