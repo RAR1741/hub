@@ -320,9 +320,13 @@ export async function syncCalendar(deps: GcalDeps): Promise<SyncResult> {
     if (!prior) continue; // new event, not a change
     const delta = Math.abs(Date.parse(row.starts_at) - Date.parse(prior.starts_at));
     if (delta === 0) continue; // unchanged (same instant, maybe different format)
-    // All-day rows used to be stored at UTC midnight; the shift to local midnight
-    // is < 24h, so only a >= 24h move (a real date change) counts.
-    if (!events[i].start?.dateTime && delta < 24 * 60 * 60 * 1000) continue;
+    // Legacy all-day rows stored UTC midnight; the one-time shift of the SAME date
+    // to local midnight isn't a real change.
+    if (
+      !events[i].start?.dateTime &&
+      Date.parse(prior.starts_at) === Date.parse(`${events[i].start!.date}T00:00:00Z`)
+    )
+      continue;
     if (new Date(row.starts_at).getTime() <= nowMs) continue; // past
     try {
       await notifyMeetingChanged(deps.db, { id: prior.id, title: row.title, starts_at: row.starts_at });
