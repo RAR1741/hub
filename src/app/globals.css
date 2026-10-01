@@ -1071,6 +1071,19 @@
     font-size: 14px;
   }
 
+  a.meet {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  a.meet:hover {
+    background: var(--surface-2);
+  }
+
+  a.meet:hover .t {
+    text-decoration: underline;
+  }
+
   .req {
     font-size: 10px;
     font-weight: 800;

@@ -163,6 +163,15 @@ export async function getEvent(id: string, db?: SupabaseClient): Promise<Event |
   return data ? eventFromRow(data as EventRow) : null;
 }
 
+/** gcal_event_id → event id for the events linked to these calendar meetings. */
+export async function eventIdsByGcalId(gcalIds: string[], db?: SupabaseClient): Promise<Map<string, string>> {
+  if (gcalIds.length === 0) return new Map();
+  const client = db ?? (await import("./db")).getDb();
+  const { data, error } = await client.from("event").select("id, gcal_event_id").in("gcal_event_id", gcalIds);
+  if (error) console.error("eventIdsByGcalId: query failed", error);
+  return new Map(((data ?? []) as { id: string; gcal_event_id: string }[]).map((r) => [r.gcal_event_id, r.id]));
+}
+
 export async function updateEvent(
   id: string,
   input: EventInput,
