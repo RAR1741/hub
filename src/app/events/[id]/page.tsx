@@ -1,3 +1,4 @@
+import { formatEventRange } from "@/lib/tz";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -37,8 +38,7 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
         <div>
           <h1>{event.name}</h1>
           <div className="sub mono">
-            {new Date(event.startsAt).toLocaleString(undefined, { timeZone: teamTz })} –{" "}
-            {new Date(event.endsAt).toLocaleString(undefined, { timeZone: teamTz })}
+            {formatEventRange(event.startsAt, event.endsAt, teamTz)}
             {event.location ? ` · ${event.location}` : ""}
           </div>
         </div>

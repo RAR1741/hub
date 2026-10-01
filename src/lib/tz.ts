@@ -55,3 +55,47 @@ export function datetimeLocalToInstant(value: string, tz: string): string {
   const [hh, mm] = time.split(":").map(Number);
   return localDateTimeToInstant(dateIso, hh * 60 + mm, tz);
 }
+
+/**
+ * All-day = both instants are exactly local midnight in `tz` and the span is
+ * at least 24h (Google all-day events are stored this way, end exclusive). PURE.
+ */
+export function isAllDayRange(startsAt: string, endsAt: string, tz: string): boolean {
+  return (
+    instantToDatetimeLocal(startsAt, tz).endsWith("T00:00") &&
+    instantToDatetimeLocal(endsAt, tz).endsWith("T00:00") &&
+    new Date(endsAt).getTime() - new Date(startsAt).getTime() >= 24 * 3600 * 1000
+  );
+}
+
+/**
+ * Per-cell display strings for an event range: all-day -> date only, end
+ * inclusive (last day, not the exclusive midnight); otherwise full date-times.
+ * PURE.
+ */
+export function formatEventCells(
+  startsAt: string,
+  endsAt: string,
+  tz: string,
+  locale?: string,
+): [string, string] {
+  if (!isAllDayRange(startsAt, endsAt, tz)) {
+    return [
+      new Date(startsAt).toLocaleString(locale, { timeZone: tz }),
+      new Date(endsAt).toLocaleString(locale, { timeZone: tz }),
+    ];
+  }
+  // Subtract a day from end's local date in pure date arithmetic (DST-safe).
+  const [y, m, d] = instantToDatetimeLocal(endsAt, tz).slice(0, 10).split("-").map(Number);
+  const lastDay = new Date(Date.UTC(y, m - 1, d - 1));
+  return [
+    new Date(startsAt).toLocaleDateString(locale, { timeZone: tz }),
+    lastDay.toLocaleDateString(locale, { timeZone: "UTC" }),
+  ];
+}
+
+/** "start – end" for an event range; all-day collapses to date(s). PURE. */
+export function formatEventRange(startsAt: string, endsAt: string, tz: string, locale?: string): string {
+  const [s, e] = formatEventCells(startsAt, endsAt, tz, locale);
+  return isAllDayRange(startsAt, endsAt, tz) && s === e ? s : `${s} – ${e}`;
+}

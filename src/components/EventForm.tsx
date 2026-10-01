@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { datetimeLocalToInstant, instantToDatetimeLocal } from "@/lib/tz";
+import { datetimeLocalToInstant, instantToDatetimeLocal, formatEventCells } from "@/lib/tz";
 import type { Event, Period } from "@/lib/types";
 
 type GcalCandidate = { id: string; title: string; startsAt: string; endsAt: string };
@@ -103,7 +103,7 @@ export function EventForm({ periods: allPeriods, forms, event, teamTz, onSaved }
             <option value="">— Not linked —</option>
             {candidates.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.title} ({new Date(c.startsAt).toLocaleString(undefined, { timeZone: teamTz })})
+                {c.title} ({formatEventCells(c.startsAt, c.endsAt, teamTz)[0]})
               </option>
             ))}
           </select>

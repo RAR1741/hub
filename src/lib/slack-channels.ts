@@ -1,3 +1,4 @@
+import { formatEventRange } from "@/lib/tz";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { slackDepsFromEnv, type SlackDeps } from "./slack";
 import { getTeamTimezone } from "./settings";
@@ -271,7 +272,7 @@ export async function afterEventCreated(deps: { db: SupabaseClient; slack?: Slac
     }
     const teamTz = await getTeamTimezone(deps.db);
     const where = ev.location ? ` at ${ev.location}` : "";
-    const when = `${new Date(ev.startsAt).toLocaleString(undefined, { timeZone: teamTz })} – ${new Date(ev.endsAt).toLocaleString(undefined, { timeZone: teamTz })}`;
+    const when = formatEventRange(ev.startsAt, ev.endsAt, teamTz);
     const signup = `:memo: <https://hub.redalert1741.org/events/${ev.id}|Sign up here!>`;
     await postToEventChannel(slack, channel.id, `:tada: *${ev.name}* — ${when}${where}\n${signup}`);
   } catch (e) {
