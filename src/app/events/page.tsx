@@ -1,3 +1,4 @@
+import { formatEventRange } from "@/lib/tz";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -50,8 +51,7 @@ export default async function EventsPage() {
                 <div>
                   <Link href={`/events/${e.id}`} className="font-semibold hover:underline">{e.name}</Link>
                   <div className="sub mono">
-                    {new Date(e.startsAt).toLocaleString(undefined, { timeZone: teamTz })} –{" "}
-                    {new Date(e.endsAt).toLocaleString(undefined, { timeZone: teamTz })}
+                    {formatEventRange(e.startsAt, e.endsAt, teamTz)}
                     {e.location ? ` · ${e.location}` : ""}
                   </div>
                   {e.description && <div className="text-sm text-[var(--muted)]">{e.description}</div>}

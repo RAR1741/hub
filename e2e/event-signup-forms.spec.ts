@@ -36,8 +36,8 @@ test("mentor builds a form, student submits it, mentor sees the response", async
     data: {
       name: eventName,
       periodId,
-      startsAt: "2026-09-25T18:00:00.000Z",
-      endsAt: "2026-09-25T20:00:00.000Z",
+      startsAt: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(),
+      endsAt: new Date(Date.now() + 7 * 24 * 3600 * 1000 + 2 * 3600 * 1000).toISOString(),
       formId,
     },
   });

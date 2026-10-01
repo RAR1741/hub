@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Icon } from "@/components/ui";
-import { instantToDatetimeLocal, datetimeLocalToInstant } from "@/lib/tz";
+import { instantToDatetimeLocal, datetimeLocalToInstant, formatEventCells } from "@/lib/tz";
 
 export function MeetingRow({
   id,
@@ -104,11 +104,12 @@ export function MeetingRow({
     );
   }
 
+  const [startCell, endCell] = formatEventCells(startsAt, endsAt, teamTz, "en-US");
   return (
     <tr>
       <td>{title}</td>
-      <td>{new Date(startsAt).toLocaleString("en-US", { timeZone: teamTz })}</td>
-      <td>{new Date(endsAt).toLocaleString("en-US", { timeZone: teamTz })}</td>
+      <td>{startCell}</td>
+      <td>{endCell}</td>
       <td>
         <span className={`pill ${isManual ? "on" : "role"}`}>{isManual ? "Manual" : "Google"}</span>
       </td>

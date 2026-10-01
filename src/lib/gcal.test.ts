@@ -437,6 +437,23 @@ describe("syncCalendar", () => {
     ]);
   });
 
+  test("an all-day event is stored at team-local midnight (exclusive end = next local midnight)", async () => {
+    const db = fakeDb();
+    await syncCalendar({
+      fetch: fakeFetch([
+        { id: "evt-allday", summary: "Competition Day", start: { date: "2026-10-03" }, end: { date: "2026-10-04" } },
+      ]),
+      db: db.client,
+      credentials: CREDS,
+      tz: TZ,
+      now: () => 1_700_000_000_000,
+    });
+    const meetingCall = db.calls.find((c) => c.table === "meeting")!;
+    expect(meetingCall.rows).toMatchObject([
+      { starts_at: "2026-10-03T04:00:00.000Z", ends_at: "2026-10-04T04:00:00.000Z" },
+    ]);
+  });
+
   describe("meeting_changed fan-out", () => {
     const NOW_MS = 1_700_000_000_000; // fixed "now" used by these tests
     const FUTURE = new Date(NOW_MS + 24 * 60 * 60 * 1000).toISOString();
@@ -488,6 +505,34 @@ describe("syncCalendar", () => {
         { id: "evt-1", summary: "Build Session", start: { dateTime: laterStill }, end: { dateTime: laterStill } },
       ];
       await run(events, [{ id: "m1", gcal_event_id: "evt-1", starts_at: FUTURE }]);
+      expect(notifyMeetingChanged).toHaveBeenCalledTimes(1);
+    });
+
+    test("all-day: does NOT fire when a legacy UTC-midnight row shifts to local midnight", async () => {
+      vi.mocked(notifyMeetingChanged).mockClear();
+      const events = [{ id: "evt-1", summary: "Comp", start: { date: "2023-12-01" }, end: { date: "2023-12-02" } }];
+      await run(events, [{ id: "m1", gcal_event_id: "evt-1", starts_at: "2023-12-01T00:00:00Z" }]);
+      expect(notifyMeetingChanged).not.toHaveBeenCalled();
+    });
+
+    test("all-day: fires when the event moves to a different date", async () => {
+      vi.mocked(notifyMeetingChanged).mockClear();
+      const events = [{ id: "evt-1", summary: "Comp", start: { date: "2023-12-05" }, end: { date: "2023-12-06" } }];
+      await run(events, [{ id: "m1", gcal_event_id: "evt-1", starts_at: "2023-12-01T00:00:00Z" }]);
+      expect(notifyMeetingChanged).toHaveBeenCalledTimes(1);
+    });
+
+    test("all-day: fires for a one-day move across spring-forward (23h delta)", async () => {
+      vi.mocked(notifyMeetingChanged).mockClear();
+      const events = [{ id: "evt-1", summary: "Comp", start: { date: "2024-03-11" }, end: { date: "2024-03-12" } }];
+      await run(events, [{ id: "m1", gcal_event_id: "evt-1", starts_at: "2024-03-10T05:00:00.000Z" }]);
+      expect(notifyMeetingChanged).toHaveBeenCalledTimes(1);
+    });
+
+    test("all-day: fires when a legacy UTC-midnight row moves one day earlier", async () => {
+      vi.mocked(notifyMeetingChanged).mockClear();
+      const events = [{ id: "evt-1", summary: "Comp", start: { date: "2023-12-01" }, end: { date: "2023-12-02" } }];
+      await run(events, [{ id: "m1", gcal_event_id: "evt-1", starts_at: "2023-12-02T00:00:00Z" }]);
       expect(notifyMeetingChanged).toHaveBeenCalledTimes(1);
     });
 

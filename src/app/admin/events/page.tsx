@@ -1,3 +1,4 @@
+import { formatEventCells } from "@/lib/tz";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -68,12 +69,13 @@ function EventTable({ events, periods, emptyLabel, teamTz }: { events: Event[]; 
           <tbody>
             {events.map((e) => {
               const period = periods.find((p) => p.id === e.periodId);
+              const [start, end] = formatEventCells(e.startsAt, e.endsAt, teamTz);
               return (
                 <tr key={e.id}>
                   <td>{e.name}</td>
                   <td>{period?.name ?? ""}</td>
-                  <td className="mono">{new Date(e.startsAt).toLocaleString(undefined, { timeZone: teamTz })}</td>
-                  <td className="mono">{new Date(e.endsAt).toLocaleString(undefined, { timeZone: teamTz })}</td>
+                  <td className="mono">{start}</td>
+                  <td className="mono">{end}</td>
                   <td>{e.location ?? ""}</td>
                   <td className="flex gap-2">
                     <Link href={`/admin/events/${e.id}`} className="btn btn-secondary px-3 py-1">Roster</Link>

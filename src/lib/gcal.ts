@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { localDateOf } from "./attendance";
 import { buildServiceAccountJwt as buildJwt, fetchGoogleAccessToken } from "./google-auth";
 import { notifyMeetingChanged } from "./meetings";
+import { localDateTimeToInstant } from "./tz";
 
 export type GcalTransport = typeof globalThis.fetch;
 
@@ -277,10 +278,10 @@ export async function syncCalendar(deps: GcalDeps): Promise<SyncResult> {
 
   const syncedAt = new Date(nowMs).toISOString();
   const meetingRows = events.map((e) => {
-    const startsAt = e.start!.dateTime ?? `${e.start!.date}T00:00:00Z`;
+    const startsAt = e.start!.dateTime ?? localDateTimeToInstant(e.start!.date!, 0, deps.tz);
     let endsAt: string;
     if (e.end?.dateTime) endsAt = e.end.dateTime;
-    else if (e.end?.date) endsAt = `${e.end.date}T00:00:00Z`;
+    else if (e.end?.date) endsAt = localDateTimeToInstant(e.end.date, 0, deps.tz);
     else endsAt = startsAt;
     return {
       gcal_event_id: e.id,
@@ -314,10 +315,18 @@ export async function syncCalendar(deps: GcalDeps): Promise<SyncResult> {
   // Fan out meeting_changed only for a meeting that existed before this run
   // (never a fresh insert) whose start time actually moved to a still-future
   // time (never an already-past meeting). Never aborts the sync.
-  for (const row of meetingRows) {
+  for (const [i, row] of meetingRows.entries()) {
     const prior = priorByGcalId.get(row.gcal_event_id);
     if (!prior) continue; // new event, not a change
-    if (Date.parse(prior.starts_at) === Date.parse(row.starts_at)) continue; // unchanged (same instant, maybe different format)
+    const delta = Math.abs(Date.parse(row.starts_at) - Date.parse(prior.starts_at));
+    if (delta === 0) continue; // unchanged (same instant, maybe different format)
+    // Legacy all-day rows stored UTC midnight; the one-time shift of the SAME date
+    // to local midnight isn't a real change.
+    if (
+      !events[i].start?.dateTime &&
+      Date.parse(prior.starts_at) === Date.parse(`${events[i].start!.date}T00:00:00Z`)
+    )
+      continue;
     if (new Date(row.starts_at).getTime() <= nowMs) continue; // past
     try {
       await notifyMeetingChanged(deps.db, { id: prior.id, title: row.title, starts_at: row.starts_at });

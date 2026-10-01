@@ -66,7 +66,8 @@ Mentor-and-up only (`hasRole(viewer.role, "mentor")`).
   calendar sync job; `POST /api/admin/events/[id]/unlink` (`unlinkEvent`) detaches it, after which
   those fields become editable again. If the linked calendar event disappears, the event shows an
   unlink banner (`EventUnlinkBanner.tsx`) driven by an `event.gcal_missing` flag set by the sync
-  job — see `docs/setup/google-calendar.md` for how that sync is configured.
+  job — see `docs/setup/google-calendar.md` for how that sync is configured. Google all-day
+  events are stored at team-local midnight with an exclusive end, and display as date only.
 - **Deleting an event** (`deleteEvent`) is blocked with a 409 once it has any check-in
   (`session`) history; `event_signup` rows are fine to lose and cascade-delete.
 

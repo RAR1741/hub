@@ -1,3 +1,4 @@
+import { formatEventRange } from "@/lib/tz";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
@@ -44,8 +45,7 @@ export default async function EventRosterPrintPage({ params }: { params: Promise
       <div className="print-roster">
         <h1>{event.name}</h1>
         <div className="sub">
-          {new Date(event.startsAt).toLocaleString(undefined, { timeZone: teamTz })} –{" "}
-          {new Date(event.endsAt).toLocaleString(undefined, { timeZone: teamTz })}
+          {formatEventRange(event.startsAt, event.endsAt, teamTz)}
           {event.location ? ` · ${event.location}` : ""}
         </div>
 
