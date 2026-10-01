@@ -8,6 +8,7 @@ import { listWhosHere } from "@/lib/sessions";
 import { getActivePeriod } from "@/lib/periods";
 import { personPeriodHours } from "@/lib/reports";
 import { listUpcomingMeetings } from "@/lib/meetings";
+import { eventIdsByGcalId } from "@/lib/events";
 import { listBuildDays } from "@/lib/build-days";
 import { getSetting, getTeamTimezone } from "@/lib/settings";
 import { hoursGoalProgress } from "@/lib/hours-goal";
@@ -28,6 +29,9 @@ export default async function HomePage() {
       : 0;
   const goalProgress = hoursGoalProgress(myHours, hoursGoal);
   const upcoming = await listUpcomingMeetings(new Date().toISOString(), 5);
+  const eventIds = viewer.person
+    ? await eventIdsByGcalId(upcoming.flatMap((m) => (m.gcalEventId ? [m.gcalEventId] : [])))
+    : new Map<string, string>();
   const requiredDates = new Set(
     upcoming.length
       ? (
@@ -144,8 +148,9 @@ export default async function HomePage() {
           upcoming.map((m) => {
             const start = new Date(m.startsAt);
             const dateKey = m.startsAt.slice(0, 10);
-            return (
-              <div key={m.id} className="meet">
+            const eventId = m.gcalEventId ? eventIds.get(m.gcalEventId) : undefined;
+            const children = (
+              <>
                 <span className="d mono">
                   {start
                     .toLocaleDateString(undefined, { weekday: "short", month: "numeric", day: "numeric", timeZone: teamTz })
@@ -153,6 +158,15 @@ export default async function HomePage() {
                 </span>
                 <span className="t">{m.title}</span>
                 {requiredDates.has(dateKey) && <span className="req">Required</span>}
+              </>
+            );
+            return eventId ? (
+              <Link key={m.id} href={`/events/${eventId}`} className="meet">
+                {children}
+              </Link>
+            ) : (
+              <div key={m.id} className="meet">
+                {children}
               </div>
             );
           })
