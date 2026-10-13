@@ -96,6 +96,20 @@ test("mentor builds a form, student submits it, mentor sees the response", async
     await expect(responseRow).toBeVisible();
     await expect(responseRow.getByText("Yes", { exact: true })).toBeVisible();
     await expect(responseRow.getByText("Bringing snacks!")).toBeVisible();
+
+    // Per-person roster note (#326): set via the API (the modal is covered by
+    // unit tests), then shown on the roster and the print view; clearing removes it.
+    const notePut = (note: string) =>
+      mentorApi.put(`/api/admin/events/${eventId}/note`, { data: { personId: studentPersonId, note } });
+    expect((await notePut("Leaving at 8pm")).status()).toBe(200);
+    await mentorPage.goto(`/admin/events/${eventId}`);
+    await expect(mentorPage.getByText("Leaving at 8pm")).toBeVisible();
+    await mentorPage.goto(`/admin/events/${eventId}/print`);
+    await expect(mentorPage.getByText("Leaving at 8pm")).toBeVisible();
+    expect((await notePut("")).status()).toBe(200);
+    await mentorPage.goto(`/admin/events/${eventId}`);
+    await expect(mentorPage.getByRole("heading", { name: "Responses" })).toBeVisible();
+    await expect(mentorPage.getByText("Leaving at 8pm")).toHaveCount(0);
   } finally {
     await mentorApi.delete(`/api/admin/events/${eventId}`).catch(() => {});
     await mentorApi.delete(`/api/admin/forms/${formId}`).catch(() => {});
