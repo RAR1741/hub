@@ -74,8 +74,9 @@ Mentor-and-up only (`hasRole(viewer.role, "mentor")`).
 ## Printable roster — `/admin/events/[id]/print`
 
 A plain, print-styled attendee list (name, role, signed-up/checked-in) for handing to whoever's
-running the door — see `src/app/admin/events/[id]/print/page.tsx`. It reuses `listEventRoster`
-directly; it does not include form responses.
+running the door — see `src/app/admin/events/[id]/print/page.tsx`. It also has two blank "Check 1 /
+Check 2" columns for mentors to tick by hand (e.g. bus head-counts); nothing there is tracked. It
+reuses `listEventRoster` directly; it does not include form responses.
 
 ## Sign-up forms — `/admin/forms`, `/admin/forms/[id]`
 

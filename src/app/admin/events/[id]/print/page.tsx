@@ -13,6 +13,8 @@ import { PrintButton } from "@/components/PrintButton";
  * Plain print-friendly attendee list for an event: name + role + sign-up/
  * check-in status. Issue #54 — deliberately not GatherPack's grouping/notes/
  * page-break-control roster; add those if mentors ask once this ships.
+ * Two blank Check 1 / Check 2 columns are for mentors to tick by hand (e.g. bus
+ * head-counts, issue #327) — nothing is tracked.
  */
 export const metadata: Metadata = { title: "Event Print" };
 
@@ -56,6 +58,8 @@ export default async function EventRosterPrintPage({ params }: { params: Promise
               <th>Role</th>
               <th>Signed up</th>
               <th>Checked in</th>
+              <th>Check 1</th>
+              <th>Check 2</th>
             </tr>
           </thead>
           <tbody>
@@ -65,11 +69,13 @@ export default async function EventRosterPrintPage({ params }: { params: Promise
                 <td className="mono">{r.role}</td>
                 <td>{r.signedUp ? "Yes" : ""}</td>
                 <td>{r.checkedIn ? "Yes" : ""}</td>
+                <td />
+                <td />
               </tr>
             ))}
             {roster.length === 0 && (
               <tr>
-                <td colSpan={4} className="text-sm text-[var(--muted)]">
+                <td colSpan={6}className="text-sm text-[var(--muted)]">
                   No sign-ups yet.
                 </td>
               </tr>
