@@ -87,13 +87,13 @@ export function ManualAddPerson({
     if (!personId) return;
     setBusy(true);
     try {
-      await fetch(`/api/admin/events/${eventId}/checkin`, {
+      const res = await fetch(`/api/admin/events/${eventId}/checkin`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ personId }),
       });
       router.refresh();
-      setQuery("");
+      if (res.ok) setQuery("");
     } finally {
       setBusy(false);
     }
