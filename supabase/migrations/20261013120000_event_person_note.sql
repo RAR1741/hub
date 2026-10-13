@@ -12,31 +12,12 @@ alter table event_person_note enable row level security;
 -- Deliberately NO policies: default-deny; all access via service role.
 grant all on event_person_note to service_role;
 
--- Verbatim re-declaration of merge_person (from 20260914130000_merge_person_fks.sql) plus the
--- event_person_note reassignment (#326).
--- Re-declare merge_person (latest declaration: 20260906130000_tool_maintenance.sql) to close the
--- FK gaps tracked in #283 and the integration-link gap in #284. merge_person is a hardcoded list
--- of `update ... set col = p_winner` statements, so every person FK added since it was written
--- either aborted the merge (RESTRICT -> 23503 on the final `delete from person`) or, worse,
--- silently cascade-deleted the loser's history along with the loser row.
+-- Re-declaration of merge_person (latest prior declaration: 20260914130000_merge_person_fks.sql),
+-- verbatim except for reassigning event_person_note (#326):
+--   RESTRICT / NO ACTION (merge would abort on the final `delete from person`): event_person_note.updated_by
+--   CASCADE (merge would silently destroy it): event_person_note.person_id (PK collision: winner's note wins)
 --
--- Newly reassigned, RESTRICT (the merge used to abort):
---   event.created_by, badge.created_by, badge_award.awarded_by, form.created_by,
---   form_response.person_id
--- Newly reassigned, CASCADE (the merge used to destroy these silently):
---   event_signup.person_id, event_signup_reminder.person_id, badge_award.person_id,
---   push_subscription.person_id, onshape_connection.person_id
---   event_person_note.person_id, event_person_note.updated_by (PK collision: winner's note wins)
--- Still left to cascade away on purpose (short-lived or pair-scoped, no history to keep):
---   login_otp, masquerade_session, person_merge_rejection
---
--- Also fixes two collisions that raised 23505 mid-merge (`one_session_per_person_per_event`) or
--- would have (the unique/PK constraints on the tables above), and carries the loser's Slack /
--- GitHub links onto the winner (#284) the same way the loser's email is already carried.
---
--- src/lib/merge-person-fk-coverage.test.ts is the guardrail: it scans every migration for person
--- FKs and fails if one is neither touched here nor explicitly allowlisted, so the next table added
--- cannot reopen this gap unnoticed.
+-- src/lib/merge-person-fk-coverage.test.ts is the guardrail for person FKs missed here.
 create or replace function merge_person(p_winner uuid, p_loser uuid)
 returns void
 language plpgsql

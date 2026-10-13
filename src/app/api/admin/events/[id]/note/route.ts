@@ -9,7 +9,8 @@ export const PUT = withRole<Ctx>("mentor", async (viewer, request, context) => {
   const id = reqUuid(rawId);
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   const personId = body ? reqUuid(body.personId) : null;
-  const note = body ? optString(body.note, 500) : null;
+  // Missing/non-string is malformed; only an explicit ""/whitespace string clears the note.
+  const note = body && typeof body.note === "string" ? optString(body.note, 500) : null;
   if (!id || !personId || !note) return Response.json({ error: "invalid" }, { status: 400 });
   const result = await setEventPersonNote(id, personId, note.value, viewer.person!.id);
   return result.ok

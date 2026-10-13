@@ -120,7 +120,9 @@ export default async function EventRosterPage({
                   <td>{r.signedUp ? "Yes" : ""}</td>
                   <td>{r.checkedIn ? "Yes" : ""}</td>
                   <td>
-                    {r.note && (
+                    {r.notesUnavailable ? (
+                      <span className="text-sm text-[var(--muted)]">Notes unavailable</span>
+                    ) : r.note && (
                       <>
                         <div style={{ whiteSpace: "pre-wrap" }}>{r.note.body}</div>
                         <div className="text-sm text-[var(--muted)]">
@@ -132,7 +134,7 @@ export default async function EventRosterPage({
                   <td>
                     <div className="flex flex-wrap gap-2">
                       <EventRosterActions eventId={id} entry={r} />
-                      <EventRosterNote eventId={id} entry={r} teamTz={teamTz} />
+                      {!r.notesUnavailable && <EventRosterNote eventId={id} entry={r} teamTz={teamTz} />}
                     </div>
                   </td>
                 </tr>

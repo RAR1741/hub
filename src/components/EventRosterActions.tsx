@@ -160,15 +160,38 @@ function NoteModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
   useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+
+  // Mount-only (onClose lives in a ref) so a parent re-render never re-steals focus.
+  useEffect(() => {
+    const trigger = document.activeElement as HTMLElement | null; // the Add/Edit button that opened us
     textareaRef.current?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") return onCloseRef.current();
+      if (e.key !== "Tab") return;
+      const items = dialogRef.current?.querySelectorAll<HTMLElement>("button:not([disabled]), textarea, [href], input, select");
+      if (!items?.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement;
+      if (e.shiftKey && (active === first || !dialogRef.current?.contains(active))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (active === last || !dialogRef.current?.contains(active))) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      trigger?.focus();
+    };
+  }, []);
 
   async function save(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -201,7 +224,7 @@ function NoteModal({
       aria-label={`Note for ${entry.name}`}
       onClick={onClose}
     >
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+      <div ref={dialogRef} className="modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 className="text-base font-semibold">Note for {entry.name}</h3>

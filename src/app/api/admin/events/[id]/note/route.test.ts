@@ -51,3 +51,10 @@ test("passes through the lib failure status", async () => {
   expect(res.status).toBe(400);
   expect(await res.json()).toEqual({ error: "failed" });
 });
+
+test("400 on a missing or non-string note (only an explicit blank string clears)", async () => {
+  for (const body of [{ personId: PID }, { personId: PID, note: 42 }, { personId: PID, note: null }]) {
+    expect((await PUT(req(body), ctx())).status).toBe(400);
+  }
+  expect(setEventPersonNote).not.toHaveBeenCalled();
+});

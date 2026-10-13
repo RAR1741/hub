@@ -109,6 +109,8 @@ export type RosterEntry = {
   slackLinked: boolean;
   slackInvitedAt: string | null;
   note: { body: string; updatedAt: string; updatedByName: string } | null;
+  /** The note read failed: `note` is null but notes are unknown, not absent. */
+  notesUnavailable: boolean;
 };
 
 /**
@@ -160,6 +162,7 @@ export async function listEventRoster(eventId: string, db?: SupabaseClient): Pro
       slackLinked: !!p.slack_user_id,
       slackInvitedAt: (s.slack_invited_at as string | null) ?? null,
       note: notes.get(p.id) ?? null,
+      notesUnavailable: !!noteError,
     });
   }
   for (const s of sessions ?? []) {
@@ -180,6 +183,7 @@ export async function listEventRoster(eventId: string, db?: SupabaseClient): Pro
         slackLinked: !!p.slack_user_id,
         slackInvitedAt: null,
         note: notes.get(p.id) ?? null,
+        notesUnavailable: !!noteError,
       });
     }
   }

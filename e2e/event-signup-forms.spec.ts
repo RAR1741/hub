@@ -97,18 +97,24 @@ test("mentor builds a form, student submits it, mentor sees the response", async
     await expect(responseRow.getByText("Yes", { exact: true })).toBeVisible();
     await expect(responseRow.getByText("Bringing snacks!")).toBeVisible();
 
-    // Per-person roster note (#326): set via the API (the modal is covered by
-    // unit tests), then shown on the roster and the print view; clearing removes it.
-    const notePut = (note: string) =>
-      mentorApi.put(`/api/admin/events/${eventId}/note`, { data: { personId: studentPersonId, note } });
-    expect((await notePut("Leaving at 8pm")).status()).toBe(200);
+    // Per-person roster note (#326): driven through the real dialog as the mentor,
+    // then shown on the roster and the print view; clearing removes it.
     await mentorPage.goto(`/admin/events/${eventId}`);
-    await expect(mentorPage.getByText("Leaving at 8pm")).toBeVisible();
+    const rosterRow = mentorPage.getByRole("row").filter({ has: mentorPage.getByRole("button", { name: /^(Add|Edit) note$/ }) });
+    await rosterRow.getByRole("button", { name: "Add note" }).click();
+    const noteDialog = mentorPage.getByRole("dialog", { name: "Note for Test Student" });
+    await noteDialog.getByRole("textbox", { name: "Note" }).fill("Leaving at 8pm");
+    await noteDialog.getByRole("button", { name: "Save" }).click();
+    await expect(noteDialog).toHaveCount(0);
+    await expect(rosterRow.getByText("Leaving at 8pm")).toBeVisible({ timeout: 15_000 });
     await mentorPage.goto(`/admin/events/${eventId}/print`);
     await expect(mentorPage.getByText("Leaving at 8pm")).toBeVisible();
-    expect((await notePut("")).status()).toBe(200);
     await mentorPage.goto(`/admin/events/${eventId}`);
-    await expect(mentorPage.getByRole("heading", { name: "Responses" })).toBeVisible();
+    await rosterRow.getByRole("button", { name: "Edit note" }).click();
+    await noteDialog.getByRole("textbox", { name: "Note" }).fill("");
+    await noteDialog.getByRole("button", { name: "Save" }).click();
+    await expect(noteDialog).toHaveCount(0);
+    await expect(rosterRow.getByRole("button", { name: "Add note" })).toBeVisible({ timeout: 15_000 });
     await expect(mentorPage.getByText("Leaving at 8pm")).toHaveCount(0);
   } finally {
     await mentorApi.delete(`/api/admin/events/${eventId}`).catch(() => {});
