@@ -71,12 +71,17 @@ export function ManualAddPerson({
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
+
+  const q = query.trim().toLowerCase();
+  const filtered = q ? people.filter((p) => p.name.toLowerCase().includes(q)) : people;
 
   // `people` shrinks after a successful add (router.refresh()); if the
   // stored selection fell out of the list, fall back to the first option
-  // rather than stashing a stale id in state.
-  const personId = selected && people.some((p) => p.id === selected) ? selected : (people[0]?.id ?? "");
+  // rather than stashing a stale id in state. The same fallback covers a
+  // search that filters the stored selection out.
+  const personId = selected && filtered.some((p) => p.id === selected) ? selected : (filtered[0]?.id ?? "");
 
   async function add() {
     if (!personId) return;
@@ -98,17 +103,30 @@ export function ManualAddPerson({
   return (
     <div className="card flex flex-wrap items-center gap-3">
       <span className="font-semibold" id="manual-add-label">Add someone who didn&apos;t sign up:</span>
-      <select
+      <input
+        type="search"
         className="input"
-        aria-labelledby="manual-add-label"
-        value={personId}
-        onChange={(e) => setSelected(e.target.value)}
-      >
-        {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-      </select>
+        aria-label="Search by name"
+        placeholder="Search by name…"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+      />
+      {filtered.length === 0 ? (
+        <span className="text-sm text-[var(--muted)]">No matches</span>
+      ) : (
+        <select
+          className="input"
+          aria-labelledby="manual-add-label"
+          value={personId}
+          onChange={(e) => setSelected(e.target.value)}
+        >
+          {filtered.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+      )}
       <Button
         variant="primary"
         className="px-3 py-1"
+        disabled={!personId}
         onClick={add}
         pending={busy}
         pendingLabel="Working…"
