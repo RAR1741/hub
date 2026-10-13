@@ -93,6 +93,7 @@ export function ManualAddPerson({
         body: JSON.stringify({ personId }),
       });
       router.refresh();
+      setQuery("");
     } finally {
       setBusy(false);
     }
@@ -112,7 +113,7 @@ export function ManualAddPerson({
         onChange={(e) => setQuery(e.target.value)}
       />
       {filtered.length === 0 ? (
-        <span className="text-sm text-[var(--muted)]">No matches</span>
+        <span role="status" className="text-sm text-[var(--muted)]">No matches</span>
       ) : (
         <select
           className="input"
