@@ -1,5 +1,14 @@
 import { describe, expect, test } from "vitest";
-import { datetimeLocalToInstant, formatEventRange, instantToDatetimeLocal, isAllDayRange, localDateTimeToInstant } from "./tz";
+import { datetimeLocalToInstant, formatEventRange, formatInstant, instantToDatetimeLocal, isAllDayRange, localDateTimeToInstant } from "./tz";
+
+describe("formatInstant", () => {
+  // Drops seconds; ICU may emit U+202F before AM/PM, so normalise it.
+  test("formats medium date + short time with no seconds", () => {
+    const out = formatInstant("2026-01-02T20:04:05Z", "America/Chicago", "en-US").replace(/ /g, " ");
+    expect(out).toBe("Jan 2, 2026, 2:04 PM");
+    expect(out).not.toMatch(/:\d{2}:\d{2}/);
+  });
+});
 
 describe("localDateTimeToInstant", () => {
   // Indianapolis is UTC-5 in January (no DST). 18:30 local -> 23:30 UTC same day.

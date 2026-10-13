@@ -102,5 +102,5 @@ export function formatEventRange(startsAt: string, endsAt: string, tz: string, l
 
 /** A single instant as a locale date-time in the team timezone. PURE. */
 export function formatInstant(iso: string, tz: string, locale?: string): string {
-  return new Date(iso).toLocaleString(locale, { timeZone: tz });
+  return new Date(iso).toLocaleString(locale, { timeZone: tz, dateStyle: "medium", timeStyle: "short" });
 }
