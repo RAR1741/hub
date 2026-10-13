@@ -75,7 +75,7 @@ export default async function EventRosterPrintPage({ params }: { params: Promise
             ))}
             {roster.length === 0 && (
               <tr>
-                <td colSpan={6}className="text-sm text-[var(--muted)]">
+                <td colSpan={6} className="text-sm text-[var(--muted)]">
                   No sign-ups yet.
                 </td>
               </tr>
