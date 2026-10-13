@@ -1,4 +1,4 @@
-import { formatEventRange } from "@/lib/tz";
+import { formatEventRange, formatInstant } from "@/lib/tz";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
@@ -13,7 +13,7 @@ import { listPeriods } from "@/lib/periods";
 import { getTeamTimezone } from "@/lib/settings";
 import { getViewer } from "@/lib/viewer";
 import { EventForm } from "@/components/EventForm";
-import { EventRosterActions, ManualAddPerson } from "@/components/EventRosterActions";
+import { EventRosterActions, EventRosterNote, ManualAddPerson } from "@/components/EventRosterActions";
 import { EventUnlinkBanner } from "@/components/EventUnlinkBanner";
 import { EventDeleteButton } from "@/components/EventDeleteButton";
 
@@ -105,7 +105,7 @@ export default async function EventRosterPage({
         <div style={{ overflowX: "auto" }}>
           <table className="table">
             <thead>
-              <tr><th>Name</th><th>Role</th><th>Signed up</th><th>Checked in</th><th>Actions</th></tr>
+              <tr><th>Name</th><th>Role</th><th>Signed up</th><th>Checked in</th><th>Note</th><th>Actions</th></tr>
             </thead>
             <tbody>
               {roster.map((r) => (
@@ -119,11 +119,26 @@ export default async function EventRosterPage({
                   <td className="mono">{r.role}</td>
                   <td>{r.signedUp ? "Yes" : ""}</td>
                   <td>{r.checkedIn ? "Yes" : ""}</td>
-                  <td><EventRosterActions eventId={id} entry={r} /></td>
+                  <td>
+                    {r.note && (
+                      <>
+                        <div style={{ whiteSpace: "pre-wrap" }}>{r.note.body}</div>
+                        <div className="text-sm text-[var(--muted)]">
+                          — {r.note.updatedByName}, {formatInstant(r.note.updatedAt, teamTz)}
+                        </div>
+                      </>
+                    )}
+                  </td>
+                  <td>
+                    <div className="flex flex-wrap gap-2">
+                      <EventRosterActions eventId={id} entry={r} />
+                      <EventRosterNote eventId={id} entry={r} teamTz={teamTz} />
+                    </div>
+                  </td>
                 </tr>
               ))}
               {roster.length === 0 && (
-                <tr><td colSpan={5} className="text-sm text-[var(--muted)]">No sign-ups yet.</td></tr>
+                <tr><td colSpan={6} className="text-sm text-[var(--muted)]">No sign-ups yet.</td></tr>
               )}
             </tbody>
           </table>

@@ -99,3 +99,8 @@ export function formatEventRange(startsAt: string, endsAt: string, tz: string, l
   const [s, e] = formatEventCells(startsAt, endsAt, tz, locale);
   return isAllDayRange(startsAt, endsAt, tz) && s === e ? s : `${s} – ${e}`;
 }
+
+/** A single instant as a locale date-time in the team timezone. PURE. */
+export function formatInstant(iso: string, tz: string, locale?: string): string {
+  return new Date(iso).toLocaleString(locale, { timeZone: tz });
+}
