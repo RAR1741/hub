@@ -37,13 +37,21 @@ async function alertFailures(failures: SweepFailure[]): Promise<void> {
   try {
     const slack = slackDepsFromEnv();
     const unique = uniqueFailures(failures);
+    // One failed post must not drop the remaining alerts.
+    const post = async (text: string) => {
+      try {
+        await postChannelMessage(slack, "hub-admin-alerts", text);
+      } catch (e) {
+        console.error("event channels sweep: admin alert post failed:", e);
+      }
+    };
     for (const [i, f] of unique.slice(0, MAX_POSTS).entries()) {
       if (i > 0) await new Promise((r) => setTimeout(r, POST_GAP_MS));
-      await postChannelMessage(slack, "hub-admin-alerts", `:warning: Event channel sweep: ${escapeSlack(describeFailure(f))}`);
+      await post(`:warning: Event channel sweep: ${escapeSlack(describeFailure(f))}`);
     }
     if (unique.length > MAX_POSTS) {
       await new Promise((r) => setTimeout(r, POST_GAP_MS));
-      await postChannelMessage(slack, "hub-admin-alerts", `:warning: Event channel sweep: +${unique.length - MAX_POSTS} more failing channels`);
+      await post(`:warning: Event channel sweep: +${unique.length - MAX_POSTS} more failing channels`);
     }
   } catch (e) {
     console.error("event channels sweep: admin alert post failed:", e);

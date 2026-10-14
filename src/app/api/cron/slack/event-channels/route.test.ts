@@ -162,6 +162,17 @@ describe("POST /api/cron/slack/event-channels", () => {
     expect(posts[10]).toContain("+3 more failing channels");
   });
 
+  test("a failed alert post does not stop the remaining alerts", async () => {
+    const { postChannelMessage } = await import("@/lib/slack");
+    vi.mocked(postChannelMessage).mockRejectedValueOnce(new Error("slack down")).mockResolvedValueOnce(true);
+    const { res, posts } = await runWith([
+      { event: "A", channel: "e-a", op: "archive", error: "x" },
+      { event: "B", channel: "e-b", op: "archive", error: "x" },
+    ]);
+    expect(res.status).toBe(200);
+    expect(posts).toHaveLength(2);
+  });
+
   test("a throwing alert post still records heartbeat + health and returns 200", async () => {
     const { postChannelMessage } = await import("@/lib/slack");
     vi.mocked(postChannelMessage).mockRejectedValue(new Error("slack down"));
