@@ -108,6 +108,9 @@ export type RosterEntry = {
   sessionId: string | null;
   slackLinked: boolean;
   slackInvitedAt: string | null;
+  note: { body: string; updatedAt: string; updatedByName: string } | null;
+  /** The note read failed: `note` is null but notes are unknown, not absent. */
+  notesUnavailable: boolean;
 };
 
 /**
@@ -115,19 +118,35 @@ export type RosterEntry = {
  * didn't (a mentor's manual add). `session` has two person FKs (person_id +
  * edited_by), so its embed uses the `person!person_id` hint to avoid
  * PostgREST's PGRST201 ambiguous-embed error; `event_signup` has only one
- * person FK so no hint is needed there.
+ * person FK so no hint is needed there. `event_person_note` has two (person_id +
+ * updated_by), so its embed uses `person!updated_by`.
  */
 export async function listEventRoster(eventId: string, db?: SupabaseClient): Promise<RosterEntry[]> {
   const client = db ?? (await import("./db")).getDb();
-  const [{ data: signups, error: signupError }, { data: sessions, error: sessionError }] = await Promise.all([
+  const [{ data: signups, error: signupError }, { data: sessions, error: sessionError }, { data: noteRows, error: noteError }] = await Promise.all([
     client
       .from("event_signup")
       .select("person_id, slack_invited_at, person(id, first_name, last_name, display_name, role, slack_user_id)")
       .eq("event_id", eventId),
     client.from("session").select("id, person_id, person!person_id(id, first_name, last_name, display_name, role, slack_user_id)").eq("event_id", eventId).eq("source", "event"),
+    client
+      .from("event_person_note")
+      .select("person_id, body, updated_at, person!updated_by(first_name, last_name, display_name)")
+      .eq("event_id", eventId),
   ]);
   if (signupError) console.error("listEventRoster: signup query failed", signupError);
   if (sessionError) console.error("listEventRoster: session query failed", sessionError);
+  if (noteError) console.error("listEventRoster: note query failed", noteError);
+
+  const notes = new Map<string, NonNullable<RosterEntry["note"]>>();
+  for (const n of noteRows ?? []) {
+    const editor = n.person as unknown as Pick<PersonLite, "first_name" | "last_name" | "display_name"> | null;
+    notes.set(n.person_id as string, {
+      body: n.body as string,
+      updatedAt: n.updated_at as string,
+      updatedByName: editor ? displayName(editor) : "",
+    });
+  }
 
   const entries = new Map<string, RosterEntry>();
   for (const s of signups ?? []) {
@@ -142,6 +161,8 @@ export async function listEventRoster(eventId: string, db?: SupabaseClient): Pro
       sessionId: null,
       slackLinked: !!p.slack_user_id,
       slackInvitedAt: (s.slack_invited_at as string | null) ?? null,
+      note: notes.get(p.id) ?? null,
+      notesUnavailable: !!noteError,
     });
   }
   for (const s of sessions ?? []) {
@@ -161,6 +182,8 @@ export async function listEventRoster(eventId: string, db?: SupabaseClient): Pro
         sessionId: s.id as string,
         slackLinked: !!p.slack_user_id,
         slackInvitedAt: null,
+        note: notes.get(p.id) ?? null,
+        notesUnavailable: !!noteError,
       });
     }
   }
@@ -223,6 +246,34 @@ export async function uncheckIn(
     .maybeSingle();
   if (error) return { ok: false, status: 500 };
   if (!data) return { ok: false, status: 404 };
+  return { ok: true, status: 200 };
+}
+
+/**
+ * Set (string) or clear (null) the shared mentor note for a person on an event.
+ * Keyed on event + person, so it works for manual roster adds with no signup row.
+ */
+export async function setEventPersonNote(
+  eventId: string,
+  personId: string,
+  body: string | null,
+  mentorId: string,
+  db?: SupabaseClient,
+): Promise<{ ok: boolean; status: number }> {
+  const client = db ?? (await import("./db")).getDb();
+  if (body === null) {
+    const { error } = await client
+      .from("event_person_note")
+      .delete()
+      .eq("event_id", eventId)
+      .eq("person_id", personId);
+    return error ? { ok: false, status: 500 } : { ok: true, status: 200 };
+  }
+  const { error } = await client.from("event_person_note").upsert(
+    { event_id: eventId, person_id: personId, body, updated_by: mentorId, updated_at: new Date().toISOString() },
+    { onConflict: "event_id,person_id" },
+  );
+  if (error) return { ok: false, status: error.code === FOREIGN_KEY_VIOLATION ? 400 : 500 };
   return { ok: true, status: 200 };
 }
 
