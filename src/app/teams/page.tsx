@@ -19,7 +19,7 @@ export const metadata: Metadata = { title: "Teams" };
 export default async function TeamsPage() {
   const viewer = await getViewer();
   // Teams is signed-in only — guests (the only role below student) are sent to login.
-  requirePageRole(viewer, "student");
+  requirePageRole(viewer, "student", "/teams");
   const [teams, counts] = await Promise.all([listTeams(), teamMemberCounts()]);
   const [memberIds, pendingIds] = viewer.person
     ? await Promise.all([

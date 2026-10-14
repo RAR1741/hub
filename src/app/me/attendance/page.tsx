@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { loginHref } from "@/lib/login-return";
 import { getViewer } from "@/lib/viewer";
 import { getActivePeriod } from "@/lib/periods";
 import { listBuildDays } from "@/lib/build-days";
@@ -19,7 +20,7 @@ export const metadata: Metadata = { title: "My Attendance" };
 export default async function MyAttendancePage() {
   const viewer = await getViewer();
   if (!viewer.person) {
-    redirect("/login");
+    redirect(loginHref("/me/attendance"));
   }
 
   const personId = viewer.person.id;

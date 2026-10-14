@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: "Shop" };
 
 export default async function ShopIndexPage() {
   const viewer = await getViewer();
-  requirePageRole(viewer, "student");
+  requirePageRole(viewer, "student", "/shop");
 
   const projects = await listProjects();
 

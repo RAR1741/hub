@@ -7,6 +7,7 @@ import { getEvent } from "@/lib/events";
 import { signedUpEventIds } from "@/lib/event-signups";
 import { getFormWithFields } from "@/lib/forms";
 import { getTeamTimezone } from "@/lib/settings";
+import { loginHref } from "@/lib/login-return";
 import { getViewer } from "@/lib/viewer";
 import { EventSignupButton } from "@/components/EventSignupButton";
 import { EventSignupForm } from "@/components/EventSignupForm";
@@ -19,9 +20,9 @@ function hasEventEnded(endsAt: string): boolean {
 
 export default async function EventPage({ params }: { params: Promise<{ id: string }> }) {
   const viewer = await getViewer();
-  if (!viewer.person) redirect("/login");
-
   const { id } = await params;
+  if (!viewer.person) redirect(loginHref(`/events/${id}`));
+
   const event = await getEvent(id);
   if (!event) notFound();
 

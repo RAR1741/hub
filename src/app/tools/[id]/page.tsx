@@ -13,9 +13,9 @@ export const metadata: Metadata = { title: "Tool" };
 
 export default async function ToolDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const viewer = await getViewer();
-  requirePageRole(viewer, "student");
-
   const { id } = await params;
+  requirePageRole(viewer, "student", `/tools/${id}`);
+
   const tool = await getTool(id);
   if (!tool) notFound();
 

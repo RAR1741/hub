@@ -36,19 +36,19 @@ describe("requirePageRole", () => {
 
   test("allows a viewer with the required role", () => {
     redirect.mockClear();
-    requirePageRole({ ...signedIn, role: "mentor" }, "mentor");
+    requirePageRole({ ...signedIn, role: "mentor" }, "mentor", "/people");
     expect(redirect).not.toHaveBeenCalled();
   });
 
   test("sends a signed-in but under-privileged viewer home, not to /login", () => {
     redirect.mockClear();
-    requirePageRole(signedIn, "mentor");
+    requirePageRole(signedIn, "mentor", "/people");
     expect(redirect).toHaveBeenCalledWith("/");
   });
 
-  test("sends an anonymous viewer to /login", () => {
+  test("sends an anonymous viewer to /login with next", () => {
     redirect.mockClear();
-    requirePageRole(guest, "student");
-    expect(redirect).toHaveBeenCalledWith("/login");
+    requirePageRole(guest, "student", "/teams");
+    expect(redirect).toHaveBeenCalledWith("/login?next=%2Fteams");
   });
 });

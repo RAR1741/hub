@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import type { Role } from "./types";
 import type { Viewer } from "./viewer";
+import { loginHref } from "./login-return";
 
 const RANK: Record<Role, number> = {
   guest: 0,
@@ -26,11 +27,11 @@ export function requireRole(actual: Role, required: Role): void {
 
 /**
  * Page-level role gate (server components only — it calls `redirect`).
- * A viewer who lacks `required` is sent away: anonymous visitors to /login,
- * where signing in actually helps, and anyone already signed in home — a
+ * A viewer who lacks `required` is sent away: anonymous visitors to
+ * /login (returning to `next` afterwards), where signing in actually helps, and anyone already signed in home — a
  * signed-in user bounced to the sign-in form just loops back to the denial.
  */
-export function requirePageRole(viewer: Viewer, required: Role): void {
+export function requirePageRole(viewer: Viewer, required: Role, next: string): void {
   if (hasRole(viewer.role, required)) return;
-  redirect(viewer.person ? "/" : "/login");
+  redirect(viewer.person ? "/" : loginHref(next));
 }
