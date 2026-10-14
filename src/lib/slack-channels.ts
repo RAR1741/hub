@@ -119,6 +119,7 @@ export async function archiveChannel(deps: SlackDeps, channelId: string): Promis
     let { ok, body } = await post(deps, "conversations.archive", { channel: channelId });
     if (!ok && body.error === "not_in_channel") {
       const join = await post(deps, "conversations.join", { channel: channelId });
+      if (!join.ok && join.body.error === "is_archived") return { ok: true };
       if (!join.ok) {
         console.error(`[slack] conversations.join failed:`, join.body.error ?? join.body);
         return { ok: false, error: `join:${String(join.body.error ?? "unknown")}` };
@@ -365,6 +366,8 @@ export async function sweepEventChannels(deps: { db: SupabaseClient; slack?: Sla
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const summary: SweepSummary = { archived: 0, renamed: 0, invited: 0, failed: 0, failures: [] };
   const fail = (ev: SweepEventRow, op: SweepFailure["op"], error?: string) => {
+    // No token / non-prod: the Slack call was skipped, not failed — don't count or alert it.
+    if (!slack.token || !slack.isProd) return;
     summary.failed++;
     summary.failures.push({ event: ev.name, channel: ev.slack_channel_name, op, error });
   };

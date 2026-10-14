@@ -39,7 +39,7 @@ Per-event Slack channels (nightly sweep, see the [event channels design](../supe
 also need `channels:manage` and `channels:join`. The sweep joins a channel it is not in (made by an
 older bot identity) before archiving it. If Slack answers `restricted_action` (channel created by
 another identity; only its creator or a workspace admin may archive), archive it manually in Slack
-- the next sweep sees `already_archived` and records it. Every failed channel is posted to
+- after that the next sweep should record it as archived. Every failed channel is posted to
 `#hub-admin-alerts` on each sweep run.
 
 The IDs above are hardcoded in `src/lib/slack-registry.ts` and nothing but a real send checks

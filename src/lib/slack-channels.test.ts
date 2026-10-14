@@ -194,6 +194,14 @@ describe("archiveChannel", () => {
     expect(requests).toHaveLength(2);
   });
 
+  test("not_in_channel, join says is_archived -> success", async () => {
+    const { fetchFn } = fakeFetch([
+      { status: 200, body: { ok: false, error: "not_in_channel" } },
+      { status: 200, body: { ok: false, error: "is_archived" } },
+    ]);
+    expect(await archiveChannel(prodDeps(fetchFn), "C1")).toEqual({ ok: true });
+  });
+
   test("retry returning already_archived counts as success", async () => {
     const { fetchFn } = fakeFetch([
       { status: 200, body: { ok: false, error: "not_in_channel" } },
@@ -615,6 +623,15 @@ describe("sweepEventChannels", () => {
     expect(result.archived).toBe(0);
     expect(result.failed).toBe(1);
     expect(result.failures).toEqual([{ event: "Tinker Fest", channel: "e-tinker-fest-de23", op: "archive", error: "restricted_action" }]);
+  });
+
+  test("dev/no-token skips are not counted or recorded as failures", async () => {
+    const oldEnded = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString();
+    const { fetchFn } = fakeFetch();
+    const db = makeDb([{ data: [{ id: "e-old", name: "Old", ends_at: oldEnded, slack_channel_id: "C-OLD", slack_channel_name: "e-old" }] }]);
+    const result = await sweepEventChannels({ db: db as never, slack: devDeps(fetchFn), ...noSleep });
+    expect(result.failed).toBe(0);
+    expect(result.failures).toEqual([]);
   });
 
   test("re-running archives nothing new (idempotent — already-channeled+archived events aren't reloaded)", async () => {
