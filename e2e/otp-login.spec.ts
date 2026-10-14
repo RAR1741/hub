@@ -75,3 +75,34 @@ test("an incorrect code shows an error and clears the boxes", async ({ page }) =
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByLabel("Code digit 1")).toHaveValue("");
 });
+
+async function signInWithCode(page: Page) {
+  for (let i = 0; i < CODE.length; i++) {
+    await page.getByLabel(`Code digit ${i + 1}`).fill(CODE[i]);
+  }
+}
+
+test("OTP sign-in returns to the page named by ?next=", async ({ page }) => {
+  const email = `otp-next-${Date.now()}@example.com`;
+  const personId = await seedOtpPerson(email);
+
+  await page.goto("/login?next=/teams");
+  await requestCodeThenSeedKnown(page, email, personId);
+  await signInWithCode(page);
+
+  await expect(page).toHaveURL(/\/teams$/);
+  await expect(page.getByRole("heading", { name: "Teams" })).toBeVisible();
+});
+
+test("OTP sign-in ignores an off-site ?next= and lands home", async ({ page }) => {
+  const email = `otp-evil-${Date.now()}@example.com`;
+  const personId = await seedOtpPerson(email);
+
+  await page.goto("/login?next=//evil.com");
+  await requestCodeThenSeedKnown(page, email, personId);
+  await signInWithCode(page);
+
+  await page.waitForURL("**/");
+  expect(new URL(page.url()).pathname).toBe("/");
+  await expect(page.getByText(/signed in as/i)).toBeVisible();
+});

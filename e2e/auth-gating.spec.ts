@@ -10,7 +10,15 @@ test.describe("teams hidden from guests", () => {
     const context = await browser.newContext();
     const page = await context.newPage();
     await page.goto("/teams");
-    await expect(page).toHaveURL(/\/login$/);
+    await expect(page).toHaveURL(/\/login\?next=%2Fteams$/);
+    await context.close();
+  });
+
+  test("anonymous GET /events/<id> carries the full path in next", async ({ browser }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await page.goto("/events/00000000-0000-0000-0000-000000000123");
+    await expect(page).toHaveURL(/\/login\?next=%2Fevents%2F00000000-0000-0000-0000-000000000123$/);
     await context.close();
   });
 
@@ -30,7 +38,7 @@ test.describe("people is mentor+ only", () => {
     const context = await browser.newContext();
     const page = await context.newPage();
     await page.goto("/people");
-    await expect(page).toHaveURL(/\/login$/);
+    await expect(page).toHaveURL(/\/login\?next=%2Fpeople$/);
     await context.close();
   });
 
