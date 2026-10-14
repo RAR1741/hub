@@ -14,6 +14,8 @@ import { PrintButton } from "@/components/PrintButton";
  * check-in status + the per-person mentor note (#326). Issue #54 — deliberately
  * not GatherPack's grouping/page-break-control roster; add those if mentors ask.
  * Mentor-only page, so printing notes here is safe.
+ * Two blank Check 1 / Check 2 columns are for mentors to tick by hand (e.g. bus
+ * head-counts, issue #327) — nothing is tracked.
  */
 export const metadata: Metadata = { title: "Event Print" };
 
@@ -57,6 +59,8 @@ export default async function EventRosterPrintPage({ params }: { params: Promise
               <th>Role</th>
               <th>Signed up</th>
               <th>Checked in</th>
+              <th>Check 1</th>
+              <th>Check 2</th>
               <th>Note</th>
             </tr>
           </thead>
@@ -67,6 +71,8 @@ export default async function EventRosterPrintPage({ params }: { params: Promise
                 <td className="mono">{r.role}</td>
                 <td>{r.signedUp ? "Yes" : ""}</td>
                 <td>{r.checkedIn ? "Yes" : ""}</td>
+                <td />
+                <td />
                 <td>
                   {r.notesUnavailable ? (
                     <span className="text-sm text-[var(--muted)]">Notes unavailable</span>
@@ -83,7 +89,7 @@ export default async function EventRosterPrintPage({ params }: { params: Promise
             ))}
             {roster.length === 0 && (
               <tr>
-                <td colSpan={5} className="text-sm text-[var(--muted)]">
+                <td colSpan={7} className="text-sm text-[var(--muted)]">
                   No sign-ups yet.
                 </td>
               </tr>
