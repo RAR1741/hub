@@ -4,6 +4,7 @@ import {
   channelSlug,
   createEventChannel,
   renameChannel,
+  renameChannelDetailed,
   archiveChannel,
   inviteToChannel,
   inviteToChannelDetailed,
@@ -141,6 +142,14 @@ describe("renameChannel", () => {
     const result = await renameChannel(prodDeps(fetchFn), "C1", "New Name", eventId);
     expect(result).toEqual({ name: "e-new-name-1111" });
     expect(requests).toHaveLength(2);
+  });
+});
+
+describe("renameChannelDetailed", () => {
+  test("failure carries the Slack error code; skip has none", async () => {
+    const { fetchFn } = fakeFetch([{ status: 200, body: { ok: false, error: "restricted_action" } }]);
+    expect(await renameChannelDetailed(prodDeps(fetchFn), "C1", "New", "11112222-x")).toEqual({ ok: false, error: "restricted_action" });
+    expect(await renameChannelDetailed(devDeps(fetchFn), "C1", "New", "11112222-x")).toEqual({ ok: false });
   });
 });
 
@@ -632,6 +641,29 @@ describe("sweepEventChannels", () => {
     const result = await sweepEventChannels({ db: db as never, slack: devDeps(fetchFn), ...noSleep });
     expect(result.failed).toBe(0);
     expect(result.failures).toEqual([]);
+  });
+
+  test("rename failure carries the Slack error code", async () => {
+    const stillLive = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const { fetchFn } = fakeFetch([{ status: 200, body: { ok: false, error: "channel_not_found" } }]);
+    const db = makeDb([{ data: [{ id: "e1", name: "Renamed", ends_at: stillLive, slack_channel_id: "C1", slack_channel_name: "e-old" }] }, { data: [] }]);
+    const result = await sweepEventChannels({ db: db as never, slack: fakeSlackDeps(fetchFn), ...noSleep });
+    expect(result.failures).toEqual([{ event: "Renamed", channel: "e-old", op: "rename", error: "channel_not_found" }]);
+  });
+
+  test("after a confirmed rename, later failures report the new channel name", async () => {
+    const stillLive = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const { fetchFn } = fakeFetch([
+      { status: 200, body: { ok: true } }, // rename
+      { status: 200, body: { ok: false, error: "not_in_channel" } }, // invite
+    ]);
+    const db = makeDb([
+      { data: [{ id: "e1", name: "Renamed", ends_at: stillLive, slack_channel_id: "C1", slack_channel_name: "e-old" }] },
+      { error: null }, // persist rename
+      { data: [{ event_id: "e1", person_id: "p1", person: { slack_user_id: "U1" } }] },
+    ]);
+    const result = await sweepEventChannels({ db: db as never, slack: fakeSlackDeps(fetchFn), ...noSleep });
+    expect(result.failures).toEqual([{ event: "Renamed", channel: "e-renamed", op: "invite", error: "not_in_channel" }]);
   });
 
   test("re-running archives nothing new (idempotent — already-channeled+archived events aren't reloaded)", async () => {

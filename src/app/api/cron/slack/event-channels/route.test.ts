@@ -131,6 +131,12 @@ describe("POST /api/cron/slack/event-channels", () => {
     expect(posts[0]).toContain(":warning: Event channel sweep: Tinker Fest (#e-tinker-fest-de23): archive failed — restricted_action (archive it manually");
   });
 
+  test("restricted_action on an invite gets no archive hint", async () => {
+    const { posts } = await runWith([{ event: "Live", channel: "e-live", op: "invite", error: "restricted_action" }]);
+    expect(posts[0]).toContain("invite failed — restricted_action");
+    expect(posts[0]).not.toContain("archive it manually");
+  });
+
   test("many identical invite failures for one channel -> one post and one detail entry", async () => {
     const f = { event: "Kickoff", channel: "e-kickoff", op: "invite", error: "not_in_channel" };
     const { posts, report } = await runWith(Array.from({ length: 30 }, () => f));

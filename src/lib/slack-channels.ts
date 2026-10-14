@@ -69,16 +69,21 @@ export async function createEventChannel(deps: SlackDeps, name: string, eventId:
   }
 }
 
-/** Rename a channel, trying `base` then `suffixed` on a `name_taken` collision. */
-export async function renameChannel(deps: SlackDeps, channelId: string, name: string, eventId: string): Promise<{ name: string } | null> {
+export type RenameResult = { ok: true; name: string } | { ok: false; error?: string };
+
+/**
+ * Rename a channel, trying `base` then `suffixed` on a `name_taken` collision.
+ * Carries Slack's `error` code on failure; a skip (no token / non-prod) has none.
+ */
+export async function renameChannelDetailed(deps: SlackDeps, channelId: string, name: string, eventId: string): Promise<RenameResult> {
   const { base, suffixed } = channelSlug(name, eventId);
   if (!deps.token) {
     console.log(`[slack:no-token] would rename ${channelId} to ${base}`);
-    return null;
+    return { ok: false };
   }
   if (!deps.isProd) {
     console.log(`[slack:dev] would rename ${channelId} to ${base}`);
-    return null;
+    return { ok: false };
   }
   try {
     let { ok, body } = await post(deps, "conversations.rename", { channel: channelId, name: base });
@@ -89,13 +94,19 @@ export async function renameChannel(deps: SlackDeps, channelId: string, name: st
     }
     if (!ok) {
       console.error(`[slack] conversations.rename failed:`, body.error ?? body);
-      return null;
+      return { ok: false, error: String(body.error ?? "unknown") };
     }
-    return { name: chosen };
+    return { ok: true, name: chosen };
   } catch (e) {
     console.error(`[slack] conversations.rename threw:`, e);
-    return null;
+    return { ok: false, error: e instanceof Error ? e.message : "threw" };
   }
+}
+
+/** Rename a channel; null on any failure or skip. */
+export async function renameChannel(deps: SlackDeps, channelId: string, name: string, eventId: string): Promise<{ name: string } | null> {
+  const res = await renameChannelDetailed(deps, channelId, name, eventId);
+  return res.ok ? { name: res.name } : null;
 }
 
 export type ArchiveResult = { ok: true } | { ok: false; error?: string };
@@ -408,11 +419,12 @@ export async function sweepEventChannels(deps: { db: SupabaseClient; slack?: Sla
   for (const ev of surviving) {
     const { base, suffixed } = channelSlug(ev.name, ev.id);
     if (ev.slack_channel_name === base || ev.slack_channel_name === suffixed) continue;
-    const renamed = await renameChannel(slack, ev.slack_channel_id, ev.name, ev.id);
-    if (!renamed) {
-      fail(ev, "rename");
+    const renamed = await renameChannelDetailed(slack, ev.slack_channel_id, ev.name, ev.id);
+    if (!renamed.ok) {
+      fail(ev, "rename", renamed.error);
       continue;
     }
+    ev.slack_channel_name = renamed.name; // Slack already renamed it: later failure reports use the current name
     const { error: renErr } = await deps.db.from("event").update({ slack_channel_name: renamed.name }).eq("id", ev.id);
     if (renErr) {
       console.error("sweepEventChannels: persisting renamed channel name failed:", renErr);

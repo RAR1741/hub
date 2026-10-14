@@ -14,7 +14,7 @@ const clip = (s: string) => (s.length > 60 ? `${s.slice(0, 59)}…` : s);
 const escapeSlack = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 function describeFailure(f: SweepFailure): string {
-  const hint = f.error === "restricted_action" ? " (archive it manually in Slack; after that the next sweep should record it as archived)" : "";
+  const hint = f.op === "archive" && f.error === "restricted_action" ? " (archive it manually in Slack; after that the next sweep should record it as archived)" : "";
   return `${clip(f.event)} (#${f.channel ?? "unknown"}): ${f.op} failed${f.error ? ` — ${f.error}` : ""}${hint}`;
 }
 
