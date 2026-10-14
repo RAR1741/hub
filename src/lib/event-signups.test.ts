@@ -3,6 +3,7 @@ import {
   checkInPerson,
   insertSignupReminders,
   listEventRoster,
+  setEventPersonNote,
   signUpForEvent,
   signedUpEventIds,
   uncheckIn,
@@ -281,7 +282,7 @@ describe("checkInPerson", () => {
 });
 
 describe("listEventRoster", () => {
-  function fakeDb() {
+  function fakeDb(noteFails = false) {
     return {
       from(table: string) {
         if (table === "event_signup") {
@@ -314,6 +315,20 @@ describe("listEventRoster", () => {
             }),
           };
         }
+        if (table === "event_person_note") {
+          if (noteFails) return { select: () => ({ eq: async () => ({ data: null, error: { code: "XX" } }) }) };
+          return {
+            select: () => ({
+              eq: async () => ({
+                data: [
+                  // note on p3 (manual add, no signup row)
+                  { person_id: "p3", body: "Allergic to nuts", updated_at: "2026-02-01T00:00:00Z", person: { first_name: "Mo", last_name: "M", display_name: null } },
+                ],
+                error: null,
+              }),
+            }),
+          };
+        }
         throw new Error(`unexpected table ${table}`);
       },
     } as never;
@@ -321,10 +336,72 @@ describe("listEventRoster", () => {
 
   test("merges signups and check-ins, sorted by name", async () => {
     expect(await listEventRoster("e1", fakeDb())).toEqual([
-      { personId: "p1", name: "Ann A", role: "student", signedUp: true, checkedIn: true, sessionId: "s1", slackLinked: true, slackInvitedAt: "2026-01-01T00:00:00Z" },
-      { personId: "p2", name: "Bo B", role: "mentor", signedUp: true, checkedIn: false, sessionId: null, slackLinked: false, slackInvitedAt: null },
-      { personId: "p3", name: "Cy C", role: "student", signedUp: false, checkedIn: true, sessionId: "s2", slackLinked: false, slackInvitedAt: null },
+      { personId: "p1", name: "Ann A", role: "student", signedUp: true, checkedIn: true, sessionId: "s1", slackLinked: true, slackInvitedAt: "2026-01-01T00:00:00Z", note: null, notesUnavailable: false },
+      { personId: "p2", name: "Bo B", role: "mentor", signedUp: true, checkedIn: false, sessionId: null, slackLinked: false, slackInvitedAt: null, note: null, notesUnavailable: false },
+      { personId: "p3", name: "Cy C", role: "student", signedUp: false, checkedIn: true, sessionId: "s2", slackLinked: false, slackInvitedAt: null, note: { body: "Allergic to nuts", updatedAt: "2026-02-01T00:00:00Z", updatedByName: "Mo M" }, notesUnavailable: false },
     ]);
+  });
+
+  test("a failed note read marks every entry notesUnavailable instead of looking like no notes", async () => {
+    const roster = await listEventRoster("e1", fakeDb(true));
+    expect(roster).toHaveLength(3);
+    expect(roster.every((r) => r.notesUnavailable && r.note === null)).toBe(true);
+  });
+});
+
+describe("setEventPersonNote", () => {
+  function fakeDb(error: { code?: string } | null = null) {
+    const calls = { upsert: null as unknown, onConflict: null as unknown, deleteEqs: [] as unknown[][] };
+    const db = {
+      from(table: string) {
+        if (table !== "event_person_note") throw new Error(`unexpected table ${table}`);
+        return {
+          upsert: async (row: unknown, opts: unknown) => {
+            calls.upsert = row;
+            calls.onConflict = opts;
+            return { error };
+          },
+          delete: () => ({
+            eq: (c1: string, v1: string) => ({
+              eq: async (c2: string, v2: string) => {
+                calls.deleteEqs.push([c1, v1], [c2, v2]);
+                return { error };
+              },
+            }),
+          }),
+        };
+      },
+    } as never;
+    return { db, calls };
+  }
+
+  test("null body deletes the note for that event + person", async () => {
+    const { db, calls } = fakeDb();
+    expect(await setEventPersonNote("e1", "p1", null, "m1", db)).toEqual({ ok: true, status: 200 });
+    expect(calls.deleteEqs).toEqual([["event_id", "e1"], ["person_id", "p1"]]);
+  });
+
+  test("delete error -> 500", async () => {
+    expect(await setEventPersonNote("e1", "p1", null, "m1", fakeDb({ code: "XX" }).db))
+      .toEqual({ ok: false, status: 500 });
+  });
+
+  test("string body upserts keyed on event+person with editor and updated_at", async () => {
+    const { db, calls } = fakeDb();
+    expect(await setEventPersonNote("e1", "p1", "hi", "m1", db)).toEqual({ ok: true, status: 200 });
+    expect(calls.upsert).toMatchObject({ event_id: "e1", person_id: "p1", body: "hi", updated_by: "m1" });
+    expect(typeof (calls.upsert as { updated_at: unknown }).updated_at).toBe("string");
+    expect(calls.onConflict).toEqual({ onConflict: "event_id,person_id" });
+  });
+
+  test("FK violation -> 400", async () => {
+    expect(await setEventPersonNote("e1", "p1", "hi", "m1", fakeDb({ code: "23503" }).db))
+      .toEqual({ ok: false, status: 400 });
+  });
+
+  test("other error -> 500", async () => {
+    expect(await setEventPersonNote("e1", "p1", "hi", "m1", fakeDb({ code: "XX" }).db))
+      .toEqual({ ok: false, status: 500 });
   });
 });
 

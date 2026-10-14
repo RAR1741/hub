@@ -1,9 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { RosterEntry } from "@/lib/event-signups";
+import { formatInstant } from "@/lib/tz";
 import { Button } from "@/components/ui";
+
+const NOTE_MAX = 500;
 
 export function EventRosterActions({ eventId, entry }: { eventId: string; entry: RosterEntry }) {
   const router = useRouter();
@@ -115,6 +118,152 @@ export function ManualAddPerson({
       >
         Add & check in
       </Button>
+    </div>
+  );
+}
+
+export function EventRosterNote({
+  eventId,
+  entry,
+  teamTz,
+}: {
+  eventId: string;
+  entry: RosterEntry;
+  teamTz: string;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button variant="secondary" className="px-3 py-1" onClick={() => setOpen(true)}>
+        {entry.note ? "Edit note" : "Add note"}
+      </Button>
+      {open && (
+        <NoteModal eventId={eventId} entry={entry} teamTz={teamTz} onClose={() => setOpen(false)} />
+      )}
+    </>
+  );
+}
+
+function NoteModal({
+  eventId,
+  entry,
+  teamTz,
+  onClose,
+}: {
+  eventId: string;
+  entry: RosterEntry;
+  teamTz: string;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [body, setBody] = useState(entry.note?.body ?? "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+
+  // Mount-only (onClose lives in a ref) so a parent re-render never re-steals focus.
+  useEffect(() => {
+    const trigger = document.activeElement as HTMLElement | null; // the Add/Edit button that opened us
+    textareaRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") return onCloseRef.current();
+      if (e.key !== "Tab") return;
+      const items = dialogRef.current?.querySelectorAll<HTMLElement>("button:not([disabled]), textarea, [href], input, select");
+      if (!items?.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement;
+      if (e.shiftKey && (active === first || !dialogRef.current?.contains(active))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (active === last || !dialogRef.current?.contains(active))) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      trigger?.focus();
+    };
+  }, []);
+
+  async function save(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setBusy(true);
+    setError(false);
+    try {
+      const res = await fetch(`/api/admin/events/${eventId}/note`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ personId: entry.personId, note: body }),
+      });
+      if (res.ok) {
+        onClose();
+        router.refresh();
+      } else {
+        setError(true);
+      }
+    } catch {
+      setError(true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div
+      className="modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Note for ${entry.name}`}
+      onClick={onClose}
+    >
+      <div ref={dialogRef} className="modal-card" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-base font-semibold">Note for {entry.name}</h3>
+            {entry.note && (
+              <p className="mt-1 text-sm text-[var(--muted)]">
+                Last edited by {entry.note.updatedByName} · {formatInstant(entry.note.updatedAt, teamTz)}
+              </p>
+            )}
+          </div>
+          <button type="button" className="btn" onClick={onClose} aria-label="Close">
+            ✕
+          </button>
+        </div>
+
+        <form onSubmit={save} className="flex flex-col gap-2 mt-3">
+          <label className="label">
+            Note
+            <textarea
+              ref={textareaRef}
+              className="input"
+              maxLength={NOTE_MAX}
+              value={body}
+              onChange={(e) => {
+                setBody(e.target.value);
+                setError(false);
+              }}
+            />
+          </label>
+          <p className="text-sm text-[var(--muted)]">Leave empty to remove the note.</p>
+          <Button type="submit" variant="primary" className="w-full" pending={busy} pendingLabel="Saving…">
+            Save
+          </Button>
+          {error && (
+            <p role="alert" className="text-sm" style={{ color: "var(--absent)" }}>
+              Something went wrong — try again.
+            </p>
+          )}
+        </form>
+      </div>
     </div>
   );
 }

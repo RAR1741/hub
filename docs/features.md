@@ -90,7 +90,7 @@ scannable catalog of what's built, grouped by area, with a route per entry. The
 
 - **Member events** — browse and sign up for events, including an inline form when one's attached.
   `/events`
-- **Events admin** — manage events, check-ins, manual roster entry, Google Calendar linking, and a
+- **Events admin** — manage events, check-ins, manual roster entry, per-person mentor notes, Google Calendar linking, and a
   printable roster. `/admin/events`, `/admin/events/[id]`, `/admin/events/[id]/print`
 - **Sign-up forms engine** — build custom forms attached to events. `/admin/forms` — see
   [features/events-and-forms.md](features/events-and-forms.md)

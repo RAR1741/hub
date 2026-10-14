@@ -55,6 +55,10 @@ Mentor-and-up only (`hasRole(viewer.role, "mentor")`).
 - The **roster** (`listEventRoster` in `src/lib/event-signups.ts`) merges two sources: everyone
   who signed up (`event_signup`) and everyone checked in (`session` rows with
   `source = 'event'`), so a mentor's manual add shows up even without a prior sign-up.
+- **Per-person notes:** mentors keep one shared note per (event, person) in `event_person_note`,
+  saved via `PUT /api/admin/events/[id]/note` (`{ personId, note }`). Any mentor can edit it; the
+  roster shows the note with its last editor and time, and saving an empty note deletes it. Works
+  for manual adds too. Mentor-only; never shown to students.
 - **Check-in** (`EventRosterActions.tsx` → `POST`/`DELETE /api/admin/events/[id]/checkin`) credits
   the person for the event's full duration (`starts_at`–`ends_at`) as one `session` row. The same
   route backs **"Add someone who didn't sign up"** (`ManualAddPerson`), which checks a person in
@@ -73,10 +77,11 @@ Mentor-and-up only (`hasRole(viewer.role, "mentor")`).
 
 ## Printable roster — `/admin/events/[id]/print`
 
-A plain, print-styled attendee list (name, role, signed-up/checked-in) for handing to whoever's
-running the door — see `src/app/admin/events/[id]/print/page.tsx`. It also has two blank "Check 1 /
-Check 2" columns for mentors to tick by hand (e.g. bus head-counts); nothing there is tracked. It
-reuses `listEventRoster` directly; it does not include form responses.
+A plain, print-styled attendee list (name, role, signed-up/checked-in, and a Note column with the
+per-person mentor note) for handing to whoever's running the door — see
+`src/app/admin/events/[id]/print/page.tsx`. It also has two blank "Check 1 / Check 2" columns for
+mentors to tick by hand (e.g. bus head-counts); nothing there is tracked. It reuses
+`listEventRoster` directly; it does not include form responses.
 
 ## Sign-up forms — `/admin/forms`, `/admin/forms/[id]`
 

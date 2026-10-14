@@ -1,4 +1,4 @@
-import { formatEventRange } from "@/lib/tz";
+import { formatEventRange, formatInstant } from "@/lib/tz";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
@@ -11,8 +11,9 @@ import { PrintButton } from "@/components/PrintButton";
 
 /**
  * Plain print-friendly attendee list for an event: name + role + sign-up/
- * check-in status. Issue #54 — deliberately not GatherPack's grouping/notes/
- * page-break-control roster; add those if mentors ask once this ships.
+ * check-in status + the per-person mentor note (#326). Issue #54 — deliberately
+ * not GatherPack's grouping/page-break-control roster; add those if mentors ask.
+ * Mentor-only page, so printing notes here is safe.
  * Two blank Check 1 / Check 2 columns are for mentors to tick by hand (e.g. bus
  * head-counts, issue #327) — nothing is tracked.
  */
@@ -60,6 +61,7 @@ export default async function EventRosterPrintPage({ params }: { params: Promise
               <th>Checked in</th>
               <th>Check 1</th>
               <th>Check 2</th>
+              <th>Note</th>
             </tr>
           </thead>
           <tbody>
@@ -71,11 +73,23 @@ export default async function EventRosterPrintPage({ params }: { params: Promise
                 <td>{r.checkedIn ? "Yes" : ""}</td>
                 <td />
                 <td />
+                <td>
+                  {r.notesUnavailable ? (
+                    <span className="text-sm text-[var(--muted)]">Notes unavailable</span>
+                  ) : r.note && (
+                    <>
+                      <div style={{ whiteSpace: "pre-wrap" }}>{r.note.body}</div>
+                      <div className="text-sm text-[var(--muted)]">
+                        — {r.note.updatedByName}, {formatInstant(r.note.updatedAt, teamTz)}
+                      </div>
+                    </>
+                  )}
+                </td>
               </tr>
             ))}
             {roster.length === 0 && (
               <tr>
-                <td colSpan={6} className="text-sm text-[var(--muted)]">
+                <td colSpan={7} className="text-sm text-[var(--muted)]">
                   No sign-ups yet.
                 </td>
               </tr>
