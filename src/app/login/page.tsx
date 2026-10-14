@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/viewer";
+import { safeNext } from "@/lib/login-return";
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 import { StudentLoginForm } from "@/components/StudentLoginForm";
 import { AccountRequestForm } from "@/components/AccountRequestForm";
@@ -11,12 +12,13 @@ export const metadata: Metadata = { title: "Sign In" };
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; next?: string }>;
 }) {
   // Nothing here helps someone who's already signed in — send them home.
+  const { error, next: rawNext } = await searchParams;
+  const next = safeNext(rawNext);
   const viewer = await getViewer();
-  if (viewer.person) redirect("/");
-  const { error } = await searchParams;
+  if (viewer.person) redirect(next);
 
   return (
     <main className="mx-auto flex max-w-md flex-col gap-6 py-8">
@@ -27,14 +29,14 @@ export default async function LoginPage({
       <div className="card flex flex-col gap-6">
         <section className="flex flex-col gap-3">
           <h2 className="eyebrow">Email</h2>
-          <EmailOtpForm />
+          <EmailOtpForm next={next} />
         </section>
         <hr style={{ border: 0, borderTop: "1px solid var(--hair)" }} />
         <section className="flex flex-col gap-3">
           <h2 className="eyebrow">Students</h2>
           {/* Student-ID login is dev-only for now; the API returns 404 in
               production. Email OTP above is the production path for students. */}
-          {process.env.NODE_ENV !== "production" && <StudentLoginForm />}
+          {process.env.NODE_ENV !== "production" && <StudentLoginForm next={next} />}
           <details className="text-sm">
             <summary className="cursor-pointer font-medium" style={{ color: "var(--red)" }}>
               New student? Request an account
@@ -52,7 +54,7 @@ export default async function LoginPage({
               Google sign-in failed. Try again, or ask an admin if it keeps happening.
             </p>
           )}
-          <GoogleSignInButton />
+          <GoogleSignInButton next={next} />
         </section>
         {process.env.NODE_ENV !== "production" && (
           <>
@@ -60,17 +62,17 @@ export default async function LoginPage({
             <section className="flex flex-col gap-3">
               <h2 className="eyebrow">Dev only</h2>
               <div className="flex flex-col gap-2">
-                <form action="/api/auth/dev-login?role=student" method="POST">
+                <form action={`/api/auth/dev-login?role=student&next=${encodeURIComponent(next)}`} method="POST">
                   <button type="submit" className="btn w-full">
                     Log in as Student
                   </button>
                 </form>
-                <form action="/api/auth/dev-login?role=mentor" method="POST">
+                <form action={`/api/auth/dev-login?role=mentor&next=${encodeURIComponent(next)}`} method="POST">
                   <button type="submit" className="btn w-full">
                     Log in as Mentor
                   </button>
                 </form>
-                <form action="/api/auth/dev-login?role=admin" method="POST">
+                <form action={`/api/auth/dev-login?role=admin&next=${encodeURIComponent(next)}`} method="POST">
                   <button type="submit" className="btn w-full">
                     Log in as Admin
                   </button>

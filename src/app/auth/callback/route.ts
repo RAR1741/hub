@@ -5,13 +5,15 @@ import { getDb } from "@/lib/db";
 import { serverSupabaseUrl } from "@/lib/supabase-url";
 import { AUTH_COOKIE_NAME } from "@/lib/supabase-cookie";
 import { clientUrl } from "@/lib/request-origin";
+import { safeNext } from "@/lib/login-return";
 import { decideOAuthLink } from "@/lib/oauth-link";
 import type { PersonRow } from "@/lib/types";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
-  const redirect = NextResponse.redirect(clientUrl(request, "/"));
+  const next = safeNext(url.searchParams.get("next"));
+  const redirect = NextResponse.redirect(clientUrl(request, next));
 
   // Supabase lands here with ?error=… (no code) when the provider leg fails,
   // e.g. Google rejecting the client secret. Show it instead of bouncing home.

@@ -2,11 +2,11 @@
 
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 
-export function GoogleSignInButton() {
+export function GoogleSignInButton({ next }: { next: string }) {
   async function signIn() {
     await getSupabaseBrowser().auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { redirectTo: `${window.location.origin}/auth/callback${next === "/" ? "" : `?next=${encodeURIComponent(next)}`}` },
     });
   }
   return (
