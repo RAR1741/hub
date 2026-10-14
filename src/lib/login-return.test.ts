@@ -34,6 +34,8 @@ describe("safeNext", () => {
     "/a/..//evil.com",
     "/%2e//evil.com",
     "/%2E%2E//evil.com",
+    "/\t/[",
+    "/\t/",
   ])("rejects %j", (raw) => {
     expect(safeNext(raw)).toBe("/");
   });

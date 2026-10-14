@@ -1,7 +1,12 @@
 /** Same-origin path to return to after sign-in, or "/" if `raw` is anything else. */
 export function safeNext(raw: string | null | undefined): string {
   if (!raw || raw[0] !== "/" || raw[1] === "/" || raw[1] === "\\") return "/";
-  const u = new URL(raw, "http://x"); // normalizes; strips tab/CR/LF
+  let u: URL;
+  try {
+    u = new URL(raw, "http://x"); // normalizes; strips tab/CR/LF
+  } catch {
+    return "/"; // e.g. "/\t/[" → "//[" parses as an invalid host and throws
+  }
   if (u.origin !== "http://x") return "/"; // //evil, /\evil, schemes
   if (/^\/(login|api|auth)(\/|$)/.test(u.pathname)) return "/"; // loops / non-pages
   const out = u.pathname + u.search;
