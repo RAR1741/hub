@@ -98,26 +98,41 @@ export async function renameChannel(deps: SlackDeps, channelId: string, name: st
   }
 }
 
-/** Archive a channel. `already_archived` counts as success (idempotent). */
-export async function archiveChannel(deps: SlackDeps, channelId: string): Promise<boolean> {
+export type ArchiveResult = { ok: true } | { ok: false; error?: string };
+
+/**
+ * Archive a channel. `already_archived` counts as success (idempotent). On
+ * `not_in_channel` (channel made by an older bot identity) the bot joins and
+ * retries once; a failed join reports `join:<code>`. A skip (no token /
+ * non-prod) carries no error.
+ */
+export async function archiveChannel(deps: SlackDeps, channelId: string): Promise<ArchiveResult> {
   if (!deps.token) {
     console.log(`[slack:no-token] would archive ${channelId}`);
-    return false;
+    return { ok: false };
   }
   if (!deps.isProd) {
     console.log(`[slack:dev] would archive ${channelId}`);
-    return false;
+    return { ok: false };
   }
   try {
-    const { ok, body } = await post(deps, "conversations.archive", { channel: channelId });
+    let { ok, body } = await post(deps, "conversations.archive", { channel: channelId });
+    if (!ok && body.error === "not_in_channel") {
+      const join = await post(deps, "conversations.join", { channel: channelId });
+      if (!join.ok) {
+        console.error(`[slack] conversations.join failed:`, join.body.error ?? join.body);
+        return { ok: false, error: `join:${String(join.body.error ?? "unknown")}` };
+      }
+      ({ ok, body } = await post(deps, "conversations.archive", { channel: channelId }));
+    }
     if (!ok && body.error !== "already_archived") {
       console.error(`[slack] conversations.archive failed:`, body.error ?? body);
-      return false;
+      return { ok: false, error: String(body.error ?? "unknown") };
     }
-    return true;
+    return { ok: true };
   } catch (e) {
     console.error(`[slack] conversations.archive threw:`, e);
-    return false;
+    return { ok: false, error: e instanceof Error ? e.message : "threw" };
   }
 }
 
@@ -334,7 +349,8 @@ export async function afterEventSignup(deps: { db: SupabaseClient; slack?: Slack
 type SweepEventRow = { id: string; name: string; ends_at: string; slack_channel_id: string; slack_channel_name: string | null };
 type SweepSignupRow = { event_id: string; person_id: string; person: { slack_user_id: string | null } | null };
 
-export type SweepSummary = { archived: number; renamed: number; invited: number; failed: number };
+export type SweepFailure = { event: string; channel: string | null; op: "archive" | "rename" | "invite"; error?: string };
+export type SweepSummary = { archived: number; renamed: number; invited: number; failed: number; failures: SweepFailure[] };
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -347,7 +363,11 @@ const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 export async function sweepEventChannels(deps: { db: SupabaseClient; slack?: SlackDeps; sleep?: (ms: number) => Promise<void> }): Promise<SweepSummary> {
   const slack = deps.slack ?? slackDepsFromEnv();
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
-  const summary: SweepSummary = { archived: 0, renamed: 0, invited: 0, failed: 0 };
+  const summary: SweepSummary = { archived: 0, renamed: 0, invited: 0, failed: 0, failures: [] };
+  const fail = (ev: SweepEventRow, op: SweepFailure["op"], error?: string) => {
+    summary.failed++;
+    summary.failures.push({ event: ev.name, channel: ev.slack_channel_name, op, error });
+  };
 
   const { data, error } = await deps.db
     .from("event")
@@ -365,15 +385,15 @@ export async function sweepEventChannels(deps: { db: SupabaseClient; slack?: Sla
 
   for (const ev of events) {
     if (Date.parse(ev.ends_at) < cutoff) {
-      const archivedOk = await archiveChannel(slack, ev.slack_channel_id);
-      if (!archivedOk) {
-        summary.failed++;
+      const archived = await archiveChannel(slack, ev.slack_channel_id);
+      if (!archived.ok) {
+        fail(ev, "archive", archived.error);
         continue;
       }
       const { error: archErr } = await deps.db.from("event").update({ slack_archived_at: new Date().toISOString() }).eq("id", ev.id);
       if (archErr) {
         console.error("sweepEventChannels: persisting slack_archived_at failed:", archErr);
-        summary.failed++;
+        fail(ev, "archive", "db_write_failed");
       } else {
         summary.archived++;
       }
@@ -387,20 +407,20 @@ export async function sweepEventChannels(deps: { db: SupabaseClient; slack?: Sla
     if (ev.slack_channel_name === base || ev.slack_channel_name === suffixed) continue;
     const renamed = await renameChannel(slack, ev.slack_channel_id, ev.name, ev.id);
     if (!renamed) {
-      summary.failed++;
+      fail(ev, "rename");
       continue;
     }
     const { error: renErr } = await deps.db.from("event").update({ slack_channel_name: renamed.name }).eq("id", ev.id);
     if (renErr) {
       console.error("sweepEventChannels: persisting renamed channel name failed:", renErr);
-      summary.failed++;
+      fail(ev, "rename", "db_write_failed");
     } else {
       summary.renamed++;
     }
   }
 
   if (surviving.length > 0) {
-    const channelByEvent = new Map(surviving.map((e) => [e.id, e.slack_channel_id]));
+    const eventById = new Map(surviving.map((e) => [e.id, e]));
     const { data: signups, error: signupErr } = await deps.db
       .from("event_signup")
       .select("event_id, person_id, person(slack_user_id)")
@@ -411,10 +431,10 @@ export async function sweepEventChannels(deps: { db: SupabaseClient; slack?: Sla
     } else {
       for (const s of (signups ?? []) as unknown as SweepSignupRow[]) {
         const slackUserId = s.person?.slack_user_id ?? null;
-        const channelId = channelByEvent.get(s.event_id);
-        if (!slackUserId || !channelId) continue; // still-unlinked stays null — that's the admin record
-        const ok = await inviteToChannel(slack, channelId, [slackUserId]);
-        if (ok) {
+        const ev = eventById.get(s.event_id);
+        if (!slackUserId || !ev) continue; // still-unlinked stays null — that's the admin record
+        const invite = await inviteToChannelDetailed(slack, ev.slack_channel_id, [slackUserId]);
+        if (invite.ok) {
           const { error: invErr } = await deps.db
             .from("event_signup")
             .update({ slack_invited_at: new Date().toISOString() })
@@ -422,12 +442,12 @@ export async function sweepEventChannels(deps: { db: SupabaseClient; slack?: Sla
             .eq("person_id", s.person_id);
           if (invErr) {
             console.error("sweepEventChannels: persisting slack_invited_at failed:", invErr);
-            summary.failed++;
+            fail(ev, "invite", "db_write_failed");
           } else {
             summary.invited++;
           }
         } else {
-          summary.failed++;
+          fail(ev, "invite", invite.error);
         }
         await sleep(1100); // ~1 invite/sec, mirrors mentor-reminders.ts
       }

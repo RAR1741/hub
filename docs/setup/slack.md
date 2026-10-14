@@ -35,6 +35,13 @@ and `src/lib/mentor-reminders.ts` (weekly reminders).
 Bot-token scopes (both apps): `chat:write`, `chat:write.public`, `im:write`, `users:read`,
 `users:read.email`, `channels:read`, `groups:read`.
 
+Per-event Slack channels (nightly sweep, see the [event channels design](../superpowers/specs/2026-08-30-event-slack-channels-design.md))
+also need `channels:manage` and `channels:join`. The sweep joins a channel it is not in (made by an
+older bot identity) before archiving it. If Slack answers `restricted_action` (channel created by
+another identity; only its creator or a workspace admin may archive), archive it manually in Slack
+- the next sweep sees `already_archived` and records it. Every failed channel is posted to
+`#hub-admin-alerts` on each sweep run.
+
 The IDs above are hardcoded in `src/lib/slack-registry.ts` and nothing but a real send checks
 them, so a wrong-but-well-formed ID posts nowhere and typechecks fine. **Admin → Slack**
 (`/admin/slack`) has a **Channel registry** card that resolves each ID against
