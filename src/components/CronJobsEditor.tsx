@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { CronJob } from "@/lib/cron-jobs";
+import { RUN_CONFIRM_MESSAGES, type CronJob } from "@/lib/cron-jobs";
 
 export type CronJobRow = CronJob & { stale: boolean };
 
-type RowState = { schedule: string; busy: boolean; status: string | null; error: string | null };
+type RowState = { schedule: string; busy: "save" | "run" | null; status: string | null; error: string | null };
 
 function formatWhen(iso: string, teamTz: string): string {
   return new Date(iso).toLocaleString(undefined, { timeZone: teamTz });
@@ -20,7 +20,7 @@ function formatLastRun(job: CronJob, teamTz: string): string {
 
 export function CronJobsEditor({ jobs, teamTz }: { jobs: CronJobRow[]; teamTz: string }) {
   const [rows, setRows] = useState<Record<number, RowState>>(() =>
-    Object.fromEntries(jobs.map((job) => [job.jobid, { schedule: job.schedule, busy: false, status: null, error: null }])),
+    Object.fromEntries(jobs.map((job) => [job.jobid, { schedule: job.schedule, busy: null, status: null, error: null }])),
   );
   const router = useRouter();
 
@@ -31,7 +31,7 @@ export function CronJobsEditor({ jobs, teamTz }: { jobs: CronJobRow[]; teamTz: s
   async function save(jobId: number) {
     const schedule = rows[jobId].schedule.trim();
     if (!schedule) return;
-    setRow(jobId, { busy: true, status: null, error: null });
+    setRow(jobId, { busy: "save", status: null, error: null });
     try {
       const res = await fetch("/api/admin/cron", {
         method: "PATCH",
@@ -40,13 +40,39 @@ export function CronJobsEditor({ jobs, teamTz }: { jobs: CronJobRow[]; teamTz: s
       });
       const body = await res.json().catch(() => ({}));
       if (res.ok) {
-        setRow(jobId, { busy: false, status: "Saved.", error: null });
+        setRow(jobId, { busy: null, status: "Saved.", error: null });
         router.refresh();
       } else {
-        setRow(jobId, { busy: false, status: null, error: body.error ?? "Save failed." });
+        setRow(jobId, { busy: null, status: null, error: body.error ?? "Save failed." });
       }
     } catch {
-      setRow(jobId, { busy: false, status: null, error: "Save failed." });
+      setRow(jobId, { busy: null, status: null, error: "Save failed." });
+    }
+  }
+
+  async function runNow(jobId: number, jobname: string) {
+    const msg = RUN_CONFIRM_MESSAGES[jobname];
+    if (msg && !window.confirm(msg)) return;
+    setRow(jobId, { busy: "run", status: null, error: null });
+    try {
+      const res = await fetch("/api/admin/cron", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setRow(jobId, {
+          busy: null,
+          status: "Queued. HTTP jobs run asynchronously — check last success (or Vercel logs) for the outcome.",
+          error: null,
+        });
+        router.refresh();
+      } else {
+        setRow(jobId, { busy: null, status: null, error: body.error ?? "Run failed." });
+      }
+    } catch {
+      setRow(jobId, { busy: null, status: null, error: "Run failed." });
     }
   }
 
@@ -57,7 +83,7 @@ export function CronJobsEditor({ jobs, teamTz }: { jobs: CronJobRow[]; teamTz: s
       </p>
       <div className="flex flex-col gap-4">
         {jobs.map((job) => {
-          const row = rows[job.jobid] ?? { schedule: job.schedule, busy: false, status: null, error: null };
+          const row = rows[job.jobid] ?? { schedule: job.schedule, busy: null, status: null, error: null };
           return (
             <div key={job.jobid} className="flex flex-col gap-2 border-b border-[var(--steel)] pb-4 last:border-b-0 last:pb-0">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -79,10 +105,18 @@ export function CronJobsEditor({ jobs, teamTz }: { jobs: CronJobRow[]; teamTz: s
                 <button
                   type="button"
                   className="btn btn-primary"
-                  disabled={row.busy || row.schedule.trim().length === 0}
+                  disabled={row.busy !== null || row.schedule.trim().length === 0}
                   onClick={() => save(job.jobid)}
                 >
-                  {row.busy ? "Saving…" : "Save"}
+                  {row.busy === "save" ? "Saving…" : "Save"}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  disabled={row.busy !== null}
+                  onClick={() => runNow(job.jobid, job.jobname)}
+                >
+                  {row.busy === "run" ? "Running…" : "Run now"}
                 </button>
               </div>
               {row.status && <p role="status" className="text-sm text-[var(--muted)]">{row.status}</p>}
