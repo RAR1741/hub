@@ -407,6 +407,7 @@ const EVENT_ID = "11112222-3333-4444-5555-666677778888";
 function makeDb(script: { data?: unknown; error?: unknown }[]) {
   const queue = [...script];
   const calls: string[] = [];
+  const updates: unknown[] = [];
   function chain(result: { data?: unknown; error?: unknown }) {
     const obj: Record<string, unknown> = {
       select: () => obj,
@@ -414,7 +415,10 @@ function makeDb(script: { data?: unknown; error?: unknown }[]) {
       is: () => obj,
       eq: () => obj,
       in: () => obj,
-      update: () => obj,
+      update: (payload: unknown) => {
+        updates.push(payload);
+        return obj;
+      },
       maybeSingle: () => Promise.resolve(result),
       then: (resolve: (r: unknown) => unknown) => resolve(result),
     };
@@ -422,6 +426,7 @@ function makeDb(script: { data?: unknown; error?: unknown }[]) {
   }
   return {
     calls,
+    updates,
     from(table: string) {
       calls.push(table);
       const result = queue.shift() ?? { data: null, error: null };
@@ -767,6 +772,7 @@ describe("sweepEventChannels: out-of-band archive detection", () => {
     expect(result.failed).toBe(0);
     expect(requests[1].url).toContain("conversations.info");
     expect(db.calls).toEqual(["event", "event"]);
+    expect(db.updates).toEqual([{ slack_archived_at: expect.any(String) }]);
   });
 
   test("archive restricted_action on an open channel stays a failure", async () => {
@@ -810,6 +816,7 @@ describe("sweepEventChannels: out-of-band archive detection", () => {
     expect(result.invited).toBe(0);
     expect(result.failed).toBe(0);
     expect(requests.map((r) => r.url.split("/api/")[1].split("?")[0])).toEqual(["conversations.invite", "conversations.info"]);
+    expect(db.updates).toEqual([{ slack_archived_at: expect.any(String) }]);
   });
 
   test("invite is_archived on an open channel stays a failure; info checked once per event", async () => {
@@ -831,5 +838,37 @@ describe("sweepEventChannels: out-of-band archive detection", () => {
     expect(result.failed).toBe(2);
     expect(result.failures.every((f) => f.error === "not_in_channel")).toBe(true);
     expect(requests.filter((r) => r.url.includes("conversations.info"))).toHaveLength(1);
+  });
+});
+
+describe("sweepEventChannels: interleaved signups across events", () => {
+  test("an archived event's later signups are skipped while other events keep inviting", async () => {
+    const live = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const { fetchFn, requests } = fakeFetch([
+      { status: 200, body: { ok: false, error: "not_in_channel" } }, // e1 invite
+      { status: 200, body: { ok: true, channel: { is_archived: true } } }, // e1 info
+      { status: 200, body: { ok: true } }, // e2 invite
+    ]);
+    const db = makeDb([
+      {
+        data: [
+          { id: "e1", name: "One", ends_at: live, slack_channel_id: "C1", slack_channel_name: "e-one" },
+          { id: "e2", name: "Two", ends_at: live, slack_channel_id: "C2", slack_channel_name: "e-two" },
+        ],
+      },
+      {
+        data: [
+          { event_id: "e1", person_id: "p1", person: { slack_user_id: "U1" } },
+          { event_id: "e2", person_id: "p2", person: { slack_user_id: "U2" } },
+          { event_id: "e1", person_id: "p3", person: { slack_user_id: "U3" } },
+        ],
+      },
+      { error: null }, // e1 archived_at
+      { error: null }, // e2 slack_invited_at
+    ]);
+    const result = await sweepEventChannels({ db: db as never, slack: fakeSlackDeps(fetchFn), sleep: async () => {} });
+    expect(result).toMatchObject({ archived: 1, invited: 1, failed: 0 });
+    expect(requests.map((r) => r.url.split("/api/")[1].split("?")[0])).toEqual(["conversations.invite", "conversations.info", "conversations.invite"]);
+    expect(db.updates).toEqual([{ slack_archived_at: expect.any(String) }, { slack_invited_at: expect.any(String) }]);
   });
 });

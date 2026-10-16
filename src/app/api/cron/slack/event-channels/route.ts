@@ -13,9 +13,15 @@ const POST_GAP_MS = 1100; // Slack posts ~1/sec per channel
 const clip = (s: string) => (s.length > 60 ? `${s.slice(0, 59)}…` : s);
 const escapeSlack = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
+function archiveHint(f: SweepFailure): string {
+  if (f.op !== "archive" || !f.error?.startsWith("restricted_action")) return "";
+  // `restricted_action (info: <code>)`: the conversations.info lookup itself failed, so we can't tell if it's archived.
+  if (f.error.includes("(info:")) return " (couldn't confirm via conversations.info — check the bot has channels:read; archive it manually in Slack if it isn't already)";
+  return " (archive it manually in Slack; after that the next sweep should record it as archived)";
+}
+
 function describeFailure(f: SweepFailure): string {
-  const hint = f.op === "archive" && f.error === "restricted_action" ? " (archive it manually in Slack; after that the next sweep should record it as archived)" : "";
-  return `${clip(f.event)} (#${f.channel ?? "unknown"}): ${f.op} failed${f.error ? ` — ${f.error}` : ""}${hint}`;
+  return `${clip(f.event)} (#${f.channel ?? "unknown"}): ${f.op} failed${f.error ? ` — ${f.error}` : ""}${archiveHint(f)}`;
 }
 
 /** Collapse repeats (e.g. 30 failed invites to one channel) to one entry per event/channel/op/error. */
