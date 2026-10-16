@@ -109,6 +109,26 @@ export async function renameChannel(deps: SlackDeps, channelId: string, name: st
   return res.ok ? { name: res.name } : null;
 }
 
+export type JoinResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Join a public channel (`conversations.join`, needs `channels:join`) — for
+ * channels created by an older bot identity the current bot isn't a member of.
+ * Callers gate on token/isProd. Failure carries Slack's `error` code
+ * (`is_archived` means the channel is archived).
+ */
+async function joinChannel(deps: SlackDeps, channelId: string): Promise<JoinResult> {
+  try {
+    const join = await post(deps, "conversations.join", { channel: channelId });
+    if (join.ok) return { ok: true };
+    if (join.body.error !== "is_archived") console.error(`[slack] conversations.join failed:`, join.body.error ?? join.body);
+    return { ok: false, error: String(join.body.error ?? "unknown") };
+  } catch (e) {
+    console.error(`[slack] conversations.join threw:`, e);
+    return { ok: false, error: "threw" };
+  }
+}
+
 export type ArchiveResult = { ok: true } | { ok: false; error?: string };
 
 /**
@@ -129,12 +149,9 @@ export async function archiveChannel(deps: SlackDeps, channelId: string): Promis
   try {
     let { ok, body } = await post(deps, "conversations.archive", { channel: channelId });
     if (!ok && body.error === "not_in_channel") {
-      const join = await post(deps, "conversations.join", { channel: channelId });
-      if (!join.ok && join.body.error === "is_archived") return { ok: true };
-      if (!join.ok) {
-        console.error(`[slack] conversations.join failed:`, join.body.error ?? join.body);
-        return { ok: false, error: `join:${String(join.body.error ?? "unknown")}` };
-      }
+      const join = await joinChannel(deps, channelId);
+      if (!join.ok && join.error === "is_archived") return { ok: true };
+      if (!join.ok) return { ok: false, error: `join:${join.error}` };
       ({ ok, body } = await post(deps, "conversations.archive", { channel: channelId }));
     }
     if (!ok && body.error !== "already_archived") {
@@ -481,6 +498,29 @@ export async function sweepEventChannels(deps: { db: SupabaseClient; slack?: Sla
   if (surviving.length > 0) {
     const eventById = new Map(surviving.map((e) => [e.id, e]));
     const archivedChecks = new Map<string, ArchivedCheck>(); // one conversations.info per event per run
+    const joins = new Map<string, JoinResult>(); // at most one conversations.join per event per run
+    const markInvited = async (ev: SweepEventRow, s: SweepSignupRow) => {
+      const { error: invErr } = await deps.db
+        .from("event_signup")
+        .update({ slack_invited_at: new Date().toISOString() })
+        .eq("event_id", s.event_id)
+        .eq("person_id", s.person_id);
+      if (invErr) {
+        console.error("sweepEventChannels: persisting slack_invited_at failed:", invErr);
+        fail(ev, "invite", "db_write_failed");
+      } else {
+        summary.invited++;
+      }
+    };
+    const markArchived = async (ev: SweepEventRow) => {
+      const { error: archErr } = await deps.db.from("event").update({ slack_archived_at: new Date().toISOString() }).eq("id", ev.id);
+      if (archErr) {
+        console.error("sweepEventChannels: persisting slack_archived_at failed:", archErr);
+        fail(ev, "invite", "db_write_failed");
+      } else {
+        summary.archived++;
+      }
+    };
     const { data: signups, error: signupErr } = await deps.db
       .from("event_signup")
       .select("event_id, person_id, person(slack_user_id)")
@@ -496,17 +536,7 @@ export async function sweepEventChannels(deps: { db: SupabaseClient; slack?: Sla
         if (archivedChecks.get(ev.id)?.archived) continue; // found archived earlier this run
         const invite = await inviteToChannelDetailed(slack, ev.slack_channel_id, [slackUserId]);
         if (invite.ok) {
-          const { error: invErr } = await deps.db
-            .from("event_signup")
-            .update({ slack_invited_at: new Date().toISOString() })
-            .eq("event_id", s.event_id)
-            .eq("person_id", s.person_id);
-          if (invErr) {
-            console.error("sweepEventChannels: persisting slack_invited_at failed:", invErr);
-            fail(ev, "invite", "db_write_failed");
-          } else {
-            summary.invited++;
-          }
+          await markInvited(ev, s);
         } else if (invite.error !== undefined && INVITE_CHECK_ERRORS.has(invite.error)) {
           let check = archivedChecks.get(ev.id);
           if (!check) {
@@ -514,12 +544,23 @@ export async function sweepEventChannels(deps: { db: SupabaseClient; slack?: Sla
             archivedChecks.set(ev.id, check);
           }
           if (check.archived) {
-            const { error: archErr } = await deps.db.from("event").update({ slack_archived_at: new Date().toISOString() }).eq("id", ev.id);
-            if (archErr) {
-              console.error("sweepEventChannels: persisting slack_archived_at failed:", archErr);
-              fail(ev, "invite", "db_write_failed");
+            await markArchived(ev);
+          } else if (invite.error === "not_in_channel" && !check.error) {
+            // Channel made by an older bot identity: join once per event, then retry the invite.
+            let join = joins.get(ev.id);
+            if (!join) {
+              join = await joinChannel(slack, ev.slack_channel_id);
+              joins.set(ev.id, join);
+            }
+            if (join.ok) {
+              const retry = await inviteToChannelDetailed(slack, ev.slack_channel_id, [slackUserId]);
+              if (retry.ok) await markInvited(ev, s);
+              else fail(ev, "invite", retry.error);
+            } else if (join.error === "is_archived") {
+              archivedChecks.set(ev.id, { archived: true });
+              await markArchived(ev);
             } else {
-              summary.archived++;
+              fail(ev, "invite", `join:${join.error}`);
             }
           } else {
             fail(ev, "invite", withInfoContext(invite.error, check));

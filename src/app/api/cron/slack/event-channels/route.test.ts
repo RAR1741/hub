@@ -123,7 +123,7 @@ describe("POST /api/cron/slack/event-channels", () => {
     expect((await res.json()).failures).toHaveLength(5);
     const detail = report.mock.calls[0][2].detail as string;
     expect(detail).toContain("Tinker Fest (#e-tinker-fest-de23): archive failed — restricted_action (archive it manually in Slack");
-    expect(detail).toContain("Other (#e-other): archive failed — join:missing_scope;");
+    expect(detail).toContain("Other (#e-other): archive failed — join:missing_scope (add the channels:join bot scope and reinstall the Slack app);");
     expect(detail).toContain("Third (#unknown): rename failed");
     expect(detail).not.toContain("Fourth");
     expect(detail).toContain("+2 more");
@@ -141,6 +141,15 @@ describe("POST /api/cron/slack/event-channels", () => {
     const { posts } = await runWith([{ event: "Live", channel: "e-live", op: "invite", error: "restricted_action" }]);
     expect(posts[0]).toContain("invite failed — restricted_action");
     expect(posts[0]).not.toContain("archive it manually");
+  });
+
+  test("join:missing_scope gets the channels:join hint on any op", async () => {
+    const { posts } = await runWith([
+      { event: "Old Chan", channel: "e-old", op: "invite", error: "join:missing_scope" },
+      { event: "Older Chan", channel: "e-older", op: "archive", error: "join:missing_scope" },
+    ]);
+    expect(posts[0]).toContain("invite failed — join:missing_scope (add the channels:join bot scope and reinstall the Slack app)");
+    expect(posts[1]).toContain("archive failed — join:missing_scope (add the channels:join bot scope and reinstall the Slack app)");
   });
 
   test("many identical invite failures for one channel -> one post and one detail entry", async () => {
