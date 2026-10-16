@@ -19,4 +19,19 @@ describe("GET /auth/callback without a code", () => {
     const res = await call("");
     expect(res.headers.get("location")).toBe("http://localhost:3000/");
   });
+
+  it("returns to a valid next path", async () => {
+    const res = await call("?next=%2Fevents%2F1");
+    expect(res.headers.get("location")).toBe("http://localhost:3000/events/1");
+  });
+
+  it("ignores an off-site next", async () => {
+    const res = await call("?next=%2F%2Fevil.com");
+    expect(res.headers.get("location")).toBe("http://localhost:3000/");
+  });
+
+  it("ignores a next that normalizes to protocol-relative", async () => {
+    const res = await call("?next=%2F.%2F%2Fevil.com");
+    expect(res.headers.get("location")).toBe("http://localhost:3000/");
+  });
 });

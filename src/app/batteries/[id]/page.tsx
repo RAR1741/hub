@@ -11,9 +11,9 @@ export const metadata: Metadata = { title: "Battery" };
 
 export default async function BatteryDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const viewer = await getViewer();
-  requirePageRole(viewer, "student");
-
   const { id } = await params;
+  requirePageRole(viewer, "student", `/batteries/${id}`);
+
   const battery = await getBattery(id);
   if (!battery) notFound();
 

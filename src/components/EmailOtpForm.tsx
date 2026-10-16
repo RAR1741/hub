@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 const CODE_LENGTH = 8;
 
-export function EmailOtpForm() {
+export function EmailOtpForm({ next }: { next: string }) {
   const [phase, setPhase] = useState<"email" | "code">("email");
   const [email, setEmail] = useState("");
   const [digits, setDigits] = useState<string[]>(Array(CODE_LENGTH).fill(""));
@@ -53,7 +53,7 @@ export function EmailOtpForm() {
         signal: controller.signal,
       });
       if (res.ok) {
-        router.push("/");
+        router.push(next);
         router.refresh();
       } else if (res.status === 429) {
         setError("Too many attempts — try again in a minute.");

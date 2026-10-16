@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { loginHref } from "@/lib/login-return";
 import { getViewer } from "@/lib/viewer";
 import { hasRole } from "@/lib/authz";
 import { typesForRole } from "@/lib/notification-types";
@@ -10,7 +11,7 @@ export const metadata: Metadata = { title: "Notifications" };
 
 export default async function NotificationsPage() {
   const viewer = await getViewer();
-  if (!viewer.person) redirect("/login");
+  if (!viewer.person) redirect(loginHref("/me/notifications"));
 
   const configured = Boolean(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY);
   const enabled = new Set(

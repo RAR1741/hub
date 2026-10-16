@@ -16,9 +16,9 @@ export const metadata: Metadata = { title: "Project" };
 
 export default async function ShopBoardPage({ params }: Params) {
   const viewer = await getViewer();
-  requirePageRole(viewer, "student");
-
   const { projectId } = await params;
+  requirePageRole(viewer, "student", `/shop/${projectId}`);
+
   const project = await getProject(projectId);
   if (!project) notFound();
   const parts = await listParts(projectId);

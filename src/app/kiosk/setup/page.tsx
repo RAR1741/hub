@@ -10,7 +10,7 @@ export default async function KioskSetupPage() {
   // token from Admin → Kiosk devices, then may log out — the kiosk cookie keeps
   // the board running without a session.
   const viewer = await getViewer();
-  requirePageRole(viewer, "mentor");
+  requirePageRole(viewer, "mentor", "/kiosk/setup");
   return (
     <main className="flex min-h-full items-center justify-center p-4">
       <div className="card flex w-full max-w-md flex-col gap-4 shadow-lg">

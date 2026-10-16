@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "Batteries" };
 
 export default async function BatteriesPage() {
   const viewer = await getViewer();
-  requirePageRole(viewer, "student");
+  requirePageRole(viewer, "student", "/batteries");
 
   const [batteries, recentUsage] = await Promise.all([listBatteries(), listUsage({ limit: 50 })]);
   const active = batteries.filter((b) => b.status === "active");

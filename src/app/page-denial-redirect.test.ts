@@ -13,7 +13,7 @@ import { expect, test } from "vitest";
  * redirect to "/" or "/login" via their own line, and only /login itself may
  * name /login as a destination.
  *
- * This fails on any NEW `redirect("/login")` copy-pasted into a page.
+ * This fails on any NEW `redirect("/login")` or `redirect(loginHref(...))` copy-pasted into a page.
  */
 
 const appDir = path.dirname(fileURLToPath(import.meta.url));
@@ -38,7 +38,7 @@ const PERSON_GATE_ALLOWLIST = new Set([
 
 test("no page redirects a denied viewer to /login", () => {
   const offenders = pageFiles(appDir)
-    .filter((f) => readFileSync(f, "utf8").includes('redirect("/login")'))
+    .filter((f) => /redirect\((?:"\/login"|loginHref\()/.test(readFileSync(f, "utf8")))
     .map((f) => path.relative(appDir, f).split(path.sep).join("/"))
     .filter((rel) => !PERSON_GATE_ALLOWLIST.has(rel));
 

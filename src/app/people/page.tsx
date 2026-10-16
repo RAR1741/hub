@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "People" };
 export default async function PeoplePage() {
   const viewer = await getViewer();
   // People is mentor+ only — students are sent home, guests to login.
-  requirePageRole(viewer, "mentor");
+  requirePageRole(viewer, "mentor", "/people");
 
   // Fetch the full roster (active + inactive); search and the inactive filter
   // are applied live on the client, so no server-side query params here.

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-export function StudentLoginForm() {
+export function StudentLoginForm({ next }: { next: string }) {
   const [studentId, setStudentId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -20,7 +20,7 @@ export function StudentLoginForm() {
         body: JSON.stringify({ studentId }),
       });
       if (res.ok) {
-        router.push("/");
+        router.push(next);
         router.refresh();
       } else {
         setError("ID not recognized. Check with a mentor.");

@@ -7,6 +7,7 @@ import { listUpcomingEvents } from "@/lib/events";
 import { signedUpEventIds } from "@/lib/event-signups";
 import { getFormWithFields } from "@/lib/forms";
 import { getTeamTimezone } from "@/lib/settings";
+import { loginHref } from "@/lib/login-return";
 import { getViewer } from "@/lib/viewer";
 import { EventSignupButton } from "@/components/EventSignupButton";
 import { EventSignupForm } from "@/components/EventSignupForm";
@@ -15,7 +16,7 @@ export const metadata: Metadata = { title: "Events" };
 
 export default async function EventsPage() {
   const viewer = await getViewer();
-  if (!viewer.person) redirect("/login");
+  if (!viewer.person) redirect(loginHref("/events"));
   const canEdit = hasRole(viewer.role, "mentor");
 
   const teamTz = await getTeamTimezone();

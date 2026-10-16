@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "Tools" };
 
 export default async function ToolsPage() {
   const viewer = await getViewer();
-  requirePageRole(viewer, "student");
+  requirePageRole(viewer, "student", "/tools");
 
   const [tools, recentChecks] = await Promise.all([listTools(), listChecks({ limit: 50 })]);
   const notRetired = tools.filter((t) => t.status !== "retired");
