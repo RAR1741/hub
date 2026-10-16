@@ -43,16 +43,40 @@ test("mentor searches by name to late-add someone to an event", async ({ browser
     const addBtn = page.getByRole("button", { name: "Add & check in" });
     const fullName = `${FIRST} ${LAST}`;
 
-    // Focus opens the list with everyone addable; nothing selected yet.
-    await search.focus();
-    await expect(search).toHaveAttribute("aria-expanded", "true");
-    expect(await options.count()).toBeGreaterThan(0);
-    await expect(options.filter({ hasText: fullName })).toHaveCount(1);
+    // Focus/click opens the list with everyone addable; nothing selected yet.
+    await expect(async () => {
+      await search.click();
+      await expect(search).toHaveAttribute("aria-expanded", "true");
+    }).toPass();
+    await expect(options.first()).toBeVisible();
+    await expect(options.filter({ hasText: fullName })).toBeVisible();
     await expect(addBtn).toBeDisabled();
 
-    // No match: "No matches", button disabled.
+    // Keyboard: Down, Down, Up lands on the first option; Enter selects it.
+    const firstId = await options.first().getAttribute("id");
+    const secondId = await options.nth(1).getAttribute("id");
+    await search.press("ArrowDown");
+    await expect(search).toHaveAttribute("aria-activedescendant", firstId!);
+    await search.press("ArrowDown");
+    await expect(search).toHaveAttribute("aria-activedescendant", secondId!);
+    await search.press("ArrowUp");
+    await expect(search).toHaveAttribute("aria-activedescendant", firstId!);
+    const firstName = (await options.first().textContent())!.trim();
+    await search.press("Enter");
+    await expect(search).toHaveValue(firstName);
+    await expect(search).toHaveAttribute("aria-expanded", "false");
+    await expect(addBtn).toBeEnabled();
+
+    // After a pick, re-opening lists everyone again; Escape closes.
+    await search.click();
+    await expect(search).toHaveAttribute("aria-expanded", "true");
+    await expect(options.nth(1)).toBeVisible();
+    await search.press("Escape");
+    await expect(search).toHaveAttribute("aria-expanded", "false");
+
+    // No match: "No matches" status, button disabled.
     await search.fill("no-such-person-qqq");
-    await expect(page.getByRole("status").getByText("No matches")).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: "No matches" })).toBeVisible();
     await expect(addBtn).toBeDisabled();
 
     // Case-insensitive, padded partial match narrows to exactly the seeded person.
