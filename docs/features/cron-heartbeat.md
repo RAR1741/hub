@@ -45,3 +45,10 @@ run status beside the heartbeat.
   as permanently overdue — loud rather than silently unmonitored.
 - The migration seeds a heartbeat for every active job, so deploying this doesn't read as eleven
   dead jobs; each one gets a single period of grace to record a real heartbeat.
+
+## Run now
+
+Each row on `/admin/cron` has a **Run now** button that executes the job's stored pg_cron command immediately (via the `run_cron_job` RPC, admin-only `POST /api/admin/cron`). It is a genuine run: HTTP jobs fire their real `net.http_post` with the real `app_setting` URL + secret, and the job's heartbeat refreshes on success.
+
+- HTTP jobs are asynchronous — the button returns once the request is queued. Check the row's "last success" or Vercel logs for the outcome (pg_net responses are only kept ~6h).
+- Side-effectful jobs ask for confirmation first: `slack-whats-new-weekly`, `slack-mentor-reminders-weekly`, `push-reminders`, `push-clocked-in-late`, `close-stale-sessions`. The reminder jobs stamp after sending, so a manual run overlapping a scheduled tick can double-send.
