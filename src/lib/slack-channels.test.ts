@@ -14,6 +14,7 @@ import {
   afterEventUpdated,
   afterEventSignup,
   sweepEventChannels,
+  isChannelArchived,
 } from "./slack-channels";
 
 type CapturedRequest = { url: string; init?: RequestInit };
@@ -622,7 +623,10 @@ describe("sweepEventChannels", () => {
 
   test("archive failure is recorded with event, channel and Slack error code", async () => {
     const oldEnded = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString();
-    const { fetchFn } = fakeFetch([{ status: 200, body: { ok: false, error: "restricted_action" } }]);
+    const { fetchFn } = fakeFetch([
+      { status: 200, body: { ok: false, error: "restricted_action" } },
+      { status: 200, body: { ok: true, channel: { is_archived: false } } }, // conversations.info: open
+    ]);
     const db = makeDb([
       { data: [{ id: "e-old", name: "Tinker Fest", ends_at: oldEnded, slack_channel_id: "C-OLD", slack_channel_name: "e-tinker-fest-de23" }] },
     ]);
@@ -656,6 +660,7 @@ describe("sweepEventChannels", () => {
     const { fetchFn } = fakeFetch([
       { status: 200, body: { ok: true } }, // rename
       { status: 200, body: { ok: false, error: "not_in_channel" } }, // invite
+      { status: 200, body: { ok: true, channel: { is_archived: false } } }, // conversations.info: open
     ]);
     const db = makeDb([
       { data: [{ id: "e1", name: "Renamed", ends_at: stillLive, slack_channel_id: "C1", slack_channel_name: "e-old" }] },
@@ -715,5 +720,116 @@ describe("sweepEventChannels", () => {
     const result = await sweepEventChannels({ db: db as never, slack: fakeSlackDeps(fetchFn), ...noSleep });
     expect(result.invited).toBe(0);
     expect(requests).toHaveLength(0);
+  });
+});
+
+describe("isChannelArchived", () => {
+  test("no token / non-prod: false, no request", async () => {
+    const { fetchFn, requests } = fakeFetch();
+    expect(await isChannelArchived(devDeps(fetchFn), "C1")).toEqual({ archived: false });
+    expect(await isChannelArchived({ fetch: fetchFn, token: "", isProd: true }, "C1")).toEqual({ archived: false });
+    expect(requests).toHaveLength(0);
+  });
+
+  test("GETs conversations.info with the channel as a query param", async () => {
+    const { fetchFn, requests } = fakeFetch([{ status: 200, body: { ok: true, channel: { is_archived: true } } }]);
+    expect(await isChannelArchived(prodDeps(fetchFn), "C1")).toEqual({ archived: true });
+    expect(requests[0].url).toBe("https://slack.com/api/conversations.info?channel=C1");
+    expect(requests[0].init?.method).toBe("GET");
+  });
+
+  test("Slack error is carried, never throws", async () => {
+    const { fetchFn } = fakeFetch([{ status: 200, body: { ok: false, error: "missing_scope" } }]);
+    expect(await isChannelArchived(prodDeps(fetchFn), "C1")).toEqual({ archived: false, error: "missing_scope" });
+    const boom = (async () => {
+      throw new Error("boom");
+    }) as unknown as typeof globalThis.fetch;
+    expect(await isChannelArchived(prodDeps(boom), "C1")).toEqual({ archived: false, error: "boom" });
+  });
+});
+
+describe("sweepEventChannels: out-of-band archive detection", () => {
+  const noSleep = { sleep: async () => {} };
+  const oldEnded = () => new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString();
+  const stillLive = () => new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+  test("archive restricted_action on an archived channel is recorded as archived, no failure", async () => {
+    const { fetchFn, requests } = fakeFetch([
+      { status: 200, body: { ok: false, error: "restricted_action" } },
+      { status: 200, body: { ok: true, channel: { is_archived: true } } },
+    ]);
+    const db = makeDb([
+      { data: [{ id: "e-old", name: "Old", ends_at: oldEnded(), slack_channel_id: "C-OLD", slack_channel_name: "e-old" }] },
+      { error: null }, // persist archived_at
+    ]);
+    const result = await sweepEventChannels({ db: db as never, slack: fakeSlackDeps(fetchFn), ...noSleep });
+    expect(result.archived).toBe(1);
+    expect(result.failed).toBe(0);
+    expect(requests[1].url).toContain("conversations.info");
+    expect(db.calls).toEqual(["event", "event"]);
+  });
+
+  test("archive restricted_action on an open channel stays a failure", async () => {
+    const { fetchFn } = fakeFetch([
+      { status: 200, body: { ok: false, error: "restricted_action" } },
+      { status: 200, body: { ok: true, channel: { is_archived: false } } },
+    ]);
+    const db = makeDb([{ data: [{ id: "e-old", name: "Old", ends_at: oldEnded(), slack_channel_id: "C-OLD", slack_channel_name: "e-old" }] }]);
+    const result = await sweepEventChannels({ db: db as never, slack: fakeSlackDeps(fetchFn), ...noSleep });
+    expect(result.archived).toBe(0);
+    expect(result.failures).toEqual([{ event: "Old", channel: "e-old", op: "archive", error: "restricted_action" }]);
+  });
+
+  test("info lookup failure keeps the original archive error with context", async () => {
+    const { fetchFn } = fakeFetch([
+      { status: 200, body: { ok: false, error: "restricted_action" } },
+      { status: 200, body: { ok: false, error: "missing_scope" } },
+    ]);
+    const db = makeDb([{ data: [{ id: "e-old", name: "Old", ends_at: oldEnded(), slack_channel_id: "C-OLD", slack_channel_name: "e-old" }] }]);
+    const result = await sweepEventChannels({ db: db as never, slack: fakeSlackDeps(fetchFn), ...noSleep });
+    expect(result.failures).toEqual([{ event: "Old", channel: "e-old", op: "archive", error: "restricted_action (info: missing_scope)" }]);
+  });
+
+  test("invite not_in_channel on an archived channel stamps archived_at and skips that event's remaining invites", async () => {
+    const { fetchFn, requests } = fakeFetch([
+      { status: 200, body: { ok: false, error: "not_in_channel" } }, // invite #1
+      { status: 200, body: { ok: true, channel: { is_archived: true } } }, // info
+    ]);
+    const db = makeDb([
+      { data: [{ id: "e1", name: "Kickoff", ends_at: stillLive(), slack_channel_id: "C1", slack_channel_name: "e-kickoff" }] },
+      {
+        data: [
+          { event_id: "e1", person_id: "p1", person: { slack_user_id: "U1" } },
+          { event_id: "e1", person_id: "p2", person: { slack_user_id: "U2" } },
+        ],
+      },
+      { error: null }, // persist archived_at
+    ]);
+    const result = await sweepEventChannels({ db: db as never, slack: fakeSlackDeps(fetchFn), ...noSleep });
+    expect(result.archived).toBe(1);
+    expect(result.invited).toBe(0);
+    expect(result.failed).toBe(0);
+    expect(requests.map((r) => r.url.split("/api/")[1].split("?")[0])).toEqual(["conversations.invite", "conversations.info"]);
+  });
+
+  test("invite is_archived on an open channel stays a failure; info checked once per event", async () => {
+    const { fetchFn, requests } = fakeFetch([
+      { status: 200, body: { ok: false, error: "not_in_channel" } },
+      { status: 200, body: { ok: true, channel: { is_archived: false } } }, // info (cached)
+      { status: 200, body: { ok: false, error: "not_in_channel" } },
+    ]);
+    const db = makeDb([
+      { data: [{ id: "e1", name: "Kickoff", ends_at: stillLive(), slack_channel_id: "C1", slack_channel_name: "e-kickoff" }] },
+      {
+        data: [
+          { event_id: "e1", person_id: "p1", person: { slack_user_id: "U1" } },
+          { event_id: "e1", person_id: "p2", person: { slack_user_id: "U2" } },
+        ],
+      },
+    ]);
+    const result = await sweepEventChannels({ db: db as never, slack: fakeSlackDeps(fetchFn), ...noSleep });
+    expect(result.failed).toBe(2);
+    expect(result.failures.every((f) => f.error === "not_in_channel")).toBe(true);
+    expect(requests.filter((r) => r.url.includes("conversations.info"))).toHaveLength(1);
   });
 });

@@ -148,6 +148,37 @@ export async function archiveChannel(deps: SlackDeps, channelId: string): Promis
   }
 }
 
+export type ArchivedCheck = { archived: boolean; error?: string };
+
+/**
+ * Ask Slack whether a channel is archived (`conversations.info`, needs
+ * `channels:read`). Slack checks permission before archived state, so an
+ * already-archived channel can still answer `restricted_action` / `not_in_channel`
+ * to archive/invite — this is the direct answer. Never throws; on any failure
+ * (skip, `missing_scope`, timeout, ...) reports `archived: false`, with `error`
+ * set when the lookup itself failed.
+ */
+export async function isChannelArchived(deps: SlackDeps, channelId: string): Promise<ArchivedCheck> {
+  if (!deps.token || !deps.isProd) return { archived: false };
+  try {
+    // Slack's read methods take query params, not the JSON body post() sends.
+    const res = await deps.fetch(`${API}conversations.info?${new URLSearchParams({ channel: channelId })}`, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${deps.token}` },
+      signal: AbortSignal.timeout(5000),
+    });
+    const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; channel?: { is_archived?: boolean } };
+    if (!(res.ok && body.ok === true)) {
+      console.error(`[slack] conversations.info failed:`, body.error ?? body);
+      return { archived: false, error: String(body.error ?? `http_${res.status}`) };
+    }
+    return { archived: body.channel?.is_archived === true };
+  } catch (e) {
+    console.error(`[slack] conversations.info threw:`, e);
+    return { archived: false, error: e instanceof Error ? e.message : "threw" };
+  }
+}
+
 export type InviteResult = { ok: true } | { ok: false; error?: string };
 
 /**
@@ -364,6 +395,13 @@ type SweepSignupRow = { event_id: string; person_id: string; person: { slack_use
 export type SweepFailure = { event: string; channel: string | null; op: "archive" | "rename" | "invite"; error?: string };
 export type SweepSummary = { archived: number; renamed: number; invited: number; failed: number; failures: SweepFailure[] };
 
+/** Errors an already-archived channel can produce (Slack checks permission/membership first); confirm via conversations.info. */
+const ARCHIVE_CHECK_ERRORS = new Set(["restricted_action", "not_in_channel"]);
+const INVITE_CHECK_ERRORS = new Set(["not_in_channel", "is_archived"]);
+
+/** Append a failed info lookup's reason to the original error, e.g. `restricted_action (info: missing_scope)`. */
+const withInfoContext = (error: string | undefined, check: ArchivedCheck) => (check.error ? `${error ?? "unknown"} (info: ${check.error})` : error);
+
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
@@ -401,8 +439,14 @@ export async function sweepEventChannels(deps: { db: SupabaseClient; slack?: Sla
     if (Date.parse(ev.ends_at) < cutoff) {
       const archived = await archiveChannel(slack, ev.slack_channel_id);
       if (!archived.ok) {
-        fail(ev, "archive", archived.error);
-        continue;
+        const e = archived.error;
+        const suspect = e !== undefined && (ARCHIVE_CHECK_ERRORS.has(e) || e.startsWith("join:"));
+        const check: ArchivedCheck = suspect ? await isChannelArchived(slack, ev.slack_channel_id) : { archived: false };
+        if (!check.archived) {
+          fail(ev, "archive", suspect ? withInfoContext(e, check) : e);
+          continue;
+        }
+        // Archived out-of-band (e.g. by an admin): record it like our own archive.
       }
       const { error: archErr } = await deps.db.from("event").update({ slack_archived_at: new Date().toISOString() }).eq("id", ev.id);
       if (archErr) {
@@ -436,6 +480,7 @@ export async function sweepEventChannels(deps: { db: SupabaseClient; slack?: Sla
 
   if (surviving.length > 0) {
     const eventById = new Map(surviving.map((e) => [e.id, e]));
+    const archivedChecks = new Map<string, ArchivedCheck>(); // one conversations.info per event per run
     const { data: signups, error: signupErr } = await deps.db
       .from("event_signup")
       .select("event_id, person_id, person(slack_user_id)")
@@ -448,6 +493,7 @@ export async function sweepEventChannels(deps: { db: SupabaseClient; slack?: Sla
         const slackUserId = s.person?.slack_user_id ?? null;
         const ev = eventById.get(s.event_id);
         if (!slackUserId || !ev) continue; // still-unlinked stays null — that's the admin record
+        if (archivedChecks.get(ev.id)?.archived) continue; // found archived earlier this run
         const invite = await inviteToChannelDetailed(slack, ev.slack_channel_id, [slackUserId]);
         if (invite.ok) {
           const { error: invErr } = await deps.db
@@ -460,6 +506,23 @@ export async function sweepEventChannels(deps: { db: SupabaseClient; slack?: Sla
             fail(ev, "invite", "db_write_failed");
           } else {
             summary.invited++;
+          }
+        } else if (invite.error !== undefined && INVITE_CHECK_ERRORS.has(invite.error)) {
+          let check = archivedChecks.get(ev.id);
+          if (!check) {
+            check = await isChannelArchived(slack, ev.slack_channel_id);
+            archivedChecks.set(ev.id, check);
+          }
+          if (check.archived) {
+            const { error: archErr } = await deps.db.from("event").update({ slack_archived_at: new Date().toISOString() }).eq("id", ev.id);
+            if (archErr) {
+              console.error("sweepEventChannels: persisting slack_archived_at failed:", archErr);
+              fail(ev, "invite", "db_write_failed");
+            } else {
+              summary.archived++;
+            }
+          } else {
+            fail(ev, "invite", withInfoContext(invite.error, check));
           }
         } else {
           fail(ev, "invite", invite.error);
