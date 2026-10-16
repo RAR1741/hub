@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { parseRescheduleInput, parseRunInput, RUN_CONFIRM_MESSAGES, runCronJob } from "./cron-jobs";
+import { parseRescheduleInput, parseRunInput, runCronJob } from "./cron-jobs";
+import { RUN_CONFIRM_MESSAGES } from "./cron-run-confirm";
 
 describe("parseRescheduleInput", () => {
   test("accepts a valid payload and trims schedule", () => {

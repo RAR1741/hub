@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { RUN_CONFIRM_MESSAGES, type CronJob } from "@/lib/cron-jobs";
+import type { CronJob } from "@/lib/cron-jobs";
+import { RUN_CONFIRM_MESSAGES } from "@/lib/cron-run-confirm";
 
 export type CronJobRow = CronJob & { stale: boolean };
 
