@@ -118,10 +118,15 @@ export type JoinResult = { ok: true } | { ok: false; error: string };
  * (`is_archived` means the channel is archived).
  */
 async function joinChannel(deps: SlackDeps, channelId: string): Promise<JoinResult> {
-  const join = await post(deps, "conversations.join", { channel: channelId });
-  if (join.ok) return { ok: true };
-  if (join.body.error !== "is_archived") console.error(`[slack] conversations.join failed:`, join.body.error ?? join.body);
-  return { ok: false, error: String(join.body.error ?? "unknown") };
+  try {
+    const join = await post(deps, "conversations.join", { channel: channelId });
+    if (join.ok) return { ok: true };
+    if (join.body.error !== "is_archived") console.error(`[slack] conversations.join failed:`, join.body.error ?? join.body);
+    return { ok: false, error: String(join.body.error ?? "unknown") };
+  } catch (e) {
+    console.error(`[slack] conversations.join threw:`, e);
+    return { ok: false, error: "threw" };
+  }
 }
 
 export type ArchiveResult = { ok: true } | { ok: false; error?: string };

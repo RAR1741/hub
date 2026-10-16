@@ -944,4 +944,57 @@ describe("sweepEventChannels: interleaved signups across events", () => {
     expect(requests.map((r) => r.url.split("/api/")[1].split("?")[0])).toEqual(["conversations.invite", "conversations.info", "conversations.invite"]);
     expect(db.updates).toEqual([{ slack_archived_at: expect.any(String) }, { slack_invited_at: expect.any(String) }]);
   });
+
+  // Routes fake Slack responses by method + channel so interleaved events are deterministic.
+  function routedFetch(handler: (method: string, channel: string) => unknown) {
+    const requests: { method: string; channel: string }[] = [];
+    const fetchFn = (async (url: string | URL | Request, init?: RequestInit) => {
+      const method = String(url).split("/api/")[1].split("?")[0];
+      const channel = method === "conversations.info" ? new URL(String(url)).searchParams.get("channel")! : (JSON.parse(init!.body as string).channel as string);
+      requests.push({ method, channel });
+      const out = handler(method, channel);
+      if (out instanceof Error) throw out;
+      return new Response(JSON.stringify(out), { status: 200, headers: { "Content-Type": "application/json" } });
+    }) as unknown as typeof globalThis.fetch;
+    return { fetchFn, requests };
+  }
+  const liveEv = (id: string, ch: string) => ({ id, name: id, ends_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), slack_channel_id: ch, slack_channel_name: `e-${id}` });
+  const su = (e: string, p: string) => ({ event_id: e, person_id: p, person: { slack_user_id: `U-${p}` } });
+
+  test("a join fetch that rejects is recorded as join:threw; sweep completes and later events still invite", async () => {
+    const { fetchFn, requests } = routedFetch((m, c) => {
+      if (m === "conversations.info") return { ok: true, channel: { is_archived: false } };
+      if (m === "conversations.join") return new Error("network down");
+      return c === "C1" ? { ok: false, error: "not_in_channel" } : { ok: true };
+    });
+    const db = makeDb([{ data: [liveEv("e1", "C1"), liveEv("e2", "C2")] }, { data: [su("e1", "p1"), su("e2", "p2")] }, { error: null }]);
+    const result = await sweepEventChannels({ db: db as never, slack: fakeSlackDeps(fetchFn), sleep: async () => {} });
+    expect(result.failures).toEqual([{ event: "e1", channel: "e-e1", op: "invite", error: "join:threw" }]);
+    expect(result.invited).toBe(1);
+    expect(requests.filter((r) => r.method === "conversations.join")).toHaveLength(1);
+  });
+
+  test("per-event join cache does not leak: A's failed join and B's good join stay independent", async () => {
+    const { fetchFn, requests } = routedFetch((m, c) => {
+      if (m === "conversations.info") return { ok: true, channel: { is_archived: false } };
+      if (m === "conversations.join") return c === "C1" ? { ok: false, error: "missing_scope" } : { ok: true };
+      // C2 is only invitable after joining; C1 never is.
+      if (c === "C1") return { ok: false, error: "not_in_channel" };
+      const joined = requests.some((r) => r.method === "conversations.join" && r.channel === "C2");
+      return joined ? { ok: true } : { ok: false, error: "not_in_channel" };
+    });
+    const db = makeDb([
+      { data: [liveEv("e1", "C1"), liveEv("e2", "C2")] },
+      { data: [su("e1", "p1"), su("e2", "p2"), su("e1", "p3"), su("e2", "p4")] },
+      { error: null },
+      { error: null },
+    ]);
+    const result = await sweepEventChannels({ db: db as never, slack: fakeSlackDeps(fetchFn), sleep: async () => {} });
+    expect(requests.filter((r) => r.method === "conversations.join").map((r) => r.channel).sort()).toEqual(["C1", "C2"]);
+    expect(result.invited).toBe(2);
+    expect(result.failures).toEqual([
+      { event: "e1", channel: "e-e1", op: "invite", error: "join:missing_scope" },
+      { event: "e1", channel: "e-e1", op: "invite", error: "join:missing_scope" },
+    ]);
+  });
 });
