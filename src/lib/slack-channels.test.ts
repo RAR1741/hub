@@ -666,6 +666,7 @@ describe("sweepEventChannels", () => {
       { status: 200, body: { ok: true } }, // rename
       { status: 200, body: { ok: false, error: "not_in_channel" } }, // invite
       { status: 200, body: { ok: true, channel: { is_archived: false } } }, // conversations.info: open
+      { status: 200, body: { ok: false, error: "missing_scope" } }, // conversations.join fails
     ]);
     const db = makeDb([
       { data: [{ id: "e1", name: "Renamed", ends_at: stillLive, slack_channel_id: "C1", slack_channel_name: "e-old" }] },
@@ -673,7 +674,7 @@ describe("sweepEventChannels", () => {
       { data: [{ event_id: "e1", person_id: "p1", person: { slack_user_id: "U1" } }] },
     ]);
     const result = await sweepEventChannels({ db: db as never, slack: fakeSlackDeps(fetchFn), ...noSleep });
-    expect(result.failures).toEqual([{ event: "Renamed", channel: "e-renamed", op: "invite", error: "not_in_channel" }]);
+    expect(result.failures).toEqual([{ event: "Renamed", channel: "e-renamed", op: "invite", error: "join:missing_scope" }]);
   });
 
   test("re-running archives nothing new (idempotent — already-channeled+archived events aren't reloaded)", async () => {
@@ -713,6 +714,78 @@ describe("sweepEventChannels", () => {
     const result = await sweepEventChannels({ db: db as never, slack: fakeSlackDeps(fetchFn), ...noSleep });
     expect(result.invited).toBe(1);
     expect(requests[0].url).toContain("conversations.invite");
+  });
+
+  describe("invite self-heal (not_in_channel)", () => {
+    const stillLive = () => new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const ev = () => ({ id: "e1", name: "Kickoff", ends_at: stillLive(), slack_channel_id: "C1", slack_channel_name: "e-kickoff" });
+    const signup = (p: string) => ({ event_id: "e1", person_id: p, person: { slack_user_id: `U-${p}` } });
+    const notIn = { status: 200, body: { ok: false, error: "not_in_channel" } };
+    const open = { status: 200, body: { ok: true, channel: { is_archived: false } } };
+    const methods = (requests: CapturedRequest[]) => requests.map((r) => r.url.split("/api/")[1].split("?")[0]);
+
+    test("joins, retries the invite once, and records the invite", async () => {
+      const { fetchFn, requests } = fakeFetch([notIn, open, { status: 200, body: { ok: true } }, { status: 200, body: { ok: true } }]);
+      const db = makeDb([{ data: [ev()] }, { data: [signup("p1")] }, { error: null }]);
+      const result = await sweepEventChannels({ db: db as never, slack: fakeSlackDeps(fetchFn), ...noSleep });
+      expect(methods(requests)).toEqual(["conversations.invite", "conversations.info", "conversations.join", "conversations.invite"]);
+      expect(result.invited).toBe(1);
+      expect(result.failed).toBe(0);
+      expect(db.updates).toHaveLength(1);
+    });
+
+    test("join failure records join:<code>; many signups still join only once", async () => {
+      const { fetchFn, requests } = fakeFetch([notIn, open, { status: 200, body: { ok: false, error: "missing_scope" } }, notIn, notIn]);
+      const db = makeDb([{ data: [ev()] }, { data: [signup("p1"), signup("p2"), signup("p3")] }]);
+      const result = await sweepEventChannels({ db: db as never, slack: fakeSlackDeps(fetchFn), ...noSleep });
+      expect(methods(requests).filter((m) => m === "conversations.join")).toHaveLength(1);
+      expect(methods(requests).filter((m) => m === "conversations.info")).toHaveLength(1);
+      expect(result.invited).toBe(0);
+      expect(result.failures).toHaveLength(3);
+      expect(result.failures.every((f) => f.op === "invite" && f.error === "join:missing_scope")).toBe(true);
+    });
+
+    test("join says is_archived: stamps archived and skips the remaining invites", async () => {
+      const { fetchFn, requests } = fakeFetch([notIn, open, { status: 200, body: { ok: false, error: "is_archived" } }]);
+      const db = makeDb([{ data: [ev()] }, { data: [signup("p1"), signup("p2")] }, { error: null }]);
+      const result = await sweepEventChannels({ db: db as never, slack: fakeSlackDeps(fetchFn), ...noSleep });
+      expect(result.archived).toBe(1);
+      expect(result.failed).toBe(0);
+      expect(requests).toHaveLength(3);
+      expect(db.updates).toEqual([{ slack_archived_at: expect.any(String) }]);
+    });
+
+    test("multiple signups: one join, every signup invited", async () => {
+      const { fetchFn, requests } = fakeFetch([
+        notIn,
+        open,
+        { status: 200, body: { ok: true } }, // join
+        { status: 200, body: { ok: true } }, // retry p1
+        { status: 200, body: { ok: true } }, // invite p2 (normal)
+        { status: 200, body: { ok: true } }, // invite p3 (normal)
+      ]);
+      const db = makeDb([{ data: [ev()] }, { data: [signup("p1"), signup("p2"), signup("p3")] }, { error: null }, { error: null }, { error: null }]);
+      const result = await sweepEventChannels({ db: db as never, slack: fakeSlackDeps(fetchFn), ...noSleep });
+      expect(methods(requests).filter((m) => m === "conversations.join")).toHaveLength(1);
+      expect(methods(requests).filter((m) => m === "conversations.invite")).toHaveLength(4);
+      expect(result.invited).toBe(3);
+      expect(result.failed).toBe(0);
+    });
+
+    test("info lookup error: no join, fails with info context", async () => {
+      const { fetchFn, requests } = fakeFetch([notIn, { status: 200, body: { ok: false, error: "missing_scope" } }]);
+      const db = makeDb([{ data: [ev()] }, { data: [signup("p1")] }]);
+      const result = await sweepEventChannels({ db: db as never, slack: fakeSlackDeps(fetchFn), ...noSleep });
+      expect(methods(requests)).not.toContain("conversations.join");
+      expect(result.failures).toEqual([{ event: "Kickoff", channel: "e-kickoff", op: "invite", error: "not_in_channel (info: missing_scope)" }]);
+    });
+
+    test("retry failure after a good join is recorded as an invite failure", async () => {
+      const { fetchFn } = fakeFetch([notIn, open, { status: 200, body: { ok: true } }, { status: 200, body: { ok: false, error: "user_not_found" } }]);
+      const db = makeDb([{ data: [ev()] }, { data: [signup("p1")] }]);
+      const result = await sweepEventChannels({ db: db as never, slack: fakeSlackDeps(fetchFn), ...noSleep });
+      expect(result.failures).toEqual([{ event: "Kickoff", channel: "e-kickoff", op: "invite", error: "user_not_found" }]);
+    });
   });
 
   test("still-unlinked signup is skipped, no invite call", async () => {
@@ -821,9 +894,9 @@ describe("sweepEventChannels: out-of-band archive detection", () => {
 
   test("invite is_archived on an open channel stays a failure; info checked once per event", async () => {
     const { fetchFn, requests } = fakeFetch([
-      { status: 200, body: { ok: false, error: "not_in_channel" } },
+      { status: 200, body: { ok: false, error: "is_archived" } },
       { status: 200, body: { ok: true, channel: { is_archived: false } } }, // info (cached)
-      { status: 200, body: { ok: false, error: "not_in_channel" } },
+      { status: 200, body: { ok: false, error: "is_archived" } },
     ]);
     const db = makeDb([
       { data: [{ id: "e1", name: "Kickoff", ends_at: stillLive(), slack_channel_id: "C1", slack_channel_name: "e-kickoff" }] },
@@ -836,7 +909,7 @@ describe("sweepEventChannels: out-of-band archive detection", () => {
     ]);
     const result = await sweepEventChannels({ db: db as never, slack: fakeSlackDeps(fetchFn), ...noSleep });
     expect(result.failed).toBe(2);
-    expect(result.failures.every((f) => f.error === "not_in_channel")).toBe(true);
+    expect(result.failures.every((f) => f.error === "is_archived")).toBe(true);
     expect(requests.filter((r) => r.url.includes("conversations.info"))).toHaveLength(1);
   });
 });

@@ -37,7 +37,8 @@ Bot-token scopes (both apps): `chat:write`, `chat:write.public`, `im:write`, `us
 
 Per-event Slack channels (nightly sweep, see the [event channels design](../superpowers/specs/2026-08-30-event-slack-channels-design.md))
 also need `channels:manage` and `channels:join`. The sweep joins a channel it is not in (made by an
-older bot identity) before archiving it. If Slack answers `restricted_action` (channel created by
+older bot identity) before archiving it, and likewise before retrying an invite that failed with
+`not_in_channel` (once per event per run). If Slack answers `restricted_action` (channel created by
 another identity; only its creator or a workspace admin may archive), archive it manually in Slack
 - after that the next sweep detects it via `conversations.info` (`channels:read`; Slack still
 answers archive/invite with `restricted_action` / `not_in_channel` for an archived channel) and

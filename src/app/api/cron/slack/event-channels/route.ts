@@ -14,6 +14,7 @@ const clip = (s: string) => (s.length > 60 ? `${s.slice(0, 59)}…` : s);
 const escapeSlack = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 function archiveHint(f: SweepFailure): string {
+  if (f.error === "join:missing_scope") return " (add the channels:join bot scope and reinstall the Slack app)";
   if (f.op !== "archive" || !f.error?.startsWith("restricted_action")) return "";
   // `restricted_action (info: <code>)`: the conversations.info lookup itself failed, so we can't tell if it's archived.
   if (f.error.includes("(info:")) return " (couldn't confirm via conversations.info — check the bot has channels:read; archive it manually in Slack if it isn't already)";
