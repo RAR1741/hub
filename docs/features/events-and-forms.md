@@ -62,8 +62,10 @@ Mentor-and-up only (`hasRole(viewer.role, "mentor")`).
 - **Check-in** (`EventRosterActions.tsx` → `POST`/`DELETE /api/admin/events/[id]/checkin`) credits
   the person for the event's full duration (`starts_at`–`ends_at`) as one `session` row. The same
   route backs **"Add someone who didn't sign up"** (`ManualAddPerson`), which checks a person in
-  directly without a sign-up record; a "Search by name" box above its dropdown filters the options
-  (case-insensitive substring) so late adds don't need scrolling a long list.
+  directly without a sign-up record. It is a single accessible search-and-select combobox: focusing
+  it lists everyone addable, typing filters by name (case-insensitive substring), arrow keys/Enter
+  or a click pick a person (Enter also picks a lone match), and "Add & check in" stays disabled
+  until someone is picked.
 - **Google Calendar linking:** `EventForm.tsx` fetches unclaimed candidates from
   `GET /api/admin/events/gcal-candidates` (`listGcalCandidates` in `src/lib/events.ts` — reads
   the already-synced `meeting` table, no live Google call) and lets a mentor attach an event to

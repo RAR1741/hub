@@ -2,8 +2,8 @@ import { expect, test } from "@playwright/test";
 import { mentorSessionCookie } from "./helpers/session";
 import { activePeriodId, deletePersonByName, upsertPerson } from "./helpers/db";
 
-// Issue #328: the "Add someone who didn't sign up" picker has a name search so
-// late adds don't require scrolling a long <select>.
+// Issue #328: the "Add someone who didn't sign up" picker is a search-and-select combobox so
+// late adds don't require scrolling a long list.
 const FIRST = "Zyxwvu";
 const LAST = `Quillfeather${Date.now()}`;
 const PERSON_ID = "00000000-0000-0000-0000-0000000e2e28";
@@ -38,24 +38,76 @@ test("mentor searches by name to late-add someone to an event", async ({ browser
     await page.goto(`/admin/events/${eventId}`);
     // Wait for hydration so the controlled search input handles fill().
     await page.waitForLoadState("networkidle");
-    const search = page.getByLabel("Search by name");
-    const select = page.getByRole("combobox", { name: /Add someone who didn't sign up/ });
+    const search = page.getByRole("combobox", { name: /Add someone who didn't sign up/ });
+    const options = page.getByRole("listbox", { name: /Add someone/ }).getByRole("option");
     const addBtn = page.getByRole("button", { name: "Add & check in" });
+    const fullName = `${FIRST} ${LAST}`;
 
-    // No match: select goes away, button disabled.
-    await search.fill("no-such-person-qqq");
-    await expect(page.getByText("No matches")).toBeVisible();
+    // Focus/click opens the list with everyone addable; nothing selected yet.
+    await expect(async () => {
+      await search.click();
+      await expect(search).toHaveAttribute("aria-expanded", "true");
+    }).toPass();
+    await expect(options.first()).toBeVisible();
+    await expect(options.filter({ hasText: fullName })).toBeVisible();
     await expect(addBtn).toBeDisabled();
 
-    // Case-insensitive partial match narrows to exactly the seeded person.
+    // Keyboard: Down, Down, Up lands on the first option; Enter selects it.
+    const firstId = await options.first().getAttribute("id");
+    const secondId = await options.nth(1).getAttribute("id");
+    await search.press("ArrowDown");
+    await expect(search).toHaveAttribute("aria-activedescendant", firstId!);
+    await search.press("ArrowDown");
+    await expect(search).toHaveAttribute("aria-activedescendant", secondId!);
+    await search.press("ArrowUp");
+    await expect(search).toHaveAttribute("aria-activedescendant", firstId!);
+    const firstName = (await options.first().textContent())!.trim();
+    await search.press("Enter");
+    await expect(search).toHaveValue(firstName);
+    await expect(search).toHaveAttribute("aria-expanded", "false");
+    await expect(addBtn).toBeEnabled();
+
+    // After a pick, re-opening lists everyone again; Escape closes.
+    await search.click();
+    await expect(search).toHaveAttribute("aria-expanded", "true");
+    await expect(options.nth(1)).toBeVisible();
+    await search.press("Escape");
+    await expect(search).toHaveAttribute("aria-expanded", "false");
+
+    // No match: "No matches" status, button disabled.
+    await search.fill("no-such-person-qqq");
+    await expect(page.getByRole("status").filter({ hasText: "No matches" })).toBeVisible();
+    await expect(addBtn).toBeDisabled();
+
+    // Case-insensitive, padded partial match narrows to exactly the seeded person.
     await search.fill(`  ${FIRST.slice(0, 5).toUpperCase()}  `);
-    await expect(select.locator("option")).toHaveCount(1);
-    await expect(select.locator("option")).toHaveText(`${FIRST} ${LAST}`);
+    await expect(options).toHaveCount(1);
+    await expect(options).toHaveText(fullName);
+    await expect(addBtn).toBeDisabled();
+
+    // Enter with a single match selects it.
+    await search.press("Enter");
+    await expect(search).toHaveValue(fullName);
+    await expect(search).toHaveAttribute("aria-expanded", "false");
+    await expect(addBtn).toBeEnabled();
+
+    // Click-only activation (no mousedown), as assistive tech may dispatch.
+    await search.fill(FIRST);
+    await options.filter({ hasText: fullName }).dispatchEvent("click");
+    await expect(search).toHaveValue(fullName);
+    await expect(addBtn).toBeEnabled();
+
+    // Editing the text clears the selection; clicking an option reselects.
+    await search.fill(FIRST);
+    await expect(addBtn).toBeDisabled();
+    await options.filter({ hasText: fullName }).click();
+    await expect(search).toHaveValue(fullName);
     await expect(addBtn).toBeEnabled();
 
     await addBtn.click();
-    await expect(page.locator("table tr", { hasText: `${FIRST} ${LAST}` }).getByText("Yes")).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator("table tr", { hasText: fullName }).getByText("Yes")).toBeVisible({ timeout: 15_000 });
     await expect(search).toHaveValue("");
+    await expect(addBtn).toBeDisabled();
   } finally {
     // Person first: session.person_id cascades, and session.event_id is
     // ON DELETE RESTRICT so the event can't be deleted while the check-in exists.
