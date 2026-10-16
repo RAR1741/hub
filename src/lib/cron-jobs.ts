@@ -51,3 +51,21 @@ export async function rescheduleCronJob(
   if (error) return { ok: false, status: 400, error: error.message };
   return { ok: true, status: 200 };
 }
+
+/** Validate the run-now payload. PURE. */
+export function parseRunInput(body: unknown): { jobId: number } | null {
+  if (typeof body !== "object" || body === null) return null;
+  const { jobId } = body as Record<string, unknown>;
+  if (typeof jobId !== "number" || !Number.isInteger(jobId) || jobId <= 0) return null;
+  return { jobId };
+}
+
+export async function runCronJob(
+  input: { jobId: number },
+  db?: SupabaseClient,
+): Promise<{ ok: boolean; status: number; error?: string }> {
+  const client = db ?? (await import("./db")).getDb();
+  const { error } = await client.rpc("run_cron_job", { job_id: input.jobId });
+  if (error) return { ok: false, status: 400, error: error.message };
+  return { ok: true, status: 200 };
+}
