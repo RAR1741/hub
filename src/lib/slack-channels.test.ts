@@ -4,6 +4,7 @@ import {
   channelSlug,
   createEventChannel,
   renameChannel,
+  renameChannelDetailed,
   archiveChannel,
   inviteToChannel,
   inviteToChannelDetailed,
@@ -144,37 +145,88 @@ describe("renameChannel", () => {
   });
 });
 
+describe("renameChannelDetailed", () => {
+  test("failure carries the Slack error code; skip has none", async () => {
+    const { fetchFn } = fakeFetch([{ status: 200, body: { ok: false, error: "restricted_action" } }]);
+    expect(await renameChannelDetailed(prodDeps(fetchFn), "C1", "New", "11112222-x")).toEqual({ ok: false, error: "restricted_action" });
+    expect(await renameChannelDetailed(devDeps(fetchFn), "C1", "New", "11112222-x")).toEqual({ ok: false });
+  });
+});
+
 describe("archiveChannel", () => {
-  test("no token -> false", async () => {
+  test("no token -> not ok, no fetch", async () => {
     const { fetchFn, requests } = fakeFetch();
-    const ok = await archiveChannel({ fetch: fetchFn, token: null, isProd: true }, "C1");
-    expect(ok).toBe(false);
+    const res = await archiveChannel({ fetch: fetchFn, token: null, isProd: true }, "C1");
+    expect(res).toEqual({ ok: false });
     expect(requests).toHaveLength(0);
   });
 
-  test("non-prod -> false, no fetch", async () => {
+  test("non-prod -> not ok, no fetch", async () => {
     const { fetchFn, requests } = fakeFetch();
-    const ok = await archiveChannel(devDeps(fetchFn), "C1");
-    expect(ok).toBe(false);
+    const res = await archiveChannel(devDeps(fetchFn), "C1");
+    expect(res).toEqual({ ok: false });
     expect(requests).toHaveLength(0);
   });
 
   test("already_archived counts as success", async () => {
     const { fetchFn } = fakeFetch([{ status: 200, body: { ok: false, error: "already_archived" } }]);
-    const ok = await archiveChannel(prodDeps(fetchFn), "C1");
-    expect(ok).toBe(true);
+    expect(await archiveChannel(prodDeps(fetchFn), "C1")).toEqual({ ok: true });
   });
 
   test("real success", async () => {
     const { fetchFn } = fakeFetch([{ status: 200, body: { ok: true } }]);
-    const ok = await archiveChannel(prodDeps(fetchFn), "C1");
-    expect(ok).toBe(true);
+    expect(await archiveChannel(prodDeps(fetchFn), "C1")).toEqual({ ok: true });
   });
 
-  test("other error -> false", async () => {
-    const { fetchFn } = fakeFetch([{ status: 200, body: { ok: false, error: "channel_not_found" } }]);
-    const ok = await archiveChannel(prodDeps(fetchFn), "C1");
-    expect(ok).toBe(false);
+  test("other error carries its code", async () => {
+    const { fetchFn } = fakeFetch([{ status: 200, body: { ok: false, error: "restricted_action" } }]);
+    expect(await archiveChannel(prodDeps(fetchFn), "C1")).toEqual({ ok: false, error: "restricted_action" });
+  });
+
+  test("not_in_channel -> join -> retry archive succeeds", async () => {
+    const { fetchFn, requests } = fakeFetch([
+      { status: 200, body: { ok: false, error: "not_in_channel" } },
+      { status: 200, body: { ok: true } }, // conversations.join
+      { status: 200, body: { ok: true } }, // retry archive
+    ]);
+    expect(await archiveChannel(prodDeps(fetchFn), "C1")).toEqual({ ok: true });
+    expect(requests.map((r) => r.url.split("/").pop())).toEqual(["conversations.archive", "conversations.join", "conversations.archive"]);
+    expect(bodyOf(requests[1])).toEqual({ channel: "C1" });
+  });
+
+  test("not_in_channel, join fails -> join error code", async () => {
+    const { fetchFn, requests } = fakeFetch([
+      { status: 200, body: { ok: false, error: "not_in_channel" } },
+      { status: 200, body: { ok: false, error: "missing_scope" } },
+    ]);
+    expect(await archiveChannel(prodDeps(fetchFn), "C1")).toEqual({ ok: false, error: "join:missing_scope" });
+    expect(requests).toHaveLength(2);
+  });
+
+  test("not_in_channel, join says is_archived -> success", async () => {
+    const { fetchFn } = fakeFetch([
+      { status: 200, body: { ok: false, error: "not_in_channel" } },
+      { status: 200, body: { ok: false, error: "is_archived" } },
+    ]);
+    expect(await archiveChannel(prodDeps(fetchFn), "C1")).toEqual({ ok: true });
+  });
+
+  test("retry returning already_archived counts as success", async () => {
+    const { fetchFn } = fakeFetch([
+      { status: 200, body: { ok: false, error: "not_in_channel" } },
+      { status: 200, body: { ok: true } },
+      { status: 200, body: { ok: false, error: "already_archived" } },
+    ]);
+    expect(await archiveChannel(prodDeps(fetchFn), "C1")).toEqual({ ok: true });
+  });
+
+  test("retry failing with restricted_action carries that code", async () => {
+    const { fetchFn } = fakeFetch([
+      { status: 200, body: { ok: false, error: "not_in_channel" } },
+      { status: 200, body: { ok: true } },
+      { status: 200, body: { ok: false, error: "restricted_action" } },
+    ]);
+    expect(await archiveChannel(prodDeps(fetchFn), "C1")).toEqual({ ok: false, error: "restricted_action" });
   });
 });
 
@@ -566,6 +618,52 @@ describe("sweepEventChannels", () => {
 
     expect(result.archived).toBe(1);
     expect(result.failed).toBe(0);
+  });
+
+  test("archive failure is recorded with event, channel and Slack error code", async () => {
+    const oldEnded = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString();
+    const { fetchFn } = fakeFetch([{ status: 200, body: { ok: false, error: "restricted_action" } }]);
+    const db = makeDb([
+      { data: [{ id: "e-old", name: "Tinker Fest", ends_at: oldEnded, slack_channel_id: "C-OLD", slack_channel_name: "e-tinker-fest-de23" }] },
+    ]);
+
+    const result = await sweepEventChannels({ db: db as never, slack: fakeSlackDeps(fetchFn), ...noSleep });
+
+    expect(result.archived).toBe(0);
+    expect(result.failed).toBe(1);
+    expect(result.failures).toEqual([{ event: "Tinker Fest", channel: "e-tinker-fest-de23", op: "archive", error: "restricted_action" }]);
+  });
+
+  test("dev/no-token skips are not counted or recorded as failures", async () => {
+    const oldEnded = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString();
+    const { fetchFn } = fakeFetch();
+    const db = makeDb([{ data: [{ id: "e-old", name: "Old", ends_at: oldEnded, slack_channel_id: "C-OLD", slack_channel_name: "e-old" }] }]);
+    const result = await sweepEventChannels({ db: db as never, slack: devDeps(fetchFn), ...noSleep });
+    expect(result.failed).toBe(0);
+    expect(result.failures).toEqual([]);
+  });
+
+  test("rename failure carries the Slack error code", async () => {
+    const stillLive = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const { fetchFn } = fakeFetch([{ status: 200, body: { ok: false, error: "channel_not_found" } }]);
+    const db = makeDb([{ data: [{ id: "e1", name: "Renamed", ends_at: stillLive, slack_channel_id: "C1", slack_channel_name: "e-old" }] }, { data: [] }]);
+    const result = await sweepEventChannels({ db: db as never, slack: fakeSlackDeps(fetchFn), ...noSleep });
+    expect(result.failures).toEqual([{ event: "Renamed", channel: "e-old", op: "rename", error: "channel_not_found" }]);
+  });
+
+  test("after a confirmed rename, later failures report the new channel name", async () => {
+    const stillLive = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const { fetchFn } = fakeFetch([
+      { status: 200, body: { ok: true } }, // rename
+      { status: 200, body: { ok: false, error: "not_in_channel" } }, // invite
+    ]);
+    const db = makeDb([
+      { data: [{ id: "e1", name: "Renamed", ends_at: stillLive, slack_channel_id: "C1", slack_channel_name: "e-old" }] },
+      { error: null }, // persist rename
+      { data: [{ event_id: "e1", person_id: "p1", person: { slack_user_id: "U1" } }] },
+    ]);
+    const result = await sweepEventChannels({ db: db as never, slack: fakeSlackDeps(fetchFn), ...noSleep });
+    expect(result.failures).toEqual([{ event: "Renamed", channel: "e-renamed", op: "invite", error: "not_in_channel" }]);
   });
 
   test("re-running archives nothing new (idempotent — already-channeled+archived events aren't reloaded)", async () => {
