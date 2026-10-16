@@ -75,16 +75,39 @@ export function ManualAddPerson({
   const router = useRouter();
   const [selected, setSelected] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(-1);
   const [busy, setBusy] = useState(false);
 
   const q = query.trim().toLowerCase();
   const filtered = q ? people.filter((p) => p.name.toLowerCase().includes(q)) : people;
 
-  // `people` shrinks after a successful add (router.refresh()); if the
-  // stored selection fell out of the list, fall back to the first option
-  // rather than stashing a stale id in state. The same fallback covers a
-  // search that filters the stored selection out.
-  const personId = selected && filtered.some((p) => p.id === selected) ? selected : (filtered[0]?.id ?? "");
+  // `people` shrinks after a successful add (router.refresh()); a selection
+  // that fell out of the list counts as unselected.
+  const personId = selected && people.some((p) => p.id === selected) ? selected : "";
+
+  function select(p: { id: string; name: string }) {
+    setSelected(p.id);
+    setQuery(p.name);
+    setOpen(false);
+    setActive(-1);
+  }
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!filtered.length) return;
+      const step = e.key === "ArrowDown" ? 1 : -1;
+      setOpen(true);
+      setActive((a) => (a < 0 ? (step === 1 ? 0 : filtered.length - 1) : (a + step + filtered.length) % filtered.length));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const pick = filtered[active] ?? (filtered.length === 1 ? filtered[0] : undefined);
+      if (open && pick) select(pick);
+    } else if (e.key === "Escape") {
+      setOpen(false);
+    }
+  }
 
   async function add() {
     if (!personId) return;
@@ -96,7 +119,10 @@ export function ManualAddPerson({
         body: JSON.stringify({ personId }),
       });
       router.refresh();
-      if (res.ok) setQuery("");
+      if (res.ok) {
+        setQuery("");
+        setSelected(null);
+      }
     } finally {
       setBusy(false);
     }
@@ -107,26 +133,59 @@ export function ManualAddPerson({
   return (
     <div className="card flex flex-wrap items-center gap-3">
       <span className="font-semibold" id="manual-add-label">Add someone who didn&apos;t sign up:</span>
-      <input
-        type="search"
-        className="input"
-        aria-label="Search by name"
-        placeholder="Search by name…"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-      />
-      {filtered.length === 0 ? (
-        <span role="status" className="text-sm text-[var(--muted)]">No matches</span>
-      ) : (
-        <select
+      <div className="relative w-72 max-w-full">
+        <input
+          type="text"
+          role="combobox"
           className="input"
           aria-labelledby="manual-add-label"
-          value={personId}
-          onChange={(e) => setSelected(e.target.value)}
+          aria-expanded={open}
+          aria-controls="manual-add-list"
+          aria-autocomplete="list"
+          aria-activedescendant={open && filtered[active] ? `manual-add-opt-${filtered[active].id}` : undefined}
+          autoComplete="off"
+          placeholder="Search by name…"
+          value={query}
+          onFocus={() => setOpen(true)}
+          onClick={() => setOpen(true)}
+          onBlur={() => setOpen(false)}
+          onKeyDown={onKeyDown}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setSelected(null);
+            setActive(-1);
+            setOpen(true);
+          }}
+        />
+        <ul
+          id="manual-add-list"
+          role="listbox"
+          aria-labelledby="manual-add-label"
+          hidden={!open}
+          className="absolute left-0 right-0 z-20 mt-1 max-h-60 overflow-auto rounded-lg border border-[var(--hair)] bg-[var(--surface)] py-1 text-sm shadow-lg"
         >
-          {filtered.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
-      )}
+          {filtered.length === 0 ? (
+            <li role="status" className="px-3 py-2 text-[var(--muted)]">No matches</li>
+          ) : (
+            filtered.map((p, i) => (
+              <li
+                key={p.id}
+                id={`manual-add-opt-${p.id}`}
+                role="option"
+                aria-selected={p.id === personId}
+                className={`cursor-pointer px-3 py-1.5 ${i === active ? "bg-[var(--surface-2)]" : ""} ${p.id === personId ? "font-semibold" : ""}`}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  select(p);
+                }}
+                onMouseEnter={() => setActive(i)}
+              >
+                {p.name}
+              </li>
+            ))
+          )}
+        </ul>
+      </div>
       <Button
         variant="primary"
         className="px-3 py-1"
