@@ -131,6 +131,12 @@ describe("POST /api/cron/slack/event-channels", () => {
     expect(posts[0]).toContain(":warning: Event channel sweep: Tinker Fest (#e-tinker-fest-de23): archive failed — restricted_action (archive it manually");
   });
 
+  test("restricted_action with a failed info lookup gets the couldn't-confirm hint", async () => {
+    const { posts } = await runWith([{ event: "Tinker Fest", channel: "e-tf", op: "archive", error: "restricted_action (info: missing_scope)" }]);
+    expect(posts[0]).toContain("archive failed — restricted_action (info: missing_scope) (couldn't confirm via conversations.info — check the bot has channels:read");
+    expect(posts[0]).not.toContain("the next sweep should record");
+  });
+
   test("restricted_action on an invite gets no archive hint", async () => {
     const { posts } = await runWith([{ event: "Live", channel: "e-live", op: "invite", error: "restricted_action" }]);
     expect(posts[0]).toContain("invite failed — restricted_action");
