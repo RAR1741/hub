@@ -91,6 +91,12 @@ test("mentor searches by name to late-add someone to an event", async ({ browser
     await expect(search).toHaveAttribute("aria-expanded", "false");
     await expect(addBtn).toBeEnabled();
 
+    // Click-only activation (no mousedown), as assistive tech may dispatch.
+    await search.fill(FIRST);
+    await options.filter({ hasText: fullName }).dispatchEvent("click");
+    await expect(search).toHaveValue(fullName);
+    await expect(addBtn).toBeEnabled();
+
     // Editing the text clears the selection; clicking an option reselects.
     await search.fill(FIRST);
     await expect(addBtn).toBeDisabled();

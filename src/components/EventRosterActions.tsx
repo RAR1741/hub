@@ -127,6 +127,8 @@ export function ManualAddPerson({
   async function add() {
     if (!personId) return;
     setBusy(true);
+    setOpen(false);
+    setActive(-1);
     try {
       const res = await fetch(`/api/admin/events/${eventId}/checkin`, {
         method: "POST",
@@ -159,6 +161,7 @@ export function ManualAddPerson({
           aria-autocomplete="list"
           aria-activedescendant={open && filtered[active] ? optId(filtered[active].id) : undefined}
           autoComplete="off"
+          disabled={busy}
           placeholder="Search by name…"
           value={query}
           onFocus={() => setOpen(true)}
@@ -189,11 +192,9 @@ export function ManualAddPerson({
               id={optId(p.id)}
               role="option"
               aria-selected={i === active}
-              className={`cursor-pointer px-3 py-1.5 ${i === active ? "bg-[var(--surface-2)]" : ""} ${p.id === personId ? "font-semibold" : ""}`}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                select(p);
-              }}
+              className={`cursor-pointer px-3 py-1.5 ${i === active ? "bg-[var(--ink)] text-[var(--surface)]" : ""} ${p.id === personId ? "font-semibold" : ""}`}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => select(p)}
               onMouseEnter={() => setActive(i)}
             >
               {p.name}
