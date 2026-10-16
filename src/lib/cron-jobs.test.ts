@@ -62,3 +62,8 @@ test("RUN_CONFIRM_MESSAGES covers side-effectful jobs", () => {
     "slack-whats-new-weekly",
   ]);
 });
+
+test.each(["slack-mentor-reminders-weekly", "push-reminders", "push-clocked-in-late"])(
+  "%s confirm warns about double sends",
+  (name) => expect(RUN_CONFIRM_MESSAGES[name]).toContain("twice"),
+);
